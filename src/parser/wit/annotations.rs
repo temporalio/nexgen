@@ -56,6 +56,9 @@ pub(super) struct Annotation {
     /// Language-prefixed arguments: "" means a bare language name.
     language_keys: &'static [&'static str],
     repeatable: bool,
+    /// None leaves language support unrestricted.
+    languages: Option<&'static [Language]>,
+    system_nexus: bool,
 }
 
 // Keep each rule here, rather than maintaining per-builder allowlists.
@@ -68,6 +71,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[""],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "namespace",
@@ -75,6 +80,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import"],
             repeatable: false,
+            languages: Some(&[Language::Dotnet, Language::Go]),
+            system_nexus: false,
         },
         Annotation {
             name: "operations-class",
@@ -82,6 +89,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import"],
             repeatable: false,
+            languages: Some(&[Language::Dotnet]),
+            system_nexus: true,
         },
         Annotation {
             name: "service-name",
@@ -89,6 +98,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "name"],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "delay-load-temporalio-workflow",
@@ -96,6 +107,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: true,
         },
         Annotation {
             name: "proto",
@@ -103,6 +116,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["type", "import"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "type-parameter",
@@ -110,6 +125,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "proto-field",
@@ -117,6 +134,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "name",
@@ -124,6 +143,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[""],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "type",
@@ -131,6 +152,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import", "from", "to"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "omit",
@@ -138,6 +161,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "api-omit",
@@ -145,6 +170,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "source",
@@ -152,6 +179,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "targets"],
             language_keys: &[""],
             repeatable: true,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "default",
@@ -159,6 +188,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import", "targets"],
             language_keys: &["", "import"],
             repeatable: true,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "fallback",
@@ -166,6 +197,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "experimental",
@@ -173,6 +206,8 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "doc",
@@ -188,6 +223,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import", "returns"],
             language_keys: &["", "import", "returns"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "operation",
@@ -195,6 +232,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "name"],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "poll",
@@ -202,6 +241,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import", "targets", "items", "resume"],
             language_keys: &["", "import", "resume"],
             repeatable: false,
+            languages: Some(&[Language::Python]),
+            system_nexus: true,
         },
         Annotation {
             name: "serialization-context",
@@ -209,6 +250,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "output-transform",
@@ -216,13 +259,17 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import", "type", "type-import"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "flatten-in-api",
-            sites: &[Record, Alias, Resource],
+            sites: &[Record],
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "flattened-type",
@@ -230,6 +277,8 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import"],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "function",
@@ -258,6 +307,8 @@ const CATALOG: &[Annotation] = {
                 "import",
             ],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "function-args",
@@ -265,6 +316,8 @@ const CATALOG: &[Annotation] = {
             keys: &["varargs", "param", "typescript-drop-prefix"],
             language_keys: &[],
             repeatable: false,
+            languages: None,
+            system_nexus: false,
         },
         Annotation {
             name: "add-rpc-compatible-with",
@@ -272,11 +325,44 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[],
             repeatable: true,
+            languages: None,
+            system_nexus: false,
         },
     ]
 };
 
 impl Annotation {
+    fn supports_language(&self, language: Language) -> bool {
+        self.languages
+            .is_none_or(|languages| languages.contains(&language))
+    }
+
+    fn argument_language(&self, key: &str) -> Option<Language> {
+        all_languages().into_iter().find(|language| {
+            self.language_keys.iter().any(|suffix| {
+                if suffix.is_empty() {
+                    key == language_key(*language)
+                } else {
+                    key == format!("{}-{suffix}", language_key(*language))
+                }
+            })
+        })
+    }
+
+    fn applies_to(&self, directive: &Directive, language: Language) -> bool {
+        // A default applies to every output language. Otherwise language-qualified
+        // arguments scope the directive to their languages.
+        directive.value("value").is_some()
+            || !directive
+                .args
+                .keys()
+                .any(|key| self.argument_language(key).is_some())
+            || directive
+                .args
+                .keys()
+                .any(|key| self.argument_language(key) == Some(language))
+    }
+
     pub(super) fn parse(name: &str, path: &Path, context: &str) -> Result<&'static Self> {
         CATALOG
             .iter()
@@ -309,20 +395,23 @@ impl Annotation {
         {
             return false;
         }
-        self.keys.contains(&key)
-            || all_languages().iter().any(|language| {
-                self.language_keys.iter().any(|suffix| {
-                    if suffix.is_empty() {
-                        key == language_key(*language)
-                    } else {
-                        key == format!("{}-{suffix}", language_key(*language))
-                    }
-                })
-            })
+        self.keys.contains(&key) || self.argument_language(key).is_some()
     }
 }
 
-fn validate_docs(docs: Option<&str>, site: Site, path: &Path, context: &str) -> Result<()> {
+#[derive(Clone, Copy)]
+struct GenerationContext {
+    language: Language,
+    system_nexus: bool,
+}
+
+fn validate_docs(
+    docs: Option<&str>,
+    site: Site,
+    path: &Path,
+    context: &str,
+    generation: Option<GenerationContext>,
+) -> Result<()> {
     let directives = parse_directives(docs, path, context)?;
     let proto_backed = directives
         .iter()
@@ -372,6 +461,28 @@ fn validate_docs(docs: Option<&str>, site: Site, path: &Path, context: &str) -> 
                 )));
             }
         }
+        if let Some(generation) = generation
+            && rule.applies_to(&directive, generation.language)
+        {
+            if !rule.supports_language(generation.language) {
+                return Err(fail(format!(
+                    "is not supported for {}; valid languages: {}",
+                    language_key(generation.language),
+                    rule.languages
+                        .unwrap()
+                        .iter()
+                        .map(|language| language_key(*language))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+            if rule.system_nexus && !generation.system_nexus {
+                return Err(Error::SystemNexusRequired {
+                    feature: rule.name,
+                    context: context.to_string(),
+                });
+            }
+        }
     }
     Ok(())
 }
@@ -404,6 +515,14 @@ pub(super) fn validate_parsed(directives: &[Directive], path: &Path, context: &s
                 };
                 return Err(fail(reason));
             }
+            if let Some(language) = rule.argument_language(key)
+                && !rule.supports_language(language)
+            {
+                return Err(fail(format!(
+                    "argument `{key}` is not supported for {}",
+                    language_key(language)
+                )));
+            }
         }
     }
     Ok(())
@@ -414,7 +533,15 @@ pub(super) fn validate(
     primary: PackageId,
     origins: &PackageOrigins,
     fallback: &Path,
+    language: Option<Language>,
 ) -> Result<()> {
+    let generation = language.map(|language| GenerationContext {
+        language,
+        system_nexus: crate::nexgen_config::current().system_nexus,
+    });
+    let validate_docs = |docs: Option<&str>, site: Site, path: &Path, context: &str| {
+        validate_docs(docs, site, path, context, generation)
+    };
     let path_for = |package: Option<PackageId>| {
         package
             .filter(|id| *id != primary)
@@ -553,6 +680,11 @@ mod tests {
                 rule.name
             );
             assert!(!rule.sites.is_empty());
+            if let Some(languages) = rule.languages {
+                assert!(!languages.is_empty());
+                let unique: BTreeSet<_> = languages.iter().collect();
+                assert_eq!(unique.len(), languages.len());
+            }
             let mut sites = Vec::new();
             for site in rule.sites {
                 assert!(!sites.contains(site));
@@ -616,6 +748,115 @@ mod tests {
         assert!(!rule("function").accepts_key("result", Site::Alias));
         assert!(rule("doc").accepts_key("returns", Site::Function));
         assert!(!rule("doc").accepts_key("returns", Site::Field));
+    }
+
+    #[test]
+    fn language_scoping_distinguishes_defaults_from_overrides() {
+        for (input, applies_to_go, applies_to_dotnet) in [
+            ("@nexus.operations-class \"Operations\"", true, true),
+            ("@nexus.operations-class dotnet=\"Operations\"", false, true),
+            (
+                "@nexus.operations-class \"Default\" dotnet=\"Operations\"",
+                true,
+                true,
+            ),
+        ] {
+            let directives =
+                parse_directives(Some(input), Path::new("test.wit"), "interface").unwrap();
+            let directive = &directives[0];
+            let rule = directive.rule;
+            assert_eq!(rule.applies_to(directive, Language::Go), applies_to_go);
+            assert_eq!(
+                rule.applies_to(directive, Language::Dotnet),
+                applies_to_dotnet
+            );
+            for language in all_languages() {
+                assert_eq!(
+                    rule.supports_language(language),
+                    language == Language::Dotnet
+                );
+            }
+            assert!(rule.system_nexus);
+        }
+    }
+
+    #[test]
+    fn inactive_override_does_not_require_system_nexus() {
+        validate_docs(
+            Some("@nexus.operations-class dotnet=\"Operations\""),
+            Site::Interface,
+            Path::new("test.wit"),
+            "interface",
+            Some(GenerationContext {
+                language: Language::Go,
+                system_nexus: false,
+            }),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn supported_override_is_valid_in_system_nexus() {
+        validate_docs(
+            Some("@nexus.operations-class dotnet=\"Operations\""),
+            Site::Interface,
+            Path::new("test.wit"),
+            "interface",
+            Some(GenerationContext {
+                language: Language::Dotnet,
+                system_nexus: true,
+            }),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn guide_availability_index_matches_catalog() {
+        let guide = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/GUIDE.md"));
+        let index = guide
+            .split_once("<!-- annotation-availability:start -->")
+            .unwrap()
+            .1
+            .split_once("<!-- annotation-availability:end -->")
+            .unwrap()
+            .0;
+        let rows: Vec<Vec<&str>> = index
+            .lines()
+            .filter(|line| line.trim_start().starts_with("| `@nexus."))
+            .map(|line| {
+                line.trim()
+                    .trim_matches('|')
+                    .split('|')
+                    .map(str::trim)
+                    .collect()
+            })
+            .collect();
+        let expected: Vec<Vec<String>> = CATALOG
+            .iter()
+            .filter(|rule| rule.languages.is_some() || rule.system_nexus)
+            .map(|rule| {
+                vec![
+                    format!("`@nexus.{}`", rule.name),
+                    rule.languages.map_or_else(
+                        || "none".to_string(),
+                        |languages| {
+                            languages
+                                .iter()
+                                .map(|language| language_key(*language))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        },
+                    ),
+                    if rule.system_nexus {
+                        "required"
+                    } else {
+                        "not required by catalog"
+                    }
+                    .to_string(),
+                ]
+            })
+            .collect();
+        assert_eq!(rows, expected);
     }
 
     #[test]

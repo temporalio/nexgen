@@ -1,0 +1,4 @@
+package test:annotations;
+world api { export models; }
+/// @nexus.operations-class "CustomOperations"
+interface models { record request {} }

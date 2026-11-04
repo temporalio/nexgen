@@ -44,8 +44,7 @@ impl<'a> AuthoredValidationPass<'a> {
     }
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
-        python::validate_service_configuration(spec)?;
-        dotnet::validate_service_configuration(spec, self.language)?;
+        dotnet::validate_namespace_configuration(spec, self.language)?;
         validate_external_type_bindings(spec, self.descriptors, self.language)
     }
 }

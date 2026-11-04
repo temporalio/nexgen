@@ -66,6 +66,13 @@ pub(crate) fn parse_api_spec_from_wit_for_language_with_inputs(
     linked_input_paths: &[PathBuf],
 ) -> Result<ApiSpec> {
     let parsed = parse_wit_with_inputs(input, &path, linked_input_paths)?;
+    annotations::validate(
+        &parsed.resolve,
+        parsed.package_id,
+        &parsed.package_origins,
+        &path,
+        Some(language),
+    )?;
     api_spec_from_wit(&parsed.resolve, parsed.package_id, path, language)
 }
 
@@ -166,7 +173,7 @@ fn parse_prepared_wit_workspace(
                 message: format_error_chain(&error),
             })?;
     let package_origins = collect_package_origins(&resolve, &source_map)?;
-    annotations::validate(&resolve, package_id, &package_origins, path)?;
+    annotations::validate(&resolve, package_id, &package_origins, path, None)?;
     Ok(ParsedWitPackage {
         resolve,
         package_id,
@@ -884,15 +891,6 @@ fn build_wit_record_spec(
     let experimental = experimental_directive(&directives, path, &context)?;
     let source = build_type_source(type_def, path, interface_name)?;
     let flatten_in_api = directive(&directives, "flatten-in-api", path, &context)?.is_some();
-    if directive(&directives, "omit", path, &context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.clone(),
-            directive: "@nexus.omit".to_string(),
-            reason: "mark record fields with `@nexus.omit`; type-level omit is no longer supported"
-                .to_string(),
-        });
-    }
     let model_doc = directive(&directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
@@ -985,34 +983,6 @@ fn build_native_proto_source(
     let Some(proto_directive) = directive(&directives, "proto", path, &context)? else {
         return Ok(None);
     };
-    if directive(&directives, "flatten-in-api", path, &context)?.is_some()
-        && !matches!(type_def.kind, TypeDefKind::Record(_))
-    {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context,
-            directive: "@nexus.flatten-in-api".to_string(),
-            reason: "only supported on record types".to_string(),
-        });
-    }
-    if directive(&directives, "omit", path, &context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context,
-            directive: "@nexus.omit".to_string(),
-            reason: "mark record fields with `@nexus.omit`; type-level omit is no longer supported"
-                .to_string(),
-        });
-    }
-    if directive(&directives, "type", path, &context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context,
-            directive: "@nexus.type".to_string(),
-            reason: "cannot be combined with `@nexus.proto` on a native WIT declaration"
-                .to_string(),
-        });
-    }
     let Some(proto_name) = proto_directive.value("value") else {
         return Err(Error::InvalidWitDirective {
             path: path.to_path_buf(),
@@ -1104,27 +1074,6 @@ fn build_external_type_binding(
     let type_name = directive_prefixed_language_string(proto_directive, "type");
 
     let replacement = build_type_replacement(&directives, path, &context, &proto_name, language)?;
-
-    let flatten_in_api = directive(&directives, "flatten-in-api", path, &context)?.is_some();
-    let authored_record = matches!(type_def.kind, TypeDefKind::Record(_));
-    if flatten_in_api && !authored_record {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.clone(),
-            directive: "@nexus.flatten-in-api".to_string(),
-            reason: "only supported on record types".to_string(),
-        });
-    }
-
-    if directive(&directives, "omit", path, &context)?.is_some() {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.clone(),
-            directive: "@nexus.omit".to_string(),
-            reason: "mark record fields with `@nexus.omit`; type-level omit is no longer supported"
-                .to_string(),
-        });
-    }
 
     let external_type = ExternalTypeBindingSpec::ProtoAlias(ProtoAliasBindingSpec {
         proto: Symbol::new(proto_name.clone()),
@@ -4887,6 +4836,10 @@ interface user-service {
 
     #[test]
     fn parses_delay_load_temporalio_workflow_annotation() {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
         let wit = r#"
 package temporal:nexus@1.0.0;
 

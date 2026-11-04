@@ -1,0 +1,7 @@
+package test:annotations;
+world api { export models; }
+interface models {
+  record request {}
+  /// @nexus.poll "next_page" targets="client"
+  read: func(request: request) -> request;
+}

@@ -93,49 +93,78 @@ flowchart LR
     pollValidated --> reachableForEmission
 ```
 
-## Passes
+## Compiler stages
 
-WIT annotation syntax is validated inside the WIT frontend, immediately after
-resolving the input packages and before constructing authored IR. The catalog in
-`src/parser/wit/annotations.rs` defines placements, argument names and
-cardinality. Parsing uses that catalog for common checks; a complete resolved
-tree walk checks placements, including unused declarations and linked packages.
-Builders retain semantic checks and interpretation. This is not a new shared
-compiler pass: no WIT annotation concepts cross the parsing boundary.
+### Parsing
 
-- `AuthoredValidationPass` validates authored API intent and source-format
-  constraints. Native protobuf-backed enums must match the descriptor's full
-  case list, order, and numbers; reordered, omitted, and sparse cases are
-  rejected before planning. It also checks authored service configuration
-  against the requested API targets. Language-specific policies remain in
-  language backends.
-- `LanguageSelectionPass` selects the target-language values from authored
-  language maps.
-- `SelectedValidationPass` validates the selected generic surface after
-  selection.
-- `ResourceResolutionPass` resolves resource-method and resource-return facts
-  from the API spec and descriptors. Operations must return resources owned by
-  their service, including those held in result records. Return bindings
-  determine shared wire models regardless of API targets; resource methods are
-  bound only when an API target is selected.
-- `OperationBindingPass` attaches resolved resource facts to their owning
-  operations and resources.
-- `OperationLoweringPass` turns wire-backed resource returns into explicit
-  result records.
-- `TypePlanningPass` materializes target-ready type metadata. Protobuf messages
-  and enums with native model declarations resolve to ordinary record and enum
-  references unless replaced by an external type. The native declaration owns
-  its protobuf source; field wire bindings retain the separate protobuf type.
-  Reachability and model emission follow native model identity, while
-  language-specific converters use the wire metadata.
-- `ReachabilityPass` removes declarations outside the generated surface.
-- `PollValidationPass` refuses a client `@nexus.poll` on an operation that can't
-  get an iterator, or whose `items` field isn't a list in the model, the same
-  way for every language.
-- `EmittedNameResolutionPass` resolves final emitted JSON model identifiers. Its
-  name manifest spans the whole tree, not one leaf: a `$ref` across input files
-  names a model whose `x-<lang>-name` override is declared in the other file, so
-  the consuming module can only resolve it from the tree-wide manifest.
+The WIT and JSON Schema frontends construct authored IR. The WIT frontend
+validates annotations after resolving the input packages. The catalog in
+`src/parser/wit/annotations.rs` defines placements, argument names, cardinality,
+language eligibility, and System Nexus requirements. Parsing uses that catalog
+for common checks; a complete resolved tree walk checks placements, including
+unused declarations and linked packages. WIT generation checks availability
+against the selected language and mode before lowering. Unqualified annotations
+apply to the selected output; language-qualified annotations can remain inactive
+for other outputs. Scaffolding only checks vocabulary and placements, without
+imposing a generation language or mode. Builders retain semantic checks and
+interpretation.
+
+### AuthoredValidationPass
+
+Validates authored API intent and source-format constraints. Native
+protobuf-backed enums must match the descriptor's full case list, order, and
+numbers; reordered, omitted, and sparse cases are rejected before planning. It
+also checks authored service configuration against the requested API targets.
+Language-specific policies remain in language backends.
+
+### LanguageSelectionPass
+
+Selects the target-language values from authored language maps.
+
+### SelectedValidationPass
+
+Validates the selected generic surface after selection.
+
+### ResourceResolutionPass
+
+Resolves resource-method and resource-return facts from the API spec and
+descriptors. Operations must return resources owned by their service, including
+those held in result records. Return bindings determine shared wire models
+regardless of API targets; resource methods are bound only when an API target is
+selected.
+
+### OperationBindingPass
+
+Attaches resolved resource facts to their owning operations and resources.
+
+### OperationLoweringPass
+
+Turns wire-backed resource returns into explicit result records.
+
+### TypePlanningPass
+
+Materializes target-ready type metadata. Protobuf messages and enums with native
+model declarations resolve to ordinary record and enum references unless
+replaced by an external type. The native declaration owns its protobuf source;
+field wire bindings retain the separate protobuf type. Reachability and model
+emission follow native model identity, while language-specific converters use
+the wire metadata.
+
+### ReachabilityPass
+
+Removes declarations outside the generated surface.
+
+### PollValidationPass
+
+Refuses a client `@nexus.poll` on an operation that can't get an iterator, or
+whose `items` field isn't a list in the model, the same way for every language.
+
+### EmittedNameResolutionPass
+
+Resolves final emitted JSON model identifiers. Its name manifest spans the whole
+tree, not one leaf: a `$ref` across input files names a model whose
+`x-<lang>-name` override is declared in the other file, so the consuming module
+can only resolve it from the tree-wide manifest.
 
 ## Models and APIs
 
