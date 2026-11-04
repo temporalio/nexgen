@@ -351,15 +351,6 @@ pub enum Error {
     UnsupportedGoProtoConversion { context: String, reason: String },
 
     #[error(
-        "`@nexus.namespace go=\"{namespace}\"` implies Go package `{expected_package}`, but the output directory resolves to package `{actual_package}`; point `--output` at a directory named `{expected_package}`"
-    )]
-    GoNamespacePackageMismatch {
-        namespace: String,
-        expected_package: String,
-        actual_package: String,
-    },
-
-    #[error(
         "output directory name `{output_dir_name}` has no ASCII letters, digits, or underscores to build a Go package name from; rename the output directory"
     )]
     GoPackageNameEmpty { output_dir_name: String },

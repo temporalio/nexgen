@@ -10,7 +10,7 @@ use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 use nexgen::parser::write_prepared_wit_directory;
 #[cfg(feature = "advanced")]
 use nexgen::{AddMessageRequest, AddRpcRequest, add_message_to_file, add_rpc_to_file};
-use nexgen::{GenerateRequest, GoFacadeRequest, generate_to_file, generate_to_file_with_go_facade};
+use nexgen::{GenerateRequest, generate_to_file};
 
 #[derive(Parser)]
 #[command(name = "nexgen")]
@@ -26,7 +26,7 @@ enum Commands {
     #[command(about = "Generate C# / .NET bindings")]
     Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
-    Go(GoGenerateArgs),
+    Go(SupportPackageGenerateArgs),
     #[command(about = "Generate Java bindings")]
     Java(JavaGenerateArgs),
     #[command(about = "Generate Python bindings")]
@@ -78,18 +78,6 @@ struct SupportPackageGenerateArgs {
     /// Import path or namespace of the user-owned support package (required for WIT).
     #[arg(long = "support-package")]
     support_package: Option<String>,
-}
-
-#[derive(Args)]
-struct GoGenerateArgs {
-    #[command(flatten)]
-    common: SupportPackageGenerateArgs,
-    /// Output directory for a facade that re-exports the generated native WIT API.
-    #[arg(long = "facade-output", requires = "facade_import")]
-    facade_output: Option<PathBuf>,
-    /// Import path of the implementation package used by the facade.
-    #[arg(long = "facade-import", requires = "facade_output")]
-    facade_import: Option<String>,
 }
 
 #[derive(Args)]
@@ -199,22 +187,12 @@ fn main() -> ExitCode {
         Commands::Go(args) => {
             let request = generate_request(
                 Language::Go,
-                args.common.common,
+                args.common,
                 Default::default(),
                 None,
-                args.common.support_package,
+                args.support_package,
             );
-            if let Some(output_path) = args.facade_output {
-                generate_to_file_with_go_facade(
-                    &request,
-                    &GoFacadeRequest {
-                        output_path,
-                        implementation_import_path: args.facade_import.unwrap(),
-                    },
-                )
-            } else {
-                generate_to_file(&request)
-            }
+            generate_to_file(&request)
         }
         Commands::Java(args) => generate_to_file(&generate_request(
             Language::Java,

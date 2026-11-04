@@ -247,9 +247,10 @@ name the appropriate internal APIs. For generation into the SDK's `internal`
 package, use `@nexus.namespace go="go.temporal.io/sdk/internal"`; references to
 that package become unqualified.
 
-The sample WIT omits this Go namespace override so its generated implementation
-is a standalone package that imports the SDK's internal APIs. Its module path is
-under `go.temporal.io/sdk`, which permits importing these internal packages.
+The sample WIT declares its own implementation and facade namespaces under
+`go.temporal.io/sdk/advanced/samples/go`. Its implementation is a standalone
+package that imports the SDK's internal APIs. The module path under
+`go.temporal.io/sdk` permits importing these internal packages.
 
 System Nexus package-level declarations use `SystemNexus_` for exported symbols
 and `systemnexus_` for private symbols. Receiver methods retain their API names,
@@ -259,31 +260,49 @@ remain private unless they are also part of the public API.
 
 ### Go facades
 
-For Go native WIT API generation, supply `--facade-output` and `--facade-import`
-together to write a facade into another package. `--facade-output` selects its
-output directory; `--facade-import` names the implementation package's actual Go
-import path. The facade directory's basename determines its package name. The
-destination need not be `workflow`; it can also be `client` or another package.
+For Go WIT workflow API generation, declare both package import paths on the
+interface:
+
+```wit
+/// @nexus.namespace go="go.temporal.io/sdk/internal"
+/// @nexus.facade go="go.temporal.io/sdk/workflow"
+interface workflow-service {
+  // ...
+}
+```
+
+`@nexus.facade` requires an explicit implementation namespace and the workflow
+target. The two import paths must be distinct. Each path's final segment
+determines its package name, independently of the output directory. Without an
+explicit namespace, the implementation package still uses the output directory's
+basename.
+
+Nexgen writes `workflowservice.go` and `workflowservice_facade.go` side by side
+under `--output`. Both come from the same compiler plan and the ordinary
+`generate_to_file` library entry point. The output directory is a staging area:
+the two files declare different Go packages and cannot be compiled together. The
+SDK wrapper places them into `internal/workflowservice.go` and
+`workflow/workflowservice.go`, respectively.
+
+The existing sample declares its standalone package paths in the WIT. Generate
+its staging output with:
 
 ```sh
 cargo run --features advanced -- go advanced/samples/inputs/workflow-service.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
-  --native-api --system-nexus \
+  --targets workflow --system-nexus \
   --support-package go.temporal.io/sdk/advanced/samples/go/systemsupport \
-  --output advanced/samples/go/workflowservice \
-  --facade-output advanced/samples/go/workflowservice_facade \
-  --facade-import go.temporal.io/sdk/advanced/samples/go/workflowservice
+  --output target/go-workflow-service
 ```
+
+`cargo build-examples --format wit --lang go workflow-service` also places the
+sample's files into their checked-in implementation and facade directories.
 
 Facades expose type aliases, constants, and forwarding functions. Aliases retain
 the implementation's methods and type identity. Forwarders retain generic
 parameters, variadic arguments, and operation documentation. System Nexus
 facades expose the original names without the implementation prefix.
-
-Implementation and facade output come from the same compiler plan. The library
-entry point is `generate_to_file_with_go_facade`, with a `GoFacadeRequest`
-specifying the facade output path and implementation import path.
 
 ## WIT Directives
 

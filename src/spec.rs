@@ -23,6 +23,7 @@ pub struct ApiSpec<F: TypeFamily = AuthoredFamily> {
 pub struct ModelScopeSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub namespace: F::Text,
+    pub facade: F::Text,
 }
 
 impl<F: TypeFamily> ModelScopeSpec<F> {
@@ -34,6 +35,7 @@ impl<F: TypeFamily> ModelScopeSpec<F> {
         ModelScopeSpec {
             name: self.name,
             namespace: map.map_text(self.namespace),
+            facade: map.map_text(self.facade),
         }
     }
 }
@@ -320,6 +322,14 @@ impl<F: TypeFamily> ApiSpec<F> {
             .or_else(|| self.model_scope.as_ref().map(|scope| &scope.namespace))
     }
 
+    /// Returns the facade namespace text of the first service or model scope.
+    pub fn primary_facade(&self) -> Option<&F::Text> {
+        self.services
+            .first()
+            .map(|service| &service.facade)
+            .or_else(|| self.model_scope.as_ref().map(|scope| &scope.facade))
+    }
+
     pub fn external_type_binding(&self, type_name: &str) -> Option<&ExternalTypeBindingSpec<F>> {
         match self.types.get(type_name.trim_start_matches('.')) {
             Some(TypeDeclEntry {
@@ -598,6 +608,7 @@ pub struct ServiceSpec<F: TypeFamily = AuthoredFamily> {
     pub wire_name: String,
     pub doc: F::Text,
     pub namespace: F::Text,
+    pub facade: F::Text,
     pub operations_class: F::Text,
     pub endpoint: Option<String>,
     pub experimental: bool,
@@ -634,6 +645,7 @@ impl<F: TypeFamily> ServiceSpec<F> {
             wire_name: self.wire_name,
             doc: map.map_text(self.doc),
             namespace: map.map_text(self.namespace),
+            facade: map.map_text(self.facade),
             operations_class: map.map_text(self.operations_class),
             endpoint: self.endpoint,
             experimental: self.experimental,

@@ -31,8 +31,6 @@ pub struct GeneratedFiles {
     pub layout: GeneratedOutputLayout,
     pub files: BTreeMap<PathBuf, String>,
     pub warnings: Vec<String>,
-    /// Optional facade files for a separately configured output directory.
-    pub facade: Option<Box<GeneratedFiles>>,
 }
 
 impl GeneratedFiles {
@@ -43,7 +41,6 @@ impl GeneratedFiles {
             layout: GeneratedOutputLayout::SingleFile,
             files,
             warnings: Vec::new(),
-            facade: None,
         }
     }
 
@@ -52,7 +49,6 @@ impl GeneratedFiles {
             layout: GeneratedOutputLayout::Directory,
             files,
             warnings: Vec::new(),
-            facade: None,
         }
     }
 
@@ -359,15 +355,6 @@ impl GeneratedFileMap {
         Ok(prefixed)
     }
 
-    pub(crate) fn rekey_all(self, path: impl Into<PathBuf>) -> Result<Self> {
-        let path = path.into();
-        let mut rekeyed = Self::default();
-        for file in self.files.into_values() {
-            rekeyed.insert(path.clone(), file.contents, file.origin)?;
-        }
-        Ok(rekeyed)
-    }
-
     pub(crate) fn extend(&mut self, other: Self) -> Result<()> {
         for (path, file) in other.files {
             self.insert(path, file.contents, file.origin)?;
@@ -454,7 +441,6 @@ pub enum TsDateTimeTypes {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct GenerateFilesOptions {
     pub(crate) go_output_dir_name: String,
-    pub(crate) go_facade: Option<go::GoFacadeOptions>,
     pub(crate) java_package_root: Option<String>,
     pub(crate) support_package: Option<String>,
     /// The TypeScript temporal representation (`--date-time-types`); ignored by
@@ -558,8 +544,6 @@ fn generate_go_tree(
         &go::GoOptions {
             output_dir_name: options.go_output_dir_name,
             support_package: options.support_package,
-            facade: options.go_facade,
-            ..go::GoOptions::default()
         },
     )
 }

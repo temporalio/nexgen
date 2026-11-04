@@ -2374,7 +2374,6 @@ pub(crate) fn generate(
         layout: crate::generator::GeneratedOutputLayout::Directory,
         files: generated.files.into_files(),
         warnings: generated.warnings,
-        facade: None,
     })
 }
 

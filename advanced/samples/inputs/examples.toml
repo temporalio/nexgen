@@ -1,7 +1,6 @@
 [workflow-service]
 targets = ["workflow"]
 system_nexus = true
-go_facade = true
 descriptors = "temporal"
 
 [multi-operation-service]

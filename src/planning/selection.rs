@@ -144,6 +144,7 @@ mod tests {
                 wire_name: "service".to_string(),
                 doc: Default::default(),
                 namespace: Default::default(),
+                facade: Default::default(),
                 operations_class: Default::default(),
                 endpoint: None,
                 experimental: false,

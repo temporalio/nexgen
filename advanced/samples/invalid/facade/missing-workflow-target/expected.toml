@@ -1,0 +1,5 @@
+languages = ["go"]
+
+[error]
+kind = "unsupported-go-type"
+contains = ["facade generation requires the workflow target (--targets workflow)"]

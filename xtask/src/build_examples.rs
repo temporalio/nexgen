@@ -7,10 +7,7 @@ use nexgen::error::Error as NexgenError;
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
-use nexgen::{
-    GenerateRequest, GoFacadeRequest, format_generated_files, generate_to_file,
-    generate_to_file_with_go_facade,
-};
+use nexgen::{GenerateRequest, format_generated_files, generate_to_file};
 use serde::Deserialize;
 
 use crate::error::{Error, Result};
@@ -31,8 +28,6 @@ struct ExampleOptions {
     languages: Option<Vec<String>>,
     system_nexus: Option<bool>,
     targets: Option<Vec<GenerationTarget>>,
-    #[serde(default)]
-    go_facade: bool,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
@@ -712,31 +707,47 @@ fn build_example_configuration(
         ts_date_time_types: Default::default(),
         dotnet_namespace: None,
     };
-    if language == Language::Go
-        && config
-            .examples
-            .get(example_id)
-            .is_some_and(|example| example.go_facade)
-    {
-        let facade_path = language_root.join(format!(
+    generate_to_file(&generate_request)?;
+    if language == Language::Go {
+        // Go sample facades live in the implementation's sibling `_facade`
+        // package. Nexgen emits both packages into one staging directory.
+        let facade_path = output_path.with_file_name(format!(
             "{}_facade",
-            example_directory_name(language, example_id),
+            output_path
+                .file_name()
+                .expect("example output names a directory")
+                .to_string_lossy(),
         ));
         reset_example_output_directory(&language_root, &facade_path)?;
-        generate_to_file_with_go_facade(
-            &generate_request,
-            &GoFacadeRequest {
-                output_path: facade_path.clone(),
-                implementation_import_path: format!(
-                    "go.temporal.io/sdk/advanced/samples/go/{}",
-                    example_directory_name(language, example_id),
-                ),
-            },
-        )?;
-        format_example_output(&language_root, language, &facade_path)?;
-        normalize_example_headers(&facade_path)?;
-    } else {
-        generate_to_file(&generate_request)?;
+        for entry in fs::read_dir(&output_path).map_err(|source| NexgenError::ReadFile {
+            path: output_path.clone(),
+            source,
+        })? {
+            let entry = entry.map_err(|source| NexgenError::ReadFile {
+                path: output_path.clone(),
+                source,
+            })?;
+            let name = entry.file_name();
+            let Some(stem) = name
+                .to_str()
+                .and_then(|name| name.strip_suffix("_facade.go"))
+            else {
+                continue;
+            };
+            fs::create_dir_all(&facade_path).map_err(|source| NexgenError::WriteFile {
+                path: facade_path.clone(),
+                source,
+            })?;
+            let destination = facade_path.join(format!("{stem}.go"));
+            fs::rename(entry.path(), &destination).map_err(|source| NexgenError::WriteFile {
+                path: destination,
+                source,
+            })?;
+        }
+        if facade_path.exists() {
+            format_example_output(&language_root, language, &facade_path)?;
+            normalize_example_headers(&facade_path)?;
+        }
     }
     format_example_output(&language_root, language, &output_path)?;
     normalize_example_headers(&output_path)?;

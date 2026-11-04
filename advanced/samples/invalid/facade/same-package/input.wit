@@ -1,0 +1,10 @@
+package sample:facade@1.0.0;
+
+world system { export service; }
+
+/// @nexus.namespace go="example.org/workflow"
+/// @nexus.facade go="example.org/workflow"
+interface service {
+  record request { value: string }
+  send: func(request: request) -> request;
+}

@@ -1,0 +1,6 @@
+languages = ["go"]
+targets = ["workflow"]
+
+[error]
+kind = "unsupported-go-type"
+contains = ["facade generation requires an explicit implementation namespace"]

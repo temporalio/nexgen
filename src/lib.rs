@@ -48,28 +48,7 @@ pub struct GenerateRequest {
     pub dotnet_namespace: Option<String>,
 }
 
-/// A facade package emitted alongside a Go native WIT implementation.
-pub struct GoFacadeRequest {
-    pub output_path: PathBuf,
-    pub implementation_import_path: String,
-}
-
 pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
-    generate_to_file_impl(request, None)
-}
-
-/// Generates the implementation and facade from the same compiler plan.
-pub fn generate_to_file_with_go_facade(
-    request: &GenerateRequest,
-    facade: &GoFacadeRequest,
-) -> Result<()> {
-    generate_to_file_impl(request, Some(facade))
-}
-
-fn generate_to_file_impl(
-    request: &GenerateRequest,
-    facade: Option<&GoFacadeRequest>,
-) -> Result<()> {
     let _config_scope = nexgen_config::scope(request.config.clone());
     // A resolved output path with no name at all (the filesystem root, or
     // `..` past it) is never a real output directory: Go and Java derive
@@ -109,17 +88,6 @@ fn generate_to_file_impl(
         return Err(error::Error::DotnetNamespaceMissing);
     }
 
-    if facade.is_some()
-        && (request.language != Language::Go
-            || request.config.mode != GenerationMode::NativeApi
-            || !wit_input)
-    {
-        return Err(error::Error::UnsupportedGoType {
-            context: "facade".to_string(),
-            reason: "facade generation requires Go native WIT API generation".to_string(),
-        });
-    }
-
     let tree = parser::load_api_spec_tree_for_language_with_inputs(
         request.language,
         &request.input_paths,
@@ -131,14 +99,6 @@ fn generate_to_file_impl(
         } else {
             String::new()
         },
-        go_facade: facade
-            .map(|facade| {
-                Ok(generator::go::GoFacadeOptions {
-                    package_name: output_dir_name(&facade.output_path)?,
-                    implementation_import_path: facade.implementation_import_path.clone(),
-                })
-            })
-            .transpose()?,
         java_package_root: if request.language == Language::Java {
             Some(resolve_java_package(request)?)
         } else {
@@ -156,15 +116,9 @@ fn generate_to_file_impl(
     print_warnings(&generated);
 
     write_generated_files(&request.output_path, &generated)?;
-    if let (Some(request), Some(files)) = (facade, &generated.facade) {
-        write_generated_files(&request.output_path, files)?;
-    }
 
     if request.format {
         format_generated_files(request.language, &request.output_path)?;
-        if let Some(facade) = facade {
-            format_generated_files(Language::Go, &facade.output_path)?;
-        }
     }
 
     Ok(())

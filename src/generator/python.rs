@@ -91,7 +91,6 @@ pub(crate) fn generate(
                 layout: crate::generator::GeneratedOutputLayout::Directory,
                 files: generated.files.into_files(),
                 warnings: generated.warnings,
-                facade: None,
             })
         }
         ApiSpecNode::Branch(branch) => generate_tree(branch, support_package),
@@ -168,7 +167,6 @@ fn generate_tree(
         layout: crate::generator::GeneratedOutputLayout::Directory,
         files: files.into_files(),
         warnings,
-        facade: None,
     })
 }
 

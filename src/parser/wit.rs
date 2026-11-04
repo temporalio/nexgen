@@ -112,6 +112,7 @@ fn api_spec_from_wit(
             model_scope.get_or_insert(crate::spec::ModelScopeSpec {
                 name: service.name,
                 namespace: service.namespace,
+                facade: service.facade,
             });
             continue;
         }
@@ -2659,6 +2660,9 @@ fn build_service(
     let namespace = directive(&directives, "namespace", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let facade = directive(&directives, "facade", path, &context)?
+        .map(directive_language_string)
+        .unwrap_or_default();
     let operations_class = directive(&directives, "operations-class", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
@@ -2696,6 +2700,7 @@ fn build_service(
         wire_name: wire_service_name,
         doc: LanguageStringSpec::default(),
         namespace,
+        facade,
         operations_class,
         endpoint,
         experimental,

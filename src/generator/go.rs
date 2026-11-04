@@ -54,13 +54,10 @@ const GO_DOC_COMMENT_LINE_LENGTH: usize = 88;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GoOptions {
-    /// The output directory's basename, matching the Go convention that a
-    /// package's name is its directory's name. Always a real, valid-UTF-8,
-    /// non-root name -- `generate_to_file` resolves and validates it before
-    /// generation runs.
+    /// The fallback package name when no namespace is declared. This is the
+    /// output directory's basename, resolved and validated by `generate_to_file`.
     pub(crate) output_dir_name: String,
     pub(crate) support_package: Option<String>,
-    pub(crate) facade: Option<GoFacadeOptions>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -561,24 +558,48 @@ impl GoPackageContext {
             .primary_namespace()
             .and_then(|namespace| namespace.value())
             .map(str::to_string);
-        let package_name = Self::derive_package_name(&options.output_dir_name)?;
-
-        if let Some(import_path) = &import_path {
-            let namespace_package_name = go_package_name(
-                import_path
-                    .rsplit('/')
-                    .next()
-                    .filter(|segment| !segment.is_empty())
-                    .unwrap_or(import_path),
-            );
-            if namespace_package_name != package_name {
-                return Err(Error::GoNamespacePackageMismatch {
-                    namespace: import_path.clone(),
-                    expected_package: namespace_package_name,
-                    actual_package: package_name,
-                });
-            }
-        }
+        let package_name = match &import_path {
+            Some(path) => Self::derive_package_name(path.rsplit('/').next().unwrap_or(path))?,
+            None => Self::derive_package_name(&options.output_dir_name)?,
+        };
+        let facade = api_plan
+            .primary_facade()
+            .and_then(|facade| facade.value())
+            .map(|facade| {
+                let implementation_import_path =
+                    import_path
+                        .as_ref()
+                        .ok_or_else(|| Error::UnsupportedGoType {
+                            context: "facade".to_string(),
+                            reason:
+                                "facade generation requires an explicit implementation namespace"
+                                    .to_string(),
+                        })?;
+                if facade == implementation_import_path {
+                    return Err(Error::UnsupportedGoType {
+                        context: "facade".to_string(),
+                        reason: "facade and implementation packages must be distinct".to_string(),
+                    });
+                }
+                if !crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow)
+                {
+                    return Err(Error::UnsupportedGoType {
+                        context: "facade".to_string(),
+                        reason:
+                            "facade generation requires the workflow target (--targets workflow)"
+                                .to_string(),
+                    });
+                }
+                Ok(GoFacadeOptions {
+                    package_name: Self::derive_package_name(
+                        facade.rsplit('/').next().unwrap_or(facade),
+                    )?,
+                    implementation_import_path: implementation_import_path.clone(),
+                })
+            })
+            .transpose()?;
 
         Ok(Self {
             package_name,
@@ -590,7 +611,7 @@ impl GoPackageContext {
                     .flat_map(|service| &service.operations)
                     .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
-            facade: options.facade.clone(),
+            facade,
         })
     }
 
@@ -743,7 +764,6 @@ impl GoPackageContext {
 ///
 struct GoGenerationResult {
     files: GeneratedFileMap,
-    facade_files: GeneratedFileMap,
     warnings: Vec<String>,
 }
 
@@ -761,8 +781,9 @@ fn generate_in_tree(
     options: &GoOptions,
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
+    file_name: Option<PathBuf>,
 ) -> Result<GoGenerationResult> {
-    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -799,7 +820,7 @@ fn generate_single_leaf(
     } else {
         GeneratedFileOrigin::fixed("generated Go API module")
     };
-    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin)?;
+    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin, None)?;
     if go_tree_has_json_models(&[leaf]) {
         let package_name = GoPackageContext::new(&leaf.spec, options)?.package_name;
         let definitions_path = PathBuf::from("definitions.go");
@@ -813,11 +834,6 @@ fn generate_single_leaf(
     Ok(GeneratedFiles {
         layout: crate::generator::GeneratedOutputLayout::Directory,
         files: generated.files.into_files(),
-        facade: options.facade.as_ref().map(|_| {
-            Box::new(GeneratedFiles::directory(
-                generated.facade_files.into_files(),
-            ))
-        }),
         warnings: generated.warnings,
     })
 }
@@ -850,7 +866,6 @@ fn generate_branch_tree(
     let tree_models = collect_tree_json_models(&leaves);
 
     let mut files = GeneratedFileMap::default();
-    let mut facade_files = GeneratedFileMap::default();
     let mut warnings = Vec::new();
 
     for leaf in &leaves {
@@ -863,15 +878,11 @@ fn generate_branch_tree(
             options,
             &tree_models,
             GeneratedFileOrigin::input_module(Language::Go, &leaf.source_path),
+            Some(go_flat_module_file_name(&leaf.module_path)),
         )?;
         warnings.extend(generated.warnings);
 
-        // `generate` names the single JSON member file `<package>.go`; re-key it
-        // to the flattened module path so each input file gets its own file in
-        // the flat package.
-        let file_name = go_flat_module_file_name(&leaf.module_path);
-        files.extend(generated.files.rekey_all(file_name.clone())?)?;
-        facade_files.extend(generated.facade_files.rekey_all(file_name)?)?;
+        files.extend(generated.files)?;
     }
 
     // The schema-independent runtime lives once in this package as
@@ -888,10 +899,6 @@ fn generate_branch_tree(
         layout: crate::generator::GeneratedOutputLayout::Directory,
         files: files.into_files(),
         warnings,
-        facade: options
-            .facade
-            .as_ref()
-            .map(|_| Box::new(GeneratedFiles::directory(facade_files.into_files()))),
     })
 }
 
@@ -1186,7 +1193,11 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
+    fn generate(
+        mut self,
+        primary_origin: GeneratedFileOrigin,
+        file_name: Option<PathBuf>,
+    ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
@@ -1467,17 +1478,24 @@ impl<'a> ApiPlanner<'a> {
         );
 
         let mut files = GeneratedFileMap::default();
-        let file_name = if self.external_models.renders_operation_references() {
-            PathBuf::from(format!("{}.go", self.package.package_name))
-        } else {
-            go_api_file_name(self.api_plan)
-        };
-        files.insert(file_name, output, primary_origin)?;
+        let file_name = file_name.unwrap_or_else(|| {
+            if self.external_models.renders_operation_references() {
+                PathBuf::from(format!("{}.go", self.package.package_name))
+            } else {
+                go_api_file_name(self.api_plan)
+            }
+        });
+        files.insert(&file_name, output, primary_origin)?;
 
-        let mut facade_files = GeneratedFileMap::default();
         if let Some(options) = &self.package.facade {
-            facade_files.insert(
-                go_api_file_name(self.api_plan),
+            files.insert(
+                file_name.with_file_name(format!(
+                    "{}_facade.go",
+                    file_name
+                        .file_stem()
+                        .expect("Go output has a file stem")
+                        .to_string_lossy()
+                )),
                 facade::render(
                     options,
                     &self.package,
@@ -1497,7 +1515,6 @@ impl<'a> ApiPlanner<'a> {
 
         Ok(GoGenerationResult {
             files,
-            facade_files,
             warnings: Vec::new(),
         })
     }
