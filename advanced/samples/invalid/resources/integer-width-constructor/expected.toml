@@ -1,0 +1,9 @@
+descriptors = "temporal"
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  """constructor field `seconds` uses a 32-bit integer, but request field \
+     `clocks.timestamp.seconds` requires a 64-bit integer; use matching integer widths""",
+]

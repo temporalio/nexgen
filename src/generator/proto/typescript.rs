@@ -5,32 +5,59 @@ use heck::ToLowerCamelCase;
 use prost_types::FieldDescriptorProto;
 
 use crate::error::Result;
-use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
-    RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
-    WireFunctionNames, WireValueConversion, flattened_field_from_wire_expr,
+    ApiPlanner, RenderedField, RenderedModel, RenderedTypes, ResolvedFieldType, WireFunctionNames,
+    WireValueConversion, collect_typescript_model_requirements, flattened_field_from_wire_expr,
     flattened_message_to_wire_expr, generic_model_annotation, map_value_from_wire_expr,
-    map_value_to_wire_expr_from_expr, optional_from_wire_expr, optional_to_wire_expr,
-    render_named_generic_function_start, repeated_from_wire_expr, repeated_to_wire_expr,
-    required_field_expr, required_from_wire_expr, required_to_wire_expr, support_reference,
-    typescript_authored_type_annotation, typescript_generated_field_name, typescript_ident,
+    map_value_to_wire_expr_from_expr, optional_from_wire_expr, optional_to_wire_expr, render_enum,
+    render_flags, render_function_runtime_helpers, render_model_declaration,
+    render_named_generic_function_start, render_variant, repeated_from_wire_expr,
+    repeated_to_wire_expr, required_field_expr, required_from_wire_expr, required_to_wire_expr,
+    support_reference, typescript_authored_type_annotation, typescript_generated_field_name,
+    typescript_ident,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, relative_descriptor_name,
 };
-use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
+use crate::spec::{
+    EnumSpec, ExternalTypeSpec, IntSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
+};
+
+mod resources;
+
+pub(in crate::generator) fn integer_annotation(int: IntSpec) -> &'static str {
+    match int {
+        IntSpec::I64 | IntSpec::U64 => "Long",
+        _ => "number",
+    }
+}
+
+pub(in crate::generator) fn integer_wire_conversion(int: IntSpec) -> Option<WireValueConversion> {
+    let unsigned = match int {
+        IntSpec::I64 => false,
+        IntSpec::U64 => true,
+        _ => return None,
+    };
+    Some(WireValueConversion {
+        annotation: "Long".to_string(),
+        // System Nexus crosses a JSON bridge on its way back into the isolate.
+        // Accept its decimal strings as well as decoded protobuf Long values.
+        from_wire: format!("Long.fromValue({{wire}}, {unsigned})"),
+        to_wire: format!("Long.fromValue({{value}}, {unsigned})"),
+        function_name_to_wire: None,
+        wire_function_names: None,
+        uses_rendered_model_annotation: false,
+    })
+}
 
 #[derive(Debug, Default)]
 pub(in crate::generator) struct ModelBackend {
     enum_conversions: BTreeMap<String, WireValueConversion>,
 }
 
-impl ExternalModelBackend for ModelBackend {
-    type ModelFragments = RenderedExternalModelFragments;
-    type WireConversion = WireValueConversion;
-
-    fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
+impl ModelBackend {
+    pub(in crate::generator) fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
         self.enum_conversions = api_plan
             .enums()
             .filter_map(|(name, model)| {
@@ -41,11 +68,10 @@ impl ExternalModelBackend for ModelBackend {
         Ok(())
     }
 
-    fn render_models(&self) -> Result<RenderedExternalModelFragments> {
-        Ok(RenderedExternalModelFragments::default())
-    }
-
-    fn model_type_annotation(&self, model_type: &PlannedType) -> Option<String> {
+    pub(in crate::generator) fn model_type_annotation(
+        &self,
+        model_type: &PlannedType,
+    ) -> Option<String> {
         match model_type {
             PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(proto))) => {
                 Some(message_typescript_interface_ref(&proto.proto))
@@ -61,7 +87,7 @@ impl ExternalModelBackend for ModelBackend {
         }
     }
 
-    fn wire_conversion(
+    pub(in crate::generator) fn wire_conversion(
         &self,
         model_type: &PlannedType,
         planned_record: Option<&RecordSpec<PlannedFamily>>,
@@ -491,9 +517,115 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
 }
 
 impl ModelBackend {
+    /// Render the complete model/resource graph together. All protobuf binding state
+    /// and per-model conversion orchestration stays within this invocation.
+    pub(in crate::generator) fn render_types(
+        &self,
+        planner: &ApiPlanner<'_>,
+        resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
+    ) -> Result<RenderedTypes> {
+        let models = planner.models.values().collect::<Vec<_>>();
+        let variants = planner.variants.values().collect::<Vec<_>>();
+        let uses_function_payload_helpers = crate::nexgen_config::current()
+            .targets
+            .contains(&crate::nexgen_config::GenerationTarget::Workflow)
+            && models.iter().any(|model| {
+                model.fields.iter().any(|field| {
+                    field.to_wire_expr.contains("requestArgsToPayloads(")
+                        || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                        || field.flattened_fields.iter().any(|field| {
+                            field.to_wire_expr.contains("requestArgsToPayloads(")
+                                || field.from_wire_expr.contains("requestArgsFromPayloads(")
+                        })
+                })
+            });
+        let mut rendered = RenderedTypes {
+            model_requirements: collect_typescript_model_requirements(&variants, &models),
+            model_value_exports: self.model_value_exports(&models, planner.services.is_empty()),
+            uses_function_payload_helpers,
+            ..Default::default()
+        };
+        let body = &mut rendered.model_body;
+        if uses_function_payload_helpers {
+            body.push('\n');
+            render_function_runtime_helpers(
+                body,
+                models.iter().any(|model| {
+                    model.fields.iter().any(|field| {
+                        field.from_wire_expr.contains("requestArgsFromPayloads(")
+                            || field.flattened_fields.iter().any(|field| {
+                                field.from_wire_expr.contains("requestArgsFromPayloads(")
+                            })
+                    })
+                }),
+            );
+        }
+        if !planner.enums.is_empty() {
+            body.push('\n');
+            for enumeration in planner.enums.values() {
+                render_enum(body, enumeration);
+                body.push('\n');
+            }
+        }
+        if !planner.flags.is_empty() {
+            body.push('\n');
+            for flags in planner.flags.values() {
+                render_flags(body, flags);
+                body.push('\n');
+            }
+        }
+        if !variants.is_empty() {
+            body.push('\n');
+            for variant in &variants {
+                render_variant(body, variant);
+                body.push('\n');
+            }
+        }
+        if !models.is_empty() {
+            body.push('\n');
+            for model in &models {
+                render_model_declaration(body, model);
+                let planned_record =
+                    planner
+                        .api_plan
+                        .record(&model.full_name)
+                        .unwrap_or_else(|| {
+                            panic!("planned model should exist for {}", model.full_name)
+                        });
+                self.render_model_wire_functions(
+                    body,
+                    model,
+                    planned_record,
+                    planner.api_plan,
+                    resolve_type,
+                );
+                body.push('\n');
+            }
+        }
+        // Rendered services have the same order as the complete planned service list.
+        // All resource identities are present before methods render client bindings.
+        for (service, rendered_service) in planner.api_plan.services.iter().zip(&planner.services) {
+            for resource in &service.resources {
+                let fragment = resources::render_resource(
+                    planner.api_plan,
+                    service,
+                    &resource.data,
+                    rendered_service,
+                )?;
+                rendered.resources.source.push_str(&fragment.source);
+                rendered.resources.source.push('\n');
+                rendered
+                    .resources
+                    .requirements
+                    .merge(&fragment.requirements);
+            }
+        }
+        Ok(rendered)
+    }
+
     /// Report the proto converter values that the Workflow API barrel exposes.
     /// Definitions-only barrels already re-export every model value.
-    pub(in crate::generator) fn model_value_exports(
+    fn model_value_exports(
         &self,
         models: &[&RenderedModel],
         include_default_converters: bool,
@@ -515,7 +647,7 @@ impl ModelBackend {
         exports
     }
 
-    pub(in crate::generator) fn render_model_wire_functions(
+    fn render_model_wire_functions(
         &self,
         output: &mut String,
         model: &RenderedModel,

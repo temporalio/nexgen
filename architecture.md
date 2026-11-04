@@ -100,7 +100,11 @@ flowchart LR
   case list, order, and numbers; reordered, omitted, and sparse cases are
   rejected before planning. It also checks authored service configuration
   against the requested API targets. Language-specific policies remain in
-  language backends.
+  language backends. After protobuf binding checks, record-containment
+  validation rejects mixed backing through aliases, containers, and variants
+  before resource binding or target-specific emission; independent operations
+  may use different backing within the same service. It also validates
+  constructor fields of resources returned as plain JSON.
 - `LanguageSelectionPass` selects the target-language values from authored
   language maps.
 - `SelectedValidationPass` validates the selected generic surface after
@@ -109,7 +113,9 @@ flowchart LR
   from the API spec and descriptors. Operations must return resources owned by
   their service, including those held in result records. Return bindings
   determine shared wire models regardless of API targets; resource methods are
-  bound only when an API target is selected.
+  bound only when an API target is selected. It rejects integer-width mismatches
+  between resource values and the request or result fields they bind to,
+  including constructor fields populated by operations that return resources.
 - `OperationBindingPass` attaches resolved resource facts to their owning
   operations and resources.
 - `OperationLoweringPass` turns wire-backed resource returns into explicit

@@ -21,14 +21,14 @@ use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
-    PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, PlannedWireFieldBinding, operation_input_model,
-    operation_output_direct_result,
+    PlannedResourceField, PlannedResourceMethod, PlannedResourceMethodBindingSpec,
+    PlannedResourceMethodResultKind, PlannedSpec, PlannedType, PlannedWireFieldBinding,
+    operation_input_model, operation_output_direct_result,
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldExpression,
-    FieldOrigin, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec,
+    FieldOrigin, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec,
     LanguageImportSpec, LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec,
     RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
@@ -77,6 +77,17 @@ pub(in crate::generator) struct RenderedExternalModelFragments {
     pub(in crate::generator) body: String,
     pub(in crate::generator) type_exported_names: BTreeSet<String>,
     pub(in crate::generator) value_exported_names: BTreeSet<String>,
+}
+
+/// Completed type bodies and their assembly metadata, with no backend planning state.
+#[derive(Debug, Default)]
+pub(in crate::generator) struct RenderedTypes {
+    pub(in crate::generator) model_body: String,
+    pub(in crate::generator) model_requirements: TypeScriptRequirements,
+    pub(in crate::generator) model_value_exports: Vec<String>,
+    pub(in crate::generator) uses_function_payload_helpers: bool,
+    pub(in crate::generator) resources: RenderedResource,
+    pub(in crate::generator) external_models: RenderedExternalModelFragments,
 }
 
 /// Target-specific support files together with the exports their root barrel
@@ -230,35 +241,18 @@ impl TypeScriptExternalModels {
         Ok(this)
     }
 
-    fn render_model_wire_functions(
-        &self,
-        output: &mut String,
-        model: &RenderedModel,
-        planned_record: &RecordSpec<PlannedFamily>,
-        api_plan: &PlannedSpec,
-    ) -> bool {
-        self.proto.render_model_wire_functions(
-            output,
-            model,
-            planned_record,
-            api_plan,
-            &|value_type| resolve_typescript_value_type(api_plan, self, value_type, true),
-        )
+    fn render_types(&self, planner: &ApiPlanner<'_>) -> Result<RenderedTypes> {
+        let mut rendered = self.proto.render_types(planner, &|value_type| {
+            resolve_typescript_value_type(planner.api_plan, self, value_type, true)
+        })?;
+        rendered.external_models.extend(self.json.render_models()?);
+        Ok(rendered)
     }
 
     fn render_support(&self) -> Result<RenderedTypeScriptSupport> {
         let mut support = RenderedTypeScriptSupport::default();
         support.extend(self.json.render_support()?);
         Ok(support)
-    }
-
-    fn model_value_exports(
-        &self,
-        models: &[&RenderedModel],
-        include_default_converters: bool,
-    ) -> Vec<String> {
-        self.proto
-            .model_value_exports(models, include_default_converters)
     }
 
     /// The `TransferTypeConverter` instance a model reference converts through, if
@@ -275,20 +269,10 @@ impl TypeScriptExternalModels {
     }
 }
 
-impl ExternalModelBackend for TypeScriptExternalModels {
-    type ModelFragments = RenderedExternalModelFragments;
-    type WireConversion = WireValueConversion;
-
+impl TypeScriptExternalModels {
     fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
         self.proto.prepare(api_plan)?;
         self.json.prepare(api_plan)
-    }
-
-    fn render_models(&self) -> Result<RenderedExternalModelFragments> {
-        let mut fragments = RenderedExternalModelFragments::default();
-        fragments.extend(self.proto.render_models()?);
-        fragments.extend(self.json.render_models()?);
-        Ok(fragments)
     }
 
     fn model_type_annotation(&self, model_type: &PlannedType) -> Option<String> {
@@ -323,13 +307,14 @@ impl ExternalModelBackend for TypeScriptExternalModels {
     }
 }
 
-struct ApiPlanner<'a> {
-    api_plan: &'a PlannedSpec,
+pub(in crate::generator) struct ApiPlanner<'a> {
+    pub(in crate::generator) api_plan: &'a PlannedSpec,
     external_models: TypeScriptExternalModels,
-    enums: IndexMap<String, RenderedEnum>,
-    flags: IndexMap<String, RenderedFlags>,
-    variants: IndexMap<String, RenderedVariant>,
-    models: IndexMap<String, RenderedModel>,
+    pub(in crate::generator) enums: IndexMap<String, RenderedEnum>,
+    pub(in crate::generator) flags: IndexMap<String, RenderedFlags>,
+    pub(in crate::generator) variants: IndexMap<String, RenderedVariant>,
+    pub(in crate::generator) models: IndexMap<String, RenderedModel>,
+    pub(in crate::generator) services: Vec<RenderedService<'a>>,
     // True only while a proto-backed record's fields resolve, since a proto 64-bit integer is a
     // `Long`.
     long_ints: bool,
@@ -345,11 +330,8 @@ impl<'a> ApiPlanner<'a> {
             variants: IndexMap::new(),
             long_ints: false,
             models: IndexMap::new(),
+            services: Vec::new(),
         })
-    }
-
-    fn render_external_models(&self) -> Result<RenderedExternalModelFragments> {
-        self.external_models.render_models()
     }
 
     fn ensure_resource_field_types(&mut self, resource: &PlannedResource) {
@@ -1438,24 +1420,20 @@ fn resolve_typescript_value_type(
             requirements: TypeScriptRequirements::default(),
             wire_conversion: None,
         },
-        PlannedType::Float => ResolvedFieldType {
-            annotation: "number".to_string(),
-            kind: ResolvedFieldKind::Scalar,
-            requirements: TypeScriptRequirements::default(),
-            wire_conversion: None,
-        },
-        // A proto 64-bit field is the proto runtime's `Long`. Anything else goes over JSON, and
-        // the other languages read it as a plain number.
-        PlannedType::Int(IntSpec::I64 | IntSpec::U64) if long => ResolvedFieldType {
-            annotation: "Long".to_string(),
-            kind: ResolvedFieldKind::Scalar,
-            requirements: TypeScriptRequirements {
-                long: true,
-                ..Default::default()
-            },
-            wire_conversion: None,
-        },
-        PlannedType::Int(_) => ResolvedFieldType {
+        PlannedType::Int(int) if long => {
+            let annotation = typescript_proto::integer_annotation(*int);
+            ResolvedFieldType {
+                annotation: annotation.to_string(),
+                kind: ResolvedFieldKind::Scalar,
+                requirements: TypeScriptRequirements {
+                    long: annotation == "Long",
+                    long_value: annotation == "Long",
+                    ..Default::default()
+                },
+                wire_conversion: typescript_proto::integer_wire_conversion(*int),
+            }
+        }
+        PlannedType::Int(_) | PlannedType::Float => ResolvedFieldType {
             annotation: "number".to_string(),
             kind: ResolvedFieldKind::Scalar,
             requirements: TypeScriptRequirements::default(),
@@ -1655,27 +1633,15 @@ pub(in crate::generator) fn repeated_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
 ) -> String {
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => {
-            let conversion = resolved_type
-                .wire_conversion
-                .as_ref()
-                .expect("message conversion should be present");
-            let suffix = if conversion.wire_function_names.is_some() {
-                ""
-            } else {
-                "!"
-            };
-            format!(
-                "{wire_value_expr}?.map((value: any) => {}{suffix})",
-                conversion.from_wire_expr("value")
-            )
-        }
-        ResolvedFieldKind::Enum => format!(
-            "{wire_value_expr}?.map((value: any) => {})",
-            enum_from_wire_expr(resolved_type, "value")
-        ),
-        _ => format!("{wire_value_expr}?.slice()"),
+    if let Some(value) = resolved_type.value_from_wire("value") {
+        let suffix = if resolved_type.has_authored_message_conversion() {
+            "!"
+        } else {
+            ""
+        };
+        format!("{wire_value_expr}?.map((value: any) => {value}{suffix})")
+    } else {
+        format!("{wire_value_expr}?.slice()")
     }
 }
 
@@ -1687,20 +1653,10 @@ pub(in crate::generator) fn repeated_to_wire_expr(
 }
 
 fn repeated_to_wire_expr_from_expr(resolved_type: &ResolvedFieldType, value_expr: &str) -> String {
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => format!(
-            "{value_expr}?.map((value) => {})",
-            resolved_type
-                .wire_conversion
-                .as_ref()
-                .expect("message conversion should be present")
-                .to_wire_expr("value")
-        ),
-        ResolvedFieldKind::Enum => format!(
-            "{value_expr}?.map((value) => {})",
-            enum_to_wire_expr(resolved_type, "value")
-        ),
-        _ => format!("{value_expr}?.slice()"),
+    if let Some(value) = resolved_type.value_to_wire("value") {
+        format!("{value_expr}?.map((value) => {value})")
+    } else {
+        format!("{value_expr}?.slice()")
     }
 }
 
@@ -1708,15 +1664,9 @@ pub(in crate::generator) fn map_value_from_wire_expr(
     map_value_type: &ResolvedFieldType,
     wire_value_expr: &str,
 ) -> String {
-    let value_expr = match map_value_type.kind {
-        ResolvedFieldKind::Message => map_value_type
-            .wire_conversion
-            .as_ref()
-            .expect("message conversion should be present")
-            .from_wire_expr("value"),
-        ResolvedFieldKind::Enum => enum_from_wire_expr(map_value_type, "value"),
-        _ => format!("value as {}", map_value_type.annotation),
-    };
+    let value_expr = map_value_type
+        .value_from_wire("value")
+        .unwrap_or_else(|| format!("value as {}", map_value_type.annotation));
     format!(
         "{wire_value_expr} == null ? undefined : (Object.fromEntries(Object.entries({wire_value_expr} as Record<string, any>).map(([key, value]: [string, any]) => [key, {value_expr}])) as Record<string, {}>)",
         map_value_type.annotation
@@ -1727,15 +1677,9 @@ pub(in crate::generator) fn map_value_to_wire_expr_from_expr(
     map_value_type: &ResolvedFieldType,
     value_expr: &str,
 ) -> String {
-    let mapped_value_expr = match map_value_type.kind {
-        ResolvedFieldKind::Message => map_value_type
-            .wire_conversion
-            .as_ref()
-            .expect("message conversion should be present")
-            .to_wire_expr("value"),
-        ResolvedFieldKind::Enum => enum_to_wire_expr(map_value_type, "value"),
-        _ => "value".to_string(),
-    };
+    let mapped_value_expr = map_value_type
+        .value_to_wire("value")
+        .unwrap_or_else(|| "value".to_string());
     format!(
         "{value_expr} == null ? undefined : Object.fromEntries(Object.entries({value_expr} as Record<string, any>).map(([key, value]: [string, any]) => [key, {mapped_value_expr}]))"
     )
@@ -1762,26 +1706,16 @@ pub(in crate::generator) fn required_from_wire_expr(
     let required_wire_expr =
         required_field_expr(&wire_value_expr, owner_name, generated_field_name);
 
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => {
-            let conversion = resolved_type
-                .wire_conversion
-                .as_ref()
-                .expect("message conversion should be present");
-            let decoded = conversion.from_wire_expr(&required_wire_expr);
-            if conversion.wire_function_names.is_some() {
-                decoded
-            } else {
-                // Authored converters can still return a missing value.
-                required_field_expr(&decoded, owner_name, generated_field_name)
-            }
-        }
-        ResolvedFieldKind::Enum => required_field_expr(
-            &enum_from_wire_expr(resolved_type, &required_wire_expr),
-            owner_name,
-            generated_field_name,
-        ),
-        _ => required_wire_expr,
+    let decoded = resolved_type
+        .value_from_wire(&required_wire_expr)
+        .unwrap_or(required_wire_expr);
+    // Authored message converters and enum conversions can return missing values.
+    if resolved_type.has_authored_message_conversion()
+        || resolved_type.kind == ResolvedFieldKind::Enum
+    {
+        required_field_expr(&decoded, owner_name, generated_field_name)
+    } else {
+        decoded
     }
 }
 
@@ -1792,35 +1726,19 @@ pub(in crate::generator) fn required_to_wire_expr(
 ) -> String {
     let required_value =
         required_field_expr(&format!("model.{field_name}"), owner_name, field_name);
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => resolved_type
-            .wire_conversion
-            .as_ref()
-            .expect("message conversion should be present")
-            .to_wire_expr(&required_value),
-        ResolvedFieldKind::Enum => enum_to_wire_expr(resolved_type, &required_value),
-        _ => required_value,
-    }
+    resolved_type
+        .value_to_wire(&required_value)
+        .unwrap_or(required_value)
 }
 
 pub(in crate::generator) fn optional_from_wire_expr(
     resolved_type: &ResolvedFieldType,
     wire_value_expr: &str,
 ) -> String {
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => format!(
-            "{wire_value_expr} == null ? undefined : {}",
-            resolved_type
-                .wire_conversion
-                .as_ref()
-                .expect("message conversion should be present")
-                .from_wire_expr(wire_value_expr)
-        ),
-        ResolvedFieldKind::Enum => format!(
-            "{wire_value_expr} == null ? undefined : {}",
-            enum_from_wire_expr(resolved_type, wire_value_expr)
-        ),
-        _ => format!("{wire_value_expr} ?? undefined"),
+    if let Some(value) = resolved_type.value_from_wire(wire_value_expr) {
+        format!("{wire_value_expr} == null ? undefined : {value}")
+    } else {
+        format!("{wire_value_expr} ?? undefined")
     }
 }
 
@@ -1892,20 +1810,10 @@ pub(in crate::generator) fn optional_to_wire_expr(
 }
 
 fn optional_to_wire_expr_from_expr(resolved_type: &ResolvedFieldType, value_expr: &str) -> String {
-    match resolved_type.kind {
-        ResolvedFieldKind::Message => format!(
-            "{value_expr} == null ? undefined : {}",
-            resolved_type
-                .wire_conversion
-                .as_ref()
-                .expect("message conversion should be present")
-                .to_wire_expr(value_expr)
-        ),
-        ResolvedFieldKind::Enum => format!(
-            "{value_expr} == null ? undefined : {}",
-            enum_to_wire_expr(resolved_type, value_expr)
-        ),
-        _ => value_expr.to_string(),
+    if let Some(value) = resolved_type.value_to_wire(value_expr) {
+        format!("{value_expr} == null ? undefined : {value}")
+    } else {
+        value_expr.to_string()
     }
 }
 
@@ -2110,16 +2018,21 @@ fn generate_leaf(
         planner.resolve_message_value_conversion(&model_type);
     }
 
-    let model_fragments = planner.render_external_models()?;
+    planner.services = services;
+    let enums = planner.enums.values().collect::<Vec<_>>();
+    let flags = planner.flags.values().collect::<Vec<_>>();
+    let variants = planner.variants.values().collect::<Vec<_>>();
+    let models = planner.models.values().collect::<Vec<_>>();
+    let rendered_types = planner.external_models.render_types(&planner)?;
 
     render_module_files(
-        planner.enums.values().collect::<Vec<_>>().as_slice(),
-        planner.flags.values().collect::<Vec<_>>().as_slice(),
-        planner.variants.values().collect::<Vec<_>>().as_slice(),
-        planner.models.values().collect::<Vec<_>>().as_slice(),
+        &enums,
+        &flags,
+        &variants,
+        &models,
         &planner.external_models,
-        &model_fragments,
-        &services,
+        &rendered_types,
+        &planner.services,
         &language_imports,
         support_package,
         api_plan,
@@ -2913,7 +2826,7 @@ fn typescript_operation_output_annotation(
 }
 
 #[derive(Debug)]
-struct RenderedService<'a> {
+pub(in crate::generator) struct RenderedService<'a> {
     name: &'a str,
     attr_name: String,
     wire_name: &'a str,
@@ -2923,6 +2836,12 @@ struct RenderedService<'a> {
     deprecated: bool,
     operations: Vec<RenderedOperation<'a>>,
     resources: Vec<PlannedResource>,
+}
+
+#[derive(Debug, Default)]
+pub(in crate::generator) struct RenderedResource {
+    pub(in crate::generator) source: String,
+    pub(in crate::generator) requirements: TypeScriptRequirements,
 }
 
 #[derive(Debug)]
@@ -2960,7 +2879,7 @@ struct RenderedOperationInput {
 }
 
 #[derive(Debug)]
-struct RenderedEnum {
+pub(in crate::generator) struct RenderedEnum {
     name: String,
     values: Vec<RenderedEnumValue>,
     /// The member that an unknown proto number decodes as.
@@ -2974,7 +2893,7 @@ struct RenderedEnumValue {
 }
 
 #[derive(Debug)]
-struct RenderedFlags {
+pub(in crate::generator) struct RenderedFlags {
     name: String,
     flags: Vec<RenderedFlag>,
 }
@@ -2986,7 +2905,7 @@ struct RenderedFlag {
 }
 
 #[derive(Debug)]
-struct RenderedVariant {
+pub(in crate::generator) struct RenderedVariant {
     name: String,
     doc: Option<String>,
     experimental: bool,
@@ -3106,12 +3025,14 @@ struct RenderedWithArgumentsField {
 #[derive(Debug, Clone, Default)]
 pub(in crate::generator) struct TypeScriptRequirements {
     pub(in crate::generator) long: bool,
-    value_namespace_imports: BTreeSet<String>,
+    pub(in crate::generator) long_value: bool,
+    pub(in crate::generator) value_namespace_imports: BTreeSet<String>,
 }
 
 impl TypeScriptRequirements {
-    fn merge(&mut self, other: &TypeScriptRequirements) {
+    pub(in crate::generator) fn merge(&mut self, other: &TypeScriptRequirements) {
         self.long |= other.long;
+        self.long_value |= other.long_value;
         self.value_namespace_imports
             .extend(other.value_namespace_imports.iter().cloned());
     }
@@ -3130,6 +3051,45 @@ pub(in crate::generator) struct ResolvedFieldType {
     pub(in crate::generator) kind: ResolvedFieldKind,
     pub(in crate::generator) requirements: TypeScriptRequirements,
     pub(in crate::generator) wire_conversion: Option<WireValueConversion>,
+}
+
+impl ResolvedFieldType {
+    fn value_from_wire(&self, expr: &str) -> Option<String> {
+        if self.kind == ResolvedFieldKind::Enum {
+            Some(enum_from_wire_expr(self, expr))
+        } else {
+            self.value_conversion()
+                .map(|conversion| conversion.from_wire_expr(expr))
+        }
+    }
+
+    fn value_to_wire(&self, expr: &str) -> Option<String> {
+        if self.kind == ResolvedFieldKind::Enum {
+            Some(enum_to_wire_expr(self, expr))
+        } else {
+            self.value_conversion()
+                .map(|conversion| conversion.to_wire_expr(expr))
+        }
+    }
+
+    fn value_conversion(&self) -> Option<&WireValueConversion> {
+        if self.kind == ResolvedFieldKind::Message {
+            Some(
+                self.wire_conversion
+                    .as_ref()
+                    .expect("message conversion should be present"),
+            )
+        } else {
+            self.wire_conversion.as_ref()
+        }
+    }
+
+    fn has_authored_message_conversion(&self) -> bool {
+        self.kind == ResolvedFieldKind::Message
+            && self
+                .value_conversion()
+                .is_some_and(|conversion| conversion.wire_function_names.is_none())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -3163,7 +3123,7 @@ impl WireValueConversion {
     }
 }
 
-fn collect_typescript_model_requirements(
+pub(in crate::generator) fn collect_typescript_model_requirements(
     variants: &[&RenderedVariant],
     models: &[&RenderedModel],
 ) -> TypeScriptRequirements {
@@ -3187,36 +3147,6 @@ fn collect_typescript_model_requirements(
     requirements
 }
 
-fn collect_typescript_resource_requirements(
-    services: &[RenderedService<'_>],
-) -> TypeScriptRequirements {
-    let mut requirements = TypeScriptRequirements::default();
-    for service in services {
-        for resource in &service.resources {
-            for field in &resource.fields {
-                requirements.merge(&typescript_resource_field_requirements(
-                    &field.kind,
-                    field.function.as_ref(),
-                ));
-            }
-            for method in &resource.methods {
-                for param in &method.params {
-                    requirements.merge(&typescript_resource_field_requirements(
-                        &param.kind,
-                        param.function.as_ref(),
-                    ));
-                }
-                if let Some(result) = &method.result
-                    && let PlannedResourceMethodResultKind::Value(kind) = &result.kind
-                {
-                    requirements.merge(&typescript_resource_field_requirements(kind, None));
-                }
-            }
-        }
-    }
-    requirements
-}
-
 #[allow(clippy::too_many_arguments)]
 fn render_module_files(
     enums: &[&RenderedEnum],
@@ -3224,7 +3154,7 @@ fn render_module_files(
     variants: &[&RenderedVariant],
     models: &[&RenderedModel],
     external_models: &TypeScriptExternalModels,
-    model_fragments: &RenderedExternalModelFragments,
+    rendered_types: &RenderedTypes,
     services: &[RenderedService<'_>],
     language_imports: &[LanguageImportSpec],
     support_package: &str,
@@ -3232,8 +3162,7 @@ fn render_module_files(
     module_origin: GeneratedFileOrigin,
 ) -> Result<GeneratedFileMap> {
     let targets = crate::nexgen_config::current().targets;
-    let model_requirements = collect_typescript_model_requirements(variants, models);
-    let resource_requirements = collect_typescript_resource_requirements(services);
+    let model_fragments = &rendered_types.external_models;
     let module_model_names = model_fragments
         .type_exported_names
         .iter()
@@ -3242,13 +3171,8 @@ fn render_module_files(
     let rendered_support = external_models.render_support()?;
     let mut files = GeneratedFileMap::default();
     let models_source = render_models_module(
-        enums,
-        flags,
-        variants,
         models,
-        external_models,
-        model_fragments,
-        &model_requirements,
+        rendered_types,
         language_imports,
         support_package,
         api_plan,
@@ -3264,7 +3188,7 @@ fn render_module_files(
     index_model_names.extend(variants.iter().map(|item| item.name.clone()));
     index_model_names.extend(models.iter().map(|item| item.name.clone()));
     let mut index_exports = rendered_support.root_exports.clone();
-    for name in external_models.model_value_exports(models, services.is_empty()) {
+    for name in &rendered_types.model_value_exports {
         index_exports.push(format!("export {{ {name} }} from './models';"));
     }
     files.insert(
@@ -3387,7 +3311,7 @@ fn render_module_files(
                 models,
                 &module_model_names,
                 services,
-                &resource_requirements,
+                &rendered_types.resources,
                 language_imports,
                 support_package,
                 api_plan,
@@ -3414,7 +3338,7 @@ fn render_typescript_namespace_imports(
     generated_imports: &[(&str, &str, bool)],
 ) {
     let mut namespace_imports = BTreeMap::<(String, String), bool>::new();
-    let mut named_type_imports = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut named_imports = BTreeMap::<String, BTreeMap<String, bool>>::new();
     for (namespace, package, type_only) in generated_imports {
         if contains_qualified_identifier(source, namespace) {
             namespace_imports.insert(
@@ -3453,15 +3377,17 @@ fn render_typescript_namespace_imports(
                     .or_insert(needs_value_import);
             }
             LanguageImportStyle::Named => {
-                named_type_imports
+                named_imports
                     .entry(import.module.clone())
                     .or_default()
-                    .insert(
+                    .entry(
                         import
                             .name
                             .clone()
                             .unwrap_or_else(|| import.reference.clone()),
-                    );
+                    )
+                    .and_modify(|needs_value| *needs_value |= !import.type_only)
+                    .or_insert(!import.type_only);
             }
             LanguageImportStyle::Module => {}
         }
@@ -3482,14 +3408,27 @@ fn render_typescript_namespace_imports(
         import.push_str("';\n");
         rendered_imports.push((package, import));
     }
-    for (package, imports) in named_type_imports {
+    for (package, imports) in named_imports {
         let package = typescript_relative_import(source_dir, &package);
-        let mut import = String::from("import type { ");
-        import.push_str(&imports.into_iter().collect::<Vec<_>>().join(", "));
-        import.push_str(" } from '");
-        import.push_str(&package);
-        import.push_str("';\n");
-        rendered_imports.push((package, import));
+        for needs_value in [true, false] {
+            let names = imports
+                .iter()
+                .filter(|(_, value)| **value == needs_value)
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>();
+            if !names.is_empty() {
+                let mut import = String::from(if needs_value {
+                    "import { "
+                } else {
+                    "import type { "
+                });
+                import.push_str(&names.join(", "));
+                import.push_str(" } from '");
+                import.push_str(&package);
+                import.push_str("';\n");
+                rendered_imports.push((package.clone(), import));
+            }
+        }
     }
     rendered_imports.sort_by(|(left, _), (right, _)| {
         left.starts_with('.')
@@ -3527,7 +3466,9 @@ fn render_typescript_requirement_imports(
     output: &mut String,
     requirements: &TypeScriptRequirements,
 ) {
-    if requirements.long {
+    if requirements.long_value {
+        output.push_str("import Long from 'long';\n");
+    } else if requirements.long {
         output.push_str("import type Long from 'long';\n");
     }
 }
@@ -4136,74 +4077,14 @@ fn render_system_nexus_interceptors_module(
 }
 
 fn render_models_module(
-    enums: &[&RenderedEnum],
-    flags: &[&RenderedFlags],
-    variants: &[&RenderedVariant],
     models: &[&RenderedModel],
-    external_models: &TypeScriptExternalModels,
-    model_fragments: &RenderedExternalModelFragments,
-    requirements: &TypeScriptRequirements,
+    rendered_types: &RenderedTypes,
     language_imports: &[LanguageImportSpec],
     support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
-    let targets = crate::nexgen_config::current().targets;
-    let mut body = String::new();
-
-    let uses_function_payload_helpers = targets.contains(&GenerationTarget::Workflow)
-        && models.iter().any(|model| {
-            model.fields.iter().any(|field| {
-                field.to_wire_expr.contains("requestArgsToPayloads(")
-                    || field.from_wire_expr.contains("requestArgsFromPayloads(")
-                    || field.flattened_fields.iter().any(|field| {
-                        field.to_wire_expr.contains("requestArgsToPayloads(")
-                            || field.from_wire_expr.contains("requestArgsFromPayloads(")
-                    })
-            })
-        });
-    if uses_function_payload_helpers {
-        body.push('\n');
-        render_function_runtime_helpers(
-            &mut body,
-            models.iter().any(|model| {
-                model.fields.iter().any(|field| {
-                    field.from_wire_expr.contains("requestArgsFromPayloads(")
-                        || field
-                            .flattened_fields
-                            .iter()
-                            .any(|field| field.from_wire_expr.contains("requestArgsFromPayloads("))
-                })
-            }),
-        );
-    }
-    if !enums.is_empty() {
-        body.push('\n');
-        for enumeration in enums {
-            render_enum(&mut body, enumeration);
-            body.push('\n');
-        }
-    }
-    if !flags.is_empty() {
-        body.push('\n');
-        for flag_set in flags {
-            render_flags(&mut body, flag_set);
-            body.push('\n');
-        }
-    }
-    if !variants.is_empty() {
-        body.push('\n');
-        for variant in variants {
-            render_variant(&mut body, variant);
-            body.push('\n');
-        }
-    }
-    if !models.is_empty() {
-        body.push('\n');
-        for model in models {
-            render_model(&mut body, model, external_models, api_plan);
-            body.push('\n');
-        }
-    }
+    let model_fragments = &rendered_types.external_models;
+    let mut body = rendered_types.model_body.clone();
     if !model_fragments.body.is_empty() {
         body.push('\n');
         body.push_str(&model_fragments.body);
@@ -4221,6 +4102,12 @@ fn render_models_module(
         .iter()
         .flat_map(|model| model.fields.iter())
         .flat_map(|field| field.requirements.value_namespace_imports.iter())
+        .chain(
+            rendered_types
+                .model_requirements
+                .value_namespace_imports
+                .iter(),
+        )
         .collect::<BTreeSet<_>>();
     for import in &mut model_language_imports {
         if import.type_only
@@ -4232,7 +4119,7 @@ fn render_models_module(
             import.type_only = false;
         }
     }
-    if uses_function_payload_helpers {
+    if rendered_types.uses_function_payload_helpers {
         model_language_imports.push(LanguageImportSpec {
             language: Language::TypeScript,
             reference: "temporal".to_string(),
@@ -4249,7 +4136,7 @@ fn render_models_module(
         &model_language_imports,
         &generated_value_imports,
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, &rendered_types.model_requirements);
     render_support_import_if(
         &mut imports,
         support_package,
@@ -4474,18 +4361,12 @@ fn render_resources_module(
     models: &[&RenderedModel],
     external_model_names: &BTreeSet<String>,
     services: &[RenderedService<'_>],
-    requirements: &TypeScriptRequirements,
+    rendered: &RenderedResource,
     language_imports: &[LanguageImportSpec],
     support_package: &str,
     api_plan: &PlannedSpec,
 ) -> String {
-    let mut body = String::new();
-    for service in services {
-        for resource in &service.resources {
-            render_resource(&mut body, resource, service, api_plan);
-            body.push('\n');
-        }
-    }
+    let body = rendered.source.clone();
     let mut imports = String::new();
     render_value_imports(
         &mut imports,
@@ -4499,7 +4380,7 @@ fn render_resources_module(
         &default_language_imports(language_imports, services),
         &[("workflow", typescript_workflow_module(), false)],
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, &rendered.requirements);
     render_model_type_and_enum_imports(
         &mut imports,
         "./models",
@@ -4820,7 +4701,7 @@ fn render_required_field(output: &mut String) {
     output.push_str("}\n");
 }
 
-fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
+pub(in crate::generator) fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
     output.push_str("export enum ");
     output.push_str(&enumeration.name);
     output.push_str(" {\n");
@@ -4851,7 +4732,7 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
     }
 }
 
-fn render_flags(output: &mut String, flags: &RenderedFlags) {
+pub(in crate::generator) fn render_flags(output: &mut String, flags: &RenderedFlags) {
     output.push_str("export enum ");
     output.push_str(&flags.name);
     output.push_str(" {\n");
@@ -4869,7 +4750,7 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
     output.push_str("}\n");
 }
 
-fn render_variant(output: &mut String, variant: &RenderedVariant) {
+pub(in crate::generator) fn render_variant(output: &mut String, variant: &RenderedVariant) {
     render_typescript_doc_comment(
         output,
         "",
@@ -4905,7 +4786,10 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
     }
 }
 
-fn render_function_runtime_helpers(output: &mut String, render_from: bool) {
+pub(in crate::generator) fn render_function_runtime_helpers(
+    output: &mut String,
+    render_from: bool,
+) {
     if render_from {
         output.push_str("function requestArgsFromPayloads(\n");
         output.push_str("  payloads: temporal.api.common.v1.IPayloads | null | undefined,\n");
@@ -5536,12 +5420,7 @@ fn render_flattened_type_properties(
     }
 }
 
-fn render_model(
-    output: &mut String,
-    model: &RenderedModel,
-    external_models: &TypeScriptExternalModels,
-    api_plan: &PlannedSpec,
-) {
+pub(in crate::generator) fn render_model_declaration(output: &mut String, model: &RenderedModel) {
     let doc_tags = experimental_doc_tag(model.experimental);
     if !model_uses_invocation_composition(model) {
         if model.fields.is_empty() {
@@ -5588,10 +5467,6 @@ fn render_model(
         render_function_model_invocations(output, model);
         output.push_str(">;\n\n");
     }
-    let planned_record = api_plan
-        .record(&model.full_name)
-        .unwrap_or_else(|| panic!("planned model should exist for {}", model.full_name));
-    external_models.render_model_wire_functions(output, model, planned_record, api_plan);
 }
 
 fn typescript_operation_defaults(
@@ -5799,12 +5674,15 @@ fn resource_client_require_function_name(resource: &PlannedResource) -> String {
     format!("require{}Client", resource.type_name)
 }
 
-fn render_resource(
+pub(in crate::generator) fn render_resource_with_annotations(
     output: &mut String,
     resource: &PlannedResource,
     service: &RenderedService<'_>,
     api_plan: &PlannedSpec,
-) {
+    field_annotation: impl Fn(&PlannedResourceField) -> ResolvedFieldType,
+    param_annotation: impl Fn(&PlannedResourceMethod, &PlannedResourceField) -> ResolvedFieldType,
+) -> TypeScriptRequirements {
+    let mut requirements = TypeScriptRequirements::default();
     let client_symbol_name = resource_client_symbol_name(resource);
     if service.endpoint.is_none() {
         output.push_str("const ");
@@ -5832,22 +5710,22 @@ fn render_resource(
         output.push_str("    public readonly ");
         output.push_str(&typescript_generated_field_name(&field.name));
         output.push_str(": ");
-        output.push_str(&typescript_resource_field_annotation(
-            &field.kind,
-            field.optional,
-            field.function.as_ref(),
-        ));
+        let rendered = field_annotation(field);
+        requirements.merge(&rendered.requirements);
+        output.push_str(&rendered.annotation);
         output.push_str(",\n");
     }
     output.push_str("  ) {}\n");
 
     if resource.methods.is_empty() {
         output.push_str("}\n");
-        return;
+        return requirements;
     }
 
     for method in &resource.methods {
-        let result_annotation = typescript_resource_method_result_annotation(method);
+        let result = typescript_resource_method_result_type(method);
+        requirements.merge(&result.requirements);
+        let result_annotation = result.annotation;
         output.push('\n');
         output.push_str("  public async ");
         output.push_str(&typescript_generated_field_name(&method.name));
@@ -5863,11 +5741,9 @@ fn render_resource(
                 output.push('?');
             }
             output.push_str(": ");
-            output.push_str(&typescript_resource_field_annotation(
-                &param.kind,
-                false,
-                param.function.as_ref(),
-            ));
+            let rendered = param_annotation(method, param);
+            requirements.merge(&rendered.requirements);
+            output.push_str(&rendered.annotation);
             if param.optional && before_required {
                 output.push_str(" | undefined");
             }
@@ -5950,7 +5826,7 @@ fn render_resource(
         output.push_str("(resource: ");
         output.push_str(&resource.type_name);
         output.push_str(" | ");
-        render_resource_structural_type(output, resource);
+        render_resource_structural_type(output, resource, &field_annotation);
         output.push_str(", client: workflow.NexusServiceClient<typeof ");
         output.push_str(&service.attr_name);
         output.push_str(">): ");
@@ -5987,31 +5863,41 @@ fn render_resource(
         output.push_str("  return client;\n");
         output.push_str("}\n");
     }
+    requirements
 }
 
-fn typescript_resource_method_result_annotation(method: &PlannedResourceMethod) -> String {
-    let Some(result) = &method.result else {
-        return "void".to_string();
-    };
-    let annotation = match &result.kind {
-        PlannedResourceMethodResultKind::Resource { type_name } => type_name.clone(),
-        PlannedResourceMethodResultKind::Value(kind) => {
-            typescript_resource_field_annotation(kind, result.optional, None)
+fn typescript_resource_method_result_type(method: &PlannedResourceMethod) -> ResolvedFieldType {
+    let mut rendered = match method.result.as_ref().map(|result| &result.kind) {
+        Some(PlannedResourceMethodResultKind::Value(kind)) => {
+            typescript_resource_field_type(kind, false, None, false)
         }
+        kind => ResolvedFieldType {
+            annotation: match kind {
+                Some(PlannedResourceMethodResultKind::Resource { type_name }) => type_name.clone(),
+                _ => "void".to_string(),
+            },
+            kind: ResolvedFieldKind::Scalar,
+            requirements: TypeScriptRequirements::default(),
+            wire_conversion: None,
+        },
     };
-    if result.optional && !annotation.contains(" | undefined") {
-        format!("{annotation} | undefined")
-    } else {
-        annotation
+    if method.result.as_ref().is_some_and(|result| result.optional)
+        && !rendered.annotation.contains(" | undefined")
+    {
+        rendered.annotation.push_str(" | undefined");
     }
+    rendered
 }
 
-fn typescript_resource_field_annotation(
+pub(in crate::generator) fn typescript_resource_field_type(
     kind: &PlannedType,
     optional: bool,
     function: Option<&FunctionFieldSpec<PlannedFamily>>,
-) -> String {
+    proto: bool,
+) -> ResolvedFieldType {
+    let mut requirements = TypeScriptRequirements::default();
     let base = if let Some(function) = function {
+        requirements.merge(&typescript_function_requirements(function));
         typescript_function_value_annotation(
             function
                 .alternate_type
@@ -6021,29 +5907,32 @@ fn typescript_resource_field_annotation(
             &function_constraint(function),
         )
     } else {
-        match kind {
-            PlannedType::List(value) => {
-                typescript_array_annotation(&typescript_resource_value_annotation(value))
-            }
-            PlannedType::Map(key, value) => format!(
-                "Record<{}, {}>",
-                typescript_resource_value_annotation(key),
-                typescript_resource_value_annotation(value)
-            ),
-            value => typescript_resource_value_annotation(value),
-        }
+        typescript_resource_value_annotation(kind, proto, &mut requirements)
     };
-    if optional {
-        format!("{base} | undefined")
-    } else {
-        base
+    ResolvedFieldType {
+        annotation: if optional {
+            format!("{base} | undefined")
+        } else {
+            base
+        },
+        kind: ResolvedFieldKind::Scalar,
+        requirements,
+        wire_conversion: None,
     }
 }
 
-fn typescript_resource_value_annotation(value: &PlannedType) -> String {
+fn typescript_resource_value_annotation(
+    value: &PlannedType,
+    proto: bool,
+    requirements: &mut TypeScriptRequirements,
+) -> String {
     match value {
-        PlannedType::Int(_) => "number".to_string(),
-        PlannedType::Float => "number".to_string(),
+        PlannedType::Int(int) if proto => {
+            let annotation = typescript_proto::integer_annotation(*int);
+            requirements.long |= annotation == "Long";
+            annotation.to_string()
+        }
+        PlannedType::Int(_) | PlannedType::Float => "number".to_string(),
         PlannedType::Bool => "boolean".to_string(),
         PlannedType::String => "string".to_string(),
         PlannedType::Bytes => "Uint8Array".to_string(),
@@ -6069,52 +5958,48 @@ fn typescript_resource_value_annotation(value: &PlannedType) -> String {
         PlannedType::Option(inner) => {
             format!(
                 "{} | undefined",
-                typescript_resource_value_annotation(inner)
+                typescript_resource_value_annotation(inner, proto, requirements)
             )
         }
-        PlannedType::List(inner) => {
-            typescript_array_annotation(&typescript_resource_value_annotation(inner))
-        }
+        PlannedType::List(inner) => typescript_array_annotation(
+            &typescript_resource_value_annotation(inner, proto, requirements),
+        ),
         PlannedType::Map(key, value) => format!(
             "Record<{}, {}>",
-            typescript_resource_value_annotation(key),
-            typescript_resource_value_annotation(value)
+            if proto {
+                "string".to_string()
+            } else {
+                typescript_resource_value_annotation(key, false, requirements)
+            },
+            typescript_resource_value_annotation(value, proto, requirements)
         ),
         PlannedType::Tuple(items) => format!(
             "[{}]",
             items
                 .iter()
-                .map(typescript_resource_value_annotation)
+                .map(|item| typescript_resource_value_annotation(item, proto, requirements))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
         PlannedType::Result { ok, err } => typescript_result_annotation(
             ok.as_ref()
-                .map(|ok| typescript_resource_value_annotation(ok).to_string()),
+                .map(|ok| typescript_resource_value_annotation(ok, proto, requirements)),
             err.as_ref()
-                .map(|err| typescript_resource_value_annotation(err).to_string()),
+                .map(|err| typescript_resource_value_annotation(err, proto, requirements)),
         ),
         PlannedType::External(ExternalTypeSpec::Alias(AliasTypeSpec {
             type_name,
             target: fallback,
             ..
-        })) => type_name
-            .value()
-            .map(str::to_string)
-            .unwrap_or_else(|| typescript_resource_value_annotation(fallback)),
+        })) => {
+            if let Some(annotation) = type_name.value() {
+                requirements.long |= annotation == "Long";
+                annotation.to_string()
+            } else {
+                typescript_resource_value_annotation(fallback, proto, requirements)
+            }
+        }
     }
-}
-
-fn typescript_resource_field_requirements(
-    kind: &PlannedType,
-    function: Option<&FunctionFieldSpec<PlannedFamily>>,
-) -> TypeScriptRequirements {
-    if let Some(function) = function {
-        return typescript_function_requirements(function);
-    }
-    let mut requirements = TypeScriptRequirements::default();
-    collect_typescript_value_requirements(kind, &mut requirements);
-    requirements
 }
 
 fn collect_typescript_value_requirements(
@@ -6175,11 +6060,13 @@ fn branchable_request_method_params(
         .iter()
         .filter(|param| {
             used_params.contains(&param.name)
-                && typescript_resource_field_annotation(
+                && typescript_resource_field_type(
                     &param.kind,
                     param.optional,
                     param.function.as_ref(),
+                    false,
                 )
+                .annotation
                 .trim_start()
                 .starts_with("string | ")
         })
@@ -6963,17 +6850,17 @@ fn render_resource_constructor(
     output.push(')');
 }
 
-fn render_resource_structural_type(output: &mut String, resource: &PlannedResource) {
+fn render_resource_structural_type(
+    output: &mut String,
+    resource: &PlannedResource,
+    field_annotation: &impl Fn(&PlannedResourceField) -> ResolvedFieldType,
+) {
     output.push_str("{ ");
     for field in &resource.fields {
         output.push_str("readonly ");
         output.push_str(&typescript_generated_field_name(&field.name));
         output.push_str(": ");
-        output.push_str(&typescript_resource_field_annotation(
-            &field.kind,
-            field.optional,
-            field.function.as_ref(),
-        ));
+        output.push_str(&field_annotation(field).annotation);
         output.push_str("; ");
     }
     output.push('}');
