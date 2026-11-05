@@ -10,7 +10,6 @@ from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from temporalio.api.common.v1 import message_pb2 as _message_pb2
 from temporalio.api.enums.v1 import stream_pb2 as _stream_pb2
-from temporalio.api.failure.v1 import message_pb2 as _message_pb2_1
 import builtins as _builtins
 import sys
 import typing as _typing
@@ -23,7 +22,7 @@ else:
 DESCRIPTOR: _descriptor.FileDescriptor
 
 @_typing.final
-class StreamHandle(_message.Message):
+class StreamRef(_message.Message):
     """Experimental. Might change in the future.
     Identifies one Stream. The id is opaque to callers.
     """
@@ -36,15 +35,15 @@ class StreamHandle(_message.Message):
     id: _builtins.str
     backend: _builtins.str
     """The name of the backend that holds the Stream, as the Worker and client config register
-    it, so every process routes a handle it receives. Empty is the default backend. The Store
+    it, so every process routes a ref it receives. Empty is the default backend. The Store
     never reads it.
     """
     @_builtins.property
     def owner(self) -> _message_pb2.Execution:
-        """Unset for a client's Stream. For a Workflow, business_id is the Workflow ID and run_id is
-        the first execution run id of its run chain. For a Standalone Activity, business_id is the
-        activity ID and run_id is its run id. A create and a close of a Workflow-owned Stream must
-        name its owner.
+        """Unset for a standalone Stream. For a Stream bound to a Workflow, business_id is the Workflow
+        ID and run_id is the first execution run id of its run chain. For a Standalone Activity,
+        business_id is the activity ID and run_id is its run id. A create and a close of a
+        Workflow-owned Stream must carry its owner.
         """
 
     def __init__(
@@ -60,88 +59,72 @@ class StreamHandle(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___StreamHandle: _TypeAlias = StreamHandle  # noqa: Y015
+Global___StreamRef: _TypeAlias = StreamRef  # noqa: Y015
 
 @_typing.final
 class ProducerEpoch(_message.Message):
     """Experimental. Might change in the future.
-    The ordered attempt of a Producer. Compared in this order: task_started_event_id,
-    task_attempt, task_started_time, attempt_scheduled_time, attempt. A field that a kind does
-    not use is empty and compares as zero. A timestamp compares seconds, then nanos.
+    The ordered attempt of a Producer. A higher epoch supersedes the Records of a lower epoch of the
+    same Producer. The case is the kind of the Producer. It decides how the Store orders the epochs,
+    and which earlier Records a higher epoch withdraws.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    TASK_STARTED_EVENT_ID_FIELD_NUMBER: _builtins.int
-    TASK_ATTEMPT_FIELD_NUMBER: _builtins.int
-    TASK_STARTED_TIME_FIELD_NUMBER: _builtins.int
-    ATTEMPT_SCHEDULED_TIME_FIELD_NUMBER: _builtins.int
-    ATTEMPT_FIELD_NUMBER: _builtins.int
-    task_started_event_id: _builtins.int
-    """The Workflow Task of a Workflow, or the one that dispatched a Local Activity."""
-    task_attempt: _builtins.int
-    attempt: _builtins.int
-    """Activity, Local Activity and client attempt."""
+    WORKFLOW_FIELD_NUMBER: _builtins.int
+    LOCAL_ACTIVITY_FIELD_NUMBER: _builtins.int
+    ACTIVITY_FIELD_NUMBER: _builtins.int
+    STANDALONE_ACTIVITY_FIELD_NUMBER: _builtins.int
+    CLIENT_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def task_started_time(self) -> _timestamp_pb2.Timestamp:
-        """Tells a reused started event id apart, for example after a dropped speculative task."""
+    def workflow(self) -> Global___WorkflowTaskEpoch:
+        """A Workflow run, which writes in its Workflow Task. A higher epoch withdraws the Records
+        of the run's Workflow Tasks that never completed, also those of their Local Activities.
+        """
 
     @_builtins.property
-    def attempt_scheduled_time(self) -> _timestamp_pb2.Timestamp:
-        """When the server scheduled an Activity's attempt. A reset makes it later."""
+    def local_activity(self) -> Global___LocalActivityEpoch:
+        """A Local Activity. A higher epoch withdraws the Producer's lower epochs."""
+
+    @_builtins.property
+    def activity(self) -> Global___ActivityEpoch:
+        """An Activity of a Workflow. A higher epoch withdraws the Producer's lower epochs."""
+
+    @_builtins.property
+    def standalone_activity(self) -> Global___ActivityEpoch:
+        """A Standalone Activity. A higher epoch withdraws the Producer's lower epochs."""
+
+    @_builtins.property
+    def client(self) -> Global___ClientEpoch:
+        """A client. A higher epoch only fences the lower ones, since a restarted client's earlier
+        Records are real messages, not the Records of a failed attempt.
+        """
 
     def __init__(
         self,
         *,
-        task_started_event_id: _builtins.int = ...,
-        task_attempt: _builtins.int = ...,
-        task_started_time: _timestamp_pb2.Timestamp | None = ...,
-        attempt_scheduled_time: _timestamp_pb2.Timestamp | None = ...,
-        attempt: _builtins.int = ...,
+        workflow: Global___WorkflowTaskEpoch | None = ...,
+        local_activity: Global___LocalActivityEpoch | None = ...,
+        activity: Global___ActivityEpoch | None = ...,
+        standalone_activity: Global___ActivityEpoch | None = ...,
+        client: Global___ClientEpoch | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt_scheduled_time", b"attempt_scheduled_time", "task_started_time", b"task_started_time"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["activity", b"activity", "client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "attempt_scheduled_time", b"attempt_scheduled_time", "task_attempt", b"task_attempt", "task_started_event_id", b"task_started_event_id", "task_started_time", b"task_started_time"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity", b"activity", "client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType_kind: _TypeAlias = _typing.Literal["workflow", "local_activity", "activity", "standalone_activity", "client"]  # noqa: Y015
+    _WhichOneofArgType_kind: _TypeAlias = _typing.Literal["kind", b"kind"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType_kind) -> _WhichOneofReturnType_kind | None: ...
 
 Global___ProducerEpoch: _TypeAlias = ProducerEpoch  # noqa: Y015
 
 @_typing.final
-class Producer(_message.Message):
-    """Experimental. Might change in the future."""
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    KIND_FIELD_NUMBER: _builtins.int
-    ID_FIELD_NUMBER: _builtins.int
-    EPOCH_FIELD_NUMBER: _builtins.int
-    RUN_ID_FIELD_NUMBER: _builtins.int
-    kind: _stream_pb2.StreamProducerKind.ValueType
-    id: _builtins.str
-    run_id: _builtins.str
-    """The run of the Producer, so nobody parses the id. Empty for a client."""
-    @_builtins.property
-    def epoch(self) -> Global___ProducerEpoch: ...
-    def __init__(
-        self,
-        *,
-        kind: _stream_pb2.StreamProducerKind.ValueType = ...,
-        id: _builtins.str = ...,
-        epoch: Global___ProducerEpoch | None = ...,
-        run_id: _builtins.str = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "id", b"id", "kind", b"kind", "run_id", b"run_id"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___Producer: _TypeAlias = Producer  # noqa: Y015
-
-@_typing.final
 class WorkflowTaskEpoch(_message.Message):
-    """Experimental. Might change in the future."""
+    """Experimental. Might change in the future.
+    One Workflow Task attempt of a run. It orders by started_event_id, then attempt, then
+    started_time.
+    """
 
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -151,7 +134,9 @@ class WorkflowTaskEpoch(_message.Message):
     started_event_id: _builtins.int
     attempt: _builtins.int
     @_builtins.property
-    def started_time(self) -> _timestamp_pb2.Timestamp: ...
+    def started_time(self) -> _timestamp_pb2.Timestamp:
+        """Tells a reused started event id apart, for example after a dropped speculative task."""
+
     def __init__(
         self,
         *,
@@ -168,8 +153,129 @@ class WorkflowTaskEpoch(_message.Message):
 Global___WorkflowTaskEpoch: _TypeAlias = WorkflowTaskEpoch  # noqa: Y015
 
 @_typing.final
+class LocalActivityEpoch(_message.Message):
+    """Experimental. Might change in the future.
+    The attempt of a Local Activity. It orders by task, then attempt, so a Local Activity of a
+    later Workflow Task supersedes one of an earlier task.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    attempt: _builtins.int
+    """The Local Activity's own attempt in that Workflow Task."""
+    @_builtins.property
+    def task(self) -> Global___WorkflowTaskEpoch:
+        """The Workflow Task attempt that dispatched the Local Activity."""
+
+    def __init__(
+        self,
+        *,
+        task: Global___WorkflowTaskEpoch | None = ...,
+        attempt: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["task", b"task"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "task", b"task"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___LocalActivityEpoch: _TypeAlias = LocalActivityEpoch  # noqa: Y015
+
+@_typing.final
+class ActivityEpoch(_message.Message):
+    """Experimental. Might change in the future.
+    The attempt of an Activity. It orders by attempt_scheduled_time, then attempt.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ATTEMPT_SCHEDULED_TIME_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    attempt: _builtins.int
+    @_builtins.property
+    def attempt_scheduled_time(self) -> _timestamp_pb2.Timestamp:
+        """When the server scheduled this attempt. An Activity reset starts the attempt count again,
+        so only this time orders the attempts across a reset.
+        """
+
+    def __init__(
+        self,
+        *,
+        attempt_scheduled_time: _timestamp_pb2.Timestamp | None = ...,
+        attempt: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt_scheduled_time", b"attempt_scheduled_time"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "attempt_scheduled_time", b"attempt_scheduled_time"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ActivityEpoch: _TypeAlias = ActivityEpoch  # noqa: Y015
+
+@_typing.final
+class ClientEpoch(_message.Message):
+    """Experimental. Might change in the future.
+    The attempt of a client Producer, which the client picks.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    attempt: _builtins.int
+    def __init__(
+        self,
+        *,
+        attempt: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ClientEpoch: _TypeAlias = ClientEpoch  # noqa: Y015
+
+@_typing.final
+class Producer(_message.Message):
+    """Experimental. Might change in the future.
+    The code that wrote a batch. Its id stays the same across attempts, and its epoch orders them.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ID_FIELD_NUMBER: _builtins.int
+    EPOCH_FIELD_NUMBER: _builtins.int
+    RUN_ID_FIELD_NUMBER: _builtins.int
+    id: _builtins.str
+    """Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run."""
+    run_id: _builtins.str
+    """The run of the Producer, so nobody parses the id. Empty for a client."""
+    @_builtins.property
+    def epoch(self) -> Global___ProducerEpoch:
+        """Required. Its case gives the kind of the Producer."""
+
+    def __init__(
+        self,
+        *,
+        id: _builtins.str = ...,
+        epoch: Global___ProducerEpoch | None = ...,
+        run_id: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "id", b"id", "run_id", b"run_id"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___Producer: _TypeAlias = Producer  # noqa: Y015
+
+@_typing.final
 class AppendRecord(_message.Message):
-    """Experimental. Might change in the future."""
+    """Experimental. Might change in the future.
+    One Record of a batch to append. The Store adds the batch's Producer and an offset.
+    """
 
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -191,35 +297,43 @@ Global___AppendRecord: _TypeAlias = AppendRecord  # noqa: Y015
 
 @_typing.final
 class StreamSuperseded(_message.Message):
-    """Experimental. Might change in the future."""
+    """Experimental. Might change in the future.
+    Which earlier Records a retried Producer withdraws. The Store keeps these facts for the first
+    batch of a higher epoch, or for a retry run's first write, and a read builds a Superseded item
+    from them. A reader drops the earlier Records that the facts match.
+    """
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    PRODUCER_KIND_FIELD_NUMBER: _builtins.int
     PRODUCER_ID_FIELD_NUMBER: _builtins.int
     EPOCH_FIELD_NUMBER: _builtins.int
     PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
     FAILED_TASKS_FIELD_NUMBER: _builtins.int
     WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
-    producer_kind: _stream_pb2.StreamProducerKind.ValueType
     producer_id: _builtins.str
+    """The id of the Producer that withdraws."""
     withdraw_run: _builtins.str
     """Workflow retry only. The previous run. Every Record whose Producer carries it is withdrawn."""
     run_id: _builtins.str
     """The run of the Producer, so nobody parses the id. Empty for a client."""
     @_builtins.property
-    def epoch(self) -> Global___ProducerEpoch: ...
-    @_builtins.property
-    def previous_completed_task(self) -> Global___WorkflowTaskEpoch:
-        """Workflow only."""
+    def epoch(self) -> Global___ProducerEpoch:
+        """The epoch of the Producer that withdraws, whose case picks the rule. Empty when only
+        withdraw_run applies.
+        """
 
     @_builtins.property
-    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]: ...
+    def previous_completed_task(self) -> Global___WorkflowTaskEpoch:
+        """Workflow only. The run's last completed Workflow Task."""
+
+    @_builtins.property
+    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """Workflow only. The started event ids of the run's failed or timed out Workflow Tasks."""
+
     def __init__(
         self,
         *,
-        producer_kind: _stream_pb2.StreamProducerKind.ValueType = ...,
         producer_id: _builtins.str = ...,
         epoch: Global___ProducerEpoch | None = ...,
         previous_completed_task: Global___WorkflowTaskEpoch | None = ...,
@@ -229,7 +343,7 @@ class StreamSuperseded(_message.Message):
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "previous_completed_task", b"previous_completed_task"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "failed_tasks", b"failed_tasks", "previous_completed_task", b"previous_completed_task", "producer_id", b"producer_id", "producer_kind", b"producer_kind", "run_id", b"run_id", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "failed_tasks", b"failed_tasks", "previous_completed_task", b"previous_completed_task", "producer_id", b"producer_id", "run_id", b"run_id", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -264,48 +378,10 @@ class StreamData(_message.Message):
 Global___StreamData: _TypeAlias = StreamData  # noqa: Y015
 
 @_typing.final
-class StreamClose(_message.Message):
-    """Experimental. Might change in the future.
-    The close of a Stream. A Stream has at most one, and a read returns it last.
-    """
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    PRODUCER_FIELD_NUMBER: _builtins.int
-    RESULT_FIELD_NUMBER: _builtins.int
-    FAILURE_FIELD_NUMBER: _builtins.int
-    STATUS_FIELD_NUMBER: _builtins.int
-    status: _stream_pb2.StreamCloseStatus.ValueType
-    """The result or the failure stays next to it."""
-    @_builtins.property
-    def producer(self) -> Global___Producer:
-        """The Producer that closed the Stream."""
-
-    @_builtins.property
-    def result(self) -> _message_pb2.Payload: ...
-    @_builtins.property
-    def failure(self) -> _message_pb2_1.Failure: ...
-    def __init__(
-        self,
-        *,
-        producer: Global___Producer | None = ...,
-        result: _message_pb2.Payload | None = ...,
-        failure: _message_pb2_1.Failure | None = ...,
-        status: _stream_pb2.StreamCloseStatus.ValueType = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["failure", b"failure", "producer", b"producer", "result", b"result"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["failure", b"failure", "producer", b"producer", "result", b"result", "status", b"status"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___StreamClose: _TypeAlias = StreamClose  # noqa: Y015
-
-@_typing.final
 class StreamRecord(_message.Message):
     """Experimental. Might change in the future.
     An offset is ordered and unique in one Stream, and it is sparse. Offsets have gaps, so they
-    don't count Records. Zero is never an offset. A read names its Stream, so the read checks the
+    don't count Records. Zero is never an offset. A read gives its Stream, so the read checks the
     offset against that Stream.
     """
 
@@ -314,32 +390,28 @@ class StreamRecord(_message.Message):
     OFFSET_FIELD_NUMBER: _builtins.int
     DATA_FIELD_NUMBER: _builtins.int
     SUPERSEDED_FIELD_NUMBER: _builtins.int
-    CLOSE_FIELD_NUMBER: _builtins.int
     offset: _builtins.int
     @_builtins.property
     def data(self) -> Global___StreamData: ...
     @_builtins.property
     def superseded(self) -> Global___StreamSuperseded:
         """The Store keeps only the withdrawal facts of the first batch of a higher epoch. A read
-        builds this item from them. It withdraws the earlier Records that the facts name, and a
+        builds this item from them. It withdraws the earlier Records that the facts match, and a
         reader drops them.
         """
 
-    @_builtins.property
-    def close(self) -> Global___StreamClose: ...
     def __init__(
         self,
         *,
         offset: _builtins.int = ...,
         data: Global___StreamData | None = ...,
         superseded: Global___StreamSuperseded | None = ...,
-        close: Global___StreamClose | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item", "superseded", b"superseded"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "item", b"item", "superseded", b"superseded"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item", "offset", b"offset", "superseded", b"superseded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["data", b"data", "item", b"item", "offset", b"offset", "superseded", b"superseded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_item: _TypeAlias = _typing.Literal["data", "superseded", "close"]  # noqa: Y015
+    _WhichOneofReturnType_item: _TypeAlias = _typing.Literal["data", "superseded"]  # noqa: Y015
     _WhichOneofArgType_item: _TypeAlias = _typing.Literal["item", b"item"]  # noqa: Y015
     def WhichOneof(self, oneof_group: _WhichOneofArgType_item) -> _WhichOneofReturnType_item | None: ...
 

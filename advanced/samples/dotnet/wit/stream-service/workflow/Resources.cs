@@ -15,40 +15,40 @@ namespace Temporalio.Workflows
     [GeneratedCode("nexgen", null)]
     public class Stream
     {
-        public Stream(StreamHandle handle, bool? created)
+        public Stream(StreamRef @ref, bool? created)
         {
-            Handle = handle;
+            Ref = @ref;
             Created = created;
         }
 
-        public StreamHandle Handle { get; }
+        public StreamRef Ref { get; }
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
         public Task<AppendRecordsResponse> PublishAsync(IReadOnlyList<AppendRecord> records)
         {
-            var request = new AppendRecordsOptions(Handle, records);
+            var request = new AppendRecordsOptions(Ref, records);
             return Operations.AppendRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task CloseAsync(object? result, System.Exception? failure)
+        public Task CloseAsync()
         {
-            var request = new CloseStreamOptions(Handle) { Result = result, Failure = failure };
+            var request = new CloseStreamOptions(Ref);
             return Operations.CloseStreamAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<ReadRecordsResponse> ReadAsync(long? fromOffset, StreamReadStart? start, int? maxRecords, System.TimeSpan? wait, System.TimeSpan? createWait, long? maxBytes)
         {
-            var request = new ReadRecordsOptions(Handle) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait, MaxBytes = maxBytes };
+            var request = new ReadRecordsOptions(Ref) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait, MaxBytes = maxBytes };
             return Operations.ReadRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<DescribeStreamResponse> DescribeAsync()
         {
-            var request = new DescribeStreamOptions(Handle);
+            var request = new DescribeStreamOptions(Ref);
             return Operations.DescribeStreamAsync(request);
         }
 

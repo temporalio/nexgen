@@ -8,6 +8,7 @@ import subprocess
 import sys
 import types
 import typing
+import uuid
 
 import nexusrpc
 import pytest
@@ -29,6 +30,7 @@ from wit.stream_service.both import workflow as both_workflow
 @dataclasses.dataclass
 class FakeWorkflowInfo:
     run_id: str
+    attempt: int = 1
 
 
 @pytest.fixture(
@@ -53,7 +55,24 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
     model = models.ReadRecordsResponse(
         records=[
             models.StreamRecord(
-                item=models.StreamItemData(models.StreamData(body={"text": "hi"})),
+                item=models.StreamItemData(
+                    models.StreamData(
+                        body={"text": "hi"},
+                        producer=models.Producer(
+                            id="la:r1:1",
+                            epoch=models.ProducerEpoch(
+                                kind=models.ProducerEpochKindLocalActivity(
+                                    models.LocalActivityEpoch(
+                                        task=models.WorkflowTaskEpoch(
+                                            started_event_id=4
+                                        ),
+                                        attempt=2,
+                                    )
+                                )
+                            ),
+                        ),
+                    )
+                ),
                 offset=1,
             ),
             models.StreamRecord(
@@ -62,16 +81,8 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                 ),
                 offset=2,
             ),
-            models.StreamRecord(
-                item=models.StreamItemClose(
-                    models.StreamClose(
-                        status=models.StreamCloseStatus.StreamCloseStatusCompleted
-                    )
-                ),
-                offset=3,
-            ),
         ],
-        next_offset=4,
+        next_offset=3,
         done=True,
     )
 
@@ -83,8 +94,8 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
     assert [record.WhichOneof("item") for record in wire.records] == [
         "data",
         "superseded",
-        "close",
     ]
+    assert wire.records[0].data.producer.epoch.WhichOneof("kind") == "local_activity"
     assert wire.records[1].superseded.failed_tasks == [7]
     assert converter.from_transfer_type(wire, models.ReadRecordsResponse) == model
 
@@ -102,13 +113,13 @@ def test_a_record_of_an_unknown_item_kind_has_no_item(models: types.ModuleType) 
 def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> None:
     converter = models._AppendRecordsRequestTransferTypeConverter()
     wire = converter.to_transfer_type(
-        models.AppendRecordsRequest(handle=models.StreamHandle(id="s-1"), records=[])
+        models.AppendRecordsRequest(ref=models.StreamRef(id="s-1"), records=[])
     )
-    assert wire.handle.id == "s-1"
+    assert wire.ref.id == "s-1"
 
-    wire.ClearField("handle")
+    wire.ClearField("ref")
     with pytest.raises(
-        ValueError, match="missing required field AppendRecordsRequest.handle"
+        ValueError, match="missing required field AppendRecordsRequest.ref"
     ):
         _ = converter.from_transfer_type(wire, models.AppendRecordsRequest)
 
@@ -132,7 +143,7 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 ) -> None:
     converter = models._ReadRecordsRequestTransferTypeConverter()
     wire = request_response_pb2.ReadRecordsRequest(
-        handle=message_pb2.StreamHandle(id="s-1"),
+        ref=message_pb2.StreamRef(id="s-1"),
         start=stream_pb2.StreamReadStart.ValueType(9),
     )
 
@@ -150,9 +161,9 @@ async def test_workflow_apis_call_the_stream_service(
     api: types.ModuleType,
     model_types: types.ModuleType,
 ) -> None:
-    ref = model_types.StreamHandle(id="workflow-stream")
+    ref = model_types.StreamRef(id="workflow-stream")
     replies = {
-        "CreateStream": model_types.CreateStreamResult(handle=ref, created=True),
+        "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
         "AppendRecords": model_types.AppendRecordsResponse(last_offset=3),
     }
     calls: list[tuple[str, typing.Any]] = []
@@ -180,19 +191,22 @@ async def test_workflow_apis_call_the_stream_service(
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
-    stream = await api.create_stream(id="workflow-stream")
+    monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
+    request_id = uuid.UUID(int=7)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
+    stream = await api.create_stream(stream_ref=ref)
     response = await stream.publish(records=[])
     assert response.last_offset == 3
-    # The Workflow API fills the owner and the producer from its sources.
+    # The Workflow API fills the request id and the producer from its sources.
     run = model_types.Producer(id="wf:r2", run_id="r2")
     expected = [
         (
             "CreateStream",
-            model_types.CreateStreamRequest(id="workflow-stream", owner=run),
+            model_types.CreateStreamRequest(stream_ref=ref, request_id=str(request_id)),
         ),
         (
             "AppendRecords",
-            model_types.AppendRecordsRequest(handle=ref, records=[], producer=run),
+            model_types.AppendRecordsRequest(ref=ref, records=[], producer=run),
         ),
     ]
     # The sources build the models of one package, so the calls compare as data.

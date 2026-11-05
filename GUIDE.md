@@ -1511,6 +1511,7 @@ and result types from the shared service contract.
 
 ```python
 import temporalio.client
+from stream_service import StreamRef
 from stream_service.client import StreamServiceClientExtension
 
 
@@ -1519,7 +1520,7 @@ class Client(temporalio.client.Client, StreamServiceClientExtension):
 
 
 client = await Client.connect("localhost:7233")
-stream = await client.create_stream(id="s1")
+stream = await client.create_stream(stream_ref=StreamRef(id="s1"))
 await stream.publish(records=records)
 ```
 
