@@ -205,6 +205,15 @@ them to the workflow context or invoke configured context propagators. SDK
 interceptor generation requires concrete request types because Go methods cannot
 declare type parameters.
 
+Go System Nexus operation requests use default-punning for optional scalar-like
+fields, matching the options surface: zero durations and numbers, false, empty
+strings, and zero enum or flag values represent omission. Encoding omits those
+values, and decoding maps absent fields to their zero value. Requests cannot
+distinguish an explicitly supplied zero from an omitted field. Optional structs
+and nested record fields retain their existing presence-bearing representation.
+Authored defaults still apply only in operation wrappers, not in interceptors or
+encoding/decoding.
+
 ### Python
 
 Place an importable Python package in your project and pass its module name, not

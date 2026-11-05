@@ -1,0 +1,1 @@
+Go System Nexus operation requests now use value fields for optional scalar-like types, matching the default-punning options API. Zero values represent omission; optional structs and nested record fields retain their existing representation.

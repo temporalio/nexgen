@@ -2,16 +2,20 @@ package tests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	common "go.temporal.io/api/common/v1"
+	enums "go.temporal.io/api/enums/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/interceptor"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 )
@@ -25,16 +29,22 @@ func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
 			s.Equal([]any{"workflow-input"}, request.Args)
 			s.Equal([]any{"signal-value"}, request.SignalArgs)
 			s.Nil(request.Headers)
+			s.Equal(5*time.Second, request.WorkflowTaskTimeout)
+			s.Equal(time.Hour, request.StartDelay)
 			request.ID = s.targetID("intercepted")
 			request.SignalArgs = []any{"intercepted-signal"}
 			request.Headers = map[string]*common.Payload{"trace": header}
+			request.WorkflowTaskTimeout = 10 * time.Second
+			request.StartDelay = 0
 		},
 	}
 	s.interceptors = []interceptor.WorkerInterceptor{capture}
 	var result string
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("original")},
+			ws.SignalWithStartWorkflowOptions{
+				ID: s.targetID("original"), WorkflowTaskTimeout: 5 * time.Second, StartDelay: time.Hour,
+			},
 			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		return "caller-result", err
@@ -65,8 +75,105 @@ func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
 	var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
 	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &wire))
 	s.Equal(s.targetID("intercepted"), wire.WorkflowId)
+	s.Equal(10*time.Second, wire.WorkflowTaskTimeout.AsDuration())
+	s.Nil(wire.WorkflowStartDelay)
 	s.Require().NotNil(wire.Header)
 	s.True(proto.Equal(header, wire.Header.Fields["trace"]), "workflow header changed during payload conversion")
+}
+
+func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
+	dc := commonconverter.WithDataConverterSystemNexusContext(
+		commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
+		converter.GetDefaultDataConverter(),
+	)
+	empty := ""
+	for _, tc := range []struct {
+		name    string
+		request ws.SignalWithStartWorkflowRequest
+	}{
+		{name: "omitted"},
+		{
+			name: "nonzero",
+			request: ws.SignalWithStartWorkflowRequest{
+				WorkflowExecutionTimeout: time.Hour,
+				WorkflowRunTimeout:       time.Minute,
+				WorkflowTaskTimeout:      10 * time.Second,
+				WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+				CronSchedule:             "0 * * * *",
+				StartDelay:               time.Second,
+			},
+		},
+		{
+			name: "nested presence",
+			request: ws.SignalWithStartWorkflowRequest{
+				RetryPolicy:  &temporal.RetryPolicy{},
+				Priority:     &temporal.Priority{PriorityKey: 1},
+				UserMetadata: &ws.UserMetadata{StaticSummary: &empty},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload, err := dc.ToPayload(tc.request)
+			require.NoError(t, err)
+			var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
+			require.NoError(t, converter.GetDefaultDataConverter().FromPayload(payload, &wire))
+			for _, duration := range []struct {
+				value time.Duration
+				wire  *durationpb.Duration
+			}{
+				{tc.request.WorkflowExecutionTimeout, wire.WorkflowExecutionTimeout},
+				{tc.request.WorkflowRunTimeout, wire.WorkflowRunTimeout},
+				{tc.request.WorkflowTaskTimeout, wire.WorkflowTaskTimeout},
+				{tc.request.StartDelay, wire.WorkflowStartDelay},
+			} {
+				if duration.value == 0 {
+					require.Nil(t, duration.wire)
+				} else {
+					require.NotNil(t, duration.wire)
+					require.Equal(t, duration.value, duration.wire.AsDuration())
+				}
+			}
+			require.Equal(t, tc.request.WorkflowIDConflictPolicy, wire.WorkflowIdConflictPolicy)
+			require.Equal(t, tc.request.CronSchedule, wire.CronSchedule)
+			require.Equal(t, tc.request.RetryPolicy == nil, wire.RetryPolicy == nil)
+			require.Equal(t, tc.request.Priority == nil, wire.Priority == nil)
+			require.Equal(t, tc.request.UserMetadata == nil, wire.UserMetadata == nil)
+			if tc.request.UserMetadata != nil {
+				require.NotNil(t, wire.UserMetadata.Summary)
+			}
+
+			var roundTrip ws.SignalWithStartWorkflowRequest
+			require.NoError(t, dc.FromPayload(payload, &roundTrip))
+			require.Equal(t, tc.request, roundTrip)
+		})
+	}
+
+	t.Run("present zero decodes to omission", func(t *testing.T) {
+		wire := &workflowservicepb.SignalWithStartWorkflowExecutionRequest{
+			WorkflowExecutionTimeout: durationpb.New(0),
+			WorkflowRunTimeout:       durationpb.New(0),
+			WorkflowTaskTimeout:      durationpb.New(0),
+			WorkflowStartDelay:       durationpb.New(0),
+		}
+		payload, err := converter.GetDefaultDataConverter().ToPayload(wire)
+		require.NoError(t, err)
+		var request ws.SignalWithStartWorkflowRequest
+		require.NoError(t, dc.FromPayload(payload, &request))
+		require.Zero(t, request.WorkflowExecutionTimeout)
+		require.Zero(t, request.WorkflowRunTimeout)
+		require.Zero(t, request.WorkflowTaskTimeout)
+		require.Zero(t, request.StartDelay)
+		require.Zero(t, request.WorkflowIDReusePolicy, "decoding must not evaluate wrapper defaults")
+		require.Empty(t, request.TaskQueue, "decoding must not evaluate wrapper defaults")
+
+		payload, err = dc.ToPayload(request)
+		require.NoError(t, err)
+		require.NoError(t, converter.GetDefaultDataConverter().FromPayload(payload, wire))
+		require.Nil(t, wire.WorkflowExecutionTimeout)
+		require.Nil(t, wire.WorkflowRunTimeout)
+		require.Nil(t, wire.WorkflowTaskTimeout)
+		require.Nil(t, wire.WorkflowStartDelay)
+	})
 }
 
 type recordingWorkflowServiceRuntime struct {
