@@ -74,10 +74,7 @@ pub(super) fn render(
     if sdk {
         output.push_str("func systemnexus_executeOperation(");
     } else {
-        output.push_str(&format!(
-            "// StartOperation dispatches an unencoded request through outbound.\n\
-             func (wc *{terminal}) StartOperation("
-        ));
+        output.push_str(&format!("func (wc *{terminal}) StartOperation("));
     }
     output.push_str(&format!(
         "ctx {context}, outbound {interface}, input {dispatch_input}) {future} {{\n\
@@ -102,15 +99,12 @@ pub(super) fn render(
          \treturn {failed}(ctx, fmt.Errorf(\"unsupported system Nexus operation %s/%s\", input.Service, input.Operation))\n\
          }}\n\n"
     ));
-    output.push_str(&format!(
-        "// {interface} intercepts System Nexus workflow operations before payload conversion.\n\
-         type {interface} interface {{\n"
-    ));
+    output.push_str(&format!("type {interface} interface {{\n"));
     for (_, operation) in &operations {
         let method = go_field_name(operation.name);
         let request = &operation.input_type;
         output.push_str(&format!(
-            "\t// {method} intercepts the unencoded System Nexus request.\n\
+            "\t// {method} intercepts workflow.{method}.\n\
              \t{method}(ctx {context}, request *{request}) {future}\n"
         ));
     }
@@ -118,24 +112,18 @@ pub(super) fn render(
 
     if !sdk {
         output.push_str(&format!(
-            "\n// {base} forwards operations to Next.\n\
-             type {base} struct {{\n\
+            "\ntype {base} struct {{\n\
              \tNext {interface}\n\
              }}\n\
-             \n// {terminal} schedules operations through Runtime without re-entering the interceptor chain.\n\
-             type {terminal} struct {{\n\
+             \ntype {terminal} struct {{\n\
              \tRuntime {runtime}\n\
              }}\n\
-             \n// {dispatch_input} contains a resolved operation and unencoded request for dispatch.\n\
-             type {dispatch_input} struct {{\n\
+             \ntype {dispatch_input} struct {{\n\
              \tService string\n\
              \tOperation string\n\
              \tInput any\n\
              }}\n\
-             \n// {runtime} supplies failed futures and terminal scheduling. ExecuteOperation\n\
-             // must not dispatch through the same interceptor chain again. FailedFuture\n\
-             // must fail both the result future and the operation-execution future.\n\
-             type {runtime} interface {{\n\
+             \ntype {runtime} interface {{\n\
              \tFailedFuture(ctx {context}, err error) {future}\n\
              \tExecuteOperation(ctx {context}, input {execute_input}) {future}\n\
              }}\n"

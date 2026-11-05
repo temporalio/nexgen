@@ -780,7 +780,6 @@ func init() {
 
 // --- Workflow outbound interceptors ---
 
-// StartOperation dispatches an unencoded request through outbound.
 func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
 	switch {
 	case input.Service == "temporal.api.workflowservice.v1.WorkflowService" && input.Operation == "SignalWithStartWorkflowExecution":
@@ -793,32 +792,25 @@ func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx in
 	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
 }
 
-// SystemNexus_WorkflowOutboundInterceptor intercepts System Nexus workflow operations before payload conversion.
 type SystemNexus_WorkflowOutboundInterceptor interface {
-	// SignalWithStartWorkflow intercepts the unencoded System Nexus request.
+	// SignalWithStartWorkflow intercepts workflow.SignalWithStartWorkflow.
 	SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture
 }
 
-// SystemNexus_WorkflowOutboundInterceptorBase forwards operations to Next.
 type SystemNexus_WorkflowOutboundInterceptorBase struct {
 	Next SystemNexus_WorkflowOutboundInterceptor
 }
 
-// SystemNexus_WorkflowOutboundInterceptorTerminal schedules operations through Runtime without re-entering the interceptor chain.
 type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
 	Runtime SystemNexus_WorkflowOutboundRuntime
 }
 
-// SystemNexus_ExecuteOperationInput contains a resolved operation and unencoded request for dispatch.
 type SystemNexus_ExecuteOperationInput struct {
 	Service   string
 	Operation string
 	Input     any
 }
 
-// SystemNexus_WorkflowOutboundRuntime supplies failed futures and terminal scheduling. ExecuteOperation
-// must not dispatch through the same interceptor chain again. FailedFuture
-// must fail both the result future and the operation-execution future.
 type SystemNexus_WorkflowOutboundRuntime interface {
 	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
 	ExecuteOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
