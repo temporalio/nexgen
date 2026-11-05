@@ -75,7 +75,7 @@ type recordingWorkflowServiceRuntime struct {
 	future workflow.NexusOperationFuture
 }
 
-func (r *recordingWorkflowServiceRuntime) ExecuteOperation(_ workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
+func (r *recordingWorkflowServiceRuntime) ExecuteNexusOperation(_ workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
 	r.input = input
 	return r.future
 }
@@ -83,7 +83,7 @@ func (r *recordingWorkflowServiceRuntime) ExecuteOperation(_ workflow.Context, i
 func TestWorkflowServiceInterceptorForwarding(t *testing.T) {
 	future := &failedWorkflowServiceFuture{}
 	runtime := &recordingWorkflowServiceRuntime{future: future}
-	terminal := &ws.WorkflowOutboundInterceptorTerminal{Runtime: runtime}
+	terminal := &ws.WorkflowOutboundInterceptorTerminal{SystemNexus_WorkflowOutboundRuntime: runtime}
 	base := &ws.WorkflowOutboundInterceptorBase{Next: terminal}
 	request := &ws.SignalWithStartWorkflowRequest{
 		ID: "target", Args: []any{"unencoded"}, SignalArgs: []any{42},
@@ -123,9 +123,9 @@ func TestWorkflowServiceInterceptorDispatchErrors(t *testing.T) {
 			env := suite.NewTestWorkflowEnvironment()
 			env.ExecuteWorkflow(func(ctx workflow.Context) ([]string, error) {
 				terminal := &ws.WorkflowOutboundInterceptorTerminal{
-					Runtime: &workflowServiceRuntime{},
+					SystemNexus_WorkflowOutboundRuntime: &workflowServiceRuntime{},
 				}
-				future := terminal.StartOperation(ctx, nil, ws.ExecuteOperationInput{
+				future := terminal.SystemNexus_ExecuteOperation(ctx, nil, ws.ExecuteOperationInput{
 					Service:   tc.service,
 					Operation: tc.operation, Input: tc.input,
 				})

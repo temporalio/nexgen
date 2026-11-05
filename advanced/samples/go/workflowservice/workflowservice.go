@@ -780,16 +780,16 @@ func init() {
 
 // --- Workflow outbound interceptors ---
 
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SystemNexus_ExecuteOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
 	switch {
 	case input.Service == "temporal.api.workflowservice.v1.WorkflowService" && input.Operation == "SignalWithStartWorkflowExecution":
 		request, ok := input.Input.(SystemNexus_SignalWithStartWorkflowRequest)
 		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_SignalWithStartWorkflowRequest, got %T", "temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution", input.Input))
+			return wc.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_SignalWithStartWorkflowRequest, got %T", "temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution", input.Input))
 		}
 		return outbound.SignalWithStartWorkflow(ctx, &request)
 	}
-	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
+	return wc.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
 }
 
 type SystemNexus_WorkflowOutboundInterceptor interface {
@@ -797,12 +797,27 @@ type SystemNexus_WorkflowOutboundInterceptor interface {
 	SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture
 }
 
+func (w *SystemNexus_WorkflowOutboundInterceptorBase) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
+	return w.Next.SignalWithStartWorkflow(ctx, request)
+}
+
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
+	return wc.ExecuteNexusOperation(ctx, internal.ExecuteNexusOperationInput{
+		Client:      internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService"),
+		Operation:   "SignalWithStartWorkflowExecution",
+		Input:       *request,
+		NexusHeader: nexus.Header{},
+	})
+}
+
+// --- Test-only adapters ---
+
 type SystemNexus_WorkflowOutboundInterceptorBase struct {
 	Next SystemNexus_WorkflowOutboundInterceptor
 }
 
 type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
-	Runtime SystemNexus_WorkflowOutboundRuntime
+	SystemNexus_WorkflowOutboundRuntime
 }
 
 type SystemNexus_ExecuteOperationInput struct {
@@ -813,18 +828,5 @@ type SystemNexus_ExecuteOperationInput struct {
 
 type SystemNexus_WorkflowOutboundRuntime interface {
 	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
-	ExecuteOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
-}
-
-func (w *SystemNexus_WorkflowOutboundInterceptorBase) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
-	return w.Next.SignalWithStartWorkflow(ctx, request)
-}
-
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
-	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
-		Client:      internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService"),
-		Operation:   "SignalWithStartWorkflowExecution",
-		Input:       *request,
-		NexusHeader: nexus.Header{},
-	})
+	ExecuteNexusOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
 }

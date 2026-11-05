@@ -67,22 +67,22 @@ func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOp
 
 // --- Workflow outbound interceptors ---
 
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SystemNexus_ExecuteOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
 	switch {
 	case input.Service == "InterceptorService" && input.Operation == "FirstOperation":
 		request, ok := input.Input.(SystemNexus_Request)
 		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "FirstOperation", input.Input))
+			return wc.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "FirstOperation", input.Input))
 		}
 		return outbound.FirstOperation(ctx, &request)
 	case input.Service == "InterceptorService" && input.Operation == "SecondOperation":
 		request, ok := input.Input.(SystemNexus_Request)
 		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "SecondOperation", input.Input))
+			return wc.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "SecondOperation", input.Input))
 		}
 		return outbound.SecondOperation(ctx, &request)
 	}
-	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
+	return wc.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
 }
 
 type SystemNexus_WorkflowOutboundInterceptor interface {
@@ -92,31 +92,12 @@ type SystemNexus_WorkflowOutboundInterceptor interface {
 	SecondOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture
 }
 
-type SystemNexus_WorkflowOutboundInterceptorBase struct {
-	Next SystemNexus_WorkflowOutboundInterceptor
-}
-
-type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
-	Runtime SystemNexus_WorkflowOutboundRuntime
-}
-
-type SystemNexus_ExecuteOperationInput struct {
-	Service   string
-	Operation string
-	Input     any
-}
-
-type SystemNexus_WorkflowOutboundRuntime interface {
-	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
-	ExecuteOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
-}
-
 func (w *SystemNexus_WorkflowOutboundInterceptorBase) FirstOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
 	return w.Next.FirstOperation(ctx, request)
 }
 
 func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) FirstOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
-	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
+	return wc.ExecuteNexusOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("InterceptorService"),
 		Operation:   "FirstOperation",
 		Input:       *request,
@@ -129,10 +110,31 @@ func (w *SystemNexus_WorkflowOutboundInterceptorBase) SecondOperation(ctx intern
 }
 
 func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SecondOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
-	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
+	return wc.ExecuteNexusOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("InterceptorService"),
 		Operation:   "SecondOperation",
 		Input:       *request,
 		NexusHeader: nexus.Header{},
 	})
+}
+
+// --- Test-only adapters ---
+
+type SystemNexus_WorkflowOutboundInterceptorBase struct {
+	Next SystemNexus_WorkflowOutboundInterceptor
+}
+
+type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
+	SystemNexus_WorkflowOutboundRuntime
+}
+
+type SystemNexus_ExecuteOperationInput struct {
+	Service   string
+	Operation string
+	Input     any
+}
+
+type SystemNexus_WorkflowOutboundRuntime interface {
+	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
+	ExecuteNexusOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
 }

@@ -276,7 +276,7 @@ func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, 
 		i.capture.mu.Unlock()
 	}
 	terminal := &ws.WorkflowOutboundInterceptorTerminal{
-		Runtime: &workflowServiceRuntime{next: i.Next, capture: i.capture},
+		SystemNexus_WorkflowOutboundRuntime: &workflowServiceRuntime{next: i.Next, capture: i.capture},
 	}
 	outbound := &captureWorkflowServiceOutbound{
 		WorkflowOutboundInterceptorBase: ws.WorkflowOutboundInterceptorBase{
@@ -286,9 +286,9 @@ func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, 
 	}
 	operation, ok := input.Operation.(string)
 	if !ok {
-		return terminal.Runtime.FailedFuture(ctx, fmt.Errorf("sample runtime expects a string operation name, got %T", input.Operation))
+		return terminal.FailedFuture(ctx, fmt.Errorf("sample runtime expects a string operation name, got %T", input.Operation))
 	}
-	return terminal.StartOperation(ctx, outbound, ws.ExecuteOperationInput{
+	return terminal.SystemNexus_ExecuteOperation(ctx, outbound, ws.ExecuteOperationInput{
 		Service:   input.Client.Service(),
 		Operation: operation,
 		Input:     input.Input,
@@ -317,7 +317,7 @@ type workflowServiceRuntime struct {
 	capture *captureNexusInputInterceptor
 }
 
-func (r *workflowServiceRuntime) ExecuteOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
+func (r *workflowServiceRuntime) ExecuteNexusOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
 	if !workflow.IsReplaying(ctx) {
 		r.capture.mu.Lock()
 		r.capture.calls = append(r.capture.calls, input)

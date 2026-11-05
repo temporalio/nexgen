@@ -50,13 +50,12 @@ pub(super) fn render(
         runtime,
         standalone_dispatch_input,
     ] = STANDALONE_TYPES;
-    let (interface, base, terminal, dispatch_input, execute, failed) = if sdk {
+    let (interface, base, terminal, dispatch_input, failed) = if sdk {
         (
             "systemnexus_workflowOutboundInterceptor",
             "WorkflowOutboundInterceptorBase",
             "workflowEnvironmentInterceptor",
             "executeSystemNexusOperationInput",
-            "wc.ExecuteNexusOperation",
             "FailedNexusOperationFuture",
         )
     } else {
@@ -65,8 +64,7 @@ pub(super) fn render(
             standalone_base,
             standalone_terminal,
             standalone_dispatch_input,
-            "wc.Runtime.ExecuteOperation",
-            "wc.Runtime.FailedFuture",
+            "wc.FailedFuture",
         )
     };
 
@@ -74,7 +72,9 @@ pub(super) fn render(
     if sdk {
         output.push_str("func systemnexus_executeOperation(");
     } else {
-        output.push_str(&format!("func (wc *{terminal}) StartOperation("));
+        output.push_str(&format!(
+            "func (wc *{terminal}) SystemNexus_ExecuteOperation("
+        ));
     }
     output.push_str(&format!(
         "ctx {context}, outbound {interface}, input {dispatch_input}) {future} {{\n\
@@ -110,26 +110,6 @@ pub(super) fn render(
     }
     output.push_str("}\n");
 
-    if !sdk {
-        output.push_str(&format!(
-            "\ntype {base} struct {{\n\
-             \tNext {interface}\n\
-             }}\n\
-             \ntype {terminal} struct {{\n\
-             \tRuntime {runtime}\n\
-             }}\n\
-             \ntype {dispatch_input} struct {{\n\
-             \tService string\n\
-             \tOperation string\n\
-             \tInput any\n\
-             }}\n\
-             \ntype {runtime} interface {{\n\
-             \tFailedFuture(ctx {context}, err error) {future}\n\
-             \tExecuteOperation(ctx {context}, input {execute_input}) {future}\n\
-             }}\n"
-        ));
-    }
-
     for (service, operation) in &operations {
         let method = go_field_name(operation.name);
         let request = &operation.input_type;
@@ -140,12 +120,32 @@ pub(super) fn render(
              \treturn w.Next.{method}(ctx, request)\n\
              }}\n\
              \nfunc (wc *{terminal}) {method}(ctx {context}, request *{request}) {future} {{\n\
-             \treturn {execute}(ctx, {execute_input}{{\n\
+             \treturn wc.ExecuteNexusOperation(ctx, {execute_input}{{\n\
              \t\tClient: {new_client}({service_name}),\n\
              \t\tOperation: {wire_name},\n\
              \t\tInput: *request,\n\
              \t\tNexusHeader: nexus.Header{{}},\n\
              \t}})\n\
+             }}\n"
+        ));
+    }
+    if !sdk {
+        output.push_str(&format!(
+            "\n// --- Test-only adapters ---\n\
+             \ntype {base} struct {{\n\
+             \tNext {interface}\n\
+             }}\n\
+             \ntype {terminal} struct {{\n\
+             \t{runtime}\n\
+             }}\n\
+             \ntype {dispatch_input} struct {{\n\
+             \tService string\n\
+             \tOperation string\n\
+             \tInput any\n\
+             }}\n\
+             \ntype {runtime} interface {{\n\
+             \tFailedFuture(ctx {context}, err error) {future}\n\
+             \tExecuteNexusOperation(ctx {context}, input {execute_input}) {future}\n\
              }}\n"
         ));
     }

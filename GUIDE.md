@@ -175,12 +175,15 @@ package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 Workflow System Nexus generation emits an operation-specific outbound interface,
 forwarding methods, terminal methods, and a dispatcher. Standalone packages
 expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and `Terminal`
-types, and `SystemNexus_WorkflowOutboundRuntime`. The host implements the
-runtime contract for failed futures and scheduling. Call the terminal's
-`StartOperation` with the head of the typed interceptor chain and a
-`SystemNexus_ExecuteOperationInput` containing the service, resolved operation
-name, and unencoded request. The host resolves operation references before
-dispatch. Terminal scheduling must not re-enter that chain.
+types, and `SystemNexus_WorkflowOutboundRuntime` in a `Test-only adapters`
+section. The terminal embeds the runtime interface, whose
+`ExecuteNexusOperation` method supplies scheduling directly without a forwarding
+adapter. The host implements the runtime contract for failed futures and
+scheduling. Call the terminal's `SystemNexus_ExecuteOperation` with the head of
+the typed interceptor chain and a `SystemNexus_ExecuteOperationInput` containing
+the service, resolved operation name, and unencoded request. The host resolves
+operation references before dispatch. Terminal scheduling must not re-enter that
+chain.
 
 For generation into `go.temporal.io/sdk/internal`, nexgen attaches forwarding
 methods directly to `WorkflowOutboundInterceptorBase` and terminal methods to
