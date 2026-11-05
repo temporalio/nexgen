@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import temporalio.workflow
 
 from ..models import (
@@ -17,9 +16,14 @@ from ..models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class Sender:
     token: str
+
+    def __init__(
+        self,
+        token: str,
+    ) -> None:
+        self.token = token
 
     async def submit(
         self,

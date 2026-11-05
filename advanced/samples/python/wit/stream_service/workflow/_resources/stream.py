@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -23,12 +22,19 @@ from ..models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class Stream:
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
     ref: StreamRef
     created: bool | None
+
+    def __init__(
+        self,
+        ref: StreamRef,
+        created: bool | None,
+    ) -> None:
+        self.ref = ref
+        self.created = created
 
     async def publish(
         self,

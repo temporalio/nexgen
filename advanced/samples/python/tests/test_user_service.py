@@ -76,11 +76,14 @@ class UserServiceHandler:
 @workflow.defn
 class UserServiceCallerWorkflow:
     @workflow.run
-    async def run(self) -> User:
+    async def run(self) -> UserData:
         service = user_service.UserServiceClient("user-service")
         user = await service.get_user(user_id="user-123")
         await user.notify(channels=[], sender="ops")
-        return await user.update_email("new@example.com")
+        updated = await user.update_email("new@example.com")
+        assert isinstance(updated, User)
+        # A handle isn't data, so the Workflow returns its identity fields.
+        return UserData(user_id=updated.user_id, email=updated.email)
 
 
 def test_generated_metadata() -> None:
@@ -123,7 +126,7 @@ async def test_get_user_returns_user_resource(env: WorkflowEnvironment) -> None:
         finally:
             await env.delete_nexus_endpoint(endpoint)
 
-    assert isinstance(user, User)
+    assert isinstance(user, UserData)
     assert user.user_id == "user-123"
     assert user.email == "new@example.com"
 

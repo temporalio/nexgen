@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
-import dataclasses
 import typing
 
 from ..models import (
     NotifyRequest,
     UpdateEmailRequest,
 )
+from .._resources._resource_data import UserData
 
 
-@dataclasses.dataclass
 class User:
     user_id: str
     email: str
+
+    def __init__(
+        self,
+        user_id: str,
+        email: str,
+    ) -> None:
+        self.user_id = user_id
+        self.email = email
 
     async def update_email(
         self,
@@ -28,9 +35,13 @@ class User:
         handle = await nexus_client.start_operation(
             operation="UpdateEmail",
             input=request,
-            output_type=User,
+            output_type=UserData,
         )
-        resource = await handle
+        result = await handle
+        resource = User(
+            user_id=result.user_id,
+            email=result.email,
+        )
         return bind_user_client(
             resource,
             nexus_client,

@@ -13,6 +13,7 @@ from ._resources.user import (
     User,
     bind_user_client,
 )
+from ._resources._resource_data import UserData
 
 
 class UserServiceClient:
@@ -33,9 +34,13 @@ class UserServiceClient:
         handle = await self._nexus_client.start_operation(
             operation="GetUser",
             input=request,
-            output_type=User,
+            output_type=UserData,
         )
-        resource = await handle
+        result = await handle
+        resource = User(
+            user_id=result.user_id,
+            email=result.email,
+        )
         return bind_user_client(resource, self._nexus_client)
 
     async def update_email(
@@ -51,9 +56,13 @@ class UserServiceClient:
         handle = await self._nexus_client.start_operation(
             operation="UpdateEmail",
             input=request,
-            output_type=User,
+            output_type=UserData,
         )
-        resource = await handle
+        result = await handle
+        resource = User(
+            user_id=result.user_id,
+            email=result.email,
+        )
         return bind_user_client(resource, self._nexus_client)
 
     async def notify(

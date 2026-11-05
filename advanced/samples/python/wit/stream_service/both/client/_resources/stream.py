@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import collections.abc
-import dataclasses
 import typing
 import temporalio.client
 import uuid as _uuid
@@ -27,7 +26,6 @@ import temporal_support as _support
 from .._poll import PollIterator
 
 
-@dataclasses.dataclass(init=False)
 class Stream:
     """One Stream. Build it from a stream-ref, or get it from a create."""
 

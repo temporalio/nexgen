@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime
 import temporalio.workflow
 
@@ -16,11 +15,20 @@ from ..models import (
 import temporal_support as _support
 
 
-@dataclasses.dataclass
 class StartedWorkflow:
     namespace: str
     workflow_id: str
     run_id: str | None
+
+    def __init__(
+        self,
+        namespace: str,
+        workflow_id: str,
+        run_id: str | None,
+    ) -> None:
+        self.namespace = namespace
+        self.workflow_id = workflow_id
+        self.run_id = run_id
 
     async def cancel(
         self,
