@@ -9,7 +9,8 @@ import temporalio.workflow
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
-    StreamHandle,
+    StreamIdConflictPolicy,
+    StreamRef,
 )
 from .._resources import Stream
 import temporal_support as _support
@@ -28,32 +29,32 @@ async def _create_stream(
         output_type=CreateStreamResult,
     )
     result = await handle
-    if result.handle is None:
-        raise RuntimeError("CreateStream answered without `handle`")
+    if result.ref is None:
+        raise RuntimeError("CreateStream answered without `ref`")
     return Stream(
-        handle=result.handle,
+        ref=result.ref,
         created=result.created or None,
     )
 
 
 async def create_stream(
     *,
-    id: str,
+    stream_ref: StreamRef,
     retention: datetime.timedelta | None = None,
-    stream_handle: StreamHandle | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
 ) -> Stream:
     """
     Args:
-        id: The Stream id. Required, and never empty.
+        stream_ref: The ref of the Stream to create. Its id is the Stream id.
         retention: The age after which a Record is dropped. Empty is the Store default.
-        stream_handle: The handle, whose id is stream-id. With an owner, it needs the
-            handle's owner.
+        id_conflict_policy: What the create does when the Stream exists. Unspecified is
+            fail.
     """
     request = CreateStreamRequest(
-        id=id,
+        stream_ref=stream_ref,
         retention=retention,
         withdraw_run=_support.withdraw_run(),
-        owner=_support.workflow_owner(),
-        stream_handle=stream_handle,
+        id_conflict_policy=id_conflict_policy,
+        request_id=_support.request_id(),
     )
     return await _create_stream(request)
