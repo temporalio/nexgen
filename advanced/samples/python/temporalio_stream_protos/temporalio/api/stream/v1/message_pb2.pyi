@@ -272,6 +272,56 @@ class Producer(_message.Message):
 Global___Producer: _TypeAlias = Producer  # noqa: Y015
 
 @_typing.final
+class StreamWriter(_message.Message):
+    """Experimental. Might change in the future.
+    The Producer of a write, and which earlier Records the write withdraws. An append, a close and
+    a writer carry the same fields, so the Store orders and withdraws each write the same way.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    PRODUCER_FIELD_NUMBER: _builtins.int
+    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
+    FAILED_TASKS_FIELD_NUMBER: _builtins.int
+    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
+    withdraw_run: _builtins.str
+    """Retry run only. The previous run, on the retry run's first write. Every Record whose
+    Producer carries it is withdrawn.
+    """
+    @_builtins.property
+    def producer(self) -> Global___Producer:
+        """Required on a write. Its epoch's case picks the withdrawal rule."""
+
+    @_builtins.property
+    def previous_completed_task(self) -> Global___WorkflowTaskEpoch:
+        """Workflow and Local Activity only. The run's last completed Workflow Task, from a Local
+        Activity's start. Its started_event_id is 0 before the first. The write withdraws the run's
+        Local Activity Records whose Workflow Task never completed.
+        """
+
+    @_builtins.property
+    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """Workflow and Local Activity only. The started event ids of the run's failed or timed out
+        Workflow Tasks. The write withdraws the run's Local Activity Records of these tasks.
+        """
+
+    def __init__(
+        self,
+        *,
+        producer: Global___Producer | None = ...,
+        previous_completed_task: Global___WorkflowTaskEpoch | None = ...,
+        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
+        withdraw_run: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["failed_tasks", b"failed_tasks", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___StreamWriter: _TypeAlias = StreamWriter  # noqa: Y015
+
+@_typing.final
 class AppendRecord(_message.Message):
     """Experimental. Might change in the future.
     One Record of a batch to append. The Store adds the batch's Producer and an offset.
@@ -305,45 +355,21 @@ class StreamSuperseded(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    PRODUCER_ID_FIELD_NUMBER: _builtins.int
-    EPOCH_FIELD_NUMBER: _builtins.int
-    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
-    FAILED_TASKS_FIELD_NUMBER: _builtins.int
-    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
-    RUN_ID_FIELD_NUMBER: _builtins.int
-    producer_id: _builtins.str
-    """The id of the Producer that withdraws."""
-    withdraw_run: _builtins.str
-    """Workflow retry only. The previous run. Every Record whose Producer carries it is withdrawn."""
-    run_id: _builtins.str
-    """The run of the Producer, so nobody parses the id. Empty for a client."""
+    WRITER_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def epoch(self) -> Global___ProducerEpoch:
-        """The epoch of the Producer that withdraws, whose case picks the rule. Empty when only
+    def writer(self) -> Global___StreamWriter:
+        """The writer of the batch that withdraws. Its Producer's epoch is empty when only
         withdraw_run applies.
         """
-
-    @_builtins.property
-    def previous_completed_task(self) -> Global___WorkflowTaskEpoch:
-        """Workflow only. The run's last completed Workflow Task."""
-
-    @_builtins.property
-    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
-        """Workflow only. The started event ids of the run's failed or timed out Workflow Tasks."""
 
     def __init__(
         self,
         *,
-        producer_id: _builtins.str = ...,
-        epoch: Global___ProducerEpoch | None = ...,
-        previous_completed_task: Global___WorkflowTaskEpoch | None = ...,
-        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
-        withdraw_run: _builtins.str = ...,
-        run_id: _builtins.str = ...,
+        writer: Global___StreamWriter | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "previous_completed_task", b"previous_completed_task"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["writer", b"writer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "failed_tasks", b"failed_tasks", "previous_completed_task", b"previous_completed_task", "producer_id", b"producer_id", "run_id", b"run_id", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["writer", b"writer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

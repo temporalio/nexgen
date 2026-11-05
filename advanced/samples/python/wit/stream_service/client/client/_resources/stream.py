@@ -73,18 +73,17 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> int:
-        """Publish values, and return the offset of the last one."""
+        """Append values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.client_producer(),
-            withdraw_run=_support.withdraw_run(),
+            writer=_support.client_writer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -105,7 +104,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.client_producer(),
+            writer=_support.client_writer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,

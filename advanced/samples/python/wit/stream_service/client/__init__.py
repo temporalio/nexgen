@@ -37,6 +37,7 @@ from .models import (
     StreamRef,
     StreamStatus,
     StreamSuperseded,
+    StreamWriter,
     Timestamp,
     WorkflowTaskEpoch,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "StreamRef",
     "StreamStatus",
     "StreamSuperseded",
+    "StreamWriter",
     "Timestamp",
     "WorkflowTaskEpoch",
     "StreamService",

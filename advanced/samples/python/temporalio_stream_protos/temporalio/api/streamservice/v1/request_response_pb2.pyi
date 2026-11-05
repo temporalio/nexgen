@@ -142,12 +142,9 @@ class AppendRecordsRequest(_message.Message):
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    PRODUCER_FIELD_NUMBER: _builtins.int
+    WRITER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
-    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
-    FAILED_TASKS_FIELD_NUMBER: _builtins.int
-    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
     DEFER_WITHDRAWAL_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
@@ -155,11 +152,9 @@ class AppendRecordsRequest(_message.Message):
     """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
     the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
     """
-    withdraw_run: _builtins.str
-    """Local Activity only. The previous run on a retry run's first batch, to withdraw its Records."""
     defer_withdrawal: _builtins.bool
     """Only read by the server, on a Workflow Producer's batch. The batch withdraws no Workflow
-    Task and keeps no task facts, but withdraw_run still applies.
+    Task and keeps no task facts, but the writer's withdraw_run still applies.
     """
     task_token: _builtins.bytes
     """Only read by the server. The server checks the Producer against the Activity's current
@@ -168,41 +163,25 @@ class AppendRecordsRequest(_message.Message):
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef: ...
     @_builtins.property
-    def producer(self) -> _message_pb2.Producer:
+    def writer(self) -> _message_pb2.StreamWriter:
         """Required outside a Workflow. In a Workflow the transport sets it."""
 
     @_builtins.property
     def records(self) -> _containers.RepeatedCompositeFieldContainer[_message_pb2.AppendRecord]: ...
-    @_builtins.property
-    def previous_completed_task(self) -> _message_pb2.WorkflowTaskEpoch:
-        """The run's last completed Workflow Task, from a Local Activity's start. Its started_event_id
-        is 0 before the first. The batch withdraws the run's Local Activity Records whose Workflow
-        Task never completed.
-        """
-
-    @_builtins.property
-    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
-        """The started event ids of the run's failed or timed out Workflow Tasks, from a Local
-        Activity's start. The batch withdraws the run's Local Activity Records of these tasks.
-        """
-
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        producer: _message_pb2.Producer | None = ...,
+        writer: _message_pb2.StreamWriter | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
-        previous_completed_task: _message_pb2.WorkflowTaskEpoch | None = ...,
-        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
-        withdraw_run: _builtins.str = ...,
         defer_withdrawal: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "failed_tasks", b"failed_tasks", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "namespace", b"namespace", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -247,44 +226,30 @@ class CloseStreamRequest(_message.Message):
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    PRODUCER_FIELD_NUMBER: _builtins.int
-    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
-    FAILED_TASKS_FIELD_NUMBER: _builtins.int
-    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
+    WRITER_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
-    withdraw_run: _builtins.str
-    """Only read by the server. The previous run on a retry run's close, to withdraw its Records."""
     task_token: _builtins.bytes
     """Only read by the server. It checks the token as on the append."""
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef: ...
     @_builtins.property
-    def producer(self) -> _message_pb2.Producer:
-        """The Producer that closes the Stream."""
-
-    @_builtins.property
-    def previous_completed_task(self) -> _message_pb2.WorkflowTaskEpoch:
-        """Only read by the server. The run's last completed Workflow Task, as on the append."""
-
-    @_builtins.property
-    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
-        """Only read by the server. The run's failed or timed out Workflow Tasks, as on the append."""
+    def writer(self) -> _message_pb2.StreamWriter:
+        """The writer that closes the Stream. An SDK Store reads only its Producer, and the server
+        also reads its withdrawal fields.
+        """
 
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        producer: _message_pb2.Producer | None = ...,
-        previous_completed_task: _message_pb2.WorkflowTaskEpoch | None = ...,
-        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
-        withdraw_run: _builtins.str = ...,
+        writer: _message_pb2.StreamWriter | None = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["failed_tasks", b"failed_tasks", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "ref", b"ref", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
