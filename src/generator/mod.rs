@@ -355,15 +355,6 @@ impl GeneratedFileMap {
         Ok(prefixed)
     }
 
-    pub(crate) fn rekey_all(self, path: impl Into<PathBuf>) -> Result<Self> {
-        let path = path.into();
-        let mut rekeyed = Self::default();
-        for file in self.files.into_values() {
-            rekeyed.insert(path.clone(), file.contents, file.origin)?;
-        }
-        Ok(rekeyed)
-    }
-
     pub(crate) fn extend(&mut self, other: Self) -> Result<()> {
         for (path, file) in other.files {
             self.insert(path, file.contents, file.origin)?;
@@ -553,7 +544,6 @@ fn generate_go_tree(
         &go::GoOptions {
             output_dir_name: options.go_output_dir_name,
             support_package: options.support_package,
-            ..go::GoOptions::default()
         },
     )
 }

@@ -2,8 +2,9 @@
 
 WIT-generated packages live in directories such as `protobackedshowcase/` and
 `workflowservice/`. Hand-written converters live in [`support/`](support/) for
-ordinary Nexus samples and [`systemsupport/`](systemsupport/) for system Nexus
-samples, outside the regenerated directories.
+ordinary Nexus samples and [`systemsupport/`](systemsupport/) for System Nexus
+samples. The workflow-service sample also generates a facade in
+`workflowservice_facade/`.
 
 ## Using the support package
 
@@ -35,13 +36,14 @@ cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcas
   --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
-The system Nexus sample support source imports `go.temporal.io/sdk/internal`
+The System Nexus sample support source imports `go.temporal.io/sdk/internal`
 because it lives under the SDK module tree; a project in another module cannot
 copy that import unchanged. Adapt those conversions using APIs available to your
 module. For `@nexus.source`, write the helper call without the package prefix.
 The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
-`support.WorkflowNamespace(ctx)`. The support helper calls
-`workflow.GetInfo(ctx).Namespace`. Run `go test ./...` from this sample module
-after generation. Run the same command from your own module root. See
-[the WIT guide](../../../GUIDE.md#go) for more detail. JSON Schema generation
-does not need user support.
+`support.WorkflowNamespace(ctx)`. The System Nexus support helper calls
+`internal.GetWorkflowInfo(ctx).Namespace`. Run `go test ./...` from this sample
+module after generation. Run the same command from your own module root. See
+[the WIT guide](../../../GUIDE.md#go) for support contracts and
+[`@nexus.facade`](../../../GUIDE.md#nexusfacade) for facade generation. JSON
+Schema generation does not need user support.

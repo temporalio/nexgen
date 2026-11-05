@@ -708,6 +708,47 @@ fn build_example_configuration(
         dotnet_namespace: None,
     };
     generate_to_file(&generate_request)?;
+    if language == Language::Go {
+        // Go sample facades live in the implementation's sibling `_facade`
+        // package. Nexgen emits both packages into one staging directory.
+        let facade_path = output_path.with_file_name(format!(
+            "{}_facade",
+            output_path
+                .file_name()
+                .expect("example output names a directory")
+                .to_string_lossy(),
+        ));
+        reset_example_output_directory(&language_root, &facade_path)?;
+        for entry in fs::read_dir(&output_path).map_err(|source| NexgenError::ReadFile {
+            path: output_path.clone(),
+            source,
+        })? {
+            let entry = entry.map_err(|source| NexgenError::ReadFile {
+                path: output_path.clone(),
+                source,
+            })?;
+            let name = entry.file_name();
+            if !name
+                .to_str()
+                .is_some_and(|name| name.ends_with("_facade.go"))
+            {
+                continue;
+            }
+            fs::create_dir_all(&facade_path).map_err(|source| NexgenError::WriteFile {
+                path: facade_path.clone(),
+                source,
+            })?;
+            let destination = facade_path.join(name);
+            fs::rename(entry.path(), &destination).map_err(|source| NexgenError::WriteFile {
+                path: destination,
+                source,
+            })?;
+        }
+        if facade_path.exists() {
+            format_example_output(&language_root, language, &facade_path)?;
+            normalize_example_headers(&facade_path)?;
+        }
+    }
     format_example_output(&language_root, language, &output_path)?;
     normalize_example_headers(&output_path)?;
     println!("Built {} with nexgen", output_path.display());

@@ -1833,6 +1833,7 @@ interface alerts {
                 wire_name: "ExampleService".to_string(),
                 doc: LanguageStringSpec::default(),
                 namespace: LanguageStringSpec::default(),
+                facade: LanguageStringSpec::default(),
                 operations_class: LanguageStringSpec::default(),
                 endpoint: Some("example".to_string()),
                 experimental: false,

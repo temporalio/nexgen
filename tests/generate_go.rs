@@ -168,11 +168,8 @@ fn cli_accepts_unused_go_support_package() {
 fn cli_generates_go_with_package_self_imports_removed() {
     let root = project_root();
     let temp_dir = unique_output_path("go-namespace");
-    // The output directory's basename must match the last path segment of
-    // `@nexus.namespace go="..."` -- the generated package name always comes
-    // from the output directory, and this generated code is declared to live
-    // inside the real `go.temporal.io/sdk/workflow` package.
-    let output_path = temp_dir.join("workflow");
+    // The declared namespace, not the staging directory, owns the package name.
+    let output_path = temp_dir.join("staging");
     fs::create_dir_all(&temp_dir).unwrap();
     let temp_input_path = temp_dir.join("user-service.wit");
     let input = fs::read_to_string(wit_input_path(&root, "user-service"))
@@ -210,45 +207,6 @@ fn cli_generates_go_with_package_self_imports_removed() {
     assert!(!api.contains("const Endpoint"));
     assert!(!api.contains("const GetUserOp"));
     assert!(api.contains("NexusOperationOptions{}"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn cli_rejects_go_output_directory_mismatched_with_namespace() {
-    let root = project_root();
-    let temp_dir = unique_output_path("go-namespace-mismatch");
-    // Deliberately mismatched: the namespace says `workflow`, but the output
-    // directory is named `output`.
-    let output_path = temp_dir.join("output");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let temp_input_path = temp_dir.join("user-service.wit");
-    let input = fs::read_to_string(wit_input_path(&root, "user-service"))
-        .unwrap()
-        .replace(
-            "interface user-service {",
-            "/// @nexus.namespace go=\"go.temporal.io/sdk/workflow\"\ninterface user-service {",
-        );
-    fs::write(&temp_input_path, input).unwrap();
-
-    let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
-        .args([
-            "go",
-            temp_input_path.to_str().unwrap(),
-            "--targets=workflow",
-            "--output",
-            output_path.to_str().unwrap(),
-            "--support-package",
-            "example.com/nexgen/support",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("go.temporal.io/sdk/workflow"), "{stderr}");
-    assert!(stderr.contains("package `workflow`"), "{stderr}");
-    assert!(stderr.contains("package `output`"), "{stderr}");
-    assert!(!output_path.exists());
     fs::remove_dir_all(temp_dir).unwrap();
 }
 

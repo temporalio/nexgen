@@ -1,0 +1,1 @@
+Go WIT workflow API generation supports `@nexus.facade go="..."` alongside `@nexus.namespace go="..."` to generate a facade of type aliases and forwarding functions. Implementation and facade files are emitted side by side for placement into their respective packages.

@@ -1,0 +1,6 @@
+languages = ["go"]
+targets = ["workflow"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.facade` must be used with `@nexus.namespace` for go"]

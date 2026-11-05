@@ -1,0 +1,5 @@
+languages = ["go"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["`@nexus.facade` requires the workflow target (--targets workflow)"]

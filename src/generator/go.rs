@@ -27,6 +27,8 @@ use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 use super::json_schema::go as json;
 use super::proto::go as proto;
 
+mod facade;
+
 type FunctionArgsSpec = GenericFunctionArgsSpec<PlannedFamily>;
 type FunctionFieldSpec = GenericFunctionFieldSpec<PlannedFamily>;
 type FunctionResultSpec = GenericFunctionResultSpec<PlannedFamily>;
@@ -52,12 +54,16 @@ const GO_DOC_COMMENT_LINE_LENGTH: usize = 88;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GoOptions {
-    /// The output directory's basename, matching the Go convention that a
-    /// package's name is its directory's name. Always a real, valid-UTF-8,
-    /// non-root name -- `generate_to_file` resolves and validates it before
-    /// generation runs.
+    /// The fallback package name when no namespace is declared. This is the
+    /// output directory's basename, resolved and validated by `generate_to_file`.
     pub(crate) output_dir_name: String,
     pub(crate) support_package: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GoFacadeOptions {
+    pub(crate) package_name: String,
+    pub(crate) implementation_import_path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -537,6 +543,7 @@ pub(in crate::generator) struct GoPackageContext {
     import_path: Option<String>,
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
+    facade: Option<GoFacadeOptions>,
 }
 
 impl GoPackageContext {
@@ -551,24 +558,24 @@ impl GoPackageContext {
             .primary_namespace()
             .and_then(|namespace| namespace.value())
             .map(str::to_string);
-        let package_name = Self::derive_package_name(&options.output_dir_name)?;
-
-        if let Some(import_path) = &import_path {
-            let namespace_package_name = go_package_name(
-                import_path
-                    .rsplit('/')
-                    .next()
-                    .filter(|segment| !segment.is_empty())
-                    .unwrap_or(import_path),
-            );
-            if namespace_package_name != package_name {
-                return Err(Error::GoNamespacePackageMismatch {
-                    namespace: import_path.clone(),
-                    expected_package: namespace_package_name,
-                    actual_package: package_name,
-                });
-            }
-        }
+        let package_name = match &import_path {
+            Some(path) => Self::derive_package_name(path.rsplit('/').next().unwrap_or(path))?,
+            None => Self::derive_package_name(&options.output_dir_name)?,
+        };
+        let facade = api_plan
+            .primary_facade()
+            .and_then(|facade| facade.value())
+            .map(|facade| {
+                Ok(GoFacadeOptions {
+                    package_name: Self::derive_package_name(
+                        facade.rsplit('/').next().unwrap_or(facade),
+                    )?,
+                    implementation_import_path: import_path
+                        .clone()
+                        .expect("facade requires an implementation namespace"),
+                })
+            })
+            .transpose()?;
 
         Ok(Self {
             package_name,
@@ -580,6 +587,7 @@ impl GoPackageContext {
                     .flat_map(|service| &service.operations)
                     .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
+            facade,
         })
     }
 
@@ -607,7 +615,9 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn go_type_expr(&self, type_expr: &str) -> String {
         let (imports, code_expr) = parse_go_expr(type_expr);
-        if imports.iter().any(|path| self.is_self_import(path)) {
+        if imports.iter().any(|path| {
+            self.is_self_import(path) || (self.import_path.is_some() && path == &self.package_name)
+        }) {
             self.unqualify_self_expr(&code_expr)
         } else {
             code_expr
@@ -616,26 +626,47 @@ impl GoPackageContext {
 
     fn function_name_extractor(&self, reference: &str) -> String {
         if self.support_package.is_some() && !reference.contains('.') {
-            format!("support.{reference}")
+            self.support_reference(reference)
         } else {
             self.go_type_expr(reference)
         }
     }
 
+    pub(in crate::generator) fn support_reference(&self, reference: &str) -> String {
+        match &self.support_package {
+            Some(path) if !self.is_self_import(path) => format!("support.{reference}"),
+            _ => self.go_type_expr(reference),
+        }
+    }
+
+    fn workflow_import(&self) -> &'static str {
+        if crate::nexgen_config::current().system_nexus {
+            "go.temporal.io/sdk/internal"
+        } else {
+            "go.temporal.io/sdk/workflow"
+        }
+    }
+
+    fn workflow_reference(&self, name: &str) -> String {
+        let path = self.workflow_import();
+        let qualifier = path.rsplit('/').next().unwrap();
+        self.qualified_expr(path, &format!("{qualifier}.{name}"))
+    }
+
     pub(in crate::generator) fn workflow_context_type(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Context")
+        self.workflow_reference("Context")
     }
 
     fn workflow_future_type(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Future")
+        self.workflow_reference("Future")
     }
 
     pub(in crate::generator) fn new_future(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.NewFuture")
+        self.workflow_reference("NewFuture")
     }
 
     fn workflow_go(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Go")
+        self.workflow_reference("Go")
     }
 
     pub(in crate::generator) fn new_nexus_client(&self) -> String {
@@ -643,10 +674,7 @@ impl GoPackageContext {
     }
 
     pub(in crate::generator) fn nexus_operation_options(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/workflow",
-            "workflow.NexusOperationOptions{}",
-        )
+        self.workflow_reference("NexusOperationOptions{}")
     }
 
     pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
@@ -729,8 +757,9 @@ fn generate_in_tree(
     options: &GoOptions,
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
+    file_name: Option<PathBuf>,
 ) -> Result<GoGenerationResult> {
-    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -767,7 +796,7 @@ fn generate_single_leaf(
     } else {
         GeneratedFileOrigin::fixed("generated Go API module")
     };
-    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin)?;
+    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin, None)?;
     if go_tree_has_json_models(&[leaf]) {
         let package_name = GoPackageContext::new(&leaf.spec, options)?.package_name;
         let definitions_path = PathBuf::from("definitions.go");
@@ -825,14 +854,11 @@ fn generate_branch_tree(
             options,
             &tree_models,
             GeneratedFileOrigin::input_module(Language::Go, &leaf.source_path),
+            Some(go_flat_module_file_name(&leaf.module_path)),
         )?;
         warnings.extend(generated.warnings);
 
-        // `generate` names the single JSON member file `<package>.go`; re-key it
-        // to the flattened module path so each input file gets its own file in
-        // the flat package.
-        let file_name = go_flat_module_file_name(&leaf.module_path);
-        files.extend(generated.files.rekey_all(file_name)?)?;
+        files.extend(generated.files)?;
     }
 
     // The schema-independent runtime lives once in this package as
@@ -1143,7 +1169,11 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
+    fn generate(
+        mut self,
+        primary_origin: GeneratedFileOrigin,
+        file_name: Option<PathBuf>,
+    ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
@@ -1254,9 +1284,9 @@ impl<'a> ApiPlanner<'a> {
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
-        if has_operations && !self.package.is_self_import("go.temporal.io/sdk/workflow") {
+        if has_operations && !self.package.is_self_import(self.package.workflow_import()) {
             self.imports
-                .insert("go.temporal.io/sdk/workflow".to_string());
+                .insert(self.package.workflow_import().to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
@@ -1327,10 +1357,10 @@ impl<'a> ApiPlanner<'a> {
             .contains(&GenerationTarget::Workflow)
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
-            && !self.package.is_self_import("go.temporal.io/sdk/workflow")
+            && !self.package.is_self_import(self.package.workflow_import())
         {
             self.imports
-                .insert("go.temporal.io/sdk/workflow".to_string());
+                .insert(self.package.workflow_import().to_string());
         }
         let mut external_imports = self.external_models.imports();
         let registry = if crate::nexgen_config::current().system_nexus
@@ -1394,6 +1424,7 @@ impl<'a> ApiPlanner<'a> {
                     })
                 }))
             && let Some(path) = &self.package.support_package
+            && !self.package.is_self_import(path)
             && !external_imports
                 .iter()
                 .any(|(existing, _)| existing == path)
@@ -1423,12 +1454,40 @@ impl<'a> ApiPlanner<'a> {
         );
 
         let mut files = GeneratedFileMap::default();
-        let file_name = if self.external_models.renders_operation_references() {
-            PathBuf::from(format!("{}.go", self.package.package_name))
-        } else {
-            go_api_file_name(self.api_plan)
-        };
-        files.insert(file_name, output, primary_origin)?;
+        let file_name = file_name.unwrap_or_else(|| {
+            if self.external_models.renders_operation_references() {
+                PathBuf::from(format!("{}.go", self.package.package_name))
+            } else {
+                go_api_file_name(self.api_plan)
+            }
+        });
+        files.insert(&file_name, output, primary_origin)?;
+
+        if let Some(options) = &self.package.facade {
+            files.insert(
+                file_name.with_file_name(format!(
+                    "{}_facade.go",
+                    file_name
+                        .file_stem()
+                        .expect("Go output has a file stem")
+                        .to_string_lossy()
+                )),
+                facade::render(
+                    options,
+                    &self.package,
+                    &self.imports,
+                    &external_imports,
+                    &self.enums,
+                    &self.flags,
+                    &self.variants,
+                    &self.models,
+                    &services,
+                    self.api_plan,
+                    &visibility,
+                ),
+                GeneratedFileOrigin::fixed("generated Go facade"),
+            )?;
+        }
 
         Ok(GoGenerationResult {
             files,
@@ -1563,7 +1622,10 @@ impl<'a> ApiPlanner<'a> {
                                                 format!("*{}", field.go_type)
                                             },
                                         ),
-                                        default_expression: planned.default_expression.clone(),
+                                        default_expression: planned
+                                            .default_expression
+                                            .as_deref()
+                                            .map(|value| self.package.go_type_expr(value)),
                                     }
                                 })
                                 .collect(),
@@ -1627,7 +1689,10 @@ impl<'a> ApiPlanner<'a> {
                         public_go_type,
                         default_punning_zero,
                         default_input,
-                        default_expression: planned_field.default_expression.clone(),
+                        default_expression: planned_field
+                            .default_expression
+                            .as_deref()
+                            .map(|value| self.package.go_type_expr(value)),
                         function,
                         function_args,
                         required: planned_field.api_required,
@@ -1663,7 +1728,7 @@ impl<'a> ApiPlanner<'a> {
             wire_name: operation.wire_name.as_str(),
             doc: operation.doc.value(),
             return_doc: operation.return_doc.value(),
-            func_name: go_unexported_name(&operation.name),
+            func_name: go_declaration_name(&go_unexported_name(&operation.name)),
             input_type,
             model_type_parameters,
             output_type,
@@ -1962,6 +2027,7 @@ impl<'a> ApiPlanner<'a> {
                     message.info.full_name.clone(),
                     RenderedModel {
                         name: message.model_name.clone(),
+                        type_parameters: Vec::new(),
                         fields: Vec::new(),
                     },
                 );
@@ -1979,6 +2045,10 @@ impl<'a> ApiPlanner<'a> {
             message.info.full_name.clone(),
             RenderedModel {
                 name: go_generic_declaration_name(&model_name, &model_parameters),
+                type_parameters: model_parameters
+                    .iter()
+                    .map(|usage| usage.parameter.name.clone())
+                    .collect(),
                 fields: Vec::new(),
             },
         );
@@ -2031,7 +2101,11 @@ impl<'a> ApiPlanner<'a> {
                 PlannedFieldKind::Singular(value) => {
                     let resolved = self.resolve_planned_value_type(value)?;
                     if !field.required
-                        && type_needs_pointer_when_optional(value, &resolved.type_expr)
+                        && type_needs_pointer_when_optional(
+                            value,
+                            &resolved.type_expr,
+                            &self.package,
+                        )
                     {
                         format!("*{}", resolved.type_expr)
                     } else {
@@ -2218,9 +2292,8 @@ fn render_operation_registry(
         "go.temporal.io/sdk/internal",
         "internal.SystemNexusRegistryEntry",
     );
-    output.push_str(&format!(
-        "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
-    ));
+    let registry_name = go_declaration_name("nexusOperationRegistry");
+    output.push_str(&format!("\nvar {registry_name} = map[{key}]{info}{{\n"));
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
@@ -2258,7 +2331,7 @@ fn render_operation_registry(
             "internal.UpdateSystemNexusRegistry",
         );
         output.push_str(&format!(
-            "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
+            "\nfunc init() {{\n\t{register}({registry_name})\n}}\n"
         ));
     }
     Ok(GoOperationRegistry {
@@ -2486,6 +2559,7 @@ struct RenderedVariantCase {
 pub(in crate::generator) struct RenderedModel {
     /// Go type name (e.g. `"UserProfile"`, `"Coordinates"`).
     pub(in crate::generator) name: String,
+    pub(in crate::generator) type_parameters: Vec<String>,
     /// Struct fields in declaration order.
     pub(in crate::generator) fields: Vec<RenderedField>,
 }
@@ -2636,39 +2710,56 @@ fn compute_go_visibility(
     };
 
     for (key, enumeration) in enums {
-        if !visibility.is_public(key) {
-            visibility.type_name_replacements.insert(
-                enumeration.name.clone(),
-                go_unexported_name(&enumeration.name),
-            );
-        }
+        let name = if visibility.is_public(key) {
+            enumeration.name.clone()
+        } else {
+            go_unexported_name(&enumeration.name)
+        };
+        visibility
+            .type_name_replacements
+            .insert(enumeration.name.clone(), go_declaration_name(&name));
     }
     for (key, flag_set) in flags {
-        if !visibility.is_public(key) {
-            visibility
-                .type_name_replacements
-                .insert(flag_set.name.clone(), go_unexported_name(&flag_set.name));
-        }
+        let name = if visibility.is_public(key) {
+            flag_set.name.clone()
+        } else {
+            go_unexported_name(&flag_set.name)
+        };
+        visibility
+            .type_name_replacements
+            .insert(flag_set.name.clone(), go_declaration_name(&name));
     }
     for (key, variant) in variants {
-        if !visibility.is_public(key) {
+        for name in
+            std::iter::once(&variant.name).chain(variant.cases.iter().map(|case| &case.struct_name))
+        {
+            let emitted = if visibility.is_public(key) {
+                name.clone()
+            } else {
+                go_unexported_name(name)
+            };
             visibility
                 .type_name_replacements
-                .insert(variant.name.clone(), go_unexported_name(&variant.name));
-            for case in &variant.cases {
-                visibility.type_name_replacements.insert(
-                    case.struct_name.clone(),
-                    go_unexported_name(&case.struct_name),
-                );
-            }
+                .insert(name.clone(), go_declaration_name(&emitted));
         }
     }
     for (key, model) in models {
-        if !visibility.is_public(key) {
-            let (ident, _) = split_go_type_decl_name(&model.name);
+        let (ident, _) = split_go_type_decl_name(&model.name);
+        let name = if visibility.is_public(key) {
+            ident.to_string()
+        } else {
+            go_unexported_name(ident)
+        };
+        visibility
+            .type_name_replacements
+            .insert(ident.to_string(), go_declaration_name(&name));
+    }
+    for service in &api_plan.services {
+        for resource in &service.resources {
+            let name = &resource.data.type_name;
             visibility
                 .type_name_replacements
-                .insert(ident.to_string(), go_unexported_name(ident));
+                .insert(name.clone(), go_declaration_name(name));
         }
     }
 
@@ -3157,7 +3248,11 @@ fn go_generic_reference(
 /// messages, and override/replacement types -- so that "unset" is distinct from
 /// "set to the zero value". Types whose zero value is already `nil` need no
 /// pointer: variants (interfaces) and any `any`-typed value.
-fn type_needs_pointer_when_optional(value: &PlannedValueType, type_expr: &str) -> bool {
+fn type_needs_pointer_when_optional(
+    value: &PlannedValueType,
+    type_expr: &str,
+    package: &GoPackageContext,
+) -> bool {
     if matches!(
         value,
         PlannedValueType::Variant(_) | PlannedValueType::Unknown
@@ -3166,8 +3261,13 @@ fn type_needs_pointer_when_optional(value: &PlannedValueType, type_expr: &str) -
     }
     if matches!(
         type_expr,
-        "client.VersioningOverride" | "temporal.SearchAttributes"
-    ) {
+        "client.VersioningOverride"
+            | "temporal.SearchAttributes"
+            | "internal.VersioningOverride"
+            | "internal.SearchAttributes"
+    ) || (package.is_self_import("go.temporal.io/sdk/internal")
+        && matches!(type_expr, "VersioningOverride" | "SearchAttributes"))
+    {
         return false;
     }
     // Already-nilable Go types represent absence directly.
@@ -3207,10 +3307,10 @@ fn ensure_generic_tuple(
     let type_name = format!("Tuple{arity}");
     let key = format!("{GENERIC_MODEL_KEY_PREFIX}{type_name}");
     if !models.contains_key(&key) {
-        let params = (1..=arity)
+        let type_parameters = (1..=arity)
             .map(|index| format!("T{index}"))
-            .collect::<Vec<_>>()
-            .join(", ");
+            .collect::<Vec<_>>();
+        let params = type_parameters.join(", ");
         let fields = (0..arity)
             .map(|index| RenderedField {
                 name: TUPLE_FIELD_NAMES[index].to_string(),
@@ -3224,6 +3324,7 @@ fn ensure_generic_tuple(
             key,
             RenderedModel {
                 name: format!("{type_name}[{params} any]"),
+                type_parameters,
                 fields,
             },
         );
@@ -3240,6 +3341,7 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
             key,
             RenderedModel {
                 name: "Result[T, E any]".to_string(),
+                type_parameters: vec!["T".to_string(), "E".to_string()],
                 fields: vec![
                     RenderedField {
                         name: "Result".to_string(),
@@ -3264,6 +3366,9 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
 /// Converts a PascalCase name to an unexported Go identifier by lowercasing
 /// the first character (e.g. `"GetUser"` becomes `"getUser"`).
 pub(in crate::generator) fn go_unexported_name(name: &str) -> String {
+    if let Some(name) = name.strip_prefix("SystemNexus_") {
+        return format!("systemnexus_{}", go_unexported_name(name));
+    }
     let mut chars = name.chars();
     match chars.next() {
         None => String::new(),
@@ -3273,6 +3378,18 @@ pub(in crate::generator) fn go_unexported_name(name: &str) -> String {
             go_ident(&result)
         }
     }
+}
+
+pub(in crate::generator) fn go_declaration_name(name: &str) -> String {
+    if !crate::nexgen_config::current().system_nexus {
+        return name.to_string();
+    }
+    let prefix = if is_go_exported_decl(name) {
+        "SystemNexus_"
+    } else {
+        "systemnexus_"
+    };
+    format!("{prefix}{name}")
 }
 
 /// Converts a WIT field name (kebab-case) to an exported Go field name
@@ -4403,7 +4520,7 @@ fn render_resource(
     constructor_returns_value: bool,
 ) {
     output.push_str("type ");
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" struct {\n");
 
     if resource.fields.is_empty() {
@@ -4431,8 +4548,8 @@ fn render_resource(
         output.push_str("}\n");
     }
 
-    output.push_str("\nfunc New");
-    output.push_str(&resource.type_name);
+    output.push_str("\nfunc ");
+    output.push_str(&go_declaration_name(&format!("New{}", resource.type_name)));
     output.push('(');
     for (index, field) in resource.fields.iter().enumerate() {
         if index > 0 {
@@ -4456,7 +4573,7 @@ fn render_resource(
     if !constructor_returns_value {
         output.push('*');
     }
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" {\n");
     for field in resource.fields.iter().filter(|field| field.optional) {
         let name = go_unexported_name(&go_field_name(&field.name));
@@ -4482,7 +4599,7 @@ fn render_resource(
     if !constructor_returns_value {
         output.push('&');
     }
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str("{\n");
     for field in &resource.fields {
         let name = go_unexported_name(&go_field_name(&field.name));
@@ -4525,7 +4642,7 @@ pub(in crate::generator) fn resolve_resource_field_kind(
         PlannedFieldKind::Singular(value) => {
             let (base_type, _is_struct) =
                 resolve_resource_value_type_with_struct_flag(value, package);
-            if optional && type_needs_pointer_when_optional(value, &base_type) {
+            if optional && type_needs_pointer_when_optional(value, &base_type, package) {
                 format!("*{base_type}")
             } else {
                 base_type
@@ -4665,7 +4782,7 @@ fn render_resource_methods(
 
                 // Method signature: func (u *Type) Method(ctx workflow.Context, params...) (return)
                 output.push_str("func (u *");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push_str(") ");
                 output.push_str(&method_name);
                 output.push_str("(ctx ");
@@ -4899,7 +5016,7 @@ fn render_resource_methods(
             PlannedResourceMethodBinding::Stub => {
                 // Stub method -- emit a panic placeholder
                 output.push_str("func (u *");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push_str(") ");
                 output.push_str(&method_name);
                 output.push_str("(ctx ");
@@ -4917,7 +5034,7 @@ fn render_resource_methods(
                 render_operation_future_return_type(output, package);
                 output.push_str(" {\n");
                 output.push_str("\tpanic(\"");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push('.');
                 output.push_str(&method_name);
                 output.push_str(" is not yet implemented\")\n");
@@ -4980,7 +5097,11 @@ pub(in crate::generator) fn new_nexus_client_expr(
 ) -> String {
     if crate::nexgen_config::current().system_nexus {
         return format!(
-            "internal.NewSystemNexusClient({})",
+            "{}({})",
+            package.qualified_expr(
+                "go.temporal.io/sdk/internal",
+                "internal.NewSystemNexusClient"
+            ),
             go_string_literal(service_name)
         );
     }
@@ -5093,7 +5214,7 @@ fn render_options_struct(
     params: &[RenderedUnpackedParam],
 ) {
     output.push_str("type ");
-    output.push_str(&go_field_name(operation.name));
+    output.push_str(&go_declaration_name(&go_field_name(operation.name)));
     output.push_str("Options");
     render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
     output.push_str(" struct {\n");
@@ -5135,7 +5256,7 @@ fn render_options_struct(
 
 fn render_empty_options_struct(output: &mut String, operation: &RenderedOperation<'_>) {
     output.push_str("type ");
-    output.push_str(&go_field_name(operation.name));
+    output.push_str(&go_declaration_name(&go_field_name(operation.name)));
     output.push_str("Options");
     render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
     output.push_str(" struct {\n}\n");
@@ -5615,7 +5736,7 @@ fn render_convenience_wrapper(
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) {
-    let exported_name = go_field_name(operation.name);
+    let exported_name = go_declaration_name(&go_field_name(operation.name));
     let type_params = wrapper_type_parameters(operation, params, package, visibility);
 
     let positional_params = ordered_positional_params(params);
@@ -5916,7 +6037,7 @@ fn render_forwarding_wrapper(
     operation: &RenderedOperation<'_>,
     package: &GoPackageContext,
 ) {
-    let exported_name = go_field_name(operation.name);
+    let exported_name = go_declaration_name(&go_field_name(operation.name));
 
     render_operation_doc_comment(output, operation, &[]);
     output.push_str("func ");
@@ -5950,9 +6071,130 @@ mod tests {
     use crate::error::Error;
 
     #[test]
+    fn system_nexus_declaration_names_preserve_visibility() {
+        assert_eq!(super::go_declaration_name("Request"), "Request");
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        assert_eq!(super::go_declaration_name("Request"), "SystemNexus_Request");
+        assert_eq!(super::go_declaration_name("call"), "systemnexus_call");
+        assert_eq!(
+            super::go_unexported_name("SystemNexus_Request"),
+            "systemnexus_request"
+        );
+    }
+
+    #[test]
+    fn system_nexus_visibility_keeps_unpacked_requests_private() {
+        use crate::spec::CompilerPass;
+
+        let input = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("advanced/samples/inputs/multi-operation-service.wit");
+        let tree = crate::parser::load_api_spec_tree_for_language_with_inputs(
+            crate::language::Language::Go,
+            &[input],
+        )
+        .unwrap();
+        let selected = crate::planning::LanguageSelectionPass::new(crate::language::Language::Go)
+            .apply(tree)
+            .unwrap();
+        let descriptors = crate::descriptors::DescriptorIndex::load_many(&[]).unwrap();
+        let bound = crate::planning::ResourceResolutionPass::new(
+            &descriptors,
+            vec![crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .apply(selected)
+        .unwrap();
+        let bound = crate::planning::OperationBindingPass::new()
+            .apply(bound)
+            .unwrap();
+        let lowered = crate::planning::OperationLoweringPass::new()
+            .apply(bound)
+            .unwrap();
+        let planned = crate::planning::TypePlanningPass::new(&lowered, &descriptors)
+            .apply(lowered)
+            .unwrap();
+        let crate::spec::ApiSpecNode::Leaf(leaf) = planned.root else {
+            panic!("expected a single sample module");
+        };
+        let models = leaf
+            .spec
+            .records()
+            .map(|(key, record)| {
+                (
+                    key.to_string(),
+                    super::RenderedModel {
+                        name: record.name.clone(),
+                        type_parameters: Vec::new(),
+                        fields: Vec::new(),
+                    },
+                )
+            })
+            .collect();
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let visibility = super::compute_go_visibility(
+            &leaf.spec,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &models,
+        );
+        for (key, record) in leaf.spec.records() {
+            assert_eq!(visibility.is_public(key), record.name == "Response");
+        }
+        assert_eq!(visibility.rewrite_go_expr("Request"), "systemnexus_request");
+        assert_eq!(
+            visibility.rewrite_go_expr("Response"),
+            "SystemNexus_Response"
+        );
+    }
+
+    #[test]
+    fn same_package_support_resolves_local_references() {
+        let package = super::GoPackageContext {
+            package_name: "internal".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal".to_string()),
+            has_serialization_context: false,
+            support_package: Some("go.temporal.io/sdk/internal".to_string()),
+            facade: None,
+        };
+        assert_eq!(
+            package.support_reference("DurationToProto"),
+            "DurationToProto"
+        );
+        assert_eq!(
+            package.function_name_extractor("WorkflowFunctionName"),
+            "WorkflowFunctionName"
+        );
+        assert_eq!(
+            package.go_type_expr("internal.GetWorkflowInfo(ctx).Namespace"),
+            "GetWorkflowInfo(ctx).Namespace"
+        );
+        let value = super::PlannedValueType::Scalar(super::PlannedScalarType::String);
+        for name in [
+            "SearchAttributes",
+            "VersioningOverride",
+            "internal.SearchAttributes",
+            "internal.VersioningOverride",
+        ] {
+            assert!(!super::type_needs_pointer_when_optional(
+                &value, name, &package
+            ));
+        }
+        assert!(super::type_needs_pointer_when_optional(
+            &value, "Request", &package
+        ));
+    }
+
+    #[test]
     fn record_getters_skip_private_fields() {
         let model = super::RenderedModel {
             name: "Request".to_string(),
+            type_parameters: Vec::new(),
             fields: ["ID", "iD"]
                 .into_iter()
                 .map(|name| super::RenderedField {
@@ -6036,6 +6278,7 @@ mod tests {
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
             has_serialization_context: false,
             support_package: None,
+            facade: None,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -6047,10 +6290,11 @@ mod tests {
             "TransferTypeConverter"
         );
         let package = super::GoPackageContext {
-            package_name: "workflow".to_string(),
-            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            package_name: "internal".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal".to_string()),
             has_serialization_context: false,
             support_package: None,
+            facade: None,
         };
         assert_eq!(
             package.new_transfer_type_converter(),

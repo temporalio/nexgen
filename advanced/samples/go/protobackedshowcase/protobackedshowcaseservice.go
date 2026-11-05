@@ -16,7 +16,7 @@ import (
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	support "go.temporal.io/sdk/advanced/samples/go/support"
 	"go.temporal.io/sdk/converter"
-	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/internal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -230,18 +230,18 @@ type ActivityOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue *string
 	// RetryPolicy - Required.
-	RetryPolicy temporal.RetryPolicy
+	RetryPolicy internal.RetryPolicy
 	// ScheduleToCloseTimeout - Optional.
 	ScheduleToCloseTimeout *time.Duration
 	// Priority - Optional.
-	Priority *temporal.Priority
+	Priority *internal.Priority
 }
 
 func (m ActivityOptions) GetTaskQueue() *string {
 	return m.TaskQueue
 }
 
-func (m ActivityOptions) GetRetryPolicy() temporal.RetryPolicy {
+func (m ActivityOptions) GetRetryPolicy() internal.RetryPolicy {
 	return m.RetryPolicy
 }
 
@@ -249,7 +249,7 @@ func (m ActivityOptions) GetScheduleToCloseTimeout() *time.Duration {
 	return m.ScheduleToCloseTimeout
 }
 
-func (m ActivityOptions) GetPriority() *temporal.Priority {
+func (m ActivityOptions) GetPriority() *internal.Priority {
 	return m.Priority
 }
 
@@ -735,11 +735,11 @@ type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
 	// RetryPolicy - Required.
-	RetryPolicy temporal.RetryPolicy
+	RetryPolicy internal.RetryPolicy
 	// ScheduleToCloseTimeout - Optional.
 	ScheduleToCloseTimeout time.Duration
 	// Priority - Optional.
-	Priority *temporal.Priority
+	Priority *internal.Priority
 }
 
 func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions) workflow.Future {

@@ -6074,6 +6074,7 @@ fn build_service(
         wire_name: service.fqn.clone().unwrap_or(service_name),
         doc: language_string(service.description.clone()),
         namespace: LanguageStringSpec::default(),
+        facade: LanguageStringSpec::default(),
         operations_class: LanguageStringSpec::default(),
         endpoint: service.endpoint.clone(),
         experimental: false,

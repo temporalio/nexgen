@@ -112,6 +112,7 @@ fn api_spec_from_wit(
             model_scope.get_or_insert(crate::spec::ModelScopeSpec {
                 name: service.name,
                 namespace: service.namespace,
+                facade: service.facade,
             });
             continue;
         }
@@ -2659,6 +2660,34 @@ fn build_service(
     let namespace = directive(&directives, "namespace", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let facade = directive(&directives, "facade", path, &context)?
+        .map(directive_language_string)
+        .unwrap_or_default();
+    if facade.for_language(language).is_some() {
+        if namespace.for_language(language).is_none() {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.clone(),
+                directive: "@nexus.facade".to_string(),
+                reason: format!(
+                    "`@nexus.facade` must be used with `@nexus.namespace` for {}",
+                    language_key(language),
+                ),
+            });
+        }
+        if !crate::nexgen_config::current()
+            .targets
+            .contains(&GenerationTarget::Workflow)
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.clone(),
+                directive: "@nexus.facade".to_string(),
+                reason: "`@nexus.facade` requires the workflow target (--targets workflow)"
+                    .to_string(),
+            });
+        }
+    }
     let operations_class = directive(&directives, "operations-class", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
@@ -2696,6 +2725,7 @@ fn build_service(
         wire_name: wire_service_name,
         doc: LanguageStringSpec::default(),
         namespace,
+        facade,
         operations_class,
         endpoint,
         experimental,

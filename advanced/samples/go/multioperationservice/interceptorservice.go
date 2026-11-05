@@ -4,62 +4,61 @@ package multioperationservice
 
 import (
 	"go.temporal.io/sdk/internal"
-	"go.temporal.io/sdk/workflow"
 )
 
 // --- Datatypes ---
 
-type request struct {
+type systemnexus_request struct {
 	ID string
 }
 
-func (m request) GetID() string {
+func (m systemnexus_request) GetID() string {
 	return m.ID
 }
 
 // --- Operations (internal) ---
 
-func firstOperation(ctx workflow.Context, request request) workflow.Future {
+func systemnexus_firstOperation(ctx internal.Context, request systemnexus_request) internal.Future {
 	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "FirstOperation", request, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "FirstOperation", request, internal.NexusOperationOptions{})
 	return fut
 }
 
-func secondOperation(ctx workflow.Context, request request) workflow.Future {
+func systemnexus_secondOperation(ctx internal.Context, request systemnexus_request) internal.Future {
 	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "SecondOperation", request, workflow.NexusOperationOptions{})
+	fut := c.ExecuteOperation(ctx, "SecondOperation", request, internal.NexusOperationOptions{})
 	return fut
 }
 
 // --- Operations (public API) ---
 
-type Response struct {
+type SystemNexus_Response struct {
 	// Value - Required.
 	Value string
 }
 
-func (m Response) GetValue() string {
+func (m SystemNexus_Response) GetValue() string {
 	return m.Value
 }
 
-type FirstOperationOptions struct {
+type SystemNexus_FirstOperationOptions struct {
 	// ID - Required.
 	ID string
 }
 
-func FirstOperation(ctx workflow.Context, opts FirstOperationOptions) workflow.Future {
-	return firstOperation(ctx, request{
+func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions) internal.Future {
+	return systemnexus_firstOperation(ctx, systemnexus_request{
 		ID: opts.ID,
 	})
 }
 
-type SecondOperationOptions struct {
+type SystemNexus_SecondOperationOptions struct {
 	// ID - Required.
 	ID string
 }
 
-func SecondOperation(ctx workflow.Context, opts SecondOperationOptions) workflow.Future {
-	return secondOperation(ctx, request{
+func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions) internal.Future {
+	return systemnexus_secondOperation(ctx, systemnexus_request{
 		ID: opts.ID,
 	})
 }

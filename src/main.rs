@@ -184,13 +184,16 @@ fn main() -> ExitCode {
             request.dotnet_namespace = args.namespace;
             generate_to_file(&request)
         }
-        Commands::Go(args) => generate_to_file(&generate_request(
-            Language::Go,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
+        Commands::Go(args) => {
+            let request = generate_request(
+                Language::Go,
+                args.common,
+                Default::default(),
+                None,
+                args.support_package,
+            );
+            generate_to_file(&request)
+        }
         Commands::Java(args) => generate_to_file(&generate_request(
             Language::Java,
             args.common,

@@ -17,11 +17,11 @@ use crate::spec::{ExternalTypeSpec, FieldOrigin, RecordSpec};
 use crate::generator::go::{
     GoPackageContext, PlannedEnumType, PlannedFieldKind, PlannedMessageSource, PlannedMessageType,
     PlannedOperationOutput, PlannedOperationResourceReturn, PlannedScalarType, PlannedTypeInfo,
-    PlannedValueType, RenderedModel, RenderedService, go_authored_type_annotation, go_field_name,
-    go_replacement_type_name, go_string_literal, go_unexported_name, new_nexus_client_expr,
-    operation_output, planned_field, planned_field_kind, planned_message_type,
-    public_default_punning_zero_for_field, record_for_message, record_for_model_key,
-    render_operation_future_adapter, render_operation_future_return_type,
+    PlannedValueType, RenderedModel, RenderedService, go_authored_type_annotation,
+    go_declaration_name, go_field_name, go_replacement_type_name, go_string_literal,
+    go_unexported_name, new_nexus_client_expr, operation_output, planned_field, planned_field_kind,
+    planned_message_type, public_default_punning_zero_for_field, record_for_message,
+    record_for_model_key, render_operation_future_adapter, render_operation_future_return_type,
     resolve_resource_field_kind, split_go_type_decl_name,
 };
 
@@ -172,7 +172,9 @@ impl ModelBackend {
     }
 
     fn register_support_import(&self) {
-        if let Some(path) = &self.support_package {
+        if let Some(path) = &self.support_package
+            && !self.package.is_self_import(path)
+        {
             self.imports
                 .borrow_mut()
                 .by_path
@@ -181,12 +183,8 @@ impl ModelBackend {
     }
 
     pub(in crate::generator) fn support_converter(&self, name: String) -> String {
-        if self.support_package.is_some() {
-            self.register_support_import();
-            format!("support.{name}")
-        } else {
-            name
-        }
+        self.register_support_import();
+        self.package.support_reference(&name)
     }
 
     pub(in crate::generator) fn message_proto_type(
@@ -486,6 +484,7 @@ fn go_enum_conversion(
         enum_type
             .name
             .clone()
+            .map(|name| go_declaration_name(&name))
             .ok_or_else(|| "the enum has no generated Go name".to_string())?
     };
 
@@ -570,7 +569,7 @@ fn go_message_conversion(
     }
 
     if message.source == PlannedMessageSource::Proto {
-        let base = go_unexported_name(&message.model_name);
+        let base = go_unexported_name(&backend.model_name(message));
         let from_proto = format!("{base}FromProto");
         let to_proto = format!("{base}ToProto");
         let config_arg = if crate::nexgen_config::current().system_nexus {
@@ -1253,7 +1252,7 @@ pub(in crate::generator) fn render_operation_function_proto(
         render_operation_future_adapter(
             output,
             package,
-            &resource_return.resource_type_name,
+            &go_declaration_name(&resource_return.resource_type_name),
             false,
             |output| {
                 output.push_str("\t\tvar result ");
@@ -1276,7 +1275,10 @@ pub(in crate::generator) fn render_operation_function_proto(
                     output.push_str(line);
                     output.push('\n');
                 }
-                let mut resource = format!("New{}(", resource_return.resource_type_name);
+                let mut resource = format!(
+                    "{}(",
+                    go_declaration_name(&format!("New{}", resource_return.resource_type_name))
+                );
                 for (index, initializer) in resource_return.field_initializers.iter().enumerate() {
                     if index > 0 {
                         resource.push_str(", ");
@@ -1479,7 +1481,11 @@ fn build_rendered_resource_return(
                 };
                 fields.push((go_field_name(&field.name), expr));
             }
-            Some((holder.model_name.clone(), resource_field, fields))
+            Some((
+                go_declaration_name(&holder.model_name),
+                resource_field,
+                fields,
+            ))
         }
         None => None,
     };

@@ -6,7 +6,8 @@ world system {
 
 /// @nexus.endpoint "temporal-system" go="__temporal_system" python="__temporal_system"
 /// @nexus.service-name "temporal.api.workflowservice.v1.WorkflowService"
-/// @nexus.namespace dotnet="Temporalio.Workflows"
+/// @nexus.namespace dotnet="Temporalio.Workflows" go="go.temporal.io/sdk/advanced/samples/go/workflowservice"
+/// @nexus.facade go="go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 /// @nexus.operations-class dotnet="SystemNexusWorkflowOperations"
 /// @nexus.delay-load-temporalio-workflow
 /// @nexus.experimental
@@ -47,7 +48,7 @@ interface workflow-service {
     /// @nexus.default targets="workflow"
     ///   python="_support.workflow_task_queue()"
     ///   typescript="workflow.workflowInfo().taskQueue"
-    ///   go="workflow.GetInfo(ctx).TaskQueueName"
+    ///   go="internal.GetWorkflowInfo(ctx).TaskQueueName"
     ///   dotnet="Temporalio.Workflows.Workflow.Info.TaskQueue"
     task-queue: task-queue,
     /// @nexus.doc
@@ -135,6 +136,7 @@ interface workflow-service {
 
   /// @nexus.doc
   ///   "Signal a workflow, starting it first if needed."
+  ///   go="Signal a workflow, starting it first if needed. Encode payloads with the configured data converter."
   ///   returns="A workflow handle to the started workflow."
   /// @nexus.output-transform
   ///   python-type="temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]"
