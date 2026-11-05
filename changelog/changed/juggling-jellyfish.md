@@ -1,0 +1,1 @@
+Mixed JSON/protobuf record nesting is rejected for every target, including model-only modules and JSON resource-result constructor fields. Independent JSON and protobuf operations may still share a service.

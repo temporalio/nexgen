@@ -846,6 +846,18 @@ Converters bridge the model and protobuf enum by number. A case with
 [`@nexus.fallback`](#nexusfallback) takes a protobuf number that the enum
 doesn't know.
 
+Records cannot mix JSON and protobuf backing within one value. A plain record
+cannot contain a protobuf-backed record, and a protobuf-backed record cannot
+contain a plain record. This rule applies to every target, including model-only
+modules, and follows aliases, containers, and variant payloads. Give nested
+records consistent backing, or use separate operation inputs. Independent JSON
+and protobuf operations may still share a service. External types with authored
+converters retain their own conversion contracts.
+
+Constructor fields of a resource returned as plain JSON cannot contain
+protobuf-backed records either. Use JSON-backed constructor values or return the
+resource through a protobuf-backed result.
+
 ### Transfer-Type Conversion
 
 ```wit

@@ -45,7 +45,8 @@ impl<'a> AuthoredValidationPass<'a> {
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
         dotnet::validate_namespace_configuration(spec, self.language)?;
-        validate_external_type_bindings(spec, self.descriptors, self.language)
+        validate_external_type_bindings(spec, self.descriptors, self.language)?;
+        super::record_backing::validate(spec, self.descriptors, self.language)
     }
 }
 

@@ -115,7 +115,11 @@ Validates authored API intent and source-format constraints. Native
 protobuf-backed enums must match the descriptor's full case list, order, and
 numbers; reordered, omitted, and sparse cases are rejected before planning. It
 also checks authored service configuration against the requested API targets.
-Language-specific policies remain in language backends.
+Language-specific policies remain in language backends. After protobuf binding
+checks, record-containment validation rejects mixed backing through aliases,
+containers, and variants before resource binding or target-specific emission.
+Independent operations may use different backing within the same service.
+Validation also checks constructor fields of resources returned as plain JSON.
 
 ### LanguageSelectionPass
 

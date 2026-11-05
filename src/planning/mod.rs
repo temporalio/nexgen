@@ -22,6 +22,7 @@ mod operation_lowering;
 mod poll_validation;
 mod proto;
 mod reachability;
+mod record_backing;
 mod resource_resolution;
 mod selected_validation;
 mod selection;
