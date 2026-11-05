@@ -19,7 +19,10 @@ function requiredField<T>(
 
 type CreateStreamInput = CreateStreamRequest extends infer Input
   ? Input extends unknown
-    ? Omit<Input, "owner" | "withdraw_run"> & { owner?: never; withdraw_run?: never }
+    ? Omit<Input, "request_id" | "withdraw_run"> & {
+        request_id?: never;
+        withdraw_run?: never;
+      }
     : never
   : never;
 
@@ -30,7 +33,7 @@ export async function createStream(requestInput: CreateStreamInput): Promise<Str
   const request = {
     ...requestInput,
     withdrawRun: support.withdrawRun(),
-    owner: support.workflowOwner(),
+    requestId: support.requestId(),
   } as CreateStreamRequest;
   const client = nexus.createNexusServiceClient({
     service: streamService,
@@ -42,7 +45,7 @@ export async function createStream(requestInput: CreateStreamInput): Promise<Str
   );
   const result = await handle.result();
   return new Stream(
-    requiredField(result.handle, "resource", "handle"),
+    requiredField(result.ref, "resource", "ref"),
     result.created ?? undefined,
   );
 }

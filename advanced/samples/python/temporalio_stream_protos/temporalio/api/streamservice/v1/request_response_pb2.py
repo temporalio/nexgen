@@ -23,13 +23,11 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
-from temporalio.api.common.v1 import message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2
 from temporalio.api.enums.v1 import stream_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_stream__pb2
-from temporalio.api.failure.v1 import message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2
 from temporalio.api.stream.v1 import message_pb2 as temporal_dot_api_dot_stream_dot_v1_dot_message__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n4temporal/api/streamservice/v1/request_response.proto\x12\x1dtemporal.api.streamservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a$temporal/api/common/v1/message.proto\x1a\"temporal/api/enums/v1/stream.proto\x1a%temporal/api/failure/v1/message.proto\x1a$temporal/api/stream/v1/message.proto\"\xab\x02\n\x13\x43reateStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12,\n\tretention\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x14\n\x0cwithdraw_run\x18\x04 \x01(\t\x12/\n\x05owner\x18\x06 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x16\n\x0e\x63lose_with_run\x18\x07 \x01(\x08\x12;\n\rstream_handle\x18\x08 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\x12\x12\n\ntask_token\x18\t \x01(\x0cJ\x04\x08\x05\x10\x06R\nauto_close\"k\n\x14\x43reateStreamResponse\x12\x34\n\x06handle\x18\x01 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08J\x04\x08\x03\x10\x04R\x06status\"\x82\x03\n\x14\x41ppendRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x06handle\x18\x02 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x10\n\x08sequence\x18\x04 \x01(\x03\x12\x35\n\x07records\x18\x05 \x03(\x0b\x32$.temporal.api.stream.v1.AppendRecord\x12J\n\x17previous_completed_task\x18\x06 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x14\n\x0c\x66\x61iled_tasks\x18\x07 \x03(\x03\x12\x14\n\x0cwithdraw_run\x18\x08 \x01(\t\x12\x18\n\x10\x64\x65\x66\x65r_withdrawal\x18\t \x01(\x08\x12\x12\n\ntask_token\x18\n \x01(\x0c\"B\n\x15\x41ppendRecordsResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x03\x12\x13\n\x0blast_offset\x18\x02 \x01(\x03\"\x8f\x03\n\x12\x43loseStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x06handle\x18\x02 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12/\n\x06result\x18\x04 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12J\n\x17previous_completed_task\x18\x06 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x14\n\x0c\x66\x61iled_tasks\x18\x07 \x03(\x03\x12\x14\n\x0cwithdraw_run\x18\x08 \x01(\t\x12\x12\n\ntask_token\x18\n \x01(\x0cJ\x04\x08\t\x10\nR\x06status\"\x15\n\x13\x43loseStreamResponse\"\x96\x03\n\x12ReadRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x06handle\x18\x02 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x03\x12\x35\n\x05start\x18\x04 \x01(\x0e\x32&.temporal.api.enums.v1.StreamReadStart\x12\x13\n\x0bmax_records\x18\x06 \x01(\x05\x12\'\n\x04wait\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12.\n\x0b\x63reate_wait\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x11\n\tto_offset\x18\x0b \x01(\x03\x12\x11\n\twake_only\x18\x0c \x01(\x08\x12\x0c\n\x04last\x18\r \x01(\x05\x12\x11\n\tmax_bytes\x18\x0e \x01(\x03\x12\x12\n\nfloor_from\x18\x0f \x01(\x03J\x04\x08\x05\x10\x06J\x04\x08\n\x10\x0bR\x06topicsR\x0etopic_prefixes\"\x92\x01\n\x13ReadRecordsResponse\x12\x35\n\x07records\x18\x01 \x03(\x0b\x32$.temporal.api.stream.v1.StreamRecord\x12\x13\n\x0bnext_offset\x18\x02 \x01(\x03\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\x12!\n\x19\x63ontinue_as_new_suggested\x18\x04 \x01(\x08\"`\n\x15\x44\x65scribeStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x06handle\x18\x02 \x01(\x0b\x32$.temporal.api.stream.v1.StreamHandle\"\xa2\x01\n\x16\x44\x65scribeStreamResponse\x12\x33\n\x06status\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.StreamStatus\x12\x13\n\x0blast_offset\x18\x02 \x01(\x03\x12,\n\tretention\x18\x03 \x01(\x0b\x32\x19.google.protobuf.DurationJ\x04\x08\x04\x10\x05R\nauto_closeB\xb4\x01\n io.temporal.api.streamservice.v1B\x14RequestResponseProtoP\x01Z1go.temporal.io/api/streamservice/v1;streamservice\xaa\x02\x1fTemporalio.Api.StreamService.V1\xea\x02\"Temporalio::Api::StreamService::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n4temporal/api/streamservice/v1/request_response.proto\x12\x1dtemporal.api.streamservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\"temporal/api/enums/v1/stream.proto\x1a$temporal/api/stream/v1/message.proto\"\xdf\x02\n\x13\x43reateStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\nstream_ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12,\n\tretention\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x14\n\x0cwithdraw_run\x18\x04 \x01(\t\x12/\n\x05owner\x18\x05 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x16\n\x0e\x63lose_with_run\x18\x06 \x01(\x08\x12\x12\n\ntask_token\x18\x07 \x01(\x0c\x12I\n\x12id_conflict_policy\x18\x08 \x01(\x0e\x32-.temporal.api.enums.v1.StreamIdConflictPolicy\x12\x12\n\nrequest_id\x18\t \x01(\t\"W\n\x14\x43reateStreamResponse\x12.\n\x03ref\x18\x01 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\"\xfc\x02\n\x14\x41ppendRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x10\n\x08sequence\x18\x04 \x01(\x03\x12\x35\n\x07records\x18\x05 \x03(\x0b\x32$.temporal.api.stream.v1.AppendRecord\x12J\n\x17previous_completed_task\x18\x06 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x14\n\x0c\x66\x61iled_tasks\x18\x07 \x03(\x03\x12\x14\n\x0cwithdraw_run\x18\x08 \x01(\t\x12\x18\n\x10\x64\x65\x66\x65r_withdrawal\x18\t \x01(\x08\x12\x12\n\ntask_token\x18\n \x01(\x0c\"B\n\x15\x41ppendRecordsResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x03\x12\x13\n\x0blast_offset\x18\x02 \x01(\x03\"\x97\x02\n\x12\x43loseStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12J\n\x17previous_completed_task\x18\x04 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x14\n\x0c\x66\x61iled_tasks\x18\x05 \x03(\x03\x12\x14\n\x0cwithdraw_run\x18\x06 \x01(\t\x12\x12\n\ntask_token\x18\x07 \x01(\x0c\"\x15\n\x13\x43loseStreamResponse\"\xec\x02\n\x12ReadRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x03\x12\x35\n\x05start\x18\x04 \x01(\x0e\x32&.temporal.api.enums.v1.StreamReadStart\x12\x13\n\x0bmax_records\x18\x05 \x01(\x05\x12\'\n\x04wait\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12.\n\x0b\x63reate_wait\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x11\n\tto_offset\x18\x08 \x01(\x03\x12\x11\n\twake_only\x18\t \x01(\x08\x12\x0c\n\x04last\x18\n \x01(\x05\x12\x11\n\tmax_bytes\x18\x0b \x01(\x03\x12\x12\n\nfloor_from\x18\x0c \x01(\x03\"\x92\x01\n\x13ReadRecordsResponse\x12\x35\n\x07records\x18\x01 \x03(\x0b\x32$.temporal.api.stream.v1.StreamRecord\x12\x13\n\x0bnext_offset\x18\x02 \x01(\x03\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\x12!\n\x19\x63ontinue_as_new_suggested\x18\x04 \x01(\x08\"Z\n\x15\x44\x65scribeStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\"\x90\x01\n\x16\x44\x65scribeStreamResponse\x12\x33\n\x06status\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.StreamStatus\x12\x13\n\x0blast_offset\x18\x02 \x01(\x03\x12,\n\tretention\x18\x03 \x01(\x0b\x32\x19.google.protobuf.DurationB\xb4\x01\n io.temporal.api.streamservice.v1B\x14RequestResponseProtoP\x01Z1go.temporal.io/api/streamservice/v1;streamservice\xaa\x02\x1fTemporalio.Api.StreamService.V1\xea\x02\"Temporalio::Api::StreamService::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,24 +35,24 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'temporal.api.streamservice.
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n io.temporal.api.streamservice.v1B\024RequestResponseProtoP\001Z1go.temporal.io/api/streamservice/v1;streamservice\252\002\037Temporalio.Api.StreamService.V1\352\002\"Temporalio::Api::StreamService::V1'
-  _globals['_CREATESTREAMREQUEST']._serialized_start=271
-  _globals['_CREATESTREAMREQUEST']._serialized_end=570
-  _globals['_CREATESTREAMRESPONSE']._serialized_start=572
-  _globals['_CREATESTREAMRESPONSE']._serialized_end=679
-  _globals['_APPENDRECORDSREQUEST']._serialized_start=682
-  _globals['_APPENDRECORDSREQUEST']._serialized_end=1068
-  _globals['_APPENDRECORDSRESPONSE']._serialized_start=1070
-  _globals['_APPENDRECORDSRESPONSE']._serialized_end=1136
-  _globals['_CLOSESTREAMREQUEST']._serialized_start=1139
-  _globals['_CLOSESTREAMREQUEST']._serialized_end=1538
-  _globals['_CLOSESTREAMRESPONSE']._serialized_start=1540
-  _globals['_CLOSESTREAMRESPONSE']._serialized_end=1561
-  _globals['_READRECORDSREQUEST']._serialized_start=1564
-  _globals['_READRECORDSREQUEST']._serialized_end=1970
-  _globals['_READRECORDSRESPONSE']._serialized_start=1973
-  _globals['_READRECORDSRESPONSE']._serialized_end=2119
-  _globals['_DESCRIBESTREAMREQUEST']._serialized_start=2121
-  _globals['_DESCRIBESTREAMREQUEST']._serialized_end=2217
-  _globals['_DESCRIBESTREAMRESPONSE']._serialized_start=2220
-  _globals['_DESCRIBESTREAMRESPONSE']._serialized_end=2382
+  _globals['_CREATESTREAMREQUEST']._serialized_start=194
+  _globals['_CREATESTREAMREQUEST']._serialized_end=545
+  _globals['_CREATESTREAMRESPONSE']._serialized_start=547
+  _globals['_CREATESTREAMRESPONSE']._serialized_end=634
+  _globals['_APPENDRECORDSREQUEST']._serialized_start=637
+  _globals['_APPENDRECORDSREQUEST']._serialized_end=1017
+  _globals['_APPENDRECORDSRESPONSE']._serialized_start=1019
+  _globals['_APPENDRECORDSRESPONSE']._serialized_end=1085
+  _globals['_CLOSESTREAMREQUEST']._serialized_start=1088
+  _globals['_CLOSESTREAMREQUEST']._serialized_end=1367
+  _globals['_CLOSESTREAMRESPONSE']._serialized_start=1369
+  _globals['_CLOSESTREAMRESPONSE']._serialized_end=1390
+  _globals['_READRECORDSREQUEST']._serialized_start=1393
+  _globals['_READRECORDSREQUEST']._serialized_end=1757
+  _globals['_READRECORDSRESPONSE']._serialized_start=1760
+  _globals['_READRECORDSRESPONSE']._serialized_end=1906
+  _globals['_DESCRIBESTREAMREQUEST']._serialized_start=1908
+  _globals['_DESCRIBESTREAMREQUEST']._serialized_end=1998
+  _globals['_DESCRIBESTREAMRESPONSE']._serialized_start=2001
+  _globals['_DESCRIBESTREAMRESPONSE']._serialized_end=2145
 # @@protoc_insertion_point(module_scope)

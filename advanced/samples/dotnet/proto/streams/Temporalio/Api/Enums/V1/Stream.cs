@@ -25,41 +25,36 @@ namespace Temporalio.Api.Enums.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiJ0ZW1wb3JhbC9hcGkvZW51bXMvdjEvc3RyZWFtLnByb3RvEhV0ZW1wb3Jh",
-            "bC5hcGkuZW51bXMudjEq+AEKElN0cmVhbVByb2R1Y2VyS2luZBIkCiBTVFJF",
-            "QU1fUFJPRFVDRVJfS0lORF9VTlNQRUNJRklFRBAAEiEKHVNUUkVBTV9QUk9E",
-            "VUNFUl9LSU5EX1dPUktGTE9XEAESJwojU1RSRUFNX1BST0RVQ0VSX0tJTkRf",
-            "TE9DQUxfQUNUSVZJVFkQAhIhCh1TVFJFQU1fUFJPRFVDRVJfS0lORF9BQ1RJ",
-            "VklUWRADEh8KG1NUUkVBTV9QUk9EVUNFUl9LSU5EX0NMSUVOVBAEEiwKKFNU",
-            "UkVBTV9QUk9EVUNFUl9LSU5EX1NUQU5EQUxPTkVfQUNUSVZJVFkQBSrkAQoR",
-            "U3RyZWFtQ2xvc2VTdGF0dXMSIwofU1RSRUFNX0NMT1NFX1NUQVRVU19VTlNQ",
-            "RUNJRklFRBAAEiEKHVNUUkVBTV9DTE9TRV9TVEFUVVNfQ09NUExFVEVEEAES",
-            "HgoaU1RSRUFNX0NMT1NFX1NUQVRVU19GQUlMRUQQAhIgChxTVFJFQU1fQ0xP",
-            "U0VfU1RBVFVTX0NBTkNFTEVEEAMSIgoeU1RSRUFNX0NMT1NFX1NUQVRVU19U",
-            "RVJNSU5BVEVEEAQSIQodU1RSRUFNX0NMT1NFX1NUQVRVU19USU1FRF9PVVQQ",
-            "BSp6CgxTdHJlYW1TdGF0dXMSHQoZU1RSRUFNX1NUQVRVU19VTlNQRUNJRklF",
-            "RBAAEhYKElNUUkVBTV9TVEFUVVNfT1BFThABEhgKFFNUUkVBTV9TVEFUVVNf",
-            "Q0xPU0VEEAISGQoVU1RSRUFNX1NUQVRVU19FWFBJUkVEEAMqcAoPU3RyZWFt",
-            "UmVhZFN0YXJ0EiEKHVNUUkVBTV9SRUFEX1NUQVJUX1VOU1BFQ0lGSUVEEAAS",
-            "HwobU1RSRUFNX1JFQURfU1RBUlRfQkVHSU5OSU5HEAESGQoVU1RSRUFNX1JF",
-            "QURfU1RBUlRfRU5EEAIqogQKEVN0cmVhbUVycm9yUmVhc29uEiMKH1NUUkVB",
-            "TV9FUlJPUl9SRUFTT05fVU5TUEVDSUZJRUQQABIhCh1TVFJFQU1fRVJST1Jf",
-            "UkVBU09OX05PVF9GT1VORBABEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fRVhQ",
-            "SVJFRBACEh4KGlNUUkVBTV9FUlJPUl9SRUFTT05fQ0xPU0VEEAMSHgoaU1RS",
-            "RUFNX0VSUk9SX1JFQVNPTl9GRU5DRUQQBBIgChxTVFJFQU1fRVJST1JfUkVB",
-            "U09OX1NFUVVFTkNFEAUSJQohU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFfRElW",
-            "RVJHRU5UEAYSIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfT1dORVIQBxIm",
-            "CiJTVFJFQU1fRVJST1JfUkVBU09OX0ZPUk1BVF9UT09fTkVXEAgSHgoaU1RS",
-            "RUFNX0VSUk9SX1JFQVNPTl9PRkZTRVQQCRIhCh1TVFJFQU1fRVJST1JfUkVB",
+            "bC5hcGkuZW51bXMudjEqegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
+            "VVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIYChRT",
+            "VFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQSVJF",
+            "RBADKnAKD1N0cmVhbVJlYWRTdGFydBIhCh1TVFJFQU1fUkVBRF9TVEFSVF9V",
+            "TlNQRUNJRklFRBAAEh8KG1NUUkVBTV9SRUFEX1NUQVJUX0JFR0lOTklORxAB",
+            "EhkKFVNUUkVBTV9SRUFEX1NUQVJUX0VORBACKpMBChZTdHJlYW1JZENvbmZs",
+            "aWN0UG9saWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVD",
+            "SUZJRUQQABIiCh5TVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX0ZBSUwQARIq",
+            "CiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKpAF",
+            "ChFTdHJlYW1FcnJvclJlYXNvbhIjCh9TVFJFQU1fRVJST1JfUkVBU09OX1VO",
+            "U1BFQ0lGSUVEEAASIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfRk9VTkQQ",
+            "ARIfChtTVFJFQU1fRVJST1JfUkVBU09OX0VYUElSRUQQAhIeChpTVFJFQU1f",
+            "RVJST1JfUkVBU09OX0NMT1NFRBADEh4KGlNUUkVBTV9FUlJPUl9SRUFTT05f",
+            "RkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFVRU5DRV9UT09f",
+            "TE9XEAUSJQohU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFfRElWRVJHRU5UEAYS",
+            "IQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfT1dORVIQBxImCiJTVFJFQU1f",
+            "RVJST1JfUkVBU09OX0ZPUk1BVF9UT09fTkVXEAgSJwojU1RSRUFNX0VSUk9S",
+            "X1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQCRIhCh1TVFJFQU1fRVJST1JfUkVB",
             "U09OX1RPT19MQVJHRRAKEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fSU5WQUxJ",
-            "RBALEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fU1RPUkFHRRAMEiYKIlNUUkVB",
-            "TV9FUlJPUl9SRUFTT05fVU5LTk9XTl9XUklURVIQDRIjCh9TVFJFQU1fRVJS",
-            "T1JfUkVBU09OX1VOU1VQUE9SVEVEEA5CgwEKGGlvLnRlbXBvcmFsLmFwaS5l",
-            "bnVtcy52MUILU3RyZWFtUHJvdG9QAVohZ28udGVtcG9yYWwuaW8vYXBpL2Vu",
-            "dW1zL3YxO2VudW1zqgIXVGVtcG9yYWxpby5BcGkuRW51bXMuVjHqAhpUZW1w",
-            "b3JhbGlvOjpBcGk6OkVudW1zOjpWMWIGcHJvdG8z"));
+            "RBALEisKJ1NUUkVBTV9FUlJPUl9SRUFTT05fU1RPUkFHRV9VTkFWQUlMQUJM",
+            "RRAMEiYKIlNUUkVBTV9FUlJPUl9SRUFTT05fVU5LTk9XTl9XUklURVIQDRIj",
+            "Ch9TVFJFQU1fRVJST1JfUkVBU09OX1VOU1VQUE9SVEVEEA4SJgoiU1RSRUFN",
+            "X0VSUk9SX1JFQVNPTl9BTFJFQURZX0VYSVNUUxAPEicKI1NUUkVBTV9FUlJP",
+            "Ul9SRUFTT05fU1RPUkFHRV9DT1JSVVBUEBBCgwEKGGlvLnRlbXBvcmFsLmFw",
+            "aS5lbnVtcy52MUILU3RyZWFtUHJvdG9QAVohZ28udGVtcG9yYWwuaW8vYXBp",
+            "L2VudW1zL3YxO2VudW1zqgIXVGVtcG9yYWxpby5BcGkuRW51bXMuVjHqAhpU",
+            "ZW1wb3JhbGlvOjpBcGk6OkVudW1zOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamProducerKind), typeof(global::Temporalio.Api.Enums.V1.StreamCloseStatus), typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
     }
     #endregion
 
@@ -67,37 +62,7 @@ namespace Temporalio.Api.Enums.V1 {
   #region Enums
   /// <summary>
   /// Experimental. Might change in the future.
-  /// </summary>
-  public enum StreamProducerKind {
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_WORKFLOW")] Workflow = 1,
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_LOCAL_ACTIVITY")] LocalActivity = 2,
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_ACTIVITY")] Activity = 3,
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_CLIENT")] Client = 4,
-    [pbr::OriginalName("STREAM_PRODUCER_KIND_STANDALONE_ACTIVITY")] StandaloneActivity = 5,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
-  /// How a Stream closed, so a reader tells a terminated or timed out owner from a failed one
-  /// without parsing the failure.
-  /// (-- api-linter: core::0216::synonyms=disabled
-  ///     aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-  /// </summary>
-  public enum StreamCloseStatus {
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_COMPLETED")] Completed = 1,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_FAILED")] Failed = 2,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_CANCELED")] Canceled = 3,
-    /// <summary>
-    /// TERMINATED and TIMED_OUT come only from the owner's end, never from a caller.
-    /// </summary>
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_TERMINATED")] Terminated = 4,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_TIMED_OUT")] TimedOut = 5,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
+  /// The state of a Stream, as a describe gives it.
   /// (-- api-linter: core::0216::synonyms=disabled
   ///     aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
   /// </summary>
@@ -110,6 +75,7 @@ namespace Temporalio.Api.Enums.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
+  /// Where a read starts when it has no from_offset.
   /// </summary>
   public enum StreamReadStart {
     [pbr::OriginalName("STREAM_READ_START_UNSPECIFIED")] Unspecified = 0,
@@ -119,7 +85,24 @@ namespace Temporalio.Api.Enums.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Why a Stream call failed. Each reason has one gRPC status code.
+  /// What a create does when its Stream exists. Unspecified is FAIL, as for a Workflow start.
+  /// </summary>
+  public enum StreamIdConflictPolicy {
+    [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_UNSPECIFIED")] Unspecified = 0,
+    /// <summary>
+    /// The create fails with ALREADY_EXISTS.
+    /// </summary>
+    [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_FAIL")] Fail = 1,
+    /// <summary>
+    /// The create gets the open Stream, which keeps its own Retention.
+    /// </summary>
+    [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_USE_EXISTING")] UseExisting = 2,
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
+  /// Why a Stream call failed. Each reason has one gRPC status code. An SDK raises its own error
+  /// class for each reason that code can act on, and a base class for the others.
   /// </summary>
   public enum StreamErrorReason {
     [pbr::OriginalName("STREAM_ERROR_REASON_UNSPECIFIED")] Unspecified = 0,
@@ -143,14 +126,14 @@ namespace Temporalio.Api.Enums.V1 {
     /// <summary>
     /// The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_SEQUENCE")] Sequence = 5,
+    [pbr::OriginalName("STREAM_ERROR_REASON_SEQUENCE_TOO_LOW")] SequenceTooLow = 5,
     /// <summary>
     /// The batch has the `sequence` of the last one of its epoch, and other content.
     /// FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_SEQ_DIVERGENT")] SeqDivergent = 6,
     /// <summary>
-    /// A create names another owner than the Stream has, or the owner doesn't allow this close.
+    /// A create gives another owner than the Stream has, or the owner doesn't allow this close.
     /// FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_OWNER")] NotOwner = 7,
@@ -162,7 +145,7 @@ namespace Temporalio.Api.Enums.V1 {
     /// The offset is past the newest offset + 1, for example after a failover lost the newest
     /// Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_OFFSET")] Offset = 9,
+    [pbr::OriginalName("STREAM_ERROR_REASON_OFFSET_TOO_HIGH")] OffsetTooHigh = 9,
     /// <summary>
     /// A Record or a batch is over the Store's limit. INVALID_ARGUMENT.
     /// </summary>
@@ -172,9 +155,9 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_INVALID")] Invalid = 11,
     /// <summary>
-    /// The Store failed or did not answer. UNAVAILABLE.
+    /// The Store failed or did not answer. A retry can succeed. UNAVAILABLE.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE")] Storage = 12,
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_UNAVAILABLE")] StorageUnavailable = 12,
     /// <summary>
     /// No writer has the id. The SDK's in-process writer only. NOT_FOUND.
     /// </summary>
@@ -183,6 +166,15 @@ namespace Temporalio.Api.Enums.V1 {
     /// The Store lacks a capability that the call needs. UNIMPLEMENTED.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 14,
+    /// <summary>
+    /// A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS.
+    /// </summary>
+    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 15,
+    /// <summary>
+    /// The Store gave back data that isn't valid, such as a stored value with the wrong length. A
+    /// retry reads the same data. DATA_LOSS.
+    /// </summary>
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 16,
   }
 
   #endregion

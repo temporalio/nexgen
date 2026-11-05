@@ -16,61 +16,6 @@ else:
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class _StreamProducerKind:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
-
-class _StreamProducerKindEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamProducerKind.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
-    STREAM_PRODUCER_KIND_UNSPECIFIED: _StreamProducerKind.ValueType  # 0
-    STREAM_PRODUCER_KIND_WORKFLOW: _StreamProducerKind.ValueType  # 1
-    STREAM_PRODUCER_KIND_LOCAL_ACTIVITY: _StreamProducerKind.ValueType  # 2
-    STREAM_PRODUCER_KIND_ACTIVITY: _StreamProducerKind.ValueType  # 3
-    STREAM_PRODUCER_KIND_CLIENT: _StreamProducerKind.ValueType  # 4
-    STREAM_PRODUCER_KIND_STANDALONE_ACTIVITY: _StreamProducerKind.ValueType  # 5
-
-class StreamProducerKind(_StreamProducerKind, metaclass=_StreamProducerKindEnumTypeWrapper):
-    """Experimental. Might change in the future."""
-
-STREAM_PRODUCER_KIND_UNSPECIFIED: StreamProducerKind.ValueType  # 0
-STREAM_PRODUCER_KIND_WORKFLOW: StreamProducerKind.ValueType  # 1
-STREAM_PRODUCER_KIND_LOCAL_ACTIVITY: StreamProducerKind.ValueType  # 2
-STREAM_PRODUCER_KIND_ACTIVITY: StreamProducerKind.ValueType  # 3
-STREAM_PRODUCER_KIND_CLIENT: StreamProducerKind.ValueType  # 4
-STREAM_PRODUCER_KIND_STANDALONE_ACTIVITY: StreamProducerKind.ValueType  # 5
-Global___StreamProducerKind: _TypeAlias = StreamProducerKind  # noqa: Y015
-
-class _StreamCloseStatus:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
-
-class _StreamCloseStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamCloseStatus.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
-    STREAM_CLOSE_STATUS_UNSPECIFIED: _StreamCloseStatus.ValueType  # 0
-    STREAM_CLOSE_STATUS_COMPLETED: _StreamCloseStatus.ValueType  # 1
-    STREAM_CLOSE_STATUS_FAILED: _StreamCloseStatus.ValueType  # 2
-    STREAM_CLOSE_STATUS_CANCELED: _StreamCloseStatus.ValueType  # 3
-    STREAM_CLOSE_STATUS_TERMINATED: _StreamCloseStatus.ValueType  # 4
-    """TERMINATED and TIMED_OUT come only from the owner's end, never from a caller."""
-    STREAM_CLOSE_STATUS_TIMED_OUT: _StreamCloseStatus.ValueType  # 5
-
-class StreamCloseStatus(_StreamCloseStatus, metaclass=_StreamCloseStatusEnumTypeWrapper):
-    """Experimental. Might change in the future.
-    How a Stream closed, so a reader tells a terminated or timed out owner from a failed one
-    without parsing the failure.
-    (-- api-linter: core::0216::synonyms=disabled
-        aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-    """
-
-STREAM_CLOSE_STATUS_UNSPECIFIED: StreamCloseStatus.ValueType  # 0
-STREAM_CLOSE_STATUS_COMPLETED: StreamCloseStatus.ValueType  # 1
-STREAM_CLOSE_STATUS_FAILED: StreamCloseStatus.ValueType  # 2
-STREAM_CLOSE_STATUS_CANCELED: StreamCloseStatus.ValueType  # 3
-STREAM_CLOSE_STATUS_TERMINATED: StreamCloseStatus.ValueType  # 4
-"""TERMINATED and TIMED_OUT come only from the owner's end, never from a caller."""
-STREAM_CLOSE_STATUS_TIMED_OUT: StreamCloseStatus.ValueType  # 5
-Global___StreamCloseStatus: _TypeAlias = StreamCloseStatus  # noqa: Y015
-
 class _StreamStatus:
     ValueType = _typing.NewType("ValueType", _builtins.int)
     V: _TypeAlias = ValueType  # noqa: Y015
@@ -84,6 +29,7 @@ class _StreamStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamSt
 
 class StreamStatus(_StreamStatus, metaclass=_StreamStatusEnumTypeWrapper):
     """Experimental. Might change in the future.
+    The state of a Stream, as a describe gives it.
     (-- api-linter: core::0216::synonyms=disabled
         aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
     """
@@ -105,12 +51,38 @@ class _StreamReadStartEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Strea
     STREAM_READ_START_END: _StreamReadStart.ValueType  # 2
 
 class StreamReadStart(_StreamReadStart, metaclass=_StreamReadStartEnumTypeWrapper):
-    """Experimental. Might change in the future."""
+    """Experimental. Might change in the future.
+    Where a read starts when it has no from_offset.
+    """
 
 STREAM_READ_START_UNSPECIFIED: StreamReadStart.ValueType  # 0
 STREAM_READ_START_BEGINNING: StreamReadStart.ValueType  # 1
 STREAM_READ_START_END: StreamReadStart.ValueType  # 2
 Global___StreamReadStart: _TypeAlias = StreamReadStart  # noqa: Y015
+
+class _StreamIdConflictPolicy:
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
+
+class _StreamIdConflictPolicyEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamIdConflictPolicy.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
+    STREAM_ID_CONFLICT_POLICY_UNSPECIFIED: _StreamIdConflictPolicy.ValueType  # 0
+    STREAM_ID_CONFLICT_POLICY_FAIL: _StreamIdConflictPolicy.ValueType  # 1
+    """The create fails with ALREADY_EXISTS."""
+    STREAM_ID_CONFLICT_POLICY_USE_EXISTING: _StreamIdConflictPolicy.ValueType  # 2
+    """The create gets the open Stream, which keeps its own Retention."""
+
+class StreamIdConflictPolicy(_StreamIdConflictPolicy, metaclass=_StreamIdConflictPolicyEnumTypeWrapper):
+    """Experimental. Might change in the future.
+    What a create does when its Stream exists. Unspecified is FAIL, as for a Workflow start.
+    """
+
+STREAM_ID_CONFLICT_POLICY_UNSPECIFIED: StreamIdConflictPolicy.ValueType  # 0
+STREAM_ID_CONFLICT_POLICY_FAIL: StreamIdConflictPolicy.ValueType  # 1
+"""The create fails with ALREADY_EXISTS."""
+STREAM_ID_CONFLICT_POLICY_USE_EXISTING: StreamIdConflictPolicy.ValueType  # 2
+"""The create gets the open Stream, which keeps its own Retention."""
+Global___StreamIdConflictPolicy: _TypeAlias = StreamIdConflictPolicy  # noqa: Y015
 
 class _StreamErrorReason:
     ValueType = _typing.NewType("ValueType", _builtins.int)
@@ -129,19 +101,19 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     """The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
     Workflow retry withdrew its run. FAILED_PRECONDITION.
     """
-    STREAM_ERROR_REASON_SEQUENCE: _StreamErrorReason.ValueType  # 5
+    STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
     """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
     """The batch has the `sequence` of the last one of its epoch, and other content.
     FAILED_PRECONDITION.
     """
     STREAM_ERROR_REASON_NOT_OWNER: _StreamErrorReason.ValueType  # 7
-    """A create names another owner than the Stream has, or the owner doesn't allow this close.
+    """A create gives another owner than the Stream has, or the owner doesn't allow this close.
     FAILED_PRECONDITION.
     """
     STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 8
     """A newer format version wrote the Stream. FAILED_PRECONDITION."""
-    STREAM_ERROR_REASON_OFFSET: _StreamErrorReason.ValueType  # 9
+    STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 9
     """The offset is past the newest offset + 1, for example after a failover lost the newest
     Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
     """
@@ -149,16 +121,23 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     """A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""
     STREAM_ERROR_REASON_INVALID: _StreamErrorReason.ValueType  # 11
     """The request is malformed. INVALID_ARGUMENT."""
-    STREAM_ERROR_REASON_STORAGE: _StreamErrorReason.ValueType  # 12
-    """The Store failed or did not answer. UNAVAILABLE."""
+    STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: _StreamErrorReason.ValueType  # 12
+    """The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
     STREAM_ERROR_REASON_UNKNOWN_WRITER: _StreamErrorReason.ValueType  # 13
     """No writer has the id. The SDK's in-process writer only. NOT_FOUND."""
     STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 14
     """The Store lacks a capability that the call needs. UNIMPLEMENTED."""
+    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 15
+    """A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
+    STREAM_ERROR_REASON_STORAGE_CORRUPT: _StreamErrorReason.ValueType  # 16
+    """The Store gave back data that isn't valid, such as a stored value with the wrong length. A
+    retry reads the same data. DATA_LOSS.
+    """
 
 class StreamErrorReason(_StreamErrorReason, metaclass=_StreamErrorReasonEnumTypeWrapper):
     """Experimental. Might change in the future.
-    Why a Stream call failed. Each reason has one gRPC status code.
+    Why a Stream call failed. Each reason has one gRPC status code. An SDK raises its own error
+    class for each reason that code can act on, and a base class for the others.
     """
 
 STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
@@ -172,19 +151,19 @@ STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
 """The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
 Workflow retry withdrew its run. FAILED_PRECONDITION.
 """
-STREAM_ERROR_REASON_SEQUENCE: StreamErrorReason.ValueType  # 5
+STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
 """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
 """The batch has the `sequence` of the last one of its epoch, and other content.
 FAILED_PRECONDITION.
 """
 STREAM_ERROR_REASON_NOT_OWNER: StreamErrorReason.ValueType  # 7
-"""A create names another owner than the Stream has, or the owner doesn't allow this close.
+"""A create gives another owner than the Stream has, or the owner doesn't allow this close.
 FAILED_PRECONDITION.
 """
 STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 8
 """A newer format version wrote the Stream. FAILED_PRECONDITION."""
-STREAM_ERROR_REASON_OFFSET: StreamErrorReason.ValueType  # 9
+STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 9
 """The offset is past the newest offset + 1, for example after a failover lost the newest
 Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
 """
@@ -192,10 +171,16 @@ STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 10
 """A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""
 STREAM_ERROR_REASON_INVALID: StreamErrorReason.ValueType  # 11
 """The request is malformed. INVALID_ARGUMENT."""
-STREAM_ERROR_REASON_STORAGE: StreamErrorReason.ValueType  # 12
-"""The Store failed or did not answer. UNAVAILABLE."""
+STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: StreamErrorReason.ValueType  # 12
+"""The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
 STREAM_ERROR_REASON_UNKNOWN_WRITER: StreamErrorReason.ValueType  # 13
 """No writer has the id. The SDK's in-process writer only. NOT_FOUND."""
 STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 14
 """The Store lacks a capability that the call needs. UNIMPLEMENTED."""
+STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 15
+"""A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
+STREAM_ERROR_REASON_STORAGE_CORRUPT: StreamErrorReason.ValueType  # 16
+"""The Store gave back data that isn't valid, such as a stored value with the wrong length. A
+retry reads the same data. DATA_LOSS.
+"""
 Global___StreamErrorReason: _TypeAlias = StreamErrorReason  # noqa: Y015

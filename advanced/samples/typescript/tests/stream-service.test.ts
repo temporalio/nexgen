@@ -5,7 +5,6 @@ import { describe, expect, test } from "vitest";
 
 import {
   type ReadRecordsResponse,
-  StreamCloseStatus,
   StreamStatus,
   describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
@@ -34,26 +33,15 @@ describe("stream-service generated output", () => {
           },
           offset: Long.fromNumber(2),
         },
-        {
-          item: {
-            tag: "close",
-            value: { status: StreamCloseStatus.StreamCloseStatusCompleted },
-          },
-          offset: Long.fromNumber(3),
-        },
       ],
-      nextOffset: Long.fromNumber(4),
+      nextOffset: Long.fromNumber(3),
       done: true,
     };
 
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse =
       readRecordsResponseTransferTypeConverter.toTransferType(model);
 
-    expect(proto.records?.map((record) => record.item)).toEqual([
-      "data",
-      "superseded",
-      "close",
-    ]);
+    expect(proto.records?.map((record) => record.item)).toEqual(["data", "superseded"]);
     expect(proto.records?.[1].superseded?.failedTasks?.[0].toNumber()).toBe(7);
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
@@ -73,20 +61,20 @@ describe("stream-service generated output", () => {
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
-      handle: { id: "stream-1", owner: { businessId: "workflow-1" } },
+      ref: { id: "stream-1", owner: { businessId: "workflow-1" } },
       fromOffset: Long.fromNumber(7),
       maxRecords: 10,
     };
 
     const model = readRecordsRequestTransferTypeConverter.fromTransferType(proto);
 
-    expect(model.handle.id).toBe("stream-1");
-    expect(model.handle.owner?.businessId).toBe("workflow-1");
+    expect(model.ref.id).toBe("stream-1");
+    expect(model.ref.owner?.businessId).toBe("workflow-1");
     expect(model.fromOffset?.toNumber()).toBe(7);
     expect(model.maxRecords).toBe(10);
-    expect(
-      readRecordsRequestTransferTypeConverter.toTransferType(model).handle?.id,
-    ).toBe("stream-1");
+    expect(readRecordsRequestTransferTypeConverter.toTransferType(model).ref?.id).toBe(
+      "stream-1",
+    );
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {
