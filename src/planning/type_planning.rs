@@ -2005,8 +2005,11 @@ interface alerts {
                 spec: super::super::select_spec(spec, Language::Python),
             }),
         };
-        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, targets)
+        let selected = super::super::ResourceTypeParameterPass
             .apply(authored_tree)
+            .unwrap();
+        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, targets)
+            .apply(selected)
             .unwrap();
         let operation_bound = super::super::OperationBindingPass::new()
             .apply(resource_resolved)

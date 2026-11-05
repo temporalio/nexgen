@@ -733,7 +733,8 @@ impl<F: TypeFamily> OperationSpec<F> {
 pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub doc: F::Text,
-    /// The type parameters that the resource declares, in order. It may use only these.
+    /// The type parameters that the resource uses, in order. `ResourceTypeParameterPass` infers
+    /// them.
     pub type_parameters: Vec<TypeParameterSpec>,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,

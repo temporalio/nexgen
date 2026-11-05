@@ -140,6 +140,7 @@ pub(crate) fn compile_tree_to_files(
     let selected_tree = planning::LanguageSelectionPass::new(language)
         .apply(authored_tree)
         .expect("language selection is infallible");
+    let selected_tree = planning::ResourceTypeParameterPass.apply(selected_tree)?;
     let selected_tree = planning::SelectedValidationPass.apply(selected_tree)?;
 
     // selected IR -> resource bindings -> operation relationships -> lowered

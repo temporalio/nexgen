@@ -14,7 +14,6 @@ interface holder-service {
     value: value-t,
   }
 
-  /// @nexus.type-parameter "value-t"
   resource holder {
     constructor(id: string);
 

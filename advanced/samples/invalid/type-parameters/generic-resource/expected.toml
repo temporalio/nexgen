@@ -1,5 +1,0 @@
-targets = ["workflow"]
-
-[error]
-kind = "invalid-wit"
-contains = ["resource `holder` uses the type parameter `models.context-t`, which it doesn't declare. Add `@nexus.type-parameter \"<alias>\"` to the resource for it"]

@@ -130,11 +130,10 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "type-parameter",
-            sites: &[Alias, Resource],
+            sites: &[Alias],
             keys: &[],
             language_keys: &[],
-            // A resource names each of its type parameters.
-            repeatable: true,
+            repeatable: false,
             languages: None,
             system_nexus: false,
         },
@@ -386,10 +385,6 @@ impl Annotation {
     }
 
     fn accepts_key(&self, key: &str, site: Site) -> bool {
-        // An alias is the type parameter, and a resource names the alias of each one it has.
-        if self.name == "type-parameter" {
-            return site == Site::Resource && key == "value";
-        }
         if self.name == "type"
             && site == Site::Field
             && (key.ends_with("-from") || key.ends_with("-to"))
@@ -430,21 +425,6 @@ fn validate_docs(
     let proto_backed = directives
         .iter()
         .any(|directive| directive.name() == "proto");
-    // An alias is one type parameter, so only a resource repeats the directive.
-    if site == Site::Alias
-        && directives
-            .iter()
-            .filter(|directive| directive.name() == "type-parameter")
-            .count()
-            > 1
-    {
-        return Err(Error::InvalidWitDirective {
-            path: path.to_path_buf(),
-            context: context.to_string(),
-            directive: "@nexus.type-parameter".to_string(),
-            reason: "duplicate directive".to_string(),
-        });
-    }
     for directive in directives {
         let fail = |reason: String| Error::InvalidWitDirective {
             path: path.to_path_buf(),
@@ -455,9 +435,7 @@ fn validate_docs(
         let rule = directive.rule;
         if !rule.sites.contains(&site) {
             let reason = match rule.name {
-                "type-parameter" => {
-                    "is only supported on WIT type aliases and resources".to_string()
-                }
+                "type-parameter" => "is only supported on WIT type aliases".to_string(),
                 "fallback" => "is only supported on enum cases".to_string(),
                 "type"
                     if proto_backed
@@ -888,16 +866,6 @@ mod tests {
             })
             .collect();
         assert_eq!(rows, expected);
-    }
-
-    #[test]
-    fn only_a_resource_repeats_type_parameter() {
-        let path = Path::new("test.wit");
-        let resource = "@nexus.type-parameter \"key-t\"\n@nexus.type-parameter \"value-t\"";
-        assert!(validate_docs(Some(resource), Site::Resource, path, "resource", None).is_ok());
-        let alias = "@nexus.type-parameter\n@nexus.type-parameter";
-        let err = validate_docs(Some(alias), Site::Alias, path, "type alias", None).unwrap_err();
-        assert!(err.to_string().contains("duplicate directive"), "{err}");
     }
 
     #[test]

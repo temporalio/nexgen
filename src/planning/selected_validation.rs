@@ -7,8 +7,8 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecLeaf, CompilerPass, FunctionArgsSpec, FunctionResultSpec, ResourceSpec,
-    SelectedFamily, ServiceSpec, TypeSpec,
+    ApiSpec, ApiSpecLeaf, CompilerPass, FunctionArgsSpec, FunctionResultSpec, SelectedFamily,
+    TypeSpec,
 };
 
 pub(crate) struct SelectedValidationPass;
@@ -106,9 +106,6 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
                 }
             }
         }
-        for resource in &service.resources {
-            validate_resource_type_parameters(spec, service, resource, &invalid)?;
-        }
         for operation in &service.operations {
             let Some(TypeSpec::Resource(returned)) = operation.output_type() else {
                 continue;
@@ -151,98 +148,6 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
     Ok(())
 }
 
-/// A resource may use only the type parameters that it declares, and it must use each of them.
-/// The operations that its methods bind may use only these too.
-fn validate_resource_type_parameters(
-    spec: &ApiSpec<SelectedFamily>,
-    service: &ServiceSpec<SelectedFamily>,
-    resource: &ResourceSpec<SelectedFamily>,
-    invalid: &dyn Fn(String) -> Error,
-) -> Result<()> {
-    let declared = resource
-        .type_parameters
-        .iter()
-        .map(|parameter| parameter.full_name.as_str())
-        .collect::<BTreeSet<_>>();
-    // A returned generic resource takes its type arguments from the resource that returns it.
-    let parameters = |value: &TypeSpec<SelectedFamily>| {
-        let returned = match value.without_option() {
-            TypeSpec::Resource(returned) => service
-                .resource(returned.as_str())
-                .map(|returned| returned.type_parameters.clone())
-                .unwrap_or_default(),
-            _ => Vec::new(),
-        };
-        spec.type_parameters_through_protos(value)
-            .into_iter()
-            .map(|usage| usage.parameter)
-            .chain(returned)
-            .collect::<Vec<_>>()
-    };
-    let undeclared = |value: &TypeSpec<SelectedFamily>| {
-        parameters(value)
-            .into_iter()
-            .find(|parameter| !declared.contains(parameter.full_name.as_str()))
-    };
-    let resource_types = resource
-        .fields
-        .iter()
-        .map(|field| &field.field_type)
-        .chain(resource.methods.iter().flat_map(|method| {
-            method
-                .params
-                .iter()
-                .map(|param| &param.field_type)
-                .chain(method.result.as_ref().map(|result| &result.result_type))
-        }))
-        .collect::<Vec<_>>();
-    if let Some(parameter) = resource_types.iter().find_map(|value| undeclared(value)) {
-        return Err(invalid(format!(
-            "resource `{}` uses the type parameter `{}`, which it doesn't declare. Add \
-             `@nexus.type-parameter \"<alias>\"` to the resource for it",
-            resource.name, parameter.full_name
-        )));
-    }
-    let used = resource_types
-        .iter()
-        .flat_map(|value| parameters(value))
-        .map(|parameter| parameter.full_name)
-        .collect::<BTreeSet<_>>();
-    if let Some(unused) = resource
-        .type_parameters
-        .iter()
-        .find(|parameter| !used.contains(&parameter.full_name))
-    {
-        return Err(invalid(format!(
-            "resource `{}` declares the type parameter `{}`, which none of its fields, \
-             parameters or results uses",
-            resource.name, unused.full_name
-        )));
-    }
-
-    for method in &resource.methods {
-        let Some(operation_name) = &method.operation_name else {
-            continue;
-        };
-        let Some(operation) = service.operation(operation_name) else {
-            continue;
-        };
-        if let Some(parameter) = operation
-            .input_type()
-            .into_iter()
-            .chain(operation.output_type())
-            .find_map(undeclared)
-        {
-            return Err(invalid(format!(
-                "resource-bound operation `{operation_name}` uses the type parameter `{}`, which \
-                 resource `{}` doesn't declare",
-                parameter.full_name, resource.name
-            )));
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -250,10 +155,12 @@ mod tests {
     use super::*;
     use crate::descriptors::DescriptorIndex;
     use crate::language::Language;
-    use crate::planning::{AuthoredValidationPass, LanguageSelectionPass};
-    use crate::spec::ApiSpecTree;
+    use crate::planning::{
+        AuthoredValidationPass, LanguageSelectionPass, ResourceTypeParameterPass,
+    };
+    use crate::spec::{ApiSpecNode, ApiSpecTree};
 
-    fn validate(language: Language, wit: &str) -> Result<()> {
+    fn selected(language: Language, wit: &str) -> Result<ApiSpecTree<SelectedFamily>> {
         let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
             language,
             wit,
@@ -266,7 +173,29 @@ mod tests {
         let selected = LanguageSelectionPass::new(language)
             .apply(authored)
             .expect("language selection is infallible");
-        SelectedValidationPass.apply(selected).map(|_| ())
+        ResourceTypeParameterPass.apply(selected)
+    }
+
+    fn validate(language: Language, wit: &str) -> Result<()> {
+        SelectedValidationPass
+            .apply(selected(language, wit)?)
+            .map(|_| ())
+    }
+
+    fn resource_type_parameters(wit: &str, resource: &str) -> Vec<String> {
+        let tree = selected(Language::Python, wit).unwrap();
+        let ApiSpecNode::Leaf(leaf) = tree.root else {
+            panic!("expected one module");
+        };
+        leaf.spec
+            .services
+            .iter()
+            .find_map(|service| service.resource(resource))
+            .expect("the service has the resource")
+            .type_parameters
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect()
     }
 
     const GENERIC_WIT: &str = r#"
@@ -288,5 +217,62 @@ interface generic-service {
     #[test]
     fn accepts_generic_models() {
         validate(Language::Dotnet, GENERIC_WIT).unwrap();
+    }
+
+    // The resource has no annotation. It holds the parameter only through its records.
+    const RESOURCE_WIT: &str = r#"
+package temporal:nexus@1.0.0;
+world system { export handles; }
+/// @nexus.endpoint "handles"
+interface handles {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+  /// @nexus.type-parameter
+  type body-t = placeholder;
+  /// @nexus.type-parameter
+  type key-t = placeholder;
+  record item { body: body-t, }
+  record page { items: list<item>, }
+  record put-request { id: string, item: item, }
+  record put-response {}
+  record get-request { id: string, }
+  resource handle {
+    constructor(id: string);
+    /// @nexus.operation "put"
+    put: func(item: item) -> put-response;
+    /// @nexus.operation "get"
+    get: func() -> page;
+  }
+  resource plain {
+    constructor(id: string, key: string);
+  }
+  put: func(request: put-request) -> put-response;
+  get: func(request: get-request) -> page;
+}
+"#;
+
+    #[test]
+    fn a_resource_is_generic_in_the_parameters_of_its_records() {
+        assert_eq!(resource_type_parameters(RESOURCE_WIT, "handle"), ["BodyT"]);
+        assert!(resource_type_parameters(RESOURCE_WIT, "plain").is_empty());
+    }
+
+    #[test]
+    fn a_resource_takes_its_type_parameters_in_the_order_that_it_uses_them() {
+        let wit = r#"
+package test:pairs@1.0.0;
+world system { export pairs; }
+interface pairs {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type key-t = placeholder;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  record entry { value: value-t, }
+  resource pair {
+    constructor(value: entry, key: key-t);
+  }
+}
+"#;
+        assert_eq!(resource_type_parameters(wit, "pair"), ["ValueT", "KeyT"]);
     }
 }

@@ -691,10 +691,6 @@ fn validate_type_parameter_directive(
 ) -> Result<()> {
     let context = format!("type `{}`", wit_type_full_name(resolve, type_id));
     let directives = parse_directives(type_def.docs.contents.as_deref(), path, &context)?;
-    // A resource declares its type parameters, so `build_resource` reads them.
-    if matches!(type_def.kind, TypeDefKind::Resource) {
-        return Ok(());
-    }
     let Some(_) = directive(&directives, "type-parameter", path, &context)? else {
         return Ok(());
     };
@@ -2814,8 +2810,6 @@ fn build_resource(
     let doc = directive(&resource_directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
-    let type_parameters =
-        build_resource_type_parameters(resolve, interface, &resource_directives, path, &context)?;
 
     let constructor = interface.functions.values().find(
         |function| matches!(function.kind, FunctionKind::Constructor(id) if id == resource_id),
@@ -2869,71 +2863,12 @@ fn build_resource(
     Ok(ResourceSpec {
         name: resource_name,
         doc,
-        type_parameters,
+        // `ResourceTypeParameterPass` infers them from what the resource uses.
+        type_parameters: Vec::new(),
         fields,
         methods,
         data: (),
     })
-}
-
-/// The type parameters that a resource declares, in order. Each `@nexus.type-parameter` names a
-/// type alias with `@nexus.type-parameter`, of the interface or brought in by `use`.
-fn build_resource_type_parameters(
-    resolve: &Resolve,
-    interface: &Interface,
-    directives: &[Directive],
-    path: &Path,
-    context: &str,
-) -> Result<Vec<TypeParameterSpec>> {
-    let invalid = |reason: String| Error::InvalidWitDirective {
-        path: path.to_path_buf(),
-        context: context.to_string(),
-        directive: "@nexus.type-parameter".to_string(),
-        reason,
-    };
-    let mut parameters = Vec::<TypeParameterSpec>::new();
-    for parameter in directives
-        .iter()
-        .filter(|directive| directive.name() == "type-parameter")
-    {
-        let (Some(alias), 1) = (parameter.value("value"), parameter.args.len()) else {
-            return Err(invalid(
-                "on a resource, names one type parameter alias, such as `\"body-t\"`".to_string(),
-            ));
-        };
-        let Some(mut type_id) = interface.types.get(alias).copied() else {
-            return Err(invalid(format!("`{alias}` isn't a type of this interface")));
-        };
-        // `use` adds a local alias of the type, so the loop walks the aliases to the declaration.
-        loop {
-            let type_def = &resolve.types[type_id];
-            let alias_context = format!("type `{}`", wit_type_full_name(resolve, type_id));
-            let alias_directives =
-                parse_directives(type_def.docs.contents.as_deref(), path, &alias_context)?;
-            if directive(&alias_directives, "type-parameter", path, &alias_context)?.is_some() {
-                break;
-            }
-            let TypeDefKind::Type(Type::Id(next)) = type_def.kind else {
-                return Err(invalid(format!(
-                    "`{alias}` isn't a type alias with `@nexus.type-parameter`"
-                )));
-            };
-            type_id = next;
-        }
-        let declared = TypeParameterSpec {
-            name: resolve.types[type_id]
-                .name
-                .as_deref()
-                .unwrap_or(alias)
-                .to_upper_camel_case(),
-            full_name: wit_type_full_name(resolve, type_id),
-        };
-        if parameters.contains(&declared) {
-            return Err(invalid(format!("declares `{alias}` twice")));
-        }
-        parameters.push(declared);
-    }
-    Ok(parameters)
 }
 
 fn build_resource_method(
@@ -4031,101 +3966,6 @@ interface generic-service {
                 .map(|usage| usage.parameter.name.as_str())
                 .collect::<Vec<_>>(),
             ["ContextT", "KeyT", "OutputT"]
-        );
-    }
-
-    #[test]
-    fn a_resource_declares_a_type_parameter_that_use_brings_in() {
-        let wit = r#"
-package temporal:nexus@1.0.0;
-
-world system {
-  export handles;
-}
-
-interface values {
-  use nexus:temporal-types/model@1.0.0.{placeholder};
-
-  /// @nexus.type-parameter
-  type body-t = placeholder;
-
-  record item {
-    body: body-t,
-  }
-}
-
-/// @nexus.endpoint "handles"
-interface handles {
-  use values.{body-t, item};
-
-  record put-request {
-    id: string,
-    item: item,
-  }
-
-  record put-response {}
-
-  /// @nexus.type-parameter "body-t"
-  resource handle {
-    constructor(id: string);
-
-    /// @nexus.operation "put"
-    put: func(item: item) -> put-response;
-  }
-
-  put: func(request: put-request) -> put-response;
-}
-"#;
-        let spec = parse(Language::Python, wit);
-
-        let handle = spec.services[0]
-            .resource("handle")
-            .expect("the service has the resource");
-        // The parameter is the alias that `use` names, so it correlates with the record fields.
-        assert_eq!(
-            handle.type_parameters,
-            [super::TypeParameterSpec {
-                name: "BodyT".to_string(),
-                full_name: "values.body-t".to_string(),
-            }]
-        );
-    }
-
-    #[test]
-    fn a_resource_keeps_the_order_of_its_type_parameters() {
-        let wit = r#"
-package test:pairs@1.0.0;
-
-world system { export pairs; }
-
-interface pairs {
-  type placeholder = string;
-
-  /// @nexus.type-parameter
-  type key-t = placeholder;
-
-  /// @nexus.type-parameter
-  type value-t = placeholder;
-
-  /// @nexus.type-parameter "value-t"
-  /// @nexus.type-parameter "key-t"
-  resource pair {
-    constructor(key: key-t, value: value-t);
-  }
-}
-"#;
-        let spec = parse(Language::Python, wit);
-
-        let pair = spec.services[0]
-            .resource("pair")
-            .expect("the service has the resource");
-        // Each language renders the parameters, and a call takes its runtime types, in this order.
-        assert_eq!(
-            pair.type_parameters
-                .iter()
-                .map(|parameter| parameter.name.as_str())
-                .collect::<Vec<_>>(),
-            ["ValueT", "KeyT"]
         );
     }
 
