@@ -24,6 +24,7 @@ mod proto;
 mod reachability;
 mod record_backing;
 mod resource_resolution;
+mod resource_type_parameters;
 mod selected_validation;
 mod selection;
 mod type_planning;
@@ -43,6 +44,7 @@ pub(crate) use resource_resolution::{
     ResolvedResourceHolder, ResolvedResourceMethodBinding, ResolvedResourceReturnSpec,
     ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily, ResourceResolutionPass,
 };
+pub(crate) use resource_type_parameters::ResourceTypeParameterPass;
 pub(crate) use selected_validation::SelectedValidationPass;
 pub(crate) use selection::LanguageSelectionPass;
 #[cfg(test)]

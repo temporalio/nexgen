@@ -572,7 +572,7 @@ Resources are the most complex feature of the code generator. They produce
 classes whose constructor fields represent the resource's identity, and whose
 methods delegate to Nexus operations.
 
-A resource can declare type parameters. See
+A resource that uses a type parameter is generic. See
 [Generic resources](#generic-resources).
 
 ### Resource Declaration
@@ -1680,7 +1680,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.service-name`                   | interface                                                                                     |
 | `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
 | `@nexus.proto`                          | record, enum, flags, variant, type alias, resource                                            |
-| `@nexus.type-parameter`                 | type alias, resource                                                                          |
+| `@nexus.type-parameter`                 | type alias                                                                                    |
 | `@nexus.proto-field`                    | record field                                                                                  |
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
@@ -1709,17 +1709,16 @@ type-alias prose can be written as ordinary documentation comments, but
 `@nexus.doc` there has no generated documentation consumer and is rejected.
 
 `add-rpc-compatible-with` may be repeated to declare multiple compatibility
-targets. `source` and `default` may be repeated with disjoint `targets` sets. A
-resource repeats `type-parameter`, once for each type parameter. All other
-annotations are singletons. For language-specific arguments, the recognized
-prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and `typescript`.
-Prefixes are accepted only for options that the annotation actually consumes,
-not arbitrarily on every directive. For example, `name` takes language names,
-`proto` takes `<lang>-type` and `<lang>-import`, and `type` on an external
-binding also takes `<lang>-from` and `<lang>-to`. Field `type` annotations do
-not take conversion helpers. `doc` return overrides are only valid on
-freestanding functions, and `function` signatures belong on type aliases, not
-record fields.
+targets. `source` and `default` may be repeated with disjoint `targets` sets;
+all other annotations are singletons. For language-specific arguments, the
+recognized prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and
+`typescript`. Prefixes are accepted only for options that the annotation
+actually consumes, not arbitrarily on every directive. For example, `name` takes
+language names, `proto` takes `<lang>-type` and `<lang>-import`, and `type` on
+an external binding also takes `<lang>-from` and `<lang>-to`. Field `type`
+annotations do not take conversion helpers. `doc` return overrides are only
+valid on freestanding functions, and `function` signatures belong on type
+aliases, not record fields.
 
 ### Language and System Nexus restrictions
 
@@ -1925,8 +1924,7 @@ Unreachable declarations and omitted oneofs remain valid.
 
 ### @nexus.type-parameter
 
-**Placement:** Type alias or resource **Syntax:** `@nexus.type-parameter` on a
-type alias, `@nexus.type-parameter "<alias>"` on a resource
+**Placement:** Type alias **Syntax:** `@nexus.type-parameter` (no arguments)
 
 Declares an opaque model type parameter. Records and variants infer their
 ordered generic parameters from public fields and case payloads, including
@@ -2005,9 +2003,11 @@ occur.
 
 #### Generic resources
 
-A resource declares each type parameter that it uses with
-`@nexus.type-parameter "<alias>"`, in order. The alias can come from another
-interface through `use`.
+A resource that uses a type parameter is generic in it, as a record is, so it
+needs no annotation. Its fields, the parameters and results of its methods, and
+the operations that they bind count, also through records, protos and the
+resources that it returns. The resource takes its parameters in the order that
+it first uses them.
 
 ```wit
 /// @nexus.type-parameter
@@ -2018,8 +2018,10 @@ record append-record {
   body: body-t,
 }
 
-/// @nexus.type-parameter "body-t"
-resource %stream { ... }
+resource %stream {
+  /// @nexus.operation "append-records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
 ```
 
 The resource keeps a runtime type for each parameter, and its calls decode the
@@ -2039,10 +2041,8 @@ holds such a record is generic too.
 - .NET. A call of `Stream<TBody>` takes the type argument, as in
   `CreateStreamAsync<Turn>(options)`.
 
-Go and Java refuse a generic resource. nexgen also refuses a type parameter that
-a resource uses but doesn't declare, or declares but doesn't use, and a generic
-resource in a record field or in the result of an operation with no
-`@nexus.proto` message.
+Go and Java refuse a generic resource. nexgen also refuses a generic resource in
+a record field or in the result of an operation with no `@nexus.proto` message.
 
 ---
 

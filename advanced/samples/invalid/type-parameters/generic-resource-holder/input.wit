@@ -18,7 +18,6 @@ interface job-service {
     nexus-endpoint: placeholder,
   }
 
-  /// @nexus.type-parameter "output-t"
   resource job {
     constructor(id: string);
 
