@@ -2,15 +2,12 @@ package tests
 
 import (
 	"testing"
-	"time"
 
-	"github.com/nexus-rpc/sdk-go/nexus"
 	"github.com/stretchr/testify/require"
 	common "go.temporal.io/api/common/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/interceptor"
-	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
@@ -23,16 +20,14 @@ func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
 	header, err := converter.GetDefaultDataConverter().ToPayload("intercepted-header")
 	s.Require().NoError(err)
 	capture := &captureNexusInputInterceptor{
-		onTyped: func(ctx workflow.Context, input *ws.SignalWithStartWorkflowInput) {
-			s.Equal("singleArgWorkflow", input.Request.Workflow)
-			s.Equal([]any{"workflow-input"}, input.Request.Args)
-			s.Equal([]any{"signal-value"}, input.Request.SignalArgs)
-			s.Require().NotNil(input.Request.Headers)
-			input.Request.ID = s.targetID("intercepted")
-			input.Request.SignalArgs = []any{"intercepted-signal"}
-			input.Request.Headers["trace"] = header
-			s.Same(header, ctx.Value(workflowServiceHeaderKey{}).(map[string]*common.Payload)["trace"])
-			input.Options.ScheduleToCloseTimeout = 20 * time.Second
+		onTyped: func(ctx workflow.Context, request *ws.SignalWithStartWorkflowRequest) {
+			s.Equal("singleArgWorkflow", request.Workflow)
+			s.Equal([]any{"workflow-input"}, request.Args)
+			s.Equal([]any{"signal-value"}, request.SignalArgs)
+			s.Nil(request.Headers)
+			request.ID = s.targetID("intercepted")
+			request.SignalArgs = []any{"intercepted-signal"}
+			request.Headers = map[string]*common.Payload{"trace": header}
 		},
 	}
 	s.interceptors = []interceptor.WorkerInterceptor{capture}
@@ -58,7 +53,7 @@ func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
 	s.Require().Len(calls, 1)
 	s.Equal("temporal.api.workflowservice.v1.WorkflowService", calls[0].Client.Service())
 	s.Equal("SignalWithStartWorkflowExecution", calls[0].Operation)
-	s.Equal(20*time.Second, calls[0].Options.ScheduleToCloseTimeout)
+	s.Equal(workflow.NexusOperationOptions{}, calls[0].Options)
 	s.Empty(calls[0].NexusHeader)
 
 	dc := commonconverter.WithDataConverterSystemNexusContext(
@@ -90,28 +85,23 @@ func TestWorkflowServiceInterceptorForwarding(t *testing.T) {
 	runtime := &recordingWorkflowServiceRuntime{future: future}
 	terminal := &ws.WorkflowOutboundInterceptorTerminal{Runtime: runtime}
 	base := &ws.WorkflowOutboundInterceptorBase{Next: terminal}
-	input := &ws.SignalWithStartWorkflowInput{
-		Request: ws.SignalWithStartWorkflowRequest{
-			ID: "target", Args: []any{"unencoded"}, SignalArgs: []any{42},
-		},
-		Options: workflow.NexusOperationOptions{ScheduleToCloseTimeout: time.Minute},
-		// The server currently requires empty Nexus headers for System Nexus.
-		// Verify forwarding independently of that scheduling restriction.
-		NexusHeader: nexus.Header{"trace": "header"},
+	request := &ws.SignalWithStartWorkflowRequest{
+		ID: "target", Args: []any{"unencoded"}, SignalArgs: []any{42},
 	}
-	require.Same(t, future, base.SignalWithStartWorkflow(nil, input))
+	require.Same(t, future, base.SignalWithStartWorkflow(nil, request))
 	require.Equal(t, "temporal.api.workflowservice.v1.WorkflowService", runtime.input.Client.Service())
 	require.Equal(t, "SignalWithStartWorkflowExecution", runtime.input.Operation)
-	require.Equal(t, input.Request, runtime.input.Input)
-	require.Equal(t, input.Options, runtime.input.Options)
-	require.Equal(t, input.NexusHeader, runtime.input.NexusHeader)
+	require.Equal(t, *request, runtime.input.Input)
+	require.Equal(t, workflow.NexusOperationOptions{}, runtime.input.Options)
+	require.NotNil(t, runtime.input.NexusHeader)
+	require.Empty(t, runtime.input.NexusHeader)
 }
 
 func TestWorkflowServiceInterceptorDispatchErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		service   string
-		operation any
+		operation string
 		input     any
 		want      string
 	}{
@@ -127,10 +117,6 @@ func TestWorkflowServiceInterceptorDispatchErrors(t *testing.T) {
 			name: "wrong request", service: "temporal.api.workflowservice.v1.WorkflowService", operation: "SignalWithStartWorkflowExecution",
 			input: "not a request", want: "expects SystemNexus_SignalWithStartWorkflowRequest, got string",
 		},
-		{
-			name: "host validation", service: "temporal.api.workflowservice.v1.WorkflowService", operation: 42,
-			want: "sample runtime expects a string operation name, got int",
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var suite testsuite.WorkflowTestSuite
@@ -139,8 +125,8 @@ func TestWorkflowServiceInterceptorDispatchErrors(t *testing.T) {
 				terminal := &ws.WorkflowOutboundInterceptorTerminal{
 					Runtime: &workflowServiceRuntime{},
 				}
-				future := terminal.StartOperation(ctx, nil, interceptor.ExecuteNexusOperationInput{
-					Client:    internal.NewSystemNexusClient(tc.service),
+				future := terminal.StartOperation(ctx, nil, ws.ExecuteOperationInput{
+					Service:   tc.service,
 					Operation: tc.operation, Input: tc.input,
 				})
 				resultErr := future.Get(ctx, nil)

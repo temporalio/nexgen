@@ -1310,17 +1310,10 @@ impl<'a> ApiPlanner<'a> {
                 .insert(self.package.workflow_import().to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
-        let interceptor_headers = self.package.workflow_interceptors
-            && interceptor::has_headers(&services, self.api_plan);
         if self.package.workflow_interceptors && has_operations {
             self.imports.insert("fmt".to_string());
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
-            if interceptor_headers && !self.package.is_self_import("go.temporal.io/sdk/internal") {
-                self.aliased_imports
-                    .entry("go.temporal.io/api/common/v1".to_string())
-                    .or_insert_with(|| "common".to_string());
-            }
         }
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
             op.wire_binding
@@ -1485,21 +1478,7 @@ impl<'a> ApiPlanner<'a> {
             validate_model_getter_names(model)?;
         }
         let interceptors = if self.package.workflow_interceptors && has_operations {
-            let header_payload_type = interceptor_headers.then(|| {
-                format!(
-                    "{}.Payload",
-                    self.aliased_imports
-                        .get("go.temporal.io/api/common/v1")
-                        .map(String::as_str)
-                        .unwrap_or("common")
-                )
-            });
-            interceptor::render(
-                &services,
-                self.api_plan,
-                &self.package,
-                header_payload_type.as_deref(),
-            )?
+            interceptor::render(&services, &self.package)?
         } else {
             String::new()
         };

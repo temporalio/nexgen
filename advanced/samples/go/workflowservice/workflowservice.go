@@ -780,10 +780,23 @@ func init() {
 
 // --- Workflow outbound interceptors ---
 
+// StartOperation dispatches an unencoded request through outbound.
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
+	switch {
+	case input.Service == "temporal.api.workflowservice.v1.WorkflowService" && input.Operation == "SignalWithStartWorkflowExecution":
+		request, ok := input.Input.(SystemNexus_SignalWithStartWorkflowRequest)
+		if !ok {
+			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_SignalWithStartWorkflowRequest, got %T", "temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution", input.Input))
+		}
+		return outbound.SignalWithStartWorkflow(ctx, &request)
+	}
+	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
+}
+
 // SystemNexus_WorkflowOutboundInterceptor intercepts System Nexus workflow operations before payload conversion.
 type SystemNexus_WorkflowOutboundInterceptor interface {
 	// SignalWithStartWorkflow intercepts the unencoded System Nexus request.
-	SignalWithStartWorkflow(ctx internal.Context, input *SystemNexus_SignalWithStartWorkflowInput) internal.NexusOperationFuture
+	SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture
 }
 
 // SystemNexus_WorkflowOutboundInterceptorBase forwards operations to Next.
@@ -796,59 +809,30 @@ type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
 	Runtime SystemNexus_WorkflowOutboundRuntime
 }
 
-// SystemNexus_WorkflowOutboundRuntime supplies the host's operation validation,
-// header context, failed futures, and terminal scheduling. ExecuteOperation
+// SystemNexus_ExecuteOperationInput contains a resolved operation and unencoded request for dispatch.
+type SystemNexus_ExecuteOperationInput struct {
+	Service   string
+	Operation string
+	Input     any
+}
+
+// SystemNexus_WorkflowOutboundRuntime supplies failed futures and terminal scheduling. ExecuteOperation
 // must not dispatch through the same interceptor chain again. FailedFuture
 // must fail both the result future and the operation-execution future.
 type SystemNexus_WorkflowOutboundRuntime interface {
-	ResolveOperationName(operation, input any) (string, error)
 	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
 	ExecuteOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
-	// ContextWithHeader initializes a nil map and binds that same map to the returned context.
-	ContextWithHeader(ctx internal.Context, header *map[string]*common.Payload) internal.Context
 }
 
-// SystemNexus_SignalWithStartWorkflowInput contains the request before payload conversion.
-// Interceptors may modify it synchronously before forwarding it. They must
-// not retain or mutate it after forwarding, or replace its header map.
-type SystemNexus_SignalWithStartWorkflowInput struct {
-	Request     SystemNexus_SignalWithStartWorkflowRequest
-	Options     internal.NexusOperationOptions
-	NexusHeader nexus.Header
+func (w *SystemNexus_WorkflowOutboundInterceptorBase) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
+	return w.Next.SignalWithStartWorkflow(ctx, request)
 }
 
-func (w *SystemNexus_WorkflowOutboundInterceptorBase) SignalWithStartWorkflow(ctx internal.Context, input *SystemNexus_SignalWithStartWorkflowInput) internal.NexusOperationFuture {
-	return w.Next.SignalWithStartWorkflow(ctx, input)
-}
-
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SignalWithStartWorkflow(ctx internal.Context, input *SystemNexus_SignalWithStartWorkflowInput) internal.NexusOperationFuture {
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
 	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService"),
 		Operation:   "SignalWithStartWorkflowExecution",
-		Input:       input.Request,
-		Options:     input.Options,
-		NexusHeader: input.NexusHeader,
+		Input:       *request,
+		NexusHeader: nexus.Header{},
 	})
-}
-
-// StartOperation dispatches an unencoded request through outbound.
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
-	operationName, err := wc.Runtime.ResolveOperationName(input.Operation, input.Input)
-	if err != nil {
-		return wc.Runtime.FailedFuture(ctx, err)
-	}
-	switch {
-	case input.Client.Service() == "temporal.api.workflowservice.v1.WorkflowService" && operationName == "SignalWithStartWorkflowExecution":
-		request, ok := input.Input.(SystemNexus_SignalWithStartWorkflowRequest)
-		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_SignalWithStartWorkflowRequest, got %T", "temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution", input.Input))
-		}
-		ctx = wc.Runtime.ContextWithHeader(ctx, &request.Headers)
-		return outbound.SignalWithStartWorkflow(ctx, &SystemNexus_SignalWithStartWorkflowInput{
-			Request:     request,
-			Options:     input.Options,
-			NexusHeader: input.NexusHeader,
-		})
-	}
-	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Client.Service(), operationName))
 }

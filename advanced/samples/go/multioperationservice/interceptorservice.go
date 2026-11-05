@@ -67,12 +67,31 @@ func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOp
 
 // --- Workflow outbound interceptors ---
 
+// StartOperation dispatches an unencoded request through outbound.
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
+	switch {
+	case input.Service == "InterceptorService" && input.Operation == "FirstOperation":
+		request, ok := input.Input.(SystemNexus_Request)
+		if !ok {
+			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "FirstOperation", input.Input))
+		}
+		return outbound.FirstOperation(ctx, &request)
+	case input.Service == "InterceptorService" && input.Operation == "SecondOperation":
+		request, ok := input.Input.(SystemNexus_Request)
+		if !ok {
+			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "SecondOperation", input.Input))
+		}
+		return outbound.SecondOperation(ctx, &request)
+	}
+	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
+}
+
 // SystemNexus_WorkflowOutboundInterceptor intercepts System Nexus workflow operations before payload conversion.
 type SystemNexus_WorkflowOutboundInterceptor interface {
 	// FirstOperation intercepts the unencoded System Nexus request.
-	FirstOperation(ctx internal.Context, input *SystemNexus_FirstOperationInput) internal.NexusOperationFuture
+	FirstOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture
 	// SecondOperation intercepts the unencoded System Nexus request.
-	SecondOperation(ctx internal.Context, input *SystemNexus_SecondOperationInput) internal.NexusOperationFuture
+	SecondOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture
 }
 
 // SystemNexus_WorkflowOutboundInterceptorBase forwards operations to Next.
@@ -85,89 +104,43 @@ type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
 	Runtime SystemNexus_WorkflowOutboundRuntime
 }
 
-// SystemNexus_WorkflowOutboundRuntime supplies the host's operation validation,
-// header context, failed futures, and terminal scheduling. ExecuteOperation
+// SystemNexus_ExecuteOperationInput contains a resolved operation and unencoded request for dispatch.
+type SystemNexus_ExecuteOperationInput struct {
+	Service   string
+	Operation string
+	Input     any
+}
+
+// SystemNexus_WorkflowOutboundRuntime supplies failed futures and terminal scheduling. ExecuteOperation
 // must not dispatch through the same interceptor chain again. FailedFuture
 // must fail both the result future and the operation-execution future.
 type SystemNexus_WorkflowOutboundRuntime interface {
-	ResolveOperationName(operation, input any) (string, error)
 	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
 	ExecuteOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
 }
 
-// SystemNexus_FirstOperationInput contains the request before payload conversion.
-// Interceptors may modify it synchronously before forwarding it. They must
-// not retain or mutate it after forwarding, or replace its header map.
-type SystemNexus_FirstOperationInput struct {
-	Request     SystemNexus_Request
-	Options     internal.NexusOperationOptions
-	NexusHeader nexus.Header
+func (w *SystemNexus_WorkflowOutboundInterceptorBase) FirstOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
+	return w.Next.FirstOperation(ctx, request)
 }
 
-func (w *SystemNexus_WorkflowOutboundInterceptorBase) FirstOperation(ctx internal.Context, input *SystemNexus_FirstOperationInput) internal.NexusOperationFuture {
-	return w.Next.FirstOperation(ctx, input)
-}
-
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) FirstOperation(ctx internal.Context, input *SystemNexus_FirstOperationInput) internal.NexusOperationFuture {
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) FirstOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
 	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("InterceptorService"),
 		Operation:   "FirstOperation",
-		Input:       input.Request,
-		Options:     input.Options,
-		NexusHeader: input.NexusHeader,
+		Input:       *request,
+		NexusHeader: nexus.Header{},
 	})
 }
 
-// SystemNexus_SecondOperationInput contains the request before payload conversion.
-// Interceptors may modify it synchronously before forwarding it. They must
-// not retain or mutate it after forwarding, or replace its header map.
-type SystemNexus_SecondOperationInput struct {
-	Request     SystemNexus_Request
-	Options     internal.NexusOperationOptions
-	NexusHeader nexus.Header
+func (w *SystemNexus_WorkflowOutboundInterceptorBase) SecondOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
+	return w.Next.SecondOperation(ctx, request)
 }
 
-func (w *SystemNexus_WorkflowOutboundInterceptorBase) SecondOperation(ctx internal.Context, input *SystemNexus_SecondOperationInput) internal.NexusOperationFuture {
-	return w.Next.SecondOperation(ctx, input)
-}
-
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SecondOperation(ctx internal.Context, input *SystemNexus_SecondOperationInput) internal.NexusOperationFuture {
+func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SecondOperation(ctx internal.Context, request *SystemNexus_Request) internal.NexusOperationFuture {
 	return wc.Runtime.ExecuteOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("InterceptorService"),
 		Operation:   "SecondOperation",
-		Input:       input.Request,
-		Options:     input.Options,
-		NexusHeader: input.NexusHeader,
+		Input:       *request,
+		NexusHeader: nexus.Header{},
 	})
-}
-
-// StartOperation dispatches an unencoded request through outbound.
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) StartOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
-	operationName, err := wc.Runtime.ResolveOperationName(input.Operation, input.Input)
-	if err != nil {
-		return wc.Runtime.FailedFuture(ctx, err)
-	}
-	switch {
-	case input.Client.Service() == "InterceptorService" && operationName == "FirstOperation":
-		request, ok := input.Input.(SystemNexus_Request)
-		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "FirstOperation", input.Input))
-		}
-		return outbound.FirstOperation(ctx, &SystemNexus_FirstOperationInput{
-			Request:     request,
-			Options:     input.Options,
-			NexusHeader: input.NexusHeader,
-		})
-	case input.Client.Service() == "InterceptorService" && operationName == "SecondOperation":
-		request, ok := input.Input.(SystemNexus_Request)
-		if !ok {
-			return wc.Runtime.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_Request, got %T", "InterceptorService", "SecondOperation", input.Input))
-		}
-		return outbound.SecondOperation(ctx, &SystemNexus_SecondOperationInput{
-			Request:     request,
-			Options:     input.Options,
-			NexusHeader: input.NexusHeader,
-		})
-	}
-	return wc.Runtime.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Client.Service(), operationName))
 }

@@ -431,14 +431,6 @@ pub(super) fn render(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
-                if package.workflow_interceptors {
-                    plan.add_alias(
-                        &mut scope,
-                        &interceptor::input_name(operation),
-                        Vec::new(),
-                        None,
-                    );
-                }
                 plan.add_alias(
                     &mut scope,
                     &format!(

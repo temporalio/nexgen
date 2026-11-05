@@ -24,7 +24,7 @@ type WorkflowOutboundInterceptorTerminal = implementation.SystemNexus_WorkflowOu
 
 type WorkflowOutboundRuntime = implementation.SystemNexus_WorkflowOutboundRuntime
 
-type SignalWithStartWorkflowInput = implementation.SystemNexus_SignalWithStartWorkflowInput
+type ExecuteOperationInput = implementation.SystemNexus_ExecuteOperationInput
 
 type SignalWithStartWorkflowOptions = implementation.SystemNexus_SignalWithStartWorkflowOptions
 

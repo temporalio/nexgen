@@ -239,7 +239,7 @@ type captureNexusInputInterceptor struct {
 	calls         []interceptor.ExecuteNexusOperationInput
 	dispatchCalls int
 	typedCalls    int
-	onTyped       func(workflow.Context, *ws.SignalWithStartWorkflowInput)
+	onTyped       func(workflow.Context, *ws.SignalWithStartWorkflowRequest)
 }
 
 func (i *captureNexusInputInterceptor) InterceptWorkflow(ctx workflow.Context, next interceptor.WorkflowInboundInterceptor) interceptor.WorkflowInboundInterceptor {
@@ -284,7 +284,15 @@ func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, 
 		},
 		capture: i.capture,
 	}
-	return terminal.StartOperation(ctx, outbound, input)
+	operation, ok := input.Operation.(string)
+	if !ok {
+		return terminal.Runtime.FailedFuture(ctx, fmt.Errorf("sample runtime expects a string operation name, got %T", input.Operation))
+	}
+	return terminal.StartOperation(ctx, outbound, ws.ExecuteOperationInput{
+		Service:   input.Client.Service(),
+		Operation: operation,
+		Input:     input.Input,
+	})
 }
 
 type captureWorkflowServiceOutbound struct {
@@ -292,37 +300,21 @@ type captureWorkflowServiceOutbound struct {
 	capture *captureNexusInputInterceptor
 }
 
-func (i *captureWorkflowServiceOutbound) SignalWithStartWorkflow(ctx workflow.Context, input *ws.SignalWithStartWorkflowInput) workflow.NexusOperationFuture {
+func (i *captureWorkflowServiceOutbound) SignalWithStartWorkflow(ctx workflow.Context, request *ws.SignalWithStartWorkflowRequest) workflow.NexusOperationFuture {
 	if !workflow.IsReplaying(ctx) {
 		i.capture.mu.Lock()
 		i.capture.typedCalls++
 		i.capture.mu.Unlock()
 	}
 	if i.capture.onTyped != nil {
-		i.capture.onTyped(ctx, input)
+		i.capture.onTyped(ctx, request)
 	}
-	return i.WorkflowOutboundInterceptorBase.SignalWithStartWorkflow(ctx, input)
+	return i.WorkflowOutboundInterceptorBase.SignalWithStartWorkflow(ctx, request)
 }
-
-type workflowServiceHeaderKey struct{}
 
 type workflowServiceRuntime struct {
 	next    interceptor.WorkflowOutboundInterceptor
 	capture *captureNexusInputInterceptor
-}
-
-func (*workflowServiceRuntime) ResolveOperationName(operation, _ any) (string, error) {
-	if name, ok := operation.(string); ok {
-		return name, nil
-	}
-	return "", fmt.Errorf("sample runtime expects a string operation name, got %T", operation)
-}
-
-func (*workflowServiceRuntime) ContextWithHeader(ctx workflow.Context, header *map[string]*common.Payload) workflow.Context {
-	if *header == nil {
-		*header = make(map[string]*common.Payload)
-	}
-	return workflow.WithValue(ctx, workflowServiceHeaderKey{}, *header)
 }
 
 func (r *workflowServiceRuntime) ExecuteOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {

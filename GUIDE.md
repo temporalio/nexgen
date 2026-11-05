@@ -173,12 +173,14 @@ package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 `@nexus.namespace go="go.temporal.io/sdk/internal"`.
 
 Workflow System Nexus generation emits an operation-specific outbound interface,
-typed inputs, forwarding methods, terminal methods, and a dispatcher. Standalone
-packages expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and
-`Terminal` types, and `SystemNexus_WorkflowOutboundRuntime`. The host implements
-the runtime contract for operation validation, workflow header context, failed
-futures, and scheduling. Call the terminal's `StartOperation` with the head of
-the typed interceptor chain. Terminal scheduling must not re-enter that chain.
+forwarding methods, terminal methods, and a dispatcher. Standalone packages
+expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and `Terminal`
+types, and `SystemNexus_WorkflowOutboundRuntime`. The host implements the
+runtime contract for failed futures and scheduling. Call the terminal's
+`StartOperation` with the head of the typed interceptor chain and a
+`SystemNexus_ExecuteOperationInput` containing the service, resolved operation
+name, and unencoded request. The host resolves operation references before
+dispatch. Terminal scheduling must not re-enter that chain.
 
 For generation into `go.temporal.io/sdk/internal`, nexgen attaches forwarding
 methods directly to `WorkflowOutboundInterceptorBase` and terminal methods to
@@ -188,15 +190,17 @@ only forwarding state. Both package layouts use the same operation renderer. The
 existing Go `workflow-service` sample exercises dispatch, forwarding, and
 terminal scheduling through the standalone runtime contract.
 
-Interceptor inputs expose the unencoded request, Nexus operation options, and
-Nexus headers. Request envelopes and their nested models become public types;
-the facade exposes their aliases. Interceptors may modify inputs synchronously
-before forwarding but must not retain them or replace their workflow header map.
-Go SDK header bindings use `map[string]*commonpb.Payload`, with pass-through
-converters, so context propagation does not encode headers again. The generated
-dispatcher binds that map to the workflow context before calling interceptors.
-SDK interceptor generation requires concrete request types because Go methods
-cannot declare type parameters.
+Interceptor methods accept a pointer to the unencoded request, without Nexus
+operation options or transport headers. The terminal uses default Nexus
+settings. Requests and their nested models become public types; the facade
+exposes their aliases. Interceptors may modify requests synchronously before
+forwarding but must not retain them. Request header maps may be nil, and
+interceptors may allocate or replace them. Go SDK header bindings use
+`map[string]*commonpb.Payload`, with pass-through converters. Interceptors own
+context propagation through the request headers; generated code does not bind
+them to the workflow context or invoke configured context propagators. SDK
+interceptor generation requires concrete request types because Go methods cannot
+declare type parameters.
 
 ### Python
 
