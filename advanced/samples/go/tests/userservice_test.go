@@ -53,15 +53,12 @@ func TestUserServiceIntegrationSuite(t *testing.T) {
 func (s *UserServiceIntegrationSuite) TestOperationsAndResourceMethod() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*userservice.User, error) {
 		var user userservice.User
-		if err := userservice.GetUser(ctx, userservice.GetUserOptions{UserID: "user-123"}).Get(ctx, &user); err != nil {
+		if err := userservice.GetUser(ctx, userservice.GetUserOptions{}, "user-123").Get(ctx, &user); err != nil {
 			return nil, err
 		}
 
 		var updated userservice.User
-		if err := userservice.UpdateEmail(ctx, userservice.UpdateEmailOptions{
-			UserID: "user-123",
-			Email:  "direct@example.com",
-		}).Get(ctx, &updated); err != nil {
+		if err := userservice.UpdateEmail(ctx, userservice.UpdateEmailOptions{}, "user-123", "direct@example.com").Get(ctx, &updated); err != nil {
 			return nil, err
 		}
 
@@ -87,7 +84,7 @@ func (s *UserServiceIntegrationSuite) TestOperationsAndResourceMethod() {
 func (s *UserServiceIntegrationSuite) TestOperationFailure() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var result userservice.User
-		return userservice.GetUser(ctx, userservice.GetUserOptions{UserID: "missing"}).Get(ctx, &result)
+		return userservice.GetUser(ctx, userservice.GetUserOptions{}, "missing").Get(ctx, &result)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())

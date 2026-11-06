@@ -83,12 +83,7 @@ impl<'a> TypeScope<'a> {
             declarations: BTreeMap::new(),
             imports: imports
                 .iter()
-                .map(|path| {
-                    (
-                        path.rsplit('/').next().unwrap_or(path).to_string(),
-                        path.clone(),
-                    )
-                })
+                .map(|path| (package.import_alias(path).to_string(), path.clone()))
                 .collect(),
         };
         for (path, alias) in external_imports {
@@ -748,6 +743,7 @@ mod tests {
         GoPackageContext {
             package_name: "internal".to_string(),
             import_path: Some("example.org/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
             facade: None,

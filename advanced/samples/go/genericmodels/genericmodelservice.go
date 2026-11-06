@@ -235,24 +235,23 @@ func (m GetterPair[ContextT, OutputT]) GetResultValue() result[ContextT, OutputT
 }
 
 type CompleteOptions[ContextT any] struct {
-	// Context - Required.
-	Context ContextT
-	// Contexts - Required.
-	Contexts []ContextT
-	// ByName - Required.
-	ByName map[string]ContextT
-	// Nested - Required.
-	Nested Inner[ContextT]
 	// Probe - Optional.
 	Probe *GetterProbe[ContextT]
 }
 
-func Complete[ContextT any](ctx workflow.Context, opts CompleteOptions[ContextT]) workflow.Future {
+func Complete[ContextT any](
+	ctx workflow.Context,
+	opts CompleteOptions[ContextT],
+	context ContextT,
+	contexts []ContextT,
+	byName map[string]ContextT,
+	nested Inner[ContextT],
+) workflow.Future {
 	return complete(ctx, genericRequest[ContextT]{
-		Context:  opts.Context,
-		Contexts: opts.Contexts,
-		ByName:   opts.ByName,
-		Nested:   opts.Nested,
+		Context:  context,
+		Contexts: contexts,
+		ByName:   byName,
+		Nested:   nested,
 		Probe:    opts.Probe,
 	})
 }

@@ -601,10 +601,6 @@ func (SystemNexus_SignalWithStartWorkflowResponse) TransferTypeConverter() (conv
 }
 
 type SystemNexus_SignalWithStartWorkflowOptions struct {
-	// ID - Unique identifier for the workflow execution. Must be nonempty.
-	//
-	// Required.
-	ID string
 	// TaskQueue - Task queue to run the workflow on. Defaults to the calling workflow's
 	// task queue.
 	//
@@ -681,18 +677,20 @@ type SystemNexus_SignalWithStartWorkflowOptions struct {
 // Signal a workflow, starting it first if needed. Encode payloads with the configured
 // data converter.
 //
+// Input id: Unique identifier for the workflow execution. Must be nonempty.
 // Input signal: Signal name to send with the start request.
 // Input signalArg: Arguments for the signal.
-// Input workflowValue: Workflow function identifying the workflow to start.
+// Input workflow: Workflow function identifying the workflow to start.
 // Input args: Arguments for the workflow.
 //
 // Returns: A workflow handle to the started workflow.
 func SystemNexus_SignalWithStartWorkflow(
 	ctx internal.Context,
 	opts SystemNexus_SignalWithStartWorkflowOptions,
+	id string,
 	signal string,
 	signalArg any,
-	workflowValue any,
+	workflow any,
 	args ...any,
 ) internal.Future {
 	var taskQueue string
@@ -722,11 +720,11 @@ func SystemNexus_SignalWithStartWorkflow(
 			StaticDetails: staticDetails,
 		}
 	}
-	workflowValueName := support.WorkflowFunctionName(ctx, workflowValue)
+	workflowName := support.WorkflowFunctionName(ctx, workflow)
 	return systemnexus_signalWithStartWorkflow(ctx, SystemNexus_SignalWithStartWorkflowRequest{
-		Workflow:                 workflowValueName,
+		Workflow:                 workflowName,
 		Args:                     args,
-		ID:                       opts.ID,
+		ID:                       id,
 		TaskQueue:                taskQueue,
 		Signal:                   signal,
 		SignalArgs:               []any{signalArg},

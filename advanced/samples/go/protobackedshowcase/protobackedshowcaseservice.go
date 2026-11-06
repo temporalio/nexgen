@@ -734,15 +734,13 @@ func (CallbackNexus) TransferTypeConverter() (converter.TransferTypeConverter, e
 type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
-	// RetryPolicy - Required.
-	RetryPolicy internal.RetryPolicy
 	// ScheduleToCloseTimeout - Optional.
 	ScheduleToCloseTimeout time.Duration
 	// Priority - Optional.
 	Priority *internal.Priority
 }
 
-func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions) workflow.Future {
+func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions, retryPolicy internal.RetryPolicy) workflow.Future {
 	var taskQueue *string
 	if opts.TaskQueue != "" {
 		taskQueue = &opts.TaskQueue
@@ -753,7 +751,7 @@ func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperatio
 	}
 	return activityOptionsOperation(ctx, ActivityOptions{
 		TaskQueue:              taskQueue,
-		RetryPolicy:            opts.RetryPolicy,
+		RetryPolicy:            retryPolicy,
 		ScheduleToCloseTimeout: scheduleToCloseTimeout,
 		Priority:               opts.Priority,
 	})
@@ -771,15 +769,13 @@ func FailureOperation(ctx workflow.Context, opts FailureOperationOptions) workfl
 }
 
 type WorkflowExecutionInfoOperationOptions struct {
-	// Execution - Required.
-	Execution WorkflowExecution
 	// ParentExecution - Optional.
 	ParentExecution *WorkflowExecution
 }
 
-func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions) workflow.Future {
+func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions, execution WorkflowExecution) workflow.Future {
 	return workflowExecutionInfoOperation(ctx, WorkflowExecutionInfo{
-		Execution:       opts.Execution,
+		Execution:       execution,
 		ParentExecution: opts.ParentExecution,
 	})
 }
@@ -787,14 +783,12 @@ func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecution
 type TaskQueuePartitionsOperationOptions struct {
 	// WorkflowTaskQueuePartitions - Optional.
 	WorkflowTaskQueuePartitions []TaskQueuePartition
-	// ActivityTaskQueuePartitions - Required.
-	ActivityTaskQueuePartitions []TaskQueuePartition
 }
 
-func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions) workflow.Future {
+func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions, activityTaskQueuePartitions []TaskQueuePartition) workflow.Future {
 	return taskQueuePartitionsOperation(ctx, TaskQueuePartitions{
 		WorkflowTaskQueuePartitions: opts.WorkflowTaskQueuePartitions,
-		ActivityTaskQueuePartitions: opts.ActivityTaskQueuePartitions,
+		ActivityTaskQueuePartitions: activityTaskQueuePartitions,
 	})
 }
 
@@ -810,45 +804,42 @@ func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions
 }
 
 type AlertOperationOptions struct {
-	// Message - Required.
-	Message string
 	// Severity - Optional.
 	Severity AlertLevel
 }
 
-func AlertOperation(ctx workflow.Context, opts AlertOperationOptions) workflow.Future {
+func AlertOperation(ctx workflow.Context, opts AlertOperationOptions, message string) workflow.Future {
 	var severity *AlertLevel
 	if opts.Severity != 0 {
 		severity = &opts.Severity
 	}
 	return alertOperation(ctx, Alert{
-		Message:  opts.Message,
+		Message:  message,
 		Severity: severity,
 	})
 }
 
 type CallbackInternalOperationOptions struct {
-	// Data - Required.
-	Data []byte
 }
 
-func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions) workflow.Future {
+func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions, data []byte) workflow.Future {
 	return callbackInternalOperation(ctx, CallbackInternal{
-		Data: opts.Data,
+		Data: data,
 	})
 }
 
 type CallbackNexusOperationOptions struct {
-	// Url - Required.
-	Url string
-	// Header - Required.
-	Header map[string]string
 }
 
-func CallbackNexusOperation(ctx workflow.Context, opts CallbackNexusOperationOptions) workflow.Future {
+func CallbackNexusOperation(
+	ctx workflow.Context,
+	opts CallbackNexusOperationOptions,
+	url string,
+	header map[string]string,
+) workflow.Future {
 	return callbackNexusOperation(ctx, CallbackNexus{
-		Url:    opts.Url,
-		Header: opts.Header,
+		Url:    url,
+		Header: header,
 	})
 }
 

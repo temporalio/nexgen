@@ -493,8 +493,6 @@ func (m SyncSettings) GetCheckpoint() *string {
 }
 
 type GetUserOptions struct {
-	// UserID - Required.
-	UserID string
 	// ConsistencyToken - Optional.
 	ConsistencyToken string
 }
@@ -502,138 +500,139 @@ type GetUserOptions struct {
 // Get a user.
 //
 // Returns: The matching user.
-func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
+func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
 	var consistencyToken *string
 	if opts.ConsistencyToken != "" {
 		consistencyToken = &opts.ConsistencyToken
 	}
 	return getUser(ctx, getUserRequest{
-		UserID:           opts.UserID,
+		UserID:           userID,
 		ConsistencyToken: consistencyToken,
 	})
 }
 
 type UpdateEmailOptions struct {
-	// UserID - Required.
-	UserID string
-	// Email - Required.
-	Email string
 }
 
-func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions) workflow.Future {
+func UpdateEmail(
+	ctx workflow.Context,
+	opts UpdateEmailOptions,
+	userID string,
+	email string,
+) workflow.Future {
 	return updateEmail(ctx, updateEmailRequest{
-		UserID: opts.UserID,
-		Email:  opts.Email,
+		UserID: userID,
+		Email:  email,
 	})
 }
 
 type RenameOptions struct {
-	// UserID - Required.
-	UserID string
-	// DisplayName - Required.
-	DisplayName string
 }
 
-func Rename(ctx workflow.Context, opts RenameOptions) workflow.Future {
+func Rename(
+	ctx workflow.Context,
+	opts RenameOptions,
+	userID string,
+	displayName string,
+) workflow.Future {
 	return rename(ctx, renameRequest{
-		UserID:      opts.UserID,
-		DisplayName: opts.DisplayName,
+		UserID:      userID,
+		DisplayName: displayName,
 	})
 }
 
 type SetProfileOptions struct {
-	// UserID - Required.
-	UserID string
-	// Profile - Required.
-	Profile UserProfile
 }
 
-func SetProfile(ctx workflow.Context, opts SetProfileOptions) workflow.Future {
+func SetProfile(
+	ctx workflow.Context,
+	opts SetProfileOptions,
+	userID string,
+	profile UserProfile,
+) workflow.Future {
 	return setProfile(ctx, setProfileRequest{
-		UserID:  opts.UserID,
-		Profile: opts.Profile,
+		UserID:  userID,
+		Profile: profile,
 	})
 }
 
 type RecordSyncOptions struct {
-	// UserID - Required.
-	UserID string
-	// Report - Required.
-	Report SyncReport
 }
 
-func RecordSync(ctx workflow.Context, opts RecordSyncOptions) workflow.Future {
+func RecordSync(
+	ctx workflow.Context,
+	opts RecordSyncOptions,
+	userID string,
+	report SyncReport,
+) workflow.Future {
 	return recordSync(ctx, recordSyncRequest{
-		UserID: opts.UserID,
-		Report: opts.Report,
+		UserID: userID,
+		Report: report,
 	})
 }
 
 type DeactivateOptions struct {
-	// UserID - Required.
-	UserID string
 	// Reason - Optional.
 	Reason string
 }
 
-func Deactivate(ctx workflow.Context, opts DeactivateOptions) workflow.Future {
+func Deactivate(ctx workflow.Context, opts DeactivateOptions, userID string) workflow.Future {
 	var reason *string
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
 	return deactivate(ctx, deactivateRequest{
-		UserID: opts.UserID,
+		UserID: userID,
 		Reason: reason,
 	})
 }
 
 type UpdateLabelsOptions struct {
-	// UserID - Required.
-	UserID string
-	// Tags - Required.
-	Tags []string
-	// Metadata - Required.
-	Metadata map[string]string
 	// ExtraTags - Optional.
 	ExtraTags []string
 	// ExtraMetadata - Optional.
 	ExtraMetadata map[string]string
 }
 
-func UpdateLabels(ctx workflow.Context, opts UpdateLabelsOptions) workflow.Future {
+func UpdateLabels(
+	ctx workflow.Context,
+	opts UpdateLabelsOptions,
+	userID string,
+	tags []string,
+	metadata map[string]string,
+) workflow.Future {
 	return updateLabels(ctx, updateLabelsRequest{
-		UserID:        opts.UserID,
-		Tags:          opts.Tags,
-		Metadata:      opts.Metadata,
+		UserID:        userID,
+		Tags:          tags,
+		Metadata:      metadata,
 		ExtraTags:     opts.ExtraTags,
 		ExtraMetadata: opts.ExtraMetadata,
 	})
 }
 
 type UpdateNotificationSettingsOptions struct {
-	// UserID - Required.
-	UserID string
-	// Settings - Required.
-	Settings NotificationSettings
 }
 
-func UpdateNotificationSettings(ctx workflow.Context, opts UpdateNotificationSettingsOptions) workflow.Future {
+func UpdateNotificationSettings(
+	ctx workflow.Context,
+	opts UpdateNotificationSettingsOptions,
+	userID string,
+	settings NotificationSettings,
+) workflow.Future {
 	return updateNotificationSettings(ctx, updateNotificationSettingsRequest{
-		UserID:   opts.UserID,
-		Settings: opts.Settings,
+		UserID:   userID,
+		Settings: settings,
 	})
 }
 
 type GetSyncSettingsOptions struct {
-	// UserID - Required.
-	UserID string
 	// Region - Optional.
 	Region string
 	// Checkpoint - Optional.
 	Checkpoint string
 }
 
-func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions) workflow.Future {
+func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions, userID string) workflow.Future {
 	var settingsValue *SyncSettings
 	if opts.Region != "" || opts.Checkpoint != "" {
 		var region *string
@@ -650,7 +649,7 @@ func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions) workflow
 		}
 	}
 	return getSyncSettings(ctx, getSyncSettingsRequest{
-		UserID:   opts.UserID,
+		UserID:   userID,
 		Settings: settingsValue,
 	})
 }

@@ -754,6 +754,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
 pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
+    workflow_package_alias: &'static str,
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
     facade: Option<GoFacadeOptions>,
@@ -799,6 +800,25 @@ impl GoPackageContext {
                     .targets
                     .contains(&GenerationTarget::Workflow),
             import_path,
+            workflow_package_alias: if api_plan
+                .records()
+                .any(|(_, record)| record.fields.values().any(|field| field.name == "workflow"))
+                || api_plan.services.iter().any(|service| {
+                    service.resources.iter().any(|resource| {
+                        resource
+                            .data
+                            .fields
+                            .iter()
+                            .any(|field| field.name == "workflow")
+                            || resource.data.methods.iter().any(|method| {
+                                method.params.iter().any(|param| param.name == "workflow")
+                            })
+                    })
+                }) {
+                "temporalworkflow"
+            } else {
+                "workflow"
+            },
             has_serialization_context: crate::nexgen_config::current().system_nexus
                 && api_plan
                     .services
@@ -839,8 +859,20 @@ impl GoPackageContext {
         }) {
             self.unqualify_self_expr(&code_expr)
         } else {
-            code_expr
+            self.alias_workflow_expr(&code_expr)
         }
+    }
+
+    fn import_alias<'a>(&self, path: &'a str) -> &'a str {
+        if path == "go.temporal.io/sdk/workflow" {
+            self.workflow_package_alias
+        } else {
+            path.rsplit('/').next().unwrap_or(path)
+        }
+    }
+
+    fn alias_workflow_expr(&self, expr: &str) -> String {
+        rewrite_go_package_qualifier(expr, "workflow", self.workflow_package_alias)
     }
 
     fn function_name_extractor(&self, reference: &str) -> String {
@@ -859,10 +891,12 @@ impl GoPackageContext {
     }
 
     fn sdk_reference(&self, symbol: SdkSymbol) -> SdkReference {
-        symbol.resolve(
+        let mut reference = symbol.resolve(
             self.import_path.as_deref(),
             crate::nexgen_config::current().system_nexus,
-        )
+        );
+        reference.expression = self.alias_workflow_expr(&reference.expression);
+        reference
     }
 
     pub(in crate::generator) fn workflow_context_type(&self) -> String {
@@ -1933,9 +1967,7 @@ impl<'a> ApiPlanner<'a> {
                     Some(RenderedUnpackedParam {
                         field_name: field.name.clone(),
                         doc: field.doc.clone(),
-                        param_name: if flatten_in_options
-                            || go_unexported_name(&field.name) == "workflow"
-                        {
+                        param_name: if flatten_in_options {
                             format!("{}Value", go_unexported_name(&field.name))
                         } else {
                             go_unexported_name(&field.name)
@@ -3651,21 +3683,25 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
     }
 }
 
-/// Converts a PascalCase name to an unexported Go identifier by lowercasing
-/// the first character (e.g. `"GetUser"` becomes `"getUser"`).
+/// Converts a PascalCase name to an unexported Go identifier, lowercasing
+/// leading initialisms (e.g. `"ID"` becomes `"id"` and `"UserID"` becomes `"userID"`).
 pub(in crate::generator) fn go_unexported_name(name: &str) -> String {
     if let Some(name) = name.strip_prefix("SystemNexus_") {
         return format!("systemnexus_{}", go_unexported_name(name));
     }
-    let mut chars = name.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => {
-            let mut result = first.to_lowercase().to_string();
-            result.push_str(chars.as_str());
-            go_ident(&result)
+    let mut chars = name.chars().peekable();
+    let mut result = String::new();
+    while let Some(ch) = chars.next() {
+        if !result.is_empty()
+            && (!ch.is_uppercase() || chars.peek().is_some_and(|next| next.is_lowercase()))
+        {
+            result.push(ch);
+            result.extend(chars);
+            break;
         }
+        result.extend(ch.to_lowercase());
     }
+    go_ident(&result)
 }
 
 pub(in crate::generator) fn go_declaration_name(name: &str) -> String {
@@ -3706,6 +3742,51 @@ fn go_ident(name: &str) -> String {
     } else {
         name.to_string()
     }
+}
+
+/// Rebinds package selectors in expressions without changing literals or
+/// selectors on values, such as `request.workflow`.
+fn rewrite_go_package_qualifier(expr: &str, from: &str, to: &str) -> String {
+    if from == to {
+        return expr.to_string();
+    }
+    let bytes = expr.as_bytes();
+    let mut output = String::with_capacity(expr.len());
+    let mut copied = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        if matches!(bytes[index], b'"' | b'`' | b'\'') {
+            let quote = bytes[index];
+            index += 1;
+            while index < bytes.len() {
+                let byte = bytes[index];
+                index += 1;
+                if byte == b'\\' && quote != b'`' && index < bytes.len() {
+                    index += 1;
+                } else if byte == quote {
+                    break;
+                }
+            }
+        } else if is_go_ident_start(bytes[index]) {
+            let start = index;
+            index += 1;
+            while index < bytes.len() && is_go_ident_continue(bytes[index]) {
+                index += 1;
+            }
+            if &expr[start..index] == from
+                && previous_non_whitespace(bytes, start) != Some(b'.')
+                && next_non_whitespace(bytes, index) == Some(b'.')
+            {
+                output.push_str(&expr[copied..start]);
+                output.push_str(to);
+                copied = index;
+            }
+        } else {
+            index += 1;
+        }
+    }
+    output.push_str(&expr[copied..]);
+    output
 }
 
 /// Parses a Go type expression that may contain an embedded import path.
@@ -4122,11 +4203,10 @@ fn render_file(
             output.push('\n');
         }
         for import_path in &third_party {
-            output.push('\t');
-            output.push('"');
-            output.push_str(import_path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(
+                import_path,
+                package.import_alias(import_path),
+            ));
         }
         for (path, alias) in external_imports {
             output.push_str(&go_aliased_import_line(path, alias));
@@ -4359,8 +4439,8 @@ fn render_file(
                 .iter()
                 .any(|(external, _)| external == *path)
         })
-        .filter(|path| !uses_go_package(body, path.rsplit('/').next().unwrap_or(path)))
-        .map(|path| format!("\t\"{path}\"\n"))
+        .filter(|path| !uses_go_package(body, package.import_alias(path)))
+        .map(|path| go_aliased_import_line(path, package.import_alias(path)))
         .chain(
             external_imports
                 .iter()
@@ -5500,7 +5580,7 @@ fn render_operation_function(
     output.push_str("}\n");
 }
 
-/// Renders an options struct for non-function parameters of a convenience wrapper.
+/// Renders an options struct for omittable parameters of a convenience wrapper.
 ///
 /// ```go
 /// type GetUserOptions struct {
@@ -5562,7 +5642,7 @@ fn render_empty_options_struct(output: &mut String, operation: &RenderedOperatio
 }
 
 fn param_belongs_in_options(param: &RenderedUnpackedParam) -> bool {
-    param.function.is_none() && param.function_args.is_none()
+    !param.required && param.function.is_none() && param.function_args.is_none()
 }
 
 fn param_is_positional(param: &RenderedUnpackedParam) -> bool {
@@ -6001,7 +6081,7 @@ fn wrapper_input_docs<'a>(
 /// parameters (counting `ctx`).
 ///
 /// ```go
-/// func UpdateEmail(ctx workflow.Context, userId string, email string) (*User, error) {
+/// func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions, userId string, email string) workflow.Future {
 ///     return updateEmail(ctx, UpdateEmailRequest{
 ///         UserId: userId,
 ///         Email:  email,
@@ -6013,11 +6093,11 @@ fn wrapper_input_docs<'a>(
 /// ```go
 /// func StartWorkflow(
 ///     ctx workflow.Context,
+///     opts StartWorkflowOptions,
 ///     workflow string,
 ///     workflowId string,
 ///     taskQueue string,
-///     opts StartWorkflowOptions,
-/// ) (*StartedWorkflow, error) {
+/// ) workflow.Future {
 ///     return startWorkflow(ctx, StartWorkflowRequest{
 ///         Workflow:           workflow,
 ///         Args:               opts.Args,
@@ -6138,7 +6218,8 @@ fn render_convenience_wrapper(
             output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.is_some() {
             output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some()
+        } else if param_is_positional(param)
+            || param.default_punning_zero.is_some()
             || param.flattened_fields.is_some()
             || param.default_expression.is_some()
         {
@@ -6452,6 +6533,22 @@ mod tests {
     }
 
     #[test]
+    fn unexported_names_lowercase_leading_initialisms() {
+        for (name, expected) in [
+            ("ID", "id"),
+            ("IDToken", "idToken"),
+            ("URLValue", "urlValue"),
+            ("UserID", "userID"),
+            ("GetUser", "getUser"),
+            ("Type", "type_"),
+            ("", ""),
+            ("SystemNexus_ID", "systemnexus_id"),
+        ] {
+            assert_eq!(super::go_unexported_name(name), expected, "{name}");
+        }
+    }
+
+    #[test]
     fn external_workflow_references_preserve_generation_mode() {
         assert_eq!(
             SdkSymbol::Context.resolve(None, false).import,
@@ -6463,6 +6560,45 @@ mod tests {
         );
         assert_eq!(SdkSymbol::find(INTERNAL, "Custom"), None);
         assert_eq!(SdkSymbol::find("example.org/internal", "Future"), None);
+    }
+
+    #[test]
+    fn workflow_import_alias_applies_to_sdk_references_and_authored_types() {
+        let package = super::GoPackageContext {
+            package_name: "example".to_string(),
+            workflow_interceptors: false,
+            import_path: None,
+            workflow_package_alias: "temporalworkflow",
+            has_serialization_context: false,
+            support_package: None,
+            facade: None,
+        };
+        assert_eq!(
+            package.import_alias("go.temporal.io/sdk/workflow"),
+            "temporalworkflow"
+        );
+        assert_eq!(package.workflow_context_type(), "temporalworkflow.Context");
+        assert_eq!(
+            package.new_nexus_client(),
+            "temporalworkflow.NewNexusClient"
+        );
+        assert_eq!(
+            package.go_type_expr("go.temporal.io/sdk/workflow:func(workflow.Context) error"),
+            "func(temporalworkflow.Context) error"
+        );
+        assert_eq!(
+            package.alias_workflow_expr(
+                r#"workflow.Helper("workflow.Context", `workflow.Future`, request.workflow.Value)"#
+            ),
+            r#"temporalworkflow.Helper("workflow.Context", `workflow.Future`, request.workflow.Value)"#
+        );
+        let self_package = super::GoPackageContext {
+            package_name: "workflow".to_string(),
+            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            ..package
+        };
+        assert_eq!(self_package.workflow_context_type(), "Context");
+        assert_eq!(self_package.new_nexus_client(), "NewNexusClient");
     }
 
     #[test]
@@ -6554,6 +6690,7 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "internal".to_string(),
             import_path: Some("go.temporal.io/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: Some("go.temporal.io/sdk/internal".to_string()),
             facade: None,
@@ -6674,6 +6811,7 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
             facade: None,
@@ -6691,6 +6829,7 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "internal".to_string(),
             import_path: Some("go.temporal.io/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
             facade: None,

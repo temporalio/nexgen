@@ -1572,6 +1572,16 @@ separate the targets with commas.
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
+Go operation convenience wrappers take `ctx`, an options struct, and positional
+arguments for required input fields, in that order. Optional fields and fields
+with an applicable `@nexus.default` stay in the options struct. Fields supplied
+by `@nexus.source`, omitted fields, and API-omitted fields are not arguments.
+The options struct is required even when it is empty:
+
+```go
+future := userservice.UpdateEmail(ctx, userservice.UpdateEmailOptions{}, "user-123", "alice@example.com")
+```
+
 Python keeps shared models and service contracts in the root package. Client
 APIs live in `client/`. Workflow-only generation keeps its API in the root
 package; when both targets are selected, the workflow API lives in `workflow/`.

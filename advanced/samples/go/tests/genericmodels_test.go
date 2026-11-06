@@ -5,7 +5,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-var _ func(workflow.Context, gm.CompleteOptions[string]) workflow.Future = gm.Complete[string]
+var _ func(workflow.Context, gm.CompleteOptions[string], string, []string, map[string]string, gm.Inner[string]) workflow.Future = gm.Complete[string]
 
 var success gm.OperationCompletionResult[int] = gm.OperationCompletionResultSuccess[int]{
 	Value: gm.OperationCompletionSuccess[int]{Output: 42},

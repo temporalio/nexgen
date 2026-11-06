@@ -135,6 +135,7 @@ impl ModelBackend {
                 "strings",
                 "time",
                 "workflow",
+                "temporalworkflow",
                 "converter",
                 "commonconverter",
                 "internal",
