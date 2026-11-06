@@ -36,8 +36,7 @@ async def _create_stream(
     result = await handle
     if result.ref is None:
         raise RuntimeError("CreateStream answered without `ref`")
-    return Stream(
-        body_type=body_type,
+    return Stream[body_type](
         ref=result.ref,
         created=result.created or None,
     )

@@ -36,16 +36,15 @@ class Stream(typing.Generic[BodyT]):
         self,
         ref: StreamRef,
         created: bool | None,
-        *,
-        body_type: type[BodyT] | None = None,
     ) -> None:
         self.ref = ref
         self.created = created
-        # Not a dataclass field, so the converter doesn't encode it. A
-        # decoded handle decodes its generic values as `typing.Any`.
-        self.body_type: type[BodyT] = body_type or typing.cast(
-            "type[BodyT]", typing.Any
-        )
+
+    @property
+    def body_type(self) -> type[BodyT]:
+        # Generic aliases attach their concrete types after __init__.
+        arguments = typing.get_args(getattr(self, "__orig_class__", None))
+        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
 
     async def publish(
         self,
