@@ -26,7 +26,7 @@ type StartWorkflowInput = StartWorkflowRequest extends infer Input
 /**
  * Start a Workflow through System Nexus and get a handle to it.
  *
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  */
 export async function startWorkflow(
   requestInput: StartWorkflowInput,

@@ -1,0 +1,12 @@
+package test:docs;
+
+interface api {
+  /// @nexus.doc "{@name }"
+  record request {
+    id: string,
+  }
+}
+
+world system {
+  export api;
+}

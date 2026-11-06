@@ -2,6 +2,7 @@ mod planning;
 
 pub mod add_rpc;
 pub mod descriptors;
+pub mod documentation;
 pub mod error;
 pub mod generator;
 pub mod json_schema;

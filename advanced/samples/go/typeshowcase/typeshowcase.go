@@ -314,7 +314,7 @@ type UserProfile struct {
 	//
 	// Required.
 	Tags []string
-	// Metadata - Go-specific metadata.
+	// Metadata - Default metadata.
 	//
 	// Required.
 	Metadata map[string]string
@@ -499,9 +499,9 @@ type GetUserOptions struct {
 	ConsistencyToken string
 }
 
-// Get a user.
+// Get a User. Use Rename to change the display name.
 //
-// Returns: The matching user.
+// Returns: The matching User.
 func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
 	var consistencyToken *string
 	if opts.ConsistencyToken != "" {

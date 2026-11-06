@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use indexmap::IndexMap;
 
+use crate::documentation::{LanguageDocSpec, SelectedDocSpec};
 use crate::language::Language;
 use crate::nexgen_config::GenerationTarget;
 
@@ -198,6 +199,7 @@ pub trait TypeFamily {
     type OperationData: std::fmt::Debug + Clone + PartialEq;
     type FieldData: std::fmt::Debug + Clone + PartialEq;
     type Text: TextSpec;
+    type Doc: TextSpec + Default;
 }
 
 /// Structural text operations shared by authored and selected API-spec stages.
@@ -226,6 +228,7 @@ impl TypeFamily for AuthoredFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = LanguageStringSpec;
+    type Doc = LanguageDocSpec;
 }
 
 /// Name family after target-language selection. It preserves the `ApiSpec<F>`
@@ -250,6 +253,7 @@ impl TypeFamily for SelectedFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
+    type Doc = SelectedDocSpec;
 }
 
 /// Maps one structural `ApiSpec` family into another.
@@ -278,6 +282,7 @@ pub trait ApiSpecTransform<From: TypeFamily, To: TypeFamily> {
         data: From::FieldData,
     ) -> To::FieldData;
     fn map_text(&mut self, text: From::Text) -> To::Text;
+    fn map_doc(&mut self, doc: From::Doc) -> To::Doc;
 
     /// Map descriptor text while preserving structure unless a pass explicitly
     /// normalizes the descriptor for its output family.
@@ -606,7 +611,7 @@ pub struct ServiceSpec<F: TypeFamily = AuthoredFamily> {
     /// affects `wire_name`.
     pub code_name: F::Text,
     pub wire_name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub namespace: F::Text,
     pub facade: F::Text,
     pub operations_class: F::Text,
@@ -643,7 +648,7 @@ impl<F: TypeFamily> ServiceSpec<F> {
             name: self.name,
             code_name: map.map_text(self.code_name),
             wire_name: self.wire_name,
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             namespace: map.map_text(self.namespace),
             facade: map.map_text(self.facade),
             operations_class: map.map_text(self.operations_class),
@@ -679,8 +684,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     /// Whether the authored operation is deprecated. This is annotation
     /// metadata only and has no effect on binding or wire behavior.
     pub deprecated: bool,
-    pub doc: F::Text,
-    pub return_doc: F::Text,
+    pub doc: F::Doc,
+    pub return_doc: F::Doc,
     pub input: Option<TypeSpec<F>>,
     pub output: Option<TypeSpec<F>>,
     pub output_transform: Option<OperationOutputTransformSpec<F>>,
@@ -715,8 +720,8 @@ impl<F: TypeFamily> OperationSpec<F> {
             wire_name: self.wire_name,
             experimental: self.experimental,
             deprecated: self.deprecated,
-            doc: map.map_text(self.doc),
-            return_doc: map.map_text(self.return_doc),
+            doc: map.map_doc(self.doc),
+            return_doc: map.map_doc(self.return_doc),
             input: self.input.map(|input| input.map_names_with(map)),
             output: self.output.map(|output| output.map_names_with(map)),
             output_transform: self
@@ -732,7 +737,7 @@ impl<F: TypeFamily> OperationSpec<F> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
     pub data: F::ResourceData,
@@ -749,7 +754,7 @@ pub struct ResourceFieldSpec<F: TypeFamily = AuthoredFamily> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub params: Vec<ResourceFieldSpec<F>>,
     pub result: Option<ResourceResultSpec<F>>,
     pub operation_name: Option<String>,
@@ -769,7 +774,7 @@ impl<F: TypeFamily> ResourceSpec<F> {
         let data = map.map_resource_data(&self.name, self.data);
         ResourceSpec {
             name: self.name,
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             fields: self
                 .fields
                 .into_iter()
@@ -808,7 +813,7 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
     {
         ResourceMethodSpec {
             name: self.name,
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             params: self
                 .params
                 .into_iter()
@@ -836,7 +841,7 @@ impl<F: TypeFamily> ResourceResultSpec<F> {
 pub struct RecordSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub full_name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub source: Option<ExternalTypeSourceSpec<F>>,
     pub experimental: bool,
     pub flatten_in_api: bool,
@@ -847,7 +852,7 @@ pub struct RecordSpec<F: TypeFamily = AuthoredFamily> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
-    pub doc: Option<F::Text>,
+    pub doc: Option<F::Doc>,
     pub annotation: Option<F::Text>,
     pub flattened_annotation: Option<F::Text>,
     pub field_type: TypeSpec<F>,
@@ -961,7 +966,7 @@ pub struct FlagSpec {
 pub struct VariantSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub full_name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub experimental: bool,
     pub cases: Vec<VariantCaseSpec<F>>,
     pub source: Option<ExternalVariantSourceSpec<F>>,
@@ -971,7 +976,7 @@ pub struct VariantSpec<F: TypeFamily = AuthoredFamily> {
 pub struct VariantCaseSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub wire_name: String,
-    pub doc: F::Text,
+    pub doc: F::Doc,
     pub payload: Option<TypeSpec<F>>,
 }
 
@@ -986,7 +991,7 @@ impl<F: TypeFamily> RecordSpec<F> {
         RecordSpec {
             name: self.name,
             full_name: full_name.clone(),
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             source: self.source.map(|source| source.map_names_with(map)),
             experimental: self.experimental,
             flatten_in_api: self.flatten_in_api,
@@ -1002,7 +1007,7 @@ impl<F: TypeFamily> RecordSpec<F> {
         }
     }
 
-    pub fn doc(&self) -> &F::Text {
+    pub fn doc(&self) -> &F::Doc {
         &self.doc
     }
 
@@ -1114,7 +1119,7 @@ impl<F: TypeFamily> RecordSpec<F> {
         self.fields.get(field_name).map(|field| field.name.as_str())
     }
 
-    pub fn field_doc(&self, field_name: &str) -> Option<&F::Text> {
+    pub fn field_doc(&self, field_name: &str) -> Option<&F::Doc> {
         self.fields
             .get(field_name)
             .and_then(|field| field.doc.as_ref())
@@ -1246,7 +1251,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
         let data = map.map_field_data(record_full_name, field_name, self.data);
         RecordFieldSpec {
             name: self.name,
-            doc: self.doc.map(|text| map.map_text(text)),
+            doc: self.doc.map(|doc| map.map_doc(doc)),
             annotation: self.annotation.map(|text| map.map_text(text)),
             flattened_annotation: self.flattened_annotation.map(|text| map.map_text(text)),
             field_type: self.field_type.map_names_with(map),
@@ -1280,7 +1285,7 @@ impl<F: TypeFamily> VariantSpec<F> {
         VariantSpec {
             name: self.name,
             full_name: self.full_name,
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             experimental: self.experimental,
             cases: self
                 .cases
@@ -1301,7 +1306,7 @@ impl<F: TypeFamily> VariantCaseSpec<F> {
         VariantCaseSpec {
             name: self.name,
             wire_name: self.wire_name,
-            doc: map.map_text(self.doc),
+            doc: map.map_doc(self.doc),
             payload: self.payload.map(|payload| payload.map_names_with(map)),
         }
     }

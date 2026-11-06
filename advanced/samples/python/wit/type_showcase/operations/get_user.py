@@ -37,13 +37,13 @@ async def get_user(
     user_id: str,
     consistency_token: str | None = None,
 ) -> User:
-    """Get a user.
+    """Get a User. Use rename to change the display name.
 
     .. warning::
         This API is experimental and subject to change.
 
     Returns:
-        The matching user.
+        The matching User.
     """
     request = GetUserRequest(
         user_id=user_id,

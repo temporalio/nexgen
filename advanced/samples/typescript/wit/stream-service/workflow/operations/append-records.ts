@@ -17,7 +17,7 @@ type AppendRecordsInput = AppendRecordsRequest extends infer Input
 /**
  * Append one batch. Workflow code makes the call from a Local Activity.
  *
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  */
 export async function appendRecords(
   requestInput: AppendRecordsInput,

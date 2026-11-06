@@ -41,6 +41,7 @@ impl crate::spec::TypeFamily for OperationLoweredFamily {
     type OperationData = OperationBoundOperation;
     type FieldData = ();
     type Text = SelectedTextSpec;
+    type Doc = crate::documentation::SelectedDocSpec;
 }
 
 pub(crate) struct OperationLoweringPass;
@@ -100,7 +101,7 @@ impl CompilerPass<OperationBoundFamily, OperationLoweredFamily> for OperationLow
                     RecordSpec {
                         name: record_name.clone(),
                         full_name: record_full_name.clone(),
-                        doc: SelectedTextSpec::default(),
+                        doc: Default::default(),
                         source: Some(ExternalTypeSourceSpec::Proto(ProtoTypeSpec {
                             proto: Symbol::new(resource_return.output_message_name.clone()),
                             reference: Default::default(),
@@ -305,5 +306,12 @@ impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for Operatio
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
+    }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
     }
 }

@@ -170,6 +170,30 @@ tree, not one leaf: a `$ref` across input files names a model whose
 `x-<lang>-name` override is declared in the other file, so the consuming module
 can only resolve it from the tree-wide manifest.
 
+### Documentation preparation
+
+Documentation has its own text family, separate from expressions and other
+string metadata. Frontends bind authored name references into neutral
+`DocReference` values inside documentation templates. The WIT frontend owns
+`{@name ...}` syntax, lexical scopes, imported aliases, and diagnostics,
+including references in unused declarations and inactive overrides. Later stages
+never resolve WIT names.
+
+`LanguageSelectionPass` selects documentation templates once, alongside other
+language-specific metadata. Binding, lowering, and type planning preserve the
+templates, including documentation copied to resource handles and methods.
+Documentation does not add reachability roots.
+
+Each language backend prepares documentation using its own naming rules before
+comment escaping and wrapping. Go applies its final visibility decisions and
+renders facade references separately from implementation references. .NET
+operation extension methods use their `Async` names rather than the service
+contract's method names. TypeScript function documentation shares its emitted
+function and request-parameter naming decisions. Copied documentation retains
+its bound references so another surface can change identifier spellings without
+rewriting literal prose. This is backend preparation, not a new shared compiler
+pass.
+
 ## Models and APIs
 
 Data models and their wire converters are shared across API targets. Operation

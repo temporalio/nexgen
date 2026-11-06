@@ -52,7 +52,7 @@ class User:
         self,
         display_name: str,
     ) -> User:
-        """Python rename."""
+        """rename sets the user's name to display_name."""
         request = RenameRequest(
             user_id=self.user_id,
             display_name=display_name,

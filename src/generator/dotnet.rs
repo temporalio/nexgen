@@ -2332,6 +2332,7 @@ pub(crate) fn generate(
     support_package: Option<&str>,
     namespace: Option<&str>,
 ) -> Result<GeneratedFiles> {
+    let tree = super::documentation::prepare_tree(tree, documentation_name);
     let module_base = namespace.unwrap_or(DEFAULT_NAMESPACE).to_string();
     let root_namespace = match (&tree.root, namespace) {
         (_, Some(namespace)) => namespace.to_string(),
@@ -2855,8 +2856,40 @@ fn indent_namespace_body(output: &mut String) {
     }
 }
 
-fn dotnet_doc(spec: &crate::spec::SelectedTextSpec) -> Option<&str> {
+fn documentation_name(
+    reference: &crate::documentation::DocReference,
+    spec: &PlannedSpec,
+) -> String {
+    use crate::documentation::ReferenceKind;
+    match reference.kind {
+        ReferenceKind::Type => csharp_type_name(super::documentation::type_name(reference, spec)),
+        ReferenceKind::TypeExpression => reference.name.clone(),
+        ReferenceKind::Function | ReferenceKind::Field | ReferenceKind::VariantCase => {
+            csharp_type_name(&reference.name)
+        }
+        ReferenceKind::Method => format!("{}Async", csharp_type_name(&reference.name)),
+        ReferenceKind::OperationParameter => "request".to_string(),
+        ReferenceKind::Parameter => csharp_parameter_name(&reference.name),
+    }
+}
+
+fn dotnet_doc(spec: &crate::documentation::SelectedDocSpec) -> Option<&str> {
     spec.value()
+}
+
+fn operation_method_doc(
+    doc: &crate::documentation::SelectedDocSpec,
+    operation: &PlannedOperation,
+) -> Option<String> {
+    doc.map_names_with(|reference, name| {
+        if reference.kind == crate::documentation::ReferenceKind::Function
+            && reference.name == operation.name
+        {
+            format!("{}Async", csharp_operation_ident(operation))
+        } else {
+            name.to_string()
+        }
+    })
 }
 
 fn render_operation_xml_doc(
@@ -2866,10 +2899,11 @@ fn render_operation_xml_doc(
     api_plan: &PlannedSpec,
     endpoint_parameter: bool,
 ) {
+    let summary = operation_method_doc(&operation.doc, operation);
     let return_doc = operation
         .output
         .as_ref()
-        .and_then(|_| dotnet_doc(&operation.return_doc));
+        .and_then(|_| operation_method_doc(&operation.return_doc, operation));
     let request_doc = operation_has_input(operation, api_plan)
         .then(|| {
             let PlannedType::Record(record) = operation.input_model() else {
@@ -2892,9 +2926,9 @@ fn render_operation_xml_doc(
     render_xml_doc(
         output,
         indent,
-        dotnet_doc(&operation.doc),
+        summary.as_deref(),
         params,
-        return_doc,
+        return_doc.as_deref(),
         operation.experimental,
     );
 }
@@ -3089,16 +3123,17 @@ fn render_operation_flattened_xml_doc(
     api_plan: &PlannedSpec,
     overload: &FlattenedOverload,
 ) {
+    let summary = operation_method_doc(&operation.doc, operation);
     let return_doc = operation
         .output
         .as_ref()
-        .and_then(|_| dotnet_doc(&operation.return_doc));
+        .and_then(|_| operation_method_doc(&operation.return_doc, operation));
     render_xml_doc(
         output,
         indent,
-        dotnet_doc(&operation.doc),
+        summary.as_deref(),
         flattened_method_parameter_docs(model, api_plan, overload),
-        return_doc,
+        return_doc.as_deref(),
         operation.experimental,
     );
 }
