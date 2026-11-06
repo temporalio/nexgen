@@ -1677,6 +1677,9 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
 pub struct TypeParameterSpec {
     pub name: String,
     pub full_name: String,
+    /// The position of the alias among the declarations of its interface. A generic resource
+    /// takes its type parameters in this order, so a moved method doesn't reorder them.
+    pub declaration_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

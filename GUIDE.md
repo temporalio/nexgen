@@ -1959,8 +1959,8 @@ occur.
 A resource that uses a type parameter is generic in it, as a record is, so it
 needs no annotation. Its fields, the parameters and results of its methods, and
 the operations that they bind count, also through records, protos and the
-resources that it returns. The resource takes its parameters in the order that
-it first uses them.
+resources that it returns. The resource takes its parameters in the order of
+their aliases in the interface, so a moved method doesn't reorder them.
 
 ```wit
 /// @nexus.type-parameter
