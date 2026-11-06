@@ -182,7 +182,7 @@ interface stream-service {
     // Its field name isn't ref, so the created stream takes its ref from the response, which
     // carries the owner.
     /// @nexus.doc "The ref of the Stream to create. Its id is the Stream id."
-    // TODO: implement @nexus.flatten-in-api fields="id backend"
+    /// @nexus.flatten-in-api
     stream-ref: stream-ref,
     /// @nexus.doc "The age after which a Record is dropped. Empty is the Store default."
     retention: option<duration>,

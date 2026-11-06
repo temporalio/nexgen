@@ -1094,4 +1094,90 @@ interface example-service {
             );
         }
     }
+
+    const FIELD_FLATTEN_WIT: &str = r#"
+package temporal:nexus@1.0.0;
+
+world system { export history-service; }
+
+/// @nexus.endpoint "history"
+interface history-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: option<string>,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest"
+  record get-history-request {
+    namespace: string,
+    /// @nexus.flatten-in-api
+    execution: workflow-execution,
+    /// @nexus.omit
+    maximum-page-size: placeholder,
+    /// @nexus.omit
+    next-page-token: placeholder,
+    /// @nexus.omit
+    wait-new-event: placeholder,
+    /// @nexus.omit
+    history-event-filter-type: placeholder,
+    /// @nexus.omit
+    skip-archival: placeholder,
+  }
+
+  get-history: func(request: get-history-request);
+}
+"#;
+
+    fn field_flatten_files(language: Language) -> BTreeMap<PathBuf, String> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
+            language,
+            FIELD_FLATTEN_WIT,
+            PathBuf::from("inline.wit"),
+            &[root.join("advanced/samples/inputs/deps")],
+        )
+        .unwrap();
+        let descriptors = DescriptorIndex::load_many(&[
+            root.join("advanced/samples/descriptors/temporal_api.bin")
+        ])
+        .unwrap();
+        generate_files_for_tree_with_targets_and_options(
+            language,
+            ApiSpecTree::single(spec),
+            &descriptors,
+            &[GenerationTarget::Workflow],
+            GenerateFilesOptions {
+                support_package: Some("support".to_string()),
+                ..GenerateFilesOptions::default()
+            },
+        )
+        .unwrap()
+        .files
+    }
+
+    // No sample test runs a TypeScript or .NET Workflow call, so this checks the generated code.
+    #[test]
+    fn a_flattened_field_takes_the_fields_of_its_record_in_one_call() {
+        let typescript = field_flatten_files(Language::TypeScript);
+        let operation = &typescript[&PathBuf::from("operations/get-history.ts")];
+        assert!(
+            operation.contains("& { workflowId: string; runId?: string }"),
+            "{operation}"
+        );
+        assert!(
+            operation.contains("execution: { workflowId, runId },"),
+            "{operation}"
+        );
+
+        let dotnet = field_flatten_files(Language::Dotnet);
+        let operations = &dotnet[&PathBuf::from("Operations.cs")];
+        assert!(
+            operations
+                .contains("new WorkflowExecution(options.WorkflowId) { RunId = options.RunId }"),
+            "{operations}"
+        );
+    }
 }

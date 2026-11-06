@@ -1,0 +1,6 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-wit"
+contains = ["record `history-service.get-history-request` field `execution` flattens `run_id`, whose name `run-id` is also the name of field `maximum_page_size`"]

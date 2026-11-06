@@ -1149,6 +1149,24 @@ record append-record {
 await append_records(ref=ref, records=["a", "b"])
 ```
 
+#### Flattening one field
+
+On a request field, `@nexus.flatten-in-api` makes that call take the fields of
+the field's record. The models keep the record.
+
+```wit
+record create-stream-request {
+  /// @nexus.flatten-in-api
+  stream-ref: stream-ref,
+}
+```
+
+```python
+stream = await client.create_stream[Turn](id="s1", backend="redis")
+```
+
+A resource method can't bind an operation whose request flattens a field.
+
 ### Output Transforms
 
 An operation annotated with `@nexus.output-transform` transforms the raw
@@ -1729,7 +1747,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
-| `@nexus.flatten-in-api`                 | record, resource                                                                              |
+| `@nexus.flatten-in-api`                 | record, record field, resource                                                                |
 | `@nexus.flattened-type`                 | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
@@ -2561,13 +2579,14 @@ The stream sample's full helpers are in
 
 ### @nexus.flatten-in-api
 
-**Placement:** Record type (with `@nexus.proto`), or a resource **Syntax:**
-`@nexus.flatten-in-api` (no arguments) on a record,
-`@nexus.flatten-in-api param="<parameter>"` on a resource
+**Placement:** Record type (with `@nexus.proto`), a request field of such a
+type, or a resource **Syntax:** `@nexus.flatten-in-api` (no arguments) on a
+record or a field, `@nexus.flatten-in-api param="<parameter>"` on a resource
 
 Flattens the record's fields into the parent record's generated API surface
-instead of creating a nested model. On a resource, the Python factory takes the
-fields of the constructor parameter `param` in its place.
+instead of creating a nested model. On a field, it flattens only that call. See
+[Flattening one field](#flattening-one-field). On a resource, the Python factory
+takes the fields of the constructor parameter `param` in its place.
 
 ```wit
 /// @nexus.proto "temporal.api.sdk.v1.UserMetadata"
@@ -2577,8 +2596,6 @@ record user-metadata {
   static-details: option<payload>,
 }
 ```
-
-Only supported on record types.
 
 In Go, `@nexus.flatten-in-api` promotes the record's fields into the generated
 operation options struct. For a parent request with

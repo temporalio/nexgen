@@ -1139,8 +1139,14 @@ fn build_fields_from_record(
         }
 
         if omit_directive.is_some() {
-            for conflicting_directive in ["source", "type", "flattened-type", "function", "default"]
-            {
+            for conflicting_directive in [
+                "source",
+                "type",
+                "flattened-type",
+                "function",
+                "default",
+                "flatten-in-api",
+            ] {
                 if directives
                     .iter()
                     .any(|directive| directive.name() == conflicting_directive)
@@ -1186,6 +1192,7 @@ fn build_fields_from_record(
                         default: Some(FieldOrigin::Omitted),
                         ..Default::default()
                     },
+                    flatten_in_api: false,
                     function: None,
                     data: (),
                 },
@@ -1222,6 +1229,8 @@ fn build_fields_from_record(
         let sourced = origin
             .for_language(language)
             .is_some_and(FieldOrigin::is_sourced);
+        let flatten_in_api =
+            build_field_flatten(resolve, &field.ty, &directives, path, &field_context)?;
         let annotation =
             directive(&directives, "type", path, &field_context)?.map(directive_language_string);
         let flattened_annotation = directive(&directives, "flattened-type", path, &field_context)?
@@ -1248,6 +1257,7 @@ fn build_fields_from_record(
                 field_type,
                 required,
                 origin,
+                flatten_in_api,
                 function,
                 data: (),
             },
@@ -1279,6 +1289,7 @@ fn build_fields_from_record(
                         ),
                         required: arg_field.required,
                         origin: Default::default(),
+                        flatten_in_api: false,
                         function: None,
                         data: (),
                     },
@@ -1826,6 +1837,36 @@ fn origin_directives<'a>(
         selected.push((directive, targets));
     }
     Ok(selected)
+}
+
+fn build_field_flatten(
+    resolve: &Resolve,
+    ty: &Type,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<bool> {
+    if directive(directives, "flatten-in-api", path, context)?.is_none() {
+        return Ok(false);
+    }
+    let mut ty = *ty;
+    loop {
+        let kind = match ty {
+            Type::Id(id) => &resolve.types[id].kind,
+            _ => break,
+        };
+        match kind {
+            TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => ty = *inner,
+            TypeDefKind::Record(_) => return Ok(true),
+            _ => break,
+        }
+    }
+    Err(Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.flatten-in-api".to_string(),
+        reason: "on a field, needs a record type".to_string(),
+    })
 }
 
 fn build_origin_targets(
