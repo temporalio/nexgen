@@ -117,7 +117,7 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
             {
                 return Err(invalid(format!(
                     "operation `{}` returns the generic resource `{}` with no `@nexus.proto` \
-                     message to hold its type arguments",
+                     message, which isn't supported yet",
                     operation.name, returned
                 )));
             }
