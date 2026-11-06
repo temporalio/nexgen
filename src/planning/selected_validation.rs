@@ -7,8 +7,8 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecLeaf, CompilerPass, FunctionArgsSpec, FunctionResultSpec, SelectedFamily,
-    TypeSpec,
+    ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FunctionArgsSpec, FunctionResultSpec,
+    SelectedFamily, TypeSpec,
 };
 
 pub(crate) struct SelectedValidationPass;
@@ -134,9 +134,12 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
         .collect::<BTreeSet<_>>();
     for (_, record) in spec.records() {
         for (field_name, field) in &record.fields {
-            if let TypeSpec::Resource(resource) = field.field_type.without_option()
-                && generic_resources.contains(resource.as_str())
-            {
+            if let Some(resource) = held_generic_resource(
+                spec,
+                &field.field_type,
+                &generic_resources,
+                &mut BTreeSet::new(),
+            ) {
                 return Err(invalid(format!(
                     "record `{}` field `{field_name}` holds the generic resource `{resource}`, \
                      which is not supported",
@@ -146,6 +149,45 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
         }
     }
     Ok(())
+}
+
+/// The generic resource that a value holds, also in a list, map, tuple, result or variant case.
+/// The loop over the records checks the fields of a nested record.
+fn held_generic_resource(
+    spec: &ApiSpec<SelectedFamily>,
+    value: &TypeSpec<SelectedFamily>,
+    generic_resources: &BTreeSet<&str>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<String> {
+    let mut held = |value: &TypeSpec<SelectedFamily>| {
+        held_generic_resource(spec, value, generic_resources, visiting)
+    };
+    match value {
+        TypeSpec::Resource(resource) => generic_resources
+            .contains(resource.as_str())
+            .then(|| resource.as_str().to_string()),
+        TypeSpec::Option(inner) | TypeSpec::List(inner) => held(inner),
+        TypeSpec::Tuple(items) => items.iter().find_map(held),
+        TypeSpec::Map(key, value) => held(key).or_else(|| held(value)),
+        TypeSpec::Result { ok, err } => ok.iter().chain(err).find_map(|value| held(value)),
+        TypeSpec::External(ExternalTypeSpec::Alias(alias)) => held(&alias.target),
+        TypeSpec::Variant(variant) => {
+            if !visiting.insert(variant.as_ref().to_string()) {
+                return None;
+            }
+            let resource = spec
+                .variant(variant.as_ref())
+                .into_iter()
+                .flat_map(|variant| &variant.cases)
+                .filter_map(|case| case.payload.as_ref())
+                .find_map(|payload| {
+                    held_generic_resource(spec, payload, generic_resources, visiting)
+                });
+            visiting.remove(variant.as_ref());
+            resource
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -310,5 +352,40 @@ interface holders {
     #[test]
     fn a_resource_parameter_does_not_give_its_type_parameters() {
         assert!(resource_type_parameters(RETURNED_RESOURCE_WIT, "watcher").is_empty());
+    }
+
+    #[test]
+    fn refuses_a_generic_resource_inside_a_record_field() {
+        for field_type in [
+            "list<job>",
+            "option<tuple<string, job>>",
+            "result<job, string>",
+            "map<string, job>",
+            "job-case",
+        ] {
+            let wit = format!(
+                r#"
+package test:jobs@1.0.0;
+world system {{ export jobs; }}
+interface jobs {{
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  resource job {{
+    constructor(value: value-t);
+  }}
+  variant job-case {{ none, some(job), }}
+  record holder {{ jobs: {field_type}, }}
+}}
+"#
+            );
+            let error = validate(Language::Python, &wit).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("record `jobs.holder` field `jobs` holds the generic resource `job`"),
+                "{field_type}: {error}"
+            );
+        }
     }
 }
