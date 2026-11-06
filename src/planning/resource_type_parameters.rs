@@ -1,6 +1,6 @@
 //! Infer the type parameters of each resource from the types that it uses, as records and
 //! variants infer theirs. A resource that uses a type parameter, also through records, protos or
-//! another generic resource, is generic in it.
+//! a generic resource that it returns, is generic in it.
 
 use crate::error::{Error, Result};
 use crate::spec::{
@@ -46,45 +46,45 @@ fn infer_resource_type_parameters(spec: &mut ApiSpec<SelectedFamily>) {
 }
 
 /// The type parameters of the resource's fields, of its methods, and of the operations that they
-/// bind, in the order that they first appear.
+/// bind, in the order of their declarations. A method result or an operation output that is a
+/// generic resource also gives the type parameters of that resource.
 fn used_type_parameters(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     resource: &ResourceSpec<SelectedFamily>,
 ) -> Vec<TypeParameterSpec> {
     let mut values = Vec::<&TypeSpec<SelectedFamily>>::new();
+    let mut results = Vec::<&TypeSpec<SelectedFamily>>::new();
     values.extend(resource.fields.iter().map(|field| &field.field_type));
     for method in &resource.methods {
         values.extend(method.params.iter().map(|param| &param.field_type));
-        values.extend(method.result.as_ref().map(|result| &result.result_type));
+        results.extend(method.result.as_ref().map(|result| &result.result_type));
         if let Some(operation) = method
             .operation_name
             .as_deref()
             .and_then(|name| service.operation(name))
         {
             values.extend(operation.input_type());
-            values.extend(operation.output_type());
+            results.extend(operation.output_type());
         }
     }
-    let mut parameters = Vec::<TypeParameterSpec>::new();
-    for value in values {
-        let returned = match value.without_option() {
-            TypeSpec::Resource(returned) => service
-                .resource(returned.as_str())
-                .map(|returned| returned.type_parameters.clone())
-                .unwrap_or_default(),
-            _ => Vec::new(),
-        };
-        for parameter in spec
-            .type_parameters_through_protos(value)
-            .into_iter()
-            .map(|usage| usage.parameter)
-            .chain(returned)
-        {
-            if !parameters.contains(&parameter) {
-                parameters.push(parameter);
-            }
-        }
-    }
+    let returned = results
+        .iter()
+        .filter_map(|result| match result.without_option() {
+            TypeSpec::Resource(returned) => service.resource(returned.as_str()),
+            _ => None,
+        })
+        .flat_map(|returned| returned.type_parameters.iter().cloned());
+    let mut parameters = values
+        .iter()
+        .chain(&results)
+        .flat_map(|value| spec.type_parameters_through_protos(value))
+        .map(|usage| usage.parameter)
+        .chain(returned)
+        .collect::<Vec<_>>();
+    parameters.sort_by(|left, right| {
+        (left.declaration_index, &left.full_name).cmp(&(right.declaration_index, &right.full_name))
+    });
+    parameters.dedup();
     parameters
 }

@@ -257,22 +257,58 @@ interface handles {
     }
 
     #[test]
-    fn a_resource_takes_its_type_parameters_in_the_order_that_it_uses_them() {
+    fn a_resource_takes_its_type_parameters_in_the_order_of_their_declarations() {
+        // The record and the constructor use value-t first.
         let wit = r#"
 package test:pairs@1.0.0;
 world system { export pairs; }
 interface pairs {
   type placeholder = string;
+  record entry { value: value-t, }
   /// @nexus.type-parameter
   type key-t = placeholder;
   /// @nexus.type-parameter
   type value-t = placeholder;
-  record entry { value: value-t, }
   resource pair {
     constructor(value: entry, key: key-t);
   }
 }
 "#;
-        assert_eq!(resource_type_parameters(wit, "pair"), ["ValueT", "KeyT"]);
+        assert_eq!(resource_type_parameters(wit, "pair"), ["KeyT", "ValueT"]);
+    }
+
+    // `opener` comes before `holder`, so the first pass sees `holder` before it is generic.
+    const RETURNED_RESOURCE_WIT: &str = r#"
+package test:holders@1.0.0;
+world system { export holders; }
+interface holders {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  resource opener {
+    constructor(id: string);
+    open: func() -> holder;
+  }
+  resource watcher {
+    constructor(id: string);
+    watch: func(holder: borrow<holder>);
+  }
+  resource holder {
+    constructor(value: value-t);
+  }
+}
+"#;
+
+    #[test]
+    fn a_resource_takes_the_type_parameters_of_a_resource_that_it_returns() {
+        assert_eq!(
+            resource_type_parameters(RETURNED_RESOURCE_WIT, "opener"),
+            ["ValueT"]
+        );
+    }
+
+    #[test]
+    fn a_resource_parameter_does_not_give_its_type_parameters() {
+        assert!(resource_type_parameters(RETURNED_RESOURCE_WIT, "watcher").is_empty());
     }
 }
