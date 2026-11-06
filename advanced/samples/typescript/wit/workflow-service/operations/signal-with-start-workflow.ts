@@ -28,7 +28,7 @@ type SignalWithStartWorkflowInput<
 /**
  * Signal a workflow, starting it first if needed.
  *
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  * @returns A workflow handle to the started workflow.
  * @experimental This API is experimental and subject to change.
  */

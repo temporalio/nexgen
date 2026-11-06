@@ -2273,12 +2273,56 @@ return-value documentation. Generated documentation preserves paragraph breaks,
 wraps prose to 88 columns, and escapes comment terminators (plus HTML-sensitive
 Javadoc text) so authored content cannot break the generated source.
 
+Use `{@name <reference>}` to insert a generated identifier. References use WIT
+names, not generated names or Nexus wire names. For example, the same text can
+start with `SignalWithStartWorkflow` in Go and `signal_with_start_workflow` in
+Python:
+
 ```wit
 /// @nexus.doc
-///   "Signal a workflow, starting it first if needed."
+///   "{@name signal-with-start-workflow} signals a workflow, starting it first if needed."
 ///   returns="A workflow handle to the started workflow."
 signal-with-start-workflow: func(...) -> ...;
 ```
+
+References can name the documented declaration or another declaration:
+
+| Reference                    | Target                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `request`                    | A visible top-level type or function, or a parameter in the current function. |
+| `user-profile.tags`          | A record field.                                                               |
+| `get-user.request`           | A freestanding function's parameter.                                          |
+| `user.rename`                | A resource method.                                                            |
+| `user.rename.display-name`   | A resource method's parameter.                                                |
+| `notification-target.email`  | A variant case.                                                               |
+| `other-interface/request.id` | A field in another interface of the same package.                             |
+
+A short name first searches the current function's parameters and method name,
+then the current type's fields, cases, or methods, then the current interface's
+top-level types and functions. Imported types are visible under their `use`
+names; their references resolve to the defining declaration. An interface prefix
+starts lookup at that interface, bypassing local names that would otherwise
+shadow a top-level type.
+
+Qualification selects the declaration; it does not add qualification to the
+output. For example, `{@name user-profile.tags}` expands to `Tags` in Go and
+`tags` in Python. Target-specific field renames and external type overrides
+apply. Go variant cases expand to their full struct names, such as
+`NotificationTargetEmail`; tagged variants use their case tags where there is no
+separate case declaration.
+
+Expansion inserts plain text, not a documentation link or code formatting. Bare
+WIT names and backticks remain literal. Double the opening brace to quote a
+marker: `{{@name get-user}` emits the literal text `{@name get-user}`.
+References work in descriptions, return documentation, and language overrides.
+Unknown names and malformed markers are errors, including in unused declarations
+and inactive overrides. Documentation references do not make otherwise-unused
+declarations reachable.
+
+Backends expand references using their emitted identifiers. For example, Go
+implementation docs use `SystemNexus_` names in System Nexus mode, while facade
+docs use the facade's unprefixed names. Go preserves name-led field descriptions
+without adding a second field-name prefix.
 
 Python emits the docs of a resource and its methods as docstrings. The other
 targets don't emit them yet.

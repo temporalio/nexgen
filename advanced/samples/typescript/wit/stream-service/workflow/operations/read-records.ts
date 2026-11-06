@@ -3,8 +3,6 @@
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
 import type { ReadRecordsResponse, ReadRecordsRequest } from "../models";
-import "../resources";
-import type { Stream } from "../resources";
 
 /**
  * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local

@@ -16,7 +16,7 @@ namespace Nexgen.TypeShowcase
 {
 
     /// <summary>
-    /// Get a user.
+    /// Get a User. Use RenameAsync to change the display name.
     /// </summary>
     /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
@@ -178,9 +178,9 @@ namespace Nexgen.TypeShowcase
         private const string TypeShowcaseEndpoint = "type-showcase";
 
         /// <summary>
-        /// Get a user.
+        /// Get a User. Use RenameAsync to change the display name.
         /// </summary>
-        /// <returns>The matching user.</returns>
+        /// <returns>The matching User.</returns>
         /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         private static async Task<User> GetUserAsync(GetUserRequest request)
@@ -191,10 +191,10 @@ namespace Nexgen.TypeShowcase
         }
 
         /// <summary>
-        /// Get a user.
+        /// Get a User. Use RenameAsync to change the display name.
         /// </summary>
         /// <param name="options">Options for the operation.</param>
-        /// <returns>The matching user.</returns>
+        /// <returns>The matching User.</returns>
         /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public static Task<User> GetUserAsync(GetUserOptions options)

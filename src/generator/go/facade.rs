@@ -414,10 +414,15 @@ pub(super) fn render(
             &mut scope,
             &variant.name,
             parameters.clone(),
-            variant.doc.value(),
+            variant.doc.map_names(public_documentation_name).as_deref(),
         );
         for case in &variant.cases {
-            plan.add_alias(&mut scope, &case.struct_name, parameters.clone(), None);
+            plan.add_alias(
+                &mut scope,
+                &case.struct_name,
+                parameters.clone(),
+                case.doc.map_names(public_documentation_name).as_deref(),
+            );
         }
     }
     for (key, model) in models
@@ -428,7 +433,9 @@ pub(super) fn render(
             &mut scope,
             &model.name,
             model.type_parameters.clone(),
-            record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
+            record_for_model_key(api_plan, key)
+                .and_then(|record| record.doc.map_names(public_documentation_name))
+                .as_deref(),
         );
     }
     if package.workflow_interceptors
@@ -567,7 +574,7 @@ pub(super) fn render(
                 });
                 let positional = ordered_positional_params(unpacked);
                 let docs = wrapper_input_docs(positional.iter().copied());
-                render_operation_doc_comment(&mut documentation, operation, &docs);
+                render_operation_doc_comment(&mut documentation, operation, &docs, true);
                 for (index, param) in positional.iter().enumerate() {
                     let (name, kind) = wrapper_param_signature(
                         param,
@@ -595,7 +602,7 @@ pub(super) fn render(
                     });
                 }
             } else {
-                render_operation_doc_comment(&mut documentation, operation, &[]);
+                render_operation_doc_comment(&mut documentation, operation, &[], true);
                 for (name, kind) in [
                     ("opts", format!("{}Options", go_declaration_name(&name))),
                     ("request", operation.input_type.clone()),
@@ -625,6 +632,10 @@ pub(super) fn render(
 
 fn public_name(name: &str) -> &str {
     name.strip_prefix("SystemNexus_").unwrap_or(name)
+}
+
+fn public_documentation_name(name: &str) -> String {
+    public_name(name).to_string()
 }
 
 fn render_plan(plan: &FacadePlan) -> String {

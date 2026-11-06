@@ -36,6 +36,7 @@ func systemnexus_signalWithStartWorkflow(ctx internal.Context, request SystemNex
 
 // --- Operations (public API) ---
 
+// Request fields for signaling a workflow, starting it first if needed.
 type SystemNexus_SignalWithStartWorkflowRequest struct {
 	// Workflow - Workflow function identifying the workflow to start.
 	//
@@ -478,6 +479,7 @@ func (SystemNexus_SignalWithStartWorkflowRequest) TransferTypeConverter() (conve
 	)
 }
 
+// Static metadata for a workflow execution.
 type SystemNexus_UserMetadata struct {
 	// StaticSummary - Single-line fixed summary for the workflow execution that may appear
 	// in UI and CLI. This can be in single-line Temporal Markdown format.
@@ -550,6 +552,7 @@ func systemnexus_userMetadataFromProto(cfg *commonconverter.SystemNexusContext, 
 	return nil
 }
 
+// Result of signaling a workflow and starting it if needed.
 type SystemNexus_SignalWithStartWorkflowResponse struct {
 	// RunID - Run ID of the started workflow.
 	//

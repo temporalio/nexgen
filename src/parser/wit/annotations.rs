@@ -672,7 +672,11 @@ pub(super) fn validate(
             _ => {}
         }
     }
-    Ok(())
+    super::documentation::validate(
+        resolve,
+        |package| path_for(package).to_path_buf(),
+        language.unwrap_or(Language::Python),
+    )
 }
 
 #[cfg(test)]

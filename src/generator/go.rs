@@ -319,7 +319,7 @@ struct PlannedFlag {
 struct PlannedVariant {
     info: PlannedTypeInfo,
     name: String,
-    doc: SelectedTextSpec,
+    doc: crate::documentation::SelectedDocSpec,
     experimental: bool,
     type_parameters: Vec<crate::spec::TypeParameterUsage>,
     cases: Vec<PlannedVariantCase>,
@@ -328,7 +328,7 @@ struct PlannedVariant {
 #[derive(Debug, Clone)]
 struct PlannedVariantCase {
     name: String,
-    doc: SelectedTextSpec,
+    doc: crate::documentation::SelectedDocSpec,
     payload: Option<PlannedValueType>,
 }
 
@@ -336,7 +336,7 @@ struct PlannedVariantCase {
 pub(in crate::generator) struct PlannedField {
     pub(in crate::generator) proto_name: String,
     pub(in crate::generator) authored_name: String,
-    pub(in crate::generator) doc: Option<SelectedTextSpec>,
+    pub(in crate::generator) doc: Option<crate::documentation::SelectedDocSpec>,
     annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
@@ -966,9 +966,32 @@ pub(crate) fn generate_tree(
     tree: &ApiSpecTree<PlannedFamily>,
     options: &GoOptions,
 ) -> Result<GeneratedFiles> {
+    let tree = super::documentation::prepare_tree(tree, documentation_name);
     match &tree.root {
         ApiSpecNode::Leaf(leaf) => generate_single_leaf(leaf, options),
         ApiSpecNode::Branch(branch) => generate_branch_tree(branch, options),
+    }
+}
+
+fn documentation_name(
+    reference: &crate::documentation::DocReference,
+    spec: &PlannedSpec,
+) -> String {
+    use crate::documentation::ReferenceKind;
+    match reference.kind {
+        ReferenceKind::Type => {
+            go_declaration_name(super::documentation::type_name(reference, spec))
+        }
+        ReferenceKind::TypeExpression => parse_go_expr(&reference.name).1,
+        ReferenceKind::Function => go_declaration_name(&go_field_name(&reference.name)),
+        ReferenceKind::Method | ReferenceKind::Field => go_field_name(&reference.name),
+        ReferenceKind::OperationParameter => "request".to_string(),
+        ReferenceKind::Parameter => go_unexported_name(&go_field_name(&reference.name)),
+        ReferenceKind::VariantCase => go_declaration_name(&format!(
+            "{}{}",
+            reference.parent,
+            reference.name.to_upper_camel_case()
+        )),
     }
 }
 
@@ -1438,6 +1461,63 @@ impl<'a> ApiPlanner<'a> {
             &mut services,
         );
 
+        // Documentation shares the final name decisions, including private
+        // request models, instead of independently repeating their casing.
+        let prepare_doc = |doc: &mut crate::documentation::SelectedDocSpec| {
+            doc.prepare(|reference| {
+                use crate::documentation::ReferenceKind;
+                let key = match reference.kind {
+                    ReferenceKind::Type => {
+                        Some(super::documentation::type_name(reference, self.api_plan).to_string())
+                    }
+                    ReferenceKind::VariantCase => Some(format!(
+                        "{}{}",
+                        reference.parent,
+                        reference.name.to_upper_camel_case()
+                    )),
+                    _ => None,
+                };
+                key.and_then(|key| visibility.type_name_replacements.get(&key).cloned())
+                    .unwrap_or_else(|| {
+                        if reference.kind == ReferenceKind::TypeExpression {
+                            self.package.go_type_expr(&reference.name)
+                        } else {
+                            documentation_name(reference, self.api_plan)
+                        }
+                    })
+            });
+        };
+        let mut documented_plan = self.api_plan.clone();
+        super::documentation::visit_docs(&mut documented_plan, prepare_doc);
+        for variant in self.variants.values_mut() {
+            prepare_doc(&mut variant.doc);
+            for case in &mut variant.cases {
+                prepare_doc(&mut case.doc);
+            }
+        }
+        for field in self.models.values_mut().flat_map(|model| &mut model.fields) {
+            if let Some(doc) = &mut field.doc {
+                prepare_doc(doc);
+            }
+        }
+        for operation in services
+            .iter_mut()
+            .flat_map(|service| &mut service.operations)
+        {
+            prepare_doc(&mut operation.doc);
+            prepare_doc(&mut operation.return_doc);
+            for param in operation.unpacked_input.iter_mut().flatten() {
+                if let Some(doc) = &mut param.doc {
+                    prepare_doc(doc);
+                }
+                for field in param.flattened_fields.iter_mut().flatten() {
+                    if let Some(doc) = &mut field.field.doc {
+                        prepare_doc(doc);
+                    }
+                }
+            }
+        }
+
         // Second pass: compute backend wire metadata for rendered models and
         // collect any aliased imports they require. This runs after visibility
         // so the backend renders final Go names directly.
@@ -1678,7 +1758,7 @@ impl<'a> ApiPlanner<'a> {
             self.models.iter().collect::<Vec<_>>().as_slice(),
             &services,
             &self.external_models,
-            self.api_plan,
+            &documented_plan,
             &visibility,
             &registry.body,
             &interceptors,
@@ -1713,7 +1793,7 @@ impl<'a> ApiPlanner<'a> {
                     &self.variants,
                     &self.models,
                     &services,
-                    self.api_plan,
+                    &documented_plan,
                     &visibility,
                 ),
                 GeneratedFileOrigin::fixed("generated Go facade"),
@@ -1957,8 +2037,8 @@ impl<'a> ApiPlanner<'a> {
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
-            doc: operation.doc.value(),
-            return_doc: operation.return_doc.value(),
+            doc: operation.doc.clone(),
+            return_doc: operation.return_doc.clone(),
             func_name: go_declaration_name(&go_unexported_name(&operation.name)),
             input_type,
             model_type_parameters,
@@ -2368,11 +2448,7 @@ impl<'a> ApiPlanner<'a> {
 
         Ok(RenderedField {
             name: field_name,
-            doc: field
-                .doc
-                .as_ref()
-                .and_then(|doc| doc.value())
-                .map(str::to_string),
+            doc: field.doc.clone(),
             go_type,
             default_punning_zero: None,
             required: field.required,
@@ -2634,10 +2710,10 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) wire_name: &'a str,
     /// Doc text for the operation (from `@nexus.doc`), rendered as a godoc
     /// comment on the exported wrapper function.
-    doc: Option<&'a str>,
+    doc: crate::documentation::SelectedDocSpec,
     /// Return-value doc text (from `@nexus.doc returns=`), rendered as a
     /// `Returns:` paragraph in the wrapper's godoc comment.
-    return_doc: Option<&'a str>,
+    return_doc: crate::documentation::SelectedDocSpec,
     /// Unexported Go function name (e.g. `"getUser"`).
     pub(in crate::generator) func_name: String,
     /// Go type for the request parameter (e.g. `"GetUserRequest"`).
@@ -2684,7 +2760,7 @@ struct RenderedUnpackedParam {
     field_name: String,
     /// Doc text for the field (from `@nexus.doc`), rendered as a godoc
     /// comment on the options struct field for optional parameters.
-    doc: Option<String>,
+    doc: Option<crate::documentation::SelectedDocSpec>,
     /// Unexported Go parameter name used in the function signature
     /// (e.g. `"userId"`).
     param_name: String,
@@ -2780,7 +2856,7 @@ struct RenderedVariant {
     /// Go interface type name (e.g. `"NotificationTarget"`).
     name: String,
     /// Selected documentation for the public variant interface.
-    doc: SelectedTextSpec,
+    doc: crate::documentation::SelectedDocSpec,
     /// Whether the public variant interface carries an experimental warning.
     experimental: bool,
     /// Enclosing generic parameters, carried by every case.
@@ -2798,7 +2874,7 @@ struct RenderedVariantCase {
     /// Go struct name combining variant and case (e.g. `"NotificationTargetEmail"`).
     struct_name: String,
     /// Selected documentation for the public case struct.
-    doc: SelectedTextSpec,
+    doc: crate::documentation::SelectedDocSpec,
     /// Go type of the payload field, or `None` for payload-less cases.
     payload_type: Option<String>,
 }
@@ -2821,7 +2897,7 @@ pub(in crate::generator) struct RenderedField {
     pub(in crate::generator) name: String,
     /// Doc text for the field (from `@nexus.doc`), rendered as a godoc
     /// comment above the struct field.
-    pub(in crate::generator) doc: Option<String>,
+    pub(in crate::generator) doc: Option<crate::documentation::SelectedDocSpec>,
     /// Go type expression (e.g. `"string"`, `"*PostalAddress"`, `"[]string"`).
     pub(in crate::generator) go_type: String,
     /// Zero value representing absence on a System Nexus request field.
@@ -4285,6 +4361,11 @@ fn render_file(
         }
         for (key, model) in public_models {
             output.push('\n');
+            if let Some(doc) =
+                record_for_model_key(api_plan, key).and_then(|record| record.doc.value())
+            {
+                render_go_doc_comment(&mut output, "", doc);
+            }
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
@@ -4447,13 +4528,21 @@ fn render_field_doc_comment(
     output: &mut String,
     indent: &str,
     name: &str,
-    doc: Option<&str>,
+    doc: Option<&crate::documentation::SelectedDocSpec>,
     required: bool,
 ) {
     let status = if required { "Required." } else { "Optional." };
-    let doc = doc.map(str::trim).filter(|doc| !doc.is_empty());
-    if let Some(doc) = doc {
-        render_go_doc_comment(output, indent, &format!("{name} - {doc}"));
+    let name_led = doc.is_some_and(|doc| doc.starts_with_name(name));
+    let text = doc
+        .and_then(|doc| doc.value())
+        .map(str::trim)
+        .filter(|doc| !doc.is_empty());
+    if let Some(doc) = text {
+        if name_led {
+            render_go_doc_comment(output, indent, doc);
+        } else {
+            render_go_doc_comment(output, indent, &format!("{name} - {doc}"));
+        }
         output.push_str(indent);
         output.push_str("//\n");
         render_go_doc_comment(output, indent, status);
@@ -4474,10 +4563,24 @@ fn render_operation_doc_comment(
     output: &mut String,
     operation: &RenderedOperation<'_>,
     input_docs: &[(String, String)],
+    facade: bool,
 ) {
-    let doc = operation.doc.map(str::trim).filter(|doc| !doc.is_empty());
-    let return_doc = operation
-        .return_doc
+    let text = |doc: &crate::documentation::SelectedDocSpec| {
+        if facade {
+            doc.map_names(|name| {
+                name.strip_prefix("SystemNexus_")
+                    .unwrap_or(name)
+                    .to_string()
+            })
+        } else {
+            doc.value().map(str::to_string)
+        }
+    };
+    let doc = text(&operation.doc);
+    let return_doc = text(&operation.return_doc);
+    let doc = doc.as_deref().map(str::trim).filter(|doc| !doc.is_empty());
+    let return_doc = return_doc
+        .as_deref()
         .map(str::trim)
         .filter(|doc| !doc.is_empty());
     if let Some(doc) = doc {
@@ -4688,7 +4791,7 @@ fn render_model(
                     output,
                     "\t",
                     &field.name,
-                    field.doc.as_deref(),
+                    field.doc.as_ref(),
                     field.required,
                 );
             }
@@ -5501,7 +5604,7 @@ fn render_options_struct(
                     output,
                     "\t",
                     &field.name,
-                    field.doc.as_deref(),
+                    field.doc.as_ref(),
                     field.required,
                 );
                 let public_type = if flattened.default_punning_zero.is_some() {
@@ -5517,7 +5620,7 @@ fn render_options_struct(
             output,
             "\t",
             &param.field_name,
-            param.doc.as_deref(),
+            param.doc.as_ref(),
             param.required,
         );
         output.push('\t');
@@ -5954,16 +6057,24 @@ fn wrapper_input_docs<'a>(
     params
         .into_iter()
         .filter_map(|param| {
-            let doc = param.doc.as_deref()?.trim();
-            if doc.is_empty() {
+            let name = if has_explicit_args(param) {
+                singular_args_public_param_name(param)
+            } else {
+                param.param_name.clone()
+            };
+            let doc = param.doc.as_ref()?.map_names_with(|reference, rendered| {
+                if reference.kind == crate::documentation::ReferenceKind::Field
+                    && go_field_name(&reference.name) == param.field_name
+                {
+                    name.clone()
+                } else {
+                    rendered.to_string()
+                }
+            })?;
+            if doc.trim().is_empty() {
                 None
             } else {
-                let name = if has_explicit_args(param) {
-                    singular_args_public_param_name(param)
-                } else {
-                    param.param_name.clone()
-                };
-                Some((name, doc.to_string()))
+                Some((name, doc.trim().to_string()))
             }
         })
         .collect()
@@ -6016,7 +6127,7 @@ fn render_convenience_wrapper(
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
-    render_operation_doc_comment(output, operation, &input_docs);
+    render_operation_doc_comment(output, operation, &input_docs, false);
 
     let mut signature_params: Vec<(String, String)> = vec![(
         "opts".to_string(),
@@ -6314,7 +6425,7 @@ fn render_forwarding_wrapper(
 ) {
     let exported_name = go_declaration_name(&go_field_name(operation.name));
 
-    render_operation_doc_comment(output, operation, &[]);
+    render_operation_doc_comment(output, operation, &[], false);
     output.push_str("func ");
     output.push_str(&exported_name);
     output.push_str("(ctx ");

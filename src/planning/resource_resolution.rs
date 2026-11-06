@@ -41,6 +41,7 @@ impl TypeFamily for ResourceBoundFamily {
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
+    type Doc = crate::documentation::SelectedDocSpec;
 }
 
 struct ResourceBindingMapper {
@@ -89,6 +90,13 @@ impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMa
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
     }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,7 +108,7 @@ pub(crate) struct ResolvedServiceResources {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedResourceSpec {
     pub(crate) name: String,
-    pub(crate) doc: SelectedTextSpec,
+    pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
 }
@@ -108,7 +116,7 @@ pub(crate) struct ResolvedResourceSpec {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) name: String,
-    pub(crate) doc: SelectedTextSpec,
+    pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
     pub(crate) binding: ResolvedResourceMethodBinding,

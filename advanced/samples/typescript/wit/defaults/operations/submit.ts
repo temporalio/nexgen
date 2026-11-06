@@ -32,7 +32,7 @@ type SubmitInput = Request extends infer Input
   : never;
 
 /**
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  */
 export async function submit(
   requestInput: SubmitInput,
