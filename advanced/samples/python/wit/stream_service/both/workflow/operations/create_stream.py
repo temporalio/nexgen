@@ -10,6 +10,7 @@ import temporalio.workflow
 from ...models import (
     CreateStreamRequest,
     CreateStreamResult,
+    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -45,7 +46,9 @@ async def _create_stream(
 @typing.overload
 async def create_stream(
     *,
-    stream_ref: StreamRef,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: type[BodyT],
@@ -55,7 +58,9 @@ async def create_stream(
 @typing.overload
 async def create_stream(
     *,
-    stream_ref: StreamRef,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: None = None,
@@ -64,20 +69,31 @@ async def create_stream(
 
 async def create_stream(
     *,
-    stream_ref: StreamRef,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: typing.Any = None,
 ) -> Stream[typing.Any]:
     """
     Args:
-        stream_ref: The ref of the Stream to create. Its id is the Stream id.
+        id: The Stream id, 1 to 4096 bytes.
+        owner: The run chain or Standalone Activity of a bound Stream. Empty if
+            standalone.
+        backend: Registered backend name, empty for the default. The Store never reads
+            it.
         retention: The age after which a Record is dropped. Empty is the Store default.
         id_conflict_policy: What the create does when the Stream exists. Unspecified is
             fail.
     """
     if body_type is None:
         body_type = typing.Any
+    stream_ref = StreamRef(
+        id=id,
+        owner=owner,
+        backend=backend,
+    )
     request = CreateStreamRequest(
         stream_ref=stream_ref,
         retention=retention,

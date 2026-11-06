@@ -273,7 +273,7 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "flatten-in-api",
-            sites: &[Record],
+            sites: &[Record, Field],
             keys: &[],
             language_keys: &[],
             repeatable: false,

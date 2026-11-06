@@ -1,0 +1,35 @@
+package temporal:nexus@1.0.0;
+
+world system { export history-service; }
+
+/// @nexus.endpoint "history"
+interface history-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest"
+  record get-history-request {
+    // A TypeScript default builds the request in another way.
+    /// @nexus.default typescript="'default'"
+    namespace: string,
+    /// @nexus.flatten-in-api
+    execution: option<workflow-execution>,
+    /// @nexus.omit
+    maximum-page-size: placeholder,
+    /// @nexus.omit
+    next-page-token: placeholder,
+    /// @nexus.omit
+    wait-new-event: placeholder,
+    /// @nexus.omit
+    history-event-filter-type: placeholder,
+    /// @nexus.omit
+    skip-archival: placeholder,
+  }
+
+  get-history: func(request: get-history-request);
+}

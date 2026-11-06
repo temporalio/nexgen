@@ -2514,7 +2514,7 @@ impl<'a> ApiPlanner<'a> {
         };
         let full_name = &record.full_name;
         let nested_planned_model = self.api_plan.record(full_name)?;
-        if !nested_planned_model.flatten_in_api {
+        if !nested_planned_model.flatten_in_api && !planned_field.flatten_in_api {
             return None;
         }
         let nested_rendered_model = self.models.get(full_name)?;

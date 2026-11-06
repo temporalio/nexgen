@@ -7,7 +7,8 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecLeaf, CompilerPass, FunctionArgsSpec, FunctionResultSpec, SelectedFamily,
+    ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FieldOrigin, FunctionArgsSpec,
+    FunctionResultSpec, RecordFieldSpec, RecordSpec, SelectedFamily, TypeSpec,
 };
 
 pub(crate) struct SelectedValidationPass;
@@ -103,6 +104,139 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
                         operation.name, usage.parameter.full_name, usage.parameter.name
                     )));
                 }
+            }
+        }
+    }
+
+    for (_, record) in spec.records() {
+        for (field_name, field) in &record.fields {
+            if field.flatten_in_api {
+                validate_field_flatten(spec, record, field_name, field, &invalid)?;
+            }
+        }
+        validate_flattened_field_names(spec, record, &invalid)?;
+    }
+    // A resource method builds the whole request, so it can't bind a flattened call.
+    for service in &spec.services {
+        for method in service
+            .resources
+            .iter()
+            .flat_map(|resource| &resource.methods)
+        {
+            let Some(operation) = method
+                .operation_name
+                .as_deref()
+                .and_then(|name| service.operation(name))
+            else {
+                continue;
+            };
+            let flattens = operation
+                .input_type()
+                .and_then(|input| match input.without_option() {
+                    TypeSpec::Record(record) => spec.record(record.as_str()),
+                    TypeSpec::External(ExternalTypeSpec::Proto(proto)) => {
+                        spec.record_for_proto(proto.as_str())
+                    }
+                    _ => None,
+                })
+                .is_some_and(|record| record.fields.values().any(|field| field.flatten_in_api));
+            if flattens {
+                return Err(invalid(format!(
+                    "resource method `{}` binds operation `{}`, whose request flattens a field",
+                    method.name, operation.name
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn flattened_record<'a>(
+    spec: &'a ApiSpec<SelectedFamily>,
+    field: &RecordFieldSpec<SelectedFamily>,
+) -> Option<&'a RecordSpec<SelectedFamily>> {
+    match field.field_type.without_option() {
+        TypeSpec::Record(record) => spec.record(record.as_str()),
+        TypeSpec::External(ExternalTypeSpec::Proto(proto)) => spec.record_for_proto(proto.as_str()),
+        _ => None,
+    }
+}
+
+/// A flattened field needs a proto-backed record.
+fn validate_field_flatten(
+    spec: &ApiSpec<SelectedFamily>,
+    parent: &RecordSpec<SelectedFamily>,
+    field_name: &str,
+    field: &RecordFieldSpec<SelectedFamily>,
+    invalid: &dyn Fn(String) -> Error,
+) -> Result<()> {
+    let context = format!("record `{}` field `{field_name}`", parent.full_name);
+    let Some(record) = flattened_record(spec, field).filter(|record| record.source.is_some())
+    else {
+        return Err(invalid(format!(
+            "{context} flattens its record, but its type isn't a proto-backed record"
+        )));
+    };
+    if record.flatten_in_api {
+        return Err(invalid(format!(
+            "{context} flattens `{}`, which flattens in every call already",
+            record.full_name
+        )));
+    }
+    if field.origin.is_some() {
+        return Err(invalid(format!(
+            "{context} flattens its record, so it can't have a source, a default or an api-omit too"
+        )));
+    }
+    Ok(())
+}
+
+/// The call takes the record's fields next to the others, so no two names can match in any case.
+fn validate_flattened_field_names(
+    spec: &ApiSpec<SelectedFamily>,
+    record: &RecordSpec<SelectedFamily>,
+    invalid: &dyn Fn(String) -> Error,
+) -> Result<()> {
+    let normalized = |name: &str| {
+        name.chars()
+            .filter(|character| !matches!(character, '-' | '_'))
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+    };
+    let omitted = |field: &RecordFieldSpec<SelectedFamily>| {
+        matches!(field.origin, Some(FieldOrigin::Omitted))
+    };
+    let parameters = record
+        .fields
+        .iter()
+        .filter(|(_, field)| !omitted(field) && !field.flatten_in_api)
+        .map(|(field_name, field)| (normalized(&field.name), field_name))
+        .collect::<BTreeMap<_, _>>();
+    let mut flattened_names = BTreeMap::<String, String>::new();
+    for (field_name, field) in record
+        .fields
+        .iter()
+        .filter(|(_, field)| field.flatten_in_api)
+    {
+        let Some(nested) = flattened_record(spec, field) else {
+            continue;
+        };
+        for (key, nested_field) in nested.fields.iter().filter(|(_, field)| !omitted(field)) {
+            let name = normalized(&nested_field.name);
+            if let Some(sibling) = parameters.get(&name) {
+                return Err(invalid(format!(
+                    "record `{}` field `{field_name}` flattens `{key}`, whose name `{}` is also \
+                     the name of field `{sibling}`",
+                    record.full_name, nested_field.name
+                )));
+            }
+            let owner = format!("`{key}` of field `{field_name}`");
+            if let Some(first) = flattened_names.insert(name, owner.clone()) {
+                return Err(invalid(format!(
+                    "record `{}` flattens {first} and {owner}, which have one parameter name",
+                    record.full_name
+                )));
             }
         }
     }

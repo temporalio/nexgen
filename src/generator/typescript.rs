@@ -410,6 +410,11 @@ impl<'a> ApiPlanner<'a> {
             PlannedType::Record(record) => Some(record.full_name.as_str()),
             _ => None,
         });
+        let api_plan = self.api_plan;
+        let flattened_fields = input_full_name
+            .and_then(|name| api_plan.record(name))
+            .map(|record| self.input_flattened_fields(record))
+            .unwrap_or_default();
         let rendered_input = input.map(|input| {
             let input_conversion = self.resolve_message_value_conversion(input);
             let input_model =
@@ -462,6 +467,7 @@ impl<'a> ApiPlanner<'a> {
                                 .sources_for(crate::nexgen_config::GenerationTarget::Workflow)
                                 .map(|(name, _, _)| name.to_string()),
                         );
+                        fields.extend(flattened_fields.iter().map(|flatten| flatten.name.clone()));
                         fields.sort();
                         fields.dedup();
                         fields
@@ -482,6 +488,7 @@ impl<'a> ApiPlanner<'a> {
                     })
                     .unwrap_or_default(),
                 default_initialization,
+                flattened_fields: flattened_fields.clone(),
                 transfer_type_converter: input_conversion
                     .wire_function_names
                     .as_ref()
@@ -497,6 +504,16 @@ impl<'a> ApiPlanner<'a> {
                     .or_else(|| self.external_models.transfer_type_converter(input)),
             }
         });
+
+        if let Some(input) = &rendered_input
+            && !input.flattened_fields.is_empty()
+            && input.default_initialization.is_some()
+        {
+            return Err(Error::UnsupportedTypeScriptFlatten {
+                operation: operation.name.clone(),
+                reason: "its request has a `@nexus.default` too".to_string(),
+            });
+        }
 
         // The final public return annotation may already contain type arguments.
         // Service definitions and operation handles apply their own arguments, so
@@ -614,6 +631,49 @@ impl<'a> ApiPlanner<'a> {
             runtime_type_parameters,
             output_record_type_parameters,
         })
+    }
+
+    fn input_flattened_fields(
+        &mut self,
+        record: &RecordSpec<PlannedFamily>,
+    ) -> Vec<RenderedInputFlatten> {
+        let api_plan = self.api_plan;
+        record
+            .fields
+            .values()
+            .filter(|field| field.flatten_in_api)
+            .filter_map(|field| {
+                let PlannedType::Record(nested) = &field.field_type else {
+                    return None;
+                };
+                let nested = api_plan.record(&nested.full_name)?;
+                let proto_backed = matches!(nested.source, Some(ExternalTypeSourceSpec::Proto(_)));
+                let long_ints = std::mem::replace(&mut self.long_ints, proto_backed);
+                let promoted = nested
+                    .public_fields()
+                    .filter(|(_, nested_field)| {
+                        !matches!(nested_field.origin, Some(FieldOrigin::ApiOmitted))
+                            && nested_field
+                                .source_for(GenerationTarget::Workflow)
+                                .is_none()
+                    })
+                    .map(|(_, nested_field)| {
+                        let value = self.resolve_planned_value_type(&nested_field.field_type);
+                        (
+                            typescript_generated_field_name(&nested_field.name),
+                            value.annotation,
+                            !nested_field.required,
+                        )
+                    })
+                    .collect();
+                self.long_ints = long_ints;
+                Some(RenderedInputFlatten {
+                    name: typescript_generated_field_name(&field.name),
+                    required: field.required,
+                    promoted,
+                })
+            })
+            .collect()
     }
 
     /// The public model interface name for `model_type`, when it's defined in
@@ -3213,7 +3273,15 @@ struct RenderedOperationInput {
     api_omitted_fields: Vec<String>,
     sourced_fields: Vec<RenderedSourcedField>,
     default_initialization: Option<String>,
+    flattened_fields: Vec<RenderedInputFlatten>,
     transfer_type_converter: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RenderedInputFlatten {
+    name: String,
+    required: bool,
+    promoted: Vec<(String, String, bool)>,
 }
 
 #[derive(Debug)]
@@ -6983,7 +7051,10 @@ fn render_operation_function(
     }
     if let Some(input) = &operation.input {
         output.push_str(
-            if input.sourced_fields.is_empty() && input.default_initialization.is_none() {
+            if input.sourced_fields.is_empty()
+                && input.default_initialization.is_none()
+                && input.flattened_fields.is_empty()
+            {
                 "  request: "
             } else {
                 "  requestInput: "
@@ -7022,6 +7093,8 @@ fn render_operation_function(
                 "...requestInput,\n",
                 &format!("...requestInput,\n{sourced}"),
             ));
+        } else if !input.flattened_fields.is_empty() {
+            render_flattened_request(output, input);
         } else if !input.sourced_fields.is_empty() {
             output.push_str("  const request = ");
             output.push_str("{\n    ...requestInput,\n");
@@ -7290,7 +7363,68 @@ fn render_operation_input_alias(
         output.push_str(field);
         output.push_str("?: never");
     }
-    output.push_str(" }\n    : never\n  : never;\n\n");
+    output.push_str(" }");
+    let promoted = input
+        .flattened_fields
+        .iter()
+        .flat_map(|flatten| &flatten.promoted)
+        .map(|(name, annotation, optional)| {
+            if *optional {
+                format!("{name}?: {annotation}")
+            } else {
+                format!("{name}: {annotation}")
+            }
+        })
+        .collect::<Vec<_>>();
+    if !promoted.is_empty() {
+        output.push_str(" & { ");
+        output.push_str(&promoted.join("; "));
+        output.push_str(" }");
+    }
+    output.push_str("\n    : never\n  : never;\n\n");
+}
+
+fn render_flattened_request(output: &mut String, input: &RenderedOperationInput) {
+    let promoted = input
+        .flattened_fields
+        .iter()
+        .flat_map(|flatten| flatten.promoted.iter().map(|(name, _, _)| name.as_str()))
+        .collect::<Vec<_>>();
+    output.push_str(&format!(
+        "  const {{ {}, ...requestFields }} = requestInput;\n",
+        promoted.join(", ")
+    ));
+    output.push_str("  const request = {\n    ...requestFields,\n");
+    for source in &input.sourced_fields {
+        output.push_str(&format!(
+            "    {}: {},\n",
+            source.name,
+            source.source_expressions[&GenerationTarget::Workflow]
+        ));
+    }
+    for flatten in &input.flattened_fields {
+        let members = flatten
+            .promoted
+            .iter()
+            .map(|(name, _, _)| name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        // An optional record is set when one of its fields is set.
+        let value = if flatten.required || flatten.promoted.iter().any(|(_, _, optional)| !optional)
+        {
+            format!("{{ {members} }}")
+        } else {
+            let unset = flatten
+                .promoted
+                .iter()
+                .map(|(name, _, _)| format!("{name} === undefined"))
+                .collect::<Vec<_>>()
+                .join(" && ");
+            format!("{unset} ? undefined : {{ {members} }}")
+        };
+        output.push_str(&format!("    {}: {value},\n", flatten.name));
+    }
+    output.push_str(&format!("  }} as {};\n", input.annotation));
 }
 
 fn render_resource_constructor(
