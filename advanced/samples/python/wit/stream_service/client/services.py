@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
+import typing
+
 from .models import (
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -30,7 +32,7 @@ class StreamService:
     ] = Operation(name="CreateStream")
 
     append_records: Operation[
-        AppendRecordsRequest,
+        AppendRecordsRequest[typing.Any],
         AppendRecordsResponse,
     ] = Operation(name="AppendRecords")
 
@@ -41,7 +43,7 @@ class StreamService:
 
     read_records: Operation[
         ReadRecordsRequest,
-        ReadRecordsResponse,
+        ReadRecordsResponse[typing.Any],
     ] = Operation(name="ReadRecords")
 
     describe_stream: Operation[

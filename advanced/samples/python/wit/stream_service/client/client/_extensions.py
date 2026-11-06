@@ -20,6 +20,84 @@ import temporal_support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
+BodyT = typing.TypeVar("BodyT")
+_BodyT = typing.TypeVar("_BodyT")
+
+
+class _GetStream(typing.Generic[BodyT]):
+    """Subscript it with the type arguments that the call decodes with."""
+
+    def __init__(
+        self,
+        extension: StreamServiceClientExtension,
+        body_type: type[BodyT] | None = None,
+    ) -> None:
+        self._extension: StreamServiceClientExtension = extension
+        self.body_type: type[BodyT] = typing.cast(
+            "type[BodyT]", typing.Any if body_type is None else body_type
+        )
+
+    def __getitem__(self, body_type: type[_BodyT]) -> _GetStream[_BodyT]:
+        return _GetStream(self._extension, body_type)
+
+    def __call__(
+        self,
+        *,
+        ref: StreamRef,
+        created: bool | None = None,
+    ) -> Stream[BodyT]:
+        """Return the ``Stream`` handle that has these identity fields."""
+        return Stream[self.body_type](
+            self._extension.create_nexus_client(
+                service=StreamService,
+                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+            ),
+            ref=ref,
+            created=created,
+        )
+
+
+class _CreateStream(typing.Generic[BodyT]):
+    """Subscript it with the type arguments that the call decodes with."""
+
+    def __init__(
+        self,
+        extension: StreamServiceClientExtension,
+        body_type: type[BodyT] | None = None,
+    ) -> None:
+        self._extension: StreamServiceClientExtension = extension
+        self.body_type: type[BodyT] = typing.cast(
+            "type[BodyT]", typing.Any if body_type is None else body_type
+        )
+
+    def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
+        return _CreateStream(self._extension, body_type)
+
+    async def __call__(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+    ) -> Stream[BodyT]:
+        """
+        Args:
+            stream_ref: The ref of the Stream to create. Its id is the Stream id.
+            retention: The age after which a Record is dropped. Empty is the Store
+                default.
+            id_conflict_policy: What the create does when the Stream exists. Unspecified
+                is fail.
+        """
+        request = CreateStreamRequest(
+            stream_ref=stream_ref,
+            retention=retention,
+            withdraw_run=_support.withdraw_run(),
+            id_conflict_policy=id_conflict_policy,
+            request_id=_support.request_id(),
+        )
+        return await self._extension._stream_service_create_stream(
+            request, self.body_type
+        )
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -41,26 +119,16 @@ class StreamServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
-    def get_stream(
-        self,
-        *,
-        ref: StreamRef,
-        created: bool | None,
-    ) -> Stream:
-        """Return the ``Stream`` handle that has these identity fields."""
-        return Stream(
-            self.create_nexus_client(
-                service=StreamService,
-                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
-            ),
-            ref=ref,
-            created=created,
-        )
+    @property
+    def get_stream(self) -> _GetStream[typing.Any]:
+        """Subscript it with the type arguments that the call decodes with."""
+        return _GetStream(self)
 
     async def _stream_service_create_stream(
         self,
         request: CreateStreamRequest,
-    ) -> Stream:
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]:
         nexus_client = self.create_nexus_client(
             service=StreamService,
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -73,33 +141,14 @@ class StreamServiceClientExtension(abc.ABC):
         result = await handle.result()
         if result.ref is None:
             raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream(
+        resource = Stream[body_type](
             nexus_client,
             ref=result.ref,
             created=result.created or None,
         )
         return resource
 
-    async def create_stream(
-        self,
-        *,
-        stream_ref: StreamRef,
-        retention: datetime.timedelta | None = None,
-        id_conflict_policy: StreamIdConflictPolicy | None = None,
-    ) -> Stream:
-        """
-        Args:
-            stream_ref: The ref of the Stream to create. Its id is the Stream id.
-            retention: The age after which a Record is dropped. Empty is the Store
-                default.
-            id_conflict_policy: What the create does when the Stream exists. Unspecified
-                is fail.
-        """
-        request = CreateStreamRequest(
-            stream_ref=stream_ref,
-            retention=retention,
-            withdraw_run=_support.withdraw_run(),
-            id_conflict_policy=id_conflict_policy,
-            request_id=_support.request_id(),
-        )
-        return await self._stream_service_create_stream(request)
+    @property
+    def create_stream(self) -> _CreateStream[typing.Any]:
+        """Subscript it with the type arguments that the call decodes with."""
+        return _CreateStream(self)

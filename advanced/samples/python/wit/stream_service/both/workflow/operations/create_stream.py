@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing
 import temporalio.nexus.system
 import datetime
 import temporalio.workflow
@@ -16,9 +17,14 @@ from .._resources import Stream
 import temporal_support as _support
 
 
+BodyT = typing.TypeVar("BodyT")
+_BodyT = typing.TypeVar("_BodyT")
+
+
 async def _create_stream(
     request: CreateStreamRequest,
-) -> Stream:
+    body_type: type[BodyT],
+) -> Stream[BodyT]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -31,30 +37,49 @@ async def _create_stream(
     result = await handle
     if result.ref is None:
         raise RuntimeError("CreateStream answered without `ref`")
-    return Stream(
+    return Stream[body_type](
         ref=result.ref,
         created=result.created or None,
     )
 
 
-async def create_stream(
-    *,
-    stream_ref: StreamRef,
-    retention: datetime.timedelta | None = None,
-    id_conflict_policy: StreamIdConflictPolicy | None = None,
-) -> Stream:
-    """
-    Args:
-        stream_ref: The ref of the Stream to create. Its id is the Stream id.
-        retention: The age after which a Record is dropped. Empty is the Store default.
-        id_conflict_policy: What the create does when the Stream exists. Unspecified is
-            fail.
-    """
-    request = CreateStreamRequest(
-        stream_ref=stream_ref,
-        retention=retention,
-        withdraw_run=_support.withdraw_run(),
-        id_conflict_policy=id_conflict_policy,
-        request_id=_support.request_id(),
-    )
-    return await _create_stream(request)
+class _CreateStream(typing.Generic[BodyT]):
+    """Subscript it with the type arguments that the call decodes with."""
+
+    def __init__(
+        self,
+        body_type: type[BodyT] | None = None,
+    ) -> None:
+        self.body_type: type[BodyT] = typing.cast(
+            "type[BodyT]", typing.Any if body_type is None else body_type
+        )
+
+    def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
+        return _CreateStream(body_type)
+
+    async def __call__(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+    ) -> Stream[BodyT]:
+        """
+        Args:
+            stream_ref: The ref of the Stream to create. Its id is the Stream id.
+            retention: The age after which a Record is dropped. Empty is the Store
+                default.
+            id_conflict_policy: What the create does when the Stream exists. Unspecified
+                is fail.
+        """
+        request = CreateStreamRequest(
+            stream_ref=stream_ref,
+            retention=retention,
+            withdraw_run=_support.withdraw_run(),
+            id_conflict_policy=id_conflict_policy,
+            request_id=_support.request_id(),
+        )
+        return await _create_stream(request, self.body_type)
+
+
+create_stream: _CreateStream[typing.Any] = _CreateStream()

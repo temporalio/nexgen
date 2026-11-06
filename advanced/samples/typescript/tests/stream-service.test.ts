@@ -1,28 +1,47 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import Long from "long";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type ReadRecordsResponse,
   StreamStatus,
+  createReadRecordsResponseTransferTypeConverter,
   describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
 
+class Turn {
+  constructor(readonly role: string) {}
+}
+
+const turnType: common.TypeInfo<Turn, { role: string }> = {
+  transferTypeConverter: {
+    toTransferType: (turn) => ({ role: turn.role }),
+    fromTransferType: (value) => new Turn(value.role),
+  },
+};
+
+// A body goes through the payload converter of the Workflow.
+beforeEach(() => {
+  vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
+    payloadConverter: common.defaultPayloadConverter,
+  });
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 describe("stream-service generated output", () => {
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
   // compile when those declarations drift from what they read and write.
   test("maps each read item kind through the proto oneof", () => {
-    const model: ReadRecordsResponse = {
+    const model: ReadRecordsResponse<string> = {
       records: [
         {
           item: {
             tag: "data",
-            value: {
-              body: common.defaultPayloadConverter.toPayload("hi"),
-            },
+            value: { body: "hi" },
           },
           offset: Long.fromNumber(1),
         },
@@ -45,6 +64,28 @@ describe("stream-service generated output", () => {
     expect(proto.records?.[1].superseded?.failedTasks?.[0].toNumber()).toBe(7);
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
+    );
+  });
+
+  // A Stream<Turn> read gives its runtime type to this converter.
+  test("decodes the bodies of a read with the runtime type of its stream", () => {
+    const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
+      records: [
+        {
+          item: "data",
+          data: { body: common.defaultPayloadConverter.toPayload({ role: "user" }) },
+          offset: Long.fromNumber(1),
+        },
+      ],
+    };
+
+    const model = createReadRecordsResponseTransferTypeConverter({
+      bodyT: turnType,
+    }).fromTransferType(proto);
+
+    const item = model.records?.[0].item;
+    expect(item?.tag === "data" ? item.value.body : undefined).toStrictEqual(
+      new Turn("user"),
     );
   });
 

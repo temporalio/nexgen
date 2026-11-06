@@ -41,7 +41,7 @@ export const streamService = nexus.service(
     /**
      * Append one batch. Workflow code makes the call from a Local Activity.
      */
-    appendRecords: nexus.operation<AppendRecordsRequest, AppendRecordsResponse>({
+    appendRecords: nexus.operation<AppendRecordsRequest<any>, AppendRecordsResponse>({
       name: "AppendRecords",
       inputType: { transferTypeConverter: appendRecordsRequestTransferTypeConverter },
       outputType: { transferTypeConverter: appendRecordsResponseTransferTypeConverter },
@@ -55,7 +55,7 @@ export const streamService = nexus.service(
      * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
      * Activity.
      */
-    readRecords: nexus.operation<ReadRecordsRequest, ReadRecordsResponse>({
+    readRecords: nexus.operation<ReadRecordsRequest, ReadRecordsResponse<any>>({
       name: "ReadRecords",
       inputType: { transferTypeConverter: readRecordsRequestTransferTypeConverter },
       outputType: { transferTypeConverter: readRecordsResponseTransferTypeConverter },

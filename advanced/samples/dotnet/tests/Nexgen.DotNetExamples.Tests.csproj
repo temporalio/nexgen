@@ -12,9 +12,13 @@
     <ProjectReference Include="../Nexgen.DotNetExamples.csproj" />
     <!-- The stream output takes Temporalio.Workflows, which the workflow-service output also has. -->
     <ProjectReference Include="../Nexgen.DotNetStreamService.csproj" Aliases="Streams" />
+    <!-- Its stand-in declares SDK types that Temporalio also has. -->
+    <ProjectReference Include="../Nexgen.DotNetStreamServiceSystemNexus.csproj" Aliases="SystemNexusStreams" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The System Nexus project compiles the stand-in. -->
+    <Compile Remove="SystemNexusStandIn/**" />
     <Compile Include="../wit/workflow-service/Models.cs" Link="GeneratedWorkflowService/Models.cs" />
     <Compile Include="../wit/workflow-service/Operations.cs" Link="GeneratedWorkflowService/Operations.cs" />
     <Compile Include="../wit/workflow-service/Services.cs" Link="GeneratedWorkflowService/Services.cs" />
