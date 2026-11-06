@@ -7,8 +7,24 @@ import (
 	internal "go.temporal.io/sdk/internal"
 )
 
+// Request fields for signaling a workflow, starting it first if needed.
+type SignalWithStartWorkflowRequest = implementation.SystemNexus_SignalWithStartWorkflowRequest
+
+// Static metadata for a workflow execution.
+type UserMetadata = implementation.SystemNexus_UserMetadata
+
 // Result of signaling a workflow and starting it if needed.
 type SignalWithStartWorkflowResponse = implementation.SystemNexus_SignalWithStartWorkflowResponse
+
+type WorkflowOutboundInterceptor = implementation.SystemNexus_WorkflowOutboundInterceptor
+
+type WorkflowOutboundInterceptorBase = implementation.SystemNexus_WorkflowOutboundInterceptorBase
+
+type WorkflowOutboundInterceptorTerminal = implementation.SystemNexus_WorkflowOutboundInterceptorTerminal
+
+type WorkflowOutboundRuntime = implementation.SystemNexus_WorkflowOutboundRuntime
+
+type ExecuteOperationInput = implementation.SystemNexus_ExecuteOperationInput
 
 type SignalWithStartWorkflowOptions = implementation.SystemNexus_SignalWithStartWorkflowOptions
 

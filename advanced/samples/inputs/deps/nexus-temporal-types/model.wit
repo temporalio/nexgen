@@ -137,7 +137,7 @@ interface model {
   /// @nexus.type
   ///   python="collections.abc.Mapping[str, typing.Any]"
   ///   typescript="Record<string, unknown>"
-  ///   go="map[string]any"
+  ///   go="map[string]*go.temporal.io/api/common/v1:common.Payload"
   ///   dotnet="IReadOnlyDictionary<string, object?>"
   ///   dotnet-from="ProtoExtensions.FromHeaderProto"
   ///   dotnet-to="ProtoExtensions.ToHeaderProto"

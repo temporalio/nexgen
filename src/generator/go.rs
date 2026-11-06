@@ -28,6 +28,7 @@ use super::json_schema::go as json;
 use super::proto::go as proto;
 
 mod facade;
+mod interceptor;
 
 type FunctionArgsSpec = GenericFunctionArgsSpec<PlannedFamily>;
 type FunctionFieldSpec = GenericFunctionFieldSpec<PlannedFamily>;
@@ -544,6 +545,7 @@ pub(in crate::generator) struct GoPackageContext {
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
     facade: Option<GoFacadeOptions>,
+    workflow_interceptors: bool,
 }
 
 impl GoPackageContext {
@@ -579,6 +581,10 @@ impl GoPackageContext {
 
         Ok(Self {
             package_name,
+            workflow_interceptors: crate::nexgen_config::current().system_nexus
+                && crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow),
             import_path,
             has_serialization_context: crate::nexgen_config::current().system_nexus
                 && api_plan
@@ -615,7 +621,7 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn go_type_expr(&self, type_expr: &str) -> String {
         let (imports, code_expr) = parse_go_expr(type_expr);
-        if imports.iter().any(|path| {
+        if imports.keys().any(|path| {
             self.is_self_import(path) || (self.import_path.is_some() && path == &self.package_name)
         }) {
             self.unqualify_self_expr(&code_expr)
@@ -1125,6 +1131,7 @@ struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
     package: GoPackageContext,
     imports: BTreeSet<String>,
+    aliased_imports: BTreeMap<String, String>,
     external_models: GoExternalModels,
     enums: IndexMap<String, RenderedEnum>,
     flags: IndexMap<String, RenderedFlags>,
@@ -1139,7 +1146,7 @@ impl<'a> ApiPlanner<'a> {
         tree_models: &[PlannedJsonType],
     ) -> Result<Self> {
         let package = GoPackageContext::new(api_plan, options)?;
-        let mut imports = BTreeSet::new();
+        let mut imports = BTreeMap::new();
 
         // Re-scan all resolved type expressions to collect import paths.
         // Type expressions like "temporal.RetryPolicy" were produced by
@@ -1147,7 +1154,19 @@ impl<'a> ApiPlanner<'a> {
         // we need to recover the imports from the original annotations.
         // We do this by re-parsing annotations from the planned spec.
         collect_imports_from_plan(api_plan, &mut imports);
-        imports.retain(|import_path| !package.is_self_import(import_path));
+        imports.retain(|import_path, _| !package.is_self_import(import_path));
+        let mut aliased_imports = BTreeMap::new();
+        let imports = imports
+            .into_iter()
+            .filter_map(|(path, alias)| {
+                if path.rsplit('/').next() == Some(alias.as_str()) {
+                    Some(path)
+                } else {
+                    aliased_imports.insert(path, alias);
+                    None
+                }
+            })
+            .collect();
 
         let mut external_models = GoExternalModels::new(
             api_plan,
@@ -1161,6 +1180,7 @@ impl<'a> ApiPlanner<'a> {
             api_plan,
             package,
             imports,
+            aliased_imports,
             external_models,
             enums: IndexMap::new(),
             flags: IndexMap::new(),
@@ -1222,6 +1242,7 @@ impl<'a> ApiPlanner<'a> {
             &self.flags,
             &self.variants,
             &self.models,
+            self.package.workflow_interceptors,
         );
         apply_go_visibility(
             &visibility,
@@ -1289,6 +1310,11 @@ impl<'a> ApiPlanner<'a> {
                 .insert(self.package.workflow_import().to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
+        if self.package.workflow_interceptors && has_operations {
+            self.imports.insert("fmt".to_string());
+            self.imports
+                .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
+        }
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
             op.wire_binding
                 .as_ref()
@@ -1363,6 +1389,23 @@ impl<'a> ApiPlanner<'a> {
                 .insert(self.package.workflow_import().to_string());
         }
         let mut external_imports = self.external_models.imports();
+        for (path, alias) in &self.aliased_imports {
+            if let Some((_, existing)) = external_imports
+                .iter()
+                .find(|(existing_path, _)| existing_path == path)
+            {
+                if existing != alias {
+                    return Err(Error::UnsupportedGoType {
+                        context: format!("import `{path}`"),
+                        reason: format!(
+                            "type annotations use alias `{alias}`, but protobuf bindings use `{existing}`"
+                        ),
+                    });
+                }
+            } else {
+                external_imports.push((path.clone(), alias.clone()));
+            }
+        }
         let registry = if crate::nexgen_config::current().system_nexus
             && self.package.has_serialization_context
         {
@@ -1434,6 +1477,11 @@ impl<'a> ApiPlanner<'a> {
         for model in self.models.values() {
             validate_model_getter_names(model)?;
         }
+        let interceptors = if self.package.workflow_interceptors && has_operations {
+            interceptor::render(&services, &self.package)?
+        } else {
+            String::new()
+        };
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1451,6 +1499,7 @@ impl<'a> ApiPlanner<'a> {
             self.api_plan,
             &visibility,
             &registry.body,
+            &interceptors,
         );
 
         let mut files = GeneratedFileMap::default();
@@ -2680,6 +2729,7 @@ fn compute_go_visibility(
     flags: &IndexMap<String, RenderedFlags>,
     variants: &IndexMap<String, RenderedVariant>,
     models: &IndexMap<String, RenderedModel>,
+    interceptor_inputs: bool,
 ) -> GoVisibility {
     let mut marker = GoVisibilityMarker {
         api_plan,
@@ -2698,6 +2748,14 @@ fn compute_go_visibility(
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);
+            if interceptor_inputs
+                && let Some(input) = operation
+                    .input
+                    .as_ref()
+                    .and_then(|input| planned_message_type(input, api_plan))
+            {
+                marker.mark_message_type(&input);
+            }
         }
         for resource in &service.resources {
             marker.mark_resource_public_surface(&resource.data);
@@ -3482,7 +3540,7 @@ fn parse_go_import(type_expr: &str) -> (Option<String>, String) {
 
 /// Parse package references at any depth without treating Go punctuation as
 /// part of a module path. The same walk drives public rendering and imports.
-fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
+fn parse_go_expr(expr: &str) -> (BTreeMap<String, String>, String) {
     // A leading explicit import applies to the entire expression, including
     // composite forms such as `example.org/types:[]types.Value`.
     if let Some((path, code)) = expr.split_once(':')
@@ -3490,27 +3548,32 @@ fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
             .chars()
             .any(|ch| matches!(ch, '[' | ']' | '(' | ')' | '*' | ' '))
     {
-        return (BTreeSet::from([path.to_string()]), code.to_string());
+        return (
+            BTreeMap::from([(path.to_string(), go_import_alias(code, path))]),
+            code.to_string(),
+        );
     }
-    let mut imports = BTreeSet::new();
+    let mut imports = BTreeMap::new();
     let mut rendered = String::new();
     let mut token = String::new();
-    let flush = |token: &mut String, rendered: &mut String, imports: &mut BTreeSet<String>| {
-        if token.is_empty() {
-            return;
-        }
-        let (prefix, reference) = token
-            .strip_prefix("...")
-            .map(|s| ("...", s))
-            .unwrap_or(("", token.as_str()));
-        let (import, code) = parse_go_import(reference);
-        if let Some(import) = import {
-            imports.insert(import);
-        }
-        rendered.push_str(prefix);
-        rendered.push_str(&code);
-        token.clear();
-    };
+    let flush =
+        |token: &mut String, rendered: &mut String, imports: &mut BTreeMap<String, String>| {
+            if token.is_empty() {
+                return;
+            }
+            let (prefix, reference) = token
+                .strip_prefix("...")
+                .map(|s| ("...", s))
+                .unwrap_or(("", token.as_str()));
+            let (import, code) = parse_go_import(reference);
+            if let Some(import) = import {
+                let alias = go_import_alias(&code, &import);
+                imports.insert(import, alias);
+            }
+            rendered.push_str(prefix);
+            rendered.push_str(&code);
+            token.clear();
+        };
     for ch in expr.chars() {
         if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | ':' | '-') {
             token.push(ch);
@@ -3523,9 +3586,17 @@ fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
     (imports, rendered)
 }
 
+fn go_import_alias(expression: &str, import_path: &str) -> String {
+    expression
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && !matches!(ch, '_' | '.'))
+        .find_map(|token| token.split_once('.').map(|(alias, _)| alias))
+        .unwrap_or_else(|| import_path.rsplit('/').next().unwrap_or(import_path))
+        .to_string()
+}
+
 /// Walks the [`PlannedSpec`] and collects Go import paths from any `@nexus.type`
 /// annotations that embed a module path (e.g. `go.temporal.io/sdk/temporal.RetryPolicy`).
-fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeMap<String, String>) {
     for (_, model) in api_plan.records() {
         for (_, field) in model.model_fields() {
             if let Some(annotation) = field
@@ -3566,17 +3637,17 @@ fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<Stri
                 if let (Some(annotation), Some(_expr)) =
                     (transform.type_name.value(), transform.transform.value())
                 {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
     }
 }
 
-fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_function(
+    function: &FunctionFieldSpec,
+    imports: &mut BTreeMap<String, String>,
+) {
     if !function_value_is_string(function)
         && let Some(helper) = &function.name_extractor
         && !helper.starts_with("support.")
@@ -3586,7 +3657,10 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
     if let Some(descriptor) = &function.type_descriptor {
         for text in [&descriptor.value_type, &descriptor.args_type] {
             if let Some(import) = text.import() {
-                imports.insert(import.to_string());
+                imports.insert(
+                    import.to_string(),
+                    go_import_alias(text.value().unwrap_or_default(), import),
+                );
             } else if let Some(value) = text.value() {
                 imports.extend(parse_go_expr(value).0);
             }
@@ -3609,16 +3683,16 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
         FunctionResultSpec::Authored(result) => collect_imports_from_authored_type(result, imports),
         FunctionResultSpec::Annotation(result) => {
             if let Some(annotation) = result.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             }
         }
     }
 }
 
-fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_authored_type(
+    wit_type: &PlannedType,
+    imports: &mut BTreeMap<String, String>,
+) {
     match wit_type {
         TypeSpec::Option(inner) | TypeSpec::List(inner) => {
             collect_imports_from_authored_type(inner, imports);
@@ -3644,10 +3718,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
             type_name, target, ..
         })) => {
             if let Some(annotation) = type_name.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             } else {
                 collect_imports_from_authored_type(target, imports);
             }
@@ -3657,19 +3728,22 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
 }
 
 /// Collects Go imports from a message type's replacement or authored type.
-fn collect_imports_from_message_type(message: &PlannedMessageType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_message_type(
+    message: &PlannedMessageType,
+    imports: &mut BTreeMap<String, String>,
+) {
     if let Some(replacement) = &message.replacement {
         if let Some(annotation) = replacement.type_name.value() {
-            let (import_path, _) = parse_go_import(annotation);
-            if let Some(path) = import_path {
-                imports.insert(path);
-            }
+            imports.extend(parse_go_expr(annotation).0);
         }
     }
 }
 
 /// Collects Go imports from value types within a field kind.
-fn collect_imports_from_value_type(kind: &PlannedFieldKind, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_value_type(
+    kind: &PlannedFieldKind,
+    imports: &mut BTreeMap<String, String>,
+) {
     match kind {
         PlannedFieldKind::Singular(value) | PlannedFieldKind::Repeated(value) => {
             collect_imports_from_planned_value(value, imports);
@@ -3682,7 +3756,10 @@ fn collect_imports_from_value_type(kind: &PlannedFieldKind, imports: &mut BTreeS
 }
 
 /// Recursively collects Go imports from a planned value type.
-fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_planned_value(
+    value: &PlannedValueType,
+    imports: &mut BTreeMap<String, String>,
+) {
     match value {
         PlannedValueType::TypeParameter(_) => {}
         PlannedValueType::External {
@@ -3690,10 +3767,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
             fallback,
         } => {
             if let Some(annotation) = type_name.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             } else {
                 collect_imports_from_planned_value(fallback, imports);
             }
@@ -3701,20 +3775,14 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         PlannedValueType::Enum(enum_type) => {
             if let Some(replacement) = &enum_type.replacement {
                 if let Some(annotation) = replacement.type_name.value() {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
         PlannedValueType::Message(message_type) => {
             if let Some(replacement) = &message_type.replacement {
                 if let Some(annotation) = replacement.type_name.value() {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
@@ -3788,6 +3856,7 @@ fn render_file(
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
     registry: &str,
+    interceptors: &str,
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -4047,6 +4116,7 @@ fn render_file(
     }
 
     output.push_str(registry);
+    output.push_str(interceptors);
 
     // Imports collected while planning can become unused when the SDK owns
     // input conversion instead of the generated wrapper, or when the Workflow API
@@ -6142,6 +6212,7 @@ mod tests {
             &Default::default(),
             &Default::default(),
             &models,
+            false,
         );
         for (key, record) in leaf.spec.records() {
             assert_eq!(visibility.is_public(key), record.name == "Response");
@@ -6161,6 +6232,7 @@ mod tests {
             has_serialization_context: false,
             support_package: Some("go.temporal.io/sdk/internal".to_string()),
             facade: None,
+            workflow_interceptors: false,
         };
         assert_eq!(
             package.support_reference("DurationToProto"),
@@ -6279,6 +6351,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            workflow_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -6295,6 +6368,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            workflow_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -6340,9 +6414,29 @@ mod tests {
             let (imports, rendered) = super::parse_go_expr(authored);
             assert_eq!(rendered, expected);
             assert_eq!(
-                imports,
+                imports
+                    .into_keys()
+                    .collect::<std::collections::BTreeSet<_>>(),
                 paths.into_iter().map(str::to_string).collect(),
                 "{authored}"
+            );
+        }
+    }
+
+    #[test]
+    fn composite_type_imports_preserve_package_aliases() {
+        for authored in [
+            "map[string]*go.temporal.io/api/common/v1:common.Payload",
+            "go.temporal.io/api/common/v1:map[string]*common.Payload",
+        ] {
+            let (imports, expression) = super::parse_go_expr(authored);
+            assert_eq!(expression, "map[string]*common.Payload");
+            assert_eq!(
+                imports,
+                std::collections::BTreeMap::from([(
+                    "go.temporal.io/api/common/v1".to_string(),
+                    "common".to_string(),
+                )]),
             );
         }
     }

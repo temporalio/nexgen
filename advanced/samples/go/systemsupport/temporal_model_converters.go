@@ -205,34 +205,18 @@ func MemoFromProto(dc converter.DataConverter, memo *common.Memo) (map[string]an
 	return result, nil
 }
 
-func HeaderToProto(dc converter.DataConverter, header map[string]any) (*common.Header, error) {
+func HeaderToProto(_ converter.DataConverter, header map[string]*common.Payload) (*common.Header, error) {
 	if header == nil {
 		return nil, nil
 	}
-	fields := make(map[string]*common.Payload, len(header))
-	for key, value := range header {
-		payload, err := PayloadToProto(dc, value)
-		if err != nil {
-			return nil, fmt.Errorf("encode workflow header error: %v", err)
-		}
-		fields[key] = payload
-	}
-	return &common.Header{Fields: fields}, nil
+	return &common.Header{Fields: header}, nil
 }
 
-func HeaderFromProto(dc converter.DataConverter, header *common.Header) (map[string]any, error) {
+func HeaderFromProto(_ converter.DataConverter, header *common.Header) (map[string]*common.Payload, error) {
 	if header == nil {
 		return nil, nil
 	}
-	result := make(map[string]any, len(header.GetFields()))
-	for key, payload := range header.GetFields() {
-		value, err := PayloadFromProto(dc, payload)
-		if err != nil {
-			return nil, err
-		}
-		result[key] = value
-	}
-	return result, nil
+	return header.GetFields(), nil
 }
 
 // --- SearchAttributes (temporal.api.common.v1.SearchAttributes) ---
