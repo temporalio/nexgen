@@ -1,0 +1,1 @@
+Each Python client call takes `rpc_metadata` and `rpc_timeout`, and passes them to the `start_operation` of its Nexus client. The methods of a client resource take them too. nexgen refuses a request field or method parameter with one of these names in the client target.

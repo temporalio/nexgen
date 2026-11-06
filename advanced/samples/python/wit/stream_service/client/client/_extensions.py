@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import collections.abc
 import typing
 import temporalio.client
 import temporalio.nexus.system
 import uuid as _uuid
-import datetime
 import abc
+import datetime
 
 from ..services import StreamService
 from ..models import (
@@ -60,6 +61,9 @@ class StreamServiceClientExtension(abc.ABC):
     async def _stream_service_create_stream(
         self,
         request: CreateStreamRequest,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream:
         nexus_client = self.create_nexus_client(
             service=StreamService,
@@ -69,6 +73,8 @@ class StreamServiceClientExtension(abc.ABC):
             operation=StreamService.create_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
         if result.ref is None:
@@ -86,6 +92,8 @@ class StreamServiceClientExtension(abc.ABC):
         stream_ref: StreamRef,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream:
         """
         Args:
@@ -102,4 +110,6 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )
-        return await self._stream_service_create_stream(request)
+        return await self._stream_service_create_stream(
+            request, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )

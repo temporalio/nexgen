@@ -47,6 +47,9 @@ class Stream:
     async def publish(
         self,
         records: list[AppendRecord],
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
@@ -59,11 +62,16 @@ class Stream:
             operation=StreamService.append_records,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         return await handle.result()
 
     async def close(
         self,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
@@ -74,6 +82,8 @@ class Stream:
             operation=StreamService.close_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         _ = await handle.result()
 
@@ -85,6 +95,9 @@ class Stream:
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> ReadRecordsResponse:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
@@ -100,6 +113,8 @@ class Stream:
             operation=StreamService.read_records,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         return await handle.result()
 
@@ -111,6 +126,9 @@ class Stream:
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse, None]:
         """Yield each response of ``read`` until the poll helper stops.
 
@@ -145,6 +163,8 @@ class Stream:
                 operation=StreamService.read_records,
                 arg=request,
                 id=f"{_uuid.uuid4()}",
+                rpc_metadata=rpc_metadata or {},
+                rpc_timeout=rpc_timeout,
             )
             response = await operation_handle.result()
             next_request = _support.next_read_request(request, response)
@@ -161,6 +181,9 @@ class Stream:
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> PollIterator[ReadRecordsRequest, StreamRecord]:
         """Yield each item of ``iter_read``, page by page.
 
@@ -201,6 +224,8 @@ class Stream:
                 wait=wait,
                 create_wait=create_wait,
                 max_bytes=max_bytes,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             ),
             lambda response: response.records,
             _support.next_read_request,
@@ -209,6 +234,9 @@ class Stream:
 
     async def describe(
         self,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> DescribeStreamResponse:
         """Describe the Stream's status, newest offset and Retention."""
         request = DescribeStreamRequest(
@@ -218,6 +246,8 @@ class Stream:
             operation=StreamService.describe_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         return await handle.result()
 
