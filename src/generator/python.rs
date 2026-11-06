@@ -23,7 +23,7 @@ use crate::planning::{
     RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, FlagsSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldPolicy, FlagsSpec,
     FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
     LanguageImportStyle, ModulePath, OperationPollSpec, OperationSpec, RecordFieldSpec, RecordSpec,
     SelectedTextSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
@@ -2382,7 +2382,7 @@ impl<'a> ApiPlanner<'a> {
         for ((_field_name, planned_field), rendered_field) in planned_model
             .fields
             .iter()
-            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .zip(model.fields.iter())
         {
             if let Some(source_expr) = planned_field.source_for(target) {
@@ -2532,7 +2532,7 @@ impl<'a> ApiPlanner<'a> {
             fields: nested_planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                 .zip(nested_rendered_model.fields.iter())
                 .filter(|((_, field), _)| {
                     !field.api_omitted_for(target) && field.source_for(target).is_none()
@@ -2616,7 +2616,7 @@ impl<'a> ApiPlanner<'a> {
         let fields = planned_model
             .fields
             .iter()
-            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .map(|(field_name, field)| self.build_field(planned_model, field_name, field))
             .collect::<Result<Vec<_>>>()?;
 
@@ -3040,7 +3040,7 @@ fn collect_python_language_imports(api_plan: &PlannedSpec) -> Vec<LanguageImport
         for (_, field) in record
             .fields
             .iter()
-            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         {
             if let Some(function) = &field.function {
                 collect_function_imports(function, &mut imports);
@@ -7666,8 +7666,8 @@ fn resource_return_binding_expr_python(binding: &PlannedOperationResourceFieldBi
             proto_field_name: _,
             origin,
         } => {
-            if matches!(origin, Some(FieldOrigin::Omitted))
-                || origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+            if origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || origin.as_ref().is_some_and(FieldPolicy::is_sourced)
             {
                 let expr = format!("request.{}", python_field_name(field_name));
                 if binding.optional {

@@ -25,7 +25,7 @@ use super::{
 pub(crate) struct OperationLoweredFamily;
 
 impl crate::spec::TypeFamily for OperationLoweredFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -258,8 +258,8 @@ struct OperationLoweringMapper;
 impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for OperationLoweringMapper {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) {}

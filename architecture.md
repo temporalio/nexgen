@@ -197,11 +197,16 @@ other. Plain resource identity DTOs live in the root
 endpoint clients live in the workflow API's `_clients.py`, not in the shared
 `services.py`.
 
-Field origins retain per-target expression maps through language selection and
-shared planning. API preparation selects its target's source or default
-expression when building a request. Model constructors and converters only
-handle data. This lets workflow and client APIs share models without sharing
-runtime behavior.
+Field policies separate model-level omission from a sparse map of
+target-specific origins. `LanguageFieldPolicies` retains language alternatives
+until selection; the selected `FieldPolicy` survives shared planning. Its
+accessors resolve absent target entries to `FieldOrigin::Parameter`. An explicit
+origin can instead omit the convenience argument, default a caller-overridable
+argument, or source its value. The WIT parser lowers annotations into these
+policies; later stages do not interpret annotation syntax. API preparation
+selects its target's origin when building a request. Model constructors and
+converters only handle data, preserving declared field optionality. This lets
+workflow and client APIs share models without sharing runtime behavior.
 
 Client resources keep their service-bound Nexus client. API code decodes
 returned resource data and constructs handles with that client. Python client

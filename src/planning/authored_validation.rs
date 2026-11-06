@@ -14,7 +14,7 @@ use crate::generator::{dotnet, python};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
-    FieldOrigin, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
+    FieldPolicy, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -67,7 +67,7 @@ impl<'a> ModelConfig<'a> {
         Self { record, language }
     }
 
-    fn origin(&self, field_name: &str) -> Option<&FieldOrigin> {
+    fn origin(&self, field_name: &str) -> Option<&FieldPolicy> {
         self.record
             .fields
             .get(field_name)
@@ -83,7 +83,7 @@ impl<'a> ModelConfig<'a> {
 
     fn is_field_hidden(&self, field_name: &str) -> bool {
         self.is_field_omitted(field_name)
-            || self.origin(field_name).is_some_and(FieldOrigin::is_sourced)
+            || self.origin(field_name).is_some_and(FieldPolicy::is_sourced)
     }
 }
 
@@ -331,7 +331,7 @@ fn validate_oneof_model_config(
         if grouped_field
             .origin
             .for_language(model_config.language)
-            .is_some_and(FieldOrigin::is_sourced)
+            .is_some_and(FieldPolicy::is_sourced)
         {
             return Err(Error::InvalidTypeOverrideField {
                 message: message_name.to_string(),
@@ -621,7 +621,7 @@ fn validate_record_fields(
     for (field_name, _) in model_config.record.fields.iter().filter(|(name, _)| {
         model_config
             .origin(name)
-            .is_some_and(FieldOrigin::is_sourced)
+            .is_some_and(FieldPolicy::is_sourced)
     }) {
         if oneof_by_name(oneofs, field_name).is_some() {
             continue;
@@ -830,7 +830,7 @@ fn validate_invocation_fields(
         }
         if model_config
             .origin(&function.args_field)
-            .is_some_and(FieldOrigin::is_sourced)
+            .is_some_and(FieldPolicy::is_sourced)
         {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
                 message: message_name.to_string(),

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use indexmap::IndexMap;
@@ -210,7 +210,7 @@ pub trait TextSpec: std::fmt::Debug + Clone + PartialEq {
 pub struct AuthoredFamily;
 
 impl TypeFamily for AuthoredFamily {
-    type Origin = LanguageFieldOrigins;
+    type Origin = LanguageFieldPolicies;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -234,7 +234,7 @@ impl TypeFamily for AuthoredFamily {
 pub(crate) struct SelectedFamily;
 
 impl TypeFamily for SelectedFamily {
-    type Origin = Option<FieldOrigin>;
+    type Origin = Option<FieldPolicy>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -864,21 +864,22 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldOrigin {
-    /// Present in generated models and wire conversion, but omitted from
-    /// generated operation convenience APIs.
-    ApiOmitted,
+    /// Supplied by the caller; also the fallback for missing target entries.
+    Parameter,
+    /// Retained in the shared model, but absent from this target's convenience API.
     Omitted,
-    Default {
-        expressions: BTreeMap<GenerationTarget, FieldExpression>,
-    },
-    Source {
-        expressions: BTreeMap<GenerationTarget, FieldExpression>,
-    },
-    /// Set by `@nexus.api-omit` with `targets`. Other targets take a source or a parameter.
-    ByTarget {
-        sources: BTreeMap<GenerationTarget, FieldExpression>,
-        api_omitted: BTreeSet<GenerationTarget>,
-    },
+    /// Supplied by the caller, or initialized from the expression when absent.
+    Default(FieldExpression),
+    /// Initialized by the API rather than supplied by the caller.
+    Source(FieldExpression),
+}
+
+/// Model omission is independent of the target-specific convenience API policy.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldPolicy {
+    /// Removes the field from generated models and wire conversion for all targets.
+    pub omitted: bool,
+    pub origin: BTreeMap<GenerationTarget, FieldOrigin>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -887,65 +888,168 @@ pub struct FieldExpression {
     pub import: Option<String>,
 }
 
-/// Origin alternatives retained until language selection.
+/// Field-policy alternatives retained until language selection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct LanguageFieldOrigins {
-    pub default: Option<FieldOrigin>,
-    pub by_language: BTreeMap<Language, FieldOrigin>,
+pub struct LanguageFieldPolicies {
+    pub default: Option<FieldPolicy>,
+    pub by_language: BTreeMap<Language, FieldPolicy>,
 }
 
-impl LanguageFieldOrigins {
-    pub fn for_language(&self, language: Language) -> Option<&FieldOrigin> {
+impl LanguageFieldPolicies {
+    pub fn for_language(&self, language: Language) -> Option<&FieldPolicy> {
         self.by_language.get(&language).or(self.default.as_ref())
     }
 
     pub fn is_omitted(&self) -> bool {
-        matches!(self.default, Some(FieldOrigin::Omitted))
+        self.default.as_ref().is_some_and(FieldPolicy::is_omitted)
     }
 }
 
-impl FieldOrigin {
+impl FieldPolicy {
+    /// Missing target entries represent ordinary caller-supplied parameters.
+    pub fn origin_for(&self, target: GenerationTarget) -> &FieldOrigin {
+        self.origin.get(&target).unwrap_or(&FieldOrigin::Parameter)
+    }
+
     pub fn is_omitted(&self) -> bool {
-        matches!(self, Self::Omitted)
+        self.omitted
     }
 
     pub fn source_for(&self, target: GenerationTarget) -> Option<&str> {
-        self.source_expressions()
-            .and_then(|expressions| expressions.get(&target))
-            .map(|expr| expr.value.as_str())
-    }
-
-    pub fn source_expressions(&self) -> Option<&BTreeMap<GenerationTarget, FieldExpression>> {
-        match self {
-            Self::Source { expressions } => Some(expressions),
-            Self::ByTarget { sources, .. } if !sources.is_empty() => Some(sources),
+        match self.origin_for(target) {
+            FieldOrigin::Source(expression) => Some(expression.value.as_str()),
             _ => None,
         }
+    }
+
+    pub fn source_expressions(&self) -> BTreeMap<GenerationTarget, &FieldExpression> {
+        self.origin
+            .iter()
+            .filter_map(|(&target, origin)| match origin {
+                FieldOrigin::Source(expression) => Some((target, expression)),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn is_sourced(&self) -> bool {
-        self.source_expressions().is_some()
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Source(_)))
     }
 
     pub fn api_omitted_for(&self, target: GenerationTarget) -> bool {
-        match self {
-            Self::ApiOmitted => true,
-            Self::ByTarget { api_omitted, .. } => api_omitted.contains(&target),
-            _ => false,
-        }
+        matches!(self.origin_for(target), FieldOrigin::Omitted)
+    }
+
+    pub fn has_api_omission(&self) -> bool {
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Omitted))
     }
 
     pub fn default_for(&self, target: GenerationTarget) -> Option<&str> {
-        match self {
-            Self::Default { expressions } => {
-                expressions.get(&target).map(|expr| expr.value.as_str())
-            }
+        match self.origin_for(target) {
+            FieldOrigin::Default(expression) => Some(expression.value.as_str()),
             _ => None,
         }
     }
 
+    pub fn has_default(&self) -> bool {
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Default(_)))
+    }
+
     pub fn can_initialize(&self) -> bool {
-        matches!(self, Self::Default { .. }) || self.is_sourced()
+        self.has_default() || self.is_sourced()
+    }
+}
+
+#[cfg(test)]
+mod field_policy_tests {
+    use super::*;
+
+    #[test]
+    fn missing_targets_are_parameters_without_materializing_entries() {
+        let policy = FieldPolicy::default();
+        for target in [GenerationTarget::Workflow, GenerationTarget::Client] {
+            assert_eq!(policy.origin_for(target), &FieldOrigin::Parameter);
+            assert_eq!(policy.source_for(target), None);
+            assert_eq!(policy.default_for(target), None);
+            assert!(!policy.api_omitted_for(target));
+        }
+        assert!(policy.origin.is_empty());
+        assert!(!policy.is_omitted());
+        assert!(!policy.can_initialize());
+    }
+
+    #[test]
+    fn model_omission_is_independent_of_api_omission() {
+        let policy = FieldPolicy {
+            omitted: true,
+            ..Default::default()
+        };
+        assert!(policy.is_omitted());
+        assert!(!policy.api_omitted_for(GenerationTarget::Workflow));
+
+        let policy = FieldPolicy {
+            origin: BTreeMap::from([(GenerationTarget::Workflow, FieldOrigin::Omitted)]),
+            ..Default::default()
+        };
+        assert!(!policy.is_omitted());
+        assert!(policy.api_omitted_for(GenerationTarget::Workflow));
+        assert_eq!(
+            policy.origin_for(GenerationTarget::Client),
+            &FieldOrigin::Parameter
+        );
+        assert!(!policy.can_initialize());
+    }
+
+    #[test]
+    fn expression_accessors_select_only_the_requested_origin() {
+        let source = FieldExpression {
+            value: "workflow_source()".to_string(),
+            import: None,
+        };
+        let default = FieldExpression {
+            value: "client_default".to_string(),
+            import: Some("client_defaults".to_string()),
+        };
+        let policy = FieldPolicy {
+            origin: BTreeMap::from([
+                (
+                    GenerationTarget::Workflow,
+                    FieldOrigin::Source(source.clone()),
+                ),
+                (
+                    GenerationTarget::Client,
+                    FieldOrigin::Default(default.clone()),
+                ),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            policy.source_for(GenerationTarget::Workflow),
+            Some(source.value.as_str())
+        );
+        assert_eq!(policy.source_for(GenerationTarget::Client), None);
+        assert_eq!(
+            policy.default_for(GenerationTarget::Client),
+            Some(default.value.as_str())
+        );
+        assert_eq!(policy.default_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            policy.origin_for(GenerationTarget::Client),
+            &FieldOrigin::Default(default)
+        );
+        assert_eq!(
+            policy.source_expressions(),
+            BTreeMap::from([(GenerationTarget::Workflow, &source)])
+        );
+        assert!(policy.is_sourced());
+        assert!(policy.has_default());
+        assert!(policy.can_initialize());
     }
 }
 
@@ -1031,11 +1135,15 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn public_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
-            .filter(|(_, field)| matches!(field.origin, None | Some(FieldOrigin::Default { .. })))
+            .filter(|(_, field)| {
+                !field.origin.as_ref().is_some_and(|policy| {
+                    policy.is_omitted() || policy.is_sourced() || policy.has_api_omission()
+                })
+            })
             .map(|(name, field)| (name.as_str(), field))
     }
 
@@ -1046,12 +1154,12 @@ impl<F: TypeFamily> RecordSpec<F> {
         target: GenerationTarget,
     ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
             .filter(move |(_, field)| {
-                !matches!(field.origin, Some(FieldOrigin::Omitted))
+                !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
                     && !field.api_omitted_for(target)
                     && field.source_for(target).is_none()
             })
@@ -1063,28 +1171,28 @@ impl<F: TypeFamily> RecordSpec<F> {
         target: GenerationTarget,
     ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        self.sourced_fields()
-            .filter_map(move |(name, field, expressions)| {
-                expressions
-                    .get(&target)
-                    .map(|source| (name, field, source.value.as_str()))
-            })
+        self.fields.iter().filter_map(move |(name, field)| {
+            field
+                .source_for(target)
+                .map(|source| (name.as_str(), field, source))
+        })
     }
 
     /// Fields represented by the generated model, including fields hidden from
     /// operation convenience APIs and excluding sourced fields.
     pub fn model_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
-            .filter(|(_, field)| match &field.origin {
-                None | Some(FieldOrigin::Default { .. } | FieldOrigin::ApiOmitted) => true,
-                Some(origin @ FieldOrigin::ByTarget { .. }) => !origin.is_sourced(),
-                Some(FieldOrigin::Omitted | FieldOrigin::Source { .. }) => false,
+            .filter(|(_, field)| {
+                !field
+                    .origin
+                    .as_ref()
+                    .is_some_and(|policy| policy.is_omitted() || policy.is_sourced())
             })
             .map(|(name, field)| (name.as_str(), field))
     }
@@ -1095,17 +1203,18 @@ impl<F: TypeFamily> RecordSpec<F> {
         Item = (
             &str,
             &RecordFieldSpec<F>,
-            &BTreeMap<GenerationTarget, FieldExpression>,
+            BTreeMap<GenerationTarget, &FieldExpression>,
         ),
     >
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields.iter().filter_map(|(name, field)| {
             field
                 .origin
                 .as_ref()
-                .and_then(FieldOrigin::source_expressions)
+                .filter(|policy| policy.is_sourced())
+                .map(FieldPolicy::source_expressions)
                 .map(|expressions| (name.as_str(), field, expressions))
         })
     }
@@ -1121,7 +1230,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn is_empty_model(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.doc.is_empty()
             && self
@@ -1164,11 +1273,11 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn field_omitted(&self, field_name: &str) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .get(field_name)
-            .is_some_and(|field| field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .is_some_and(|field| field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     }
 
     pub fn function(&self, field_name: &str) -> Option<&FunctionFieldSpec<F>> {
@@ -1223,14 +1332,14 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
     /// Defaults make operation arguments omittable, not model or wire fields.
     pub fn api_required(&self, target: GenerationTarget) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.required && self.default_for(target).is_none() && self.source_for(target).is_none()
     }
 
     pub fn default_for(&self, target: GenerationTarget) -> Option<&str>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.origin
             .as_ref()
@@ -1239,14 +1348,14 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
 
     pub fn has_default(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        matches!(self.origin, Some(FieldOrigin::Default { .. }))
+        self.origin.as_ref().is_some_and(FieldPolicy::has_default)
     }
 
     pub fn source_for(&self, target: GenerationTarget) -> Option<&str>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.origin
             .as_ref()
@@ -1255,14 +1364,14 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
 
     pub fn has_source(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        self.origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+        self.origin.as_ref().is_some_and(FieldPolicy::is_sourced)
     }
 
     pub fn api_omitted_for(&self, target: GenerationTarget) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.origin
             .as_ref()
@@ -1296,7 +1405,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
 
     fn is_empty_model_field(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.name.is_empty()
             && self.doc.is_none()
@@ -1922,7 +2031,7 @@ where
 
 impl<F> ApiSpec<F>
 where
-    F: TypeFamily<Origin = Option<FieldOrigin>>,
+    F: TypeFamily<Origin = Option<FieldPolicy>>,
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
@@ -1966,7 +2075,7 @@ where
         }
         if let Some(record) = self.record(record_name) {
             for field in record.fields.values() {
-                if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted)
+                if field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
                     || field
                         .annotation
                         .as_ref()
@@ -2078,7 +2187,7 @@ where
 
 impl<F> ApiSpec<F>
 where
-    F: TypeFamily<Origin = Option<FieldOrigin>>,
+    F: TypeFamily<Origin = Option<FieldPolicy>>,
     F::Proto: AsRef<str>,
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,

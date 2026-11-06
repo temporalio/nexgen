@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::error::{Error, Result};
 use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
-    ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FieldOrigin, FunctionArgsSpec,
+    ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FieldPolicy, FunctionArgsSpec,
     FunctionResultSpec, OperationSpec, RecordFieldSpec, RecordSpec, SelectedFamily, TypeSpec,
 };
 
@@ -233,7 +233,7 @@ fn validate_flattened_field_names(
             .collect::<String>()
     };
     let omitted = |field: &RecordFieldSpec<SelectedFamily>| {
-        matches!(field.origin, Some(FieldOrigin::Omitted))
+        field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
     };
     let parameters = record
         .fields

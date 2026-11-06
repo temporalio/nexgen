@@ -50,7 +50,7 @@ pub(super) fn context_propagation_header(
             "header field is not present in the request",
         )
     })?;
-    if !matches!(field.origin, Some(crate::spec::FieldOrigin::ApiOmitted)) {
+    if !field.api_omitted_for(GenerationTarget::Workflow) {
         return Err(context_propagation_error(
             &operation.name,
             "header field must use @nexus.api-omit so context propagation owns its value",

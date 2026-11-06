@@ -197,7 +197,6 @@ async def read_records(
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
-    last: int | None = None,
     max_bytes: int | None = None,
     body_type: type[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]: ...
@@ -212,7 +211,6 @@ async def read_records(
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
-    last: int | None = None,
     max_bytes: int | None = None,
     body_type: None = None,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[object],]: ...

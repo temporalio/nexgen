@@ -53,7 +53,7 @@ pub(crate) use type_planning::TypePlanningPass;
 pub(crate) struct PlannedFamily;
 
 impl TypeFamily for PlannedFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = PlannedSpecData;
     type Record = PlannedRecordType;
     type Enum = PlannedEnumType;
