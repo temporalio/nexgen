@@ -241,11 +241,36 @@ func (u *StartedWorkflow) Cancel(ctx temporalworkflow.Context, reason string) te
 	if reason != "" {
 		reasonPtr = &reason
 	}
-	return cancelWorkflow(ctx, cancelWorkflowRequest{Namespace: u.Namespace, WorkflowExecution: WorkflowExecution{WorkflowID: u.WorkflowID, RunID: u.RunID}, Reason: reasonPtr})
+	request := cancelWorkflowRequest{Namespace: u.Namespace, WorkflowExecution: WorkflowExecution{WorkflowID: u.WorkflowID, RunID: u.RunID}, Reason: reasonPtr}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var value CancelWorkflowResponse
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
 }
 
 func (u *StartedWorkflow) RestartWorkflow(ctx temporalworkflow.Context, workflow string, taskQueue string) temporalworkflow.Future {
-	return restartWorkflow(ctx, startWorkflowRequest{Namespace: u.Namespace, WorkflowID: u.WorkflowID, Workflow: workflow, TaskQueue: taskQueue})
+	request := startWorkflowRequest{Namespace: u.Namespace, WorkflowID: u.WorkflowID, Workflow: workflow, TaskQueue: taskQueue}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var result workflowservice.StartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
+		resultSettable.Set(value, nil)
+	})
+	return result
 }
 
 func (u *StartedWorkflow) GetResult(ctx temporalworkflow.Context) temporalworkflow.Future {
@@ -268,71 +293,6 @@ func NewSignalResult(namespace string, started bool) SignalResult {
 		Namespace: namespace,
 		Started:   startedPtr,
 	}
-}
-
-// --- Operations (internal) ---
-
-func startWorkflow(ctx temporalworkflow.Context, request startWorkflowRequest) temporalworkflow.Future {
-	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
-	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, temporalworkflow.NexusOperationOptions{})
-	result, resultSettable := temporalworkflow.NewFuture(ctx)
-	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
-		var result workflowservice.StartWorkflowExecutionResponse
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func restartWorkflow(ctx temporalworkflow.Context, request startWorkflowRequest) temporalworkflow.Future {
-	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
-	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, temporalworkflow.NexusOperationOptions{})
-	result, resultSettable := temporalworkflow.NewFuture(ctx)
-	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
-		var result workflowservice.StartWorkflowExecutionResponse
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func cancelWorkflow(ctx temporalworkflow.Context, request cancelWorkflowRequest) temporalworkflow.Future {
-	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
-	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, temporalworkflow.NexusOperationOptions{})
-	result, resultSettable := temporalworkflow.NewFuture(ctx)
-	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
-		var value CancelWorkflowResponse
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func signalWithStart(ctx temporalworkflow.Context, request cancelWorkflowRequest) temporalworkflow.Future {
-	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
-	fut := c.ExecuteOperation(ctx, "SignalWithStart", request, temporalworkflow.NexusOperationOptions{})
-	result, resultSettable := temporalworkflow.NewFuture(ctx)
-	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
-		var result workflowservice.SignalWithStartWorkflowExecutionResponse
-		if err := fut.Get(ctx, &result); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		value := NewSignalResult(request.Namespace, result.GetStarted())
-		resultSettable.Set(value, nil)
-	})
-	return result
 }
 
 // --- Operations (public API) ---
@@ -407,13 +367,26 @@ func StartWorkflow(
 	if opts.WorkflowStartDelay != 0 {
 		workflowStartDelay = &opts.WorkflowStartDelay
 	}
-	return startWorkflow(ctx, startWorkflowRequest{
+	request := startWorkflowRequest{
 		Workflow:           workflow,
 		WorkflowID:         workflowID,
 		TaskQueue:          taskQueue,
 		WorkflowStartDelay: workflowStartDelay,
 		Namespace:          support.WorkflowNamespace(ctx),
+	}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "StartWorkflow", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var result workflowservice.StartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
 type RestartWorkflowOptions struct {
@@ -432,13 +405,26 @@ func RestartWorkflow(
 	if opts.WorkflowStartDelay != 0 {
 		workflowStartDelay = &opts.WorkflowStartDelay
 	}
-	return restartWorkflow(ctx, startWorkflowRequest{
+	request := startWorkflowRequest{
 		Workflow:           workflow,
 		WorkflowID:         workflowID,
 		TaskQueue:          taskQueue,
 		WorkflowStartDelay: workflowStartDelay,
 		Namespace:          support.WorkflowNamespace(ctx),
+	}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "RestartWorkflow", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var result workflowservice.StartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value := NewStartedWorkflow(request.Namespace, request.WorkflowID, result.GetRunId())
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
 type CancelWorkflowOptions struct {
@@ -451,11 +437,23 @@ func CancelWorkflow(ctx temporalworkflow.Context, opts CancelWorkflowOptions, wo
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
-	return cancelWorkflow(ctx, cancelWorkflowRequest{
+	request := cancelWorkflowRequest{
 		WorkflowExecution: workflowExecution,
 		Reason:            reason,
 		Namespace:         support.WorkflowNamespace(ctx),
+	}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "CancelWorkflow", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var value CancelWorkflowResponse
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
 type SignalWithStartOptions struct {
@@ -468,9 +466,22 @@ func SignalWithStart(ctx temporalworkflow.Context, opts SignalWithStartOptions, 
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
-	return signalWithStart(ctx, cancelWorkflowRequest{
+	request := cancelWorkflowRequest{
 		WorkflowExecution: workflowExecution,
 		Reason:            reason,
 		Namespace:         support.WorkflowNamespace(ctx),
+	}
+	c := temporalworkflow.NewNexusClient("temporal-system", "StartWorkflowService")
+	fut := c.ExecuteOperation(ctx, "SignalWithStart", request, temporalworkflow.NexusOperationOptions{})
+	result, resultSettable := temporalworkflow.NewFuture(ctx)
+	temporalworkflow.Go(ctx, func(ctx temporalworkflow.Context) {
+		var result workflowservice.SignalWithStartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value := NewSignalResult(request.Namespace, result.GetStarted())
+		resultSettable.Set(value, nil)
 	})
+	return result
 }

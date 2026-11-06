@@ -173,37 +173,57 @@ package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 `@nexus.namespace go="go.temporal.io/sdk/internal"`.
 
 Workflow System Nexus generation emits an operation-specific outbound interface,
-forwarding methods, terminal methods, and a dispatcher. Standalone packages
-expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and `Terminal`
-types, and `SystemNexus_WorkflowOutboundRuntime` in a `Test-only adapters`
-section. The terminal embeds the runtime interface, whose
-`ExecuteNexusOperation` method supplies scheduling directly without a forwarding
-adapter. The host implements the runtime contract for failed futures and
-scheduling. Call the terminal's `SystemNexus_ExecuteOperation` with the head of
-the typed interceptor chain and a `SystemNexus_ExecuteOperationInput` containing
-the service, resolved operation name, and unencoded request. The host resolves
-operation references before dispatch. Terminal scheduling must not re-enter that
-chain.
+forwarding implementations, and terminal implementations. Public functions apply
+authored defaults and resolve function references before calling the SDK's typed
+interceptor chain or, in standalone packages, the generated terminal directly.
+Interceptor methods receive the public options and positional arguments, with
+resolved function names in place of function references, and return a workflow
+`Future`. The terminal constructs the request from the intercepted arguments,
+evaluates sourced fields, schedules the Nexus operation, and adapts the result.
+It does not reapply defaults or re-enter the typed interceptor chain. No
+service-name dispatcher is needed.
 
-For generation into `go.temporal.io/sdk/internal`, nexgen attaches forwarding
-methods directly to `WorkflowOutboundInterceptorBase` and terminal methods to
-`workflowEnvironmentInterceptor`, using the SDK's shared runtime helpers. The
-SDK embeds the generated interface once; its existing `Next` field remains the
-only forwarding state. Both package layouts use the same operation renderer. The
-existing Go `workflow-service` sample exercises dispatch, forwarding, and
-terminal scheduling through the standalone runtime contract.
+Ordinary Go public functions construct requests and inline execution and result
+adaptation. Neither mode generates private operation helpers.
 
-Interceptor methods accept a pointer to the unencoded request, without Nexus
-operation options or transport headers. The terminal uses default Nexus
-settings. Requests and their nested models become public types; the facade
-exposes their aliases. Interceptors may modify requests synchronously before
-forwarding but must not retain them. Request header maps may be nil, and
-interceptors may allocate or replace them. Go SDK header bindings use
-`map[string]*commonpb.Payload`, with pass-through converters. Interceptors own
-context propagation through the request headers; generated code does not bind
-them to the workflow context or invoke configured context propagators. SDK
-interceptor generation requires concrete request types because Go methods cannot
-declare type parameters.
+Go resource methods construct requests from their bound resource fields and
+method arguments, then inline the same execution and result adaptation. They
+preserve resource-owned values even when the corresponding public function
+sources those fields from the workflow context. Resource methods use the
+low-level Nexus client path, including generic Nexus interceptors, rather than
+the free function's typed interceptor hook in System Nexus mode. The existing
+`start-workflow`, `user-service`, and `defaults` samples exercise resource
+execution, resource results, namespace precedence, defaults, optional values,
+and failures.
+
+For generation into `go.temporal.io/sdk/internal`, nexgen emits methods directly
+on `WorkflowOutboundInterceptorBase` and `workflowEnvironmentInterceptor`. The
+base method forwards to `Next`; the terminal method constructs the request,
+calls `wc.ExecuteNexusOperation` directly, and adapts the result. There are no
+extra adapter functions or handwritten methods. The SDK embeds the generated
+interface once; its existing `Next` field remains the only forwarding state.
+
+Standalone packages emit free functions named
+`SystemNexus_WorkflowOutboundInterceptorBase_<Operation>` and
+`SystemNexus_WorkflowEnvironmentInterceptor_<Operation>`, together with the
+private interceptor interface. The forwarding function takes the next typed
+interceptor explicitly; the terminal function takes an `ExecuteNexusOperation`
+function explicitly. They use the same request and result renderers as the SDK
+methods, without generated test-only base, terminal, or runtime types.
+
+Standalone public functions call the generated terminal with an inline callback
+that delegates execution to the input's Nexus client. No execution helper is
+required in the support package. Tests can instead supply the next interceptor
+or execution function directly. There is no context installer or scheduling
+fallback, and facades do not re-export interceptor helpers. The Go
+`workflow-service` and `multi-operation-service` samples exercise typed calls,
+forwarding, short-circuiting, and terminal scheduling. SDK tests cover
+public-function entry into the SDK's interceptor chain.
+
+The terminal uses default Nexus settings. Generated code does not initialize
+workflow headers or invoke configured context propagators. SDK interceptor
+generation requires concrete types because Go methods cannot declare type
+parameters.
 
 Go System Nexus operation requests use default-punning for optional scalar-like
 fields, matching the options surface: zero durations and numbers, false, empty
@@ -211,8 +231,8 @@ strings, and zero enum or flag values represent omission. Encoding omits those
 values, and decoding maps absent fields to their zero value. Requests cannot
 distinguish an explicitly supplied zero from an omitted field. Optional structs
 and nested record fields retain their existing presence-bearing representation.
-Authored defaults still apply only in operation wrappers, not in interceptors or
-encoding/decoding.
+Authored defaults apply when preparing public function calls or resource-method
+requests, not in interceptors or encoding/decoding.
 
 ### Python
 

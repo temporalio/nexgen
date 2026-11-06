@@ -16,16 +16,6 @@ type UserMetadata = workflowservice.SystemNexus_UserMetadata
 // Result of signaling a workflow and starting it if needed.
 type SignalWithStartWorkflowResponse = workflowservice.SystemNexus_SignalWithStartWorkflowResponse
 
-type WorkflowOutboundInterceptor = workflowservice.SystemNexus_WorkflowOutboundInterceptor
-
-type WorkflowOutboundInterceptorBase = workflowservice.SystemNexus_WorkflowOutboundInterceptorBase
-
-type WorkflowOutboundInterceptorTerminal = workflowservice.SystemNexus_WorkflowOutboundInterceptorTerminal
-
-type WorkflowOutboundRuntime = workflowservice.SystemNexus_WorkflowOutboundRuntime
-
-type ExecuteOperationInput = workflowservice.SystemNexus_ExecuteOperationInput
-
 type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
 // Signal a workflow, starting it first if needed. Encode payloads with the configured

@@ -1,11 +1,11 @@
 package tests
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	common "go.temporal.io/api/common/v1"
 	enums "go.temporal.io/api/enums/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
@@ -14,71 +14,106 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	implementation "go.temporal.io/sdk/advanced/samples/go/workflowservice"
 	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 )
 
-func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
-	header, err := converter.GetDefaultDataConverter().ToPayload("intercepted-header")
-	s.Require().NoError(err)
-	capture := &captureNexusInputInterceptor{
-		onTyped: func(ctx workflow.Context, request *ws.SignalWithStartWorkflowRequest) {
-			s.Equal("singleArgWorkflow", request.Workflow)
-			s.Equal([]any{"workflow-input"}, request.Args)
-			s.Equal([]any{"signal-value"}, request.SignalArgs)
-			s.Nil(request.Headers)
-			s.Equal(5*time.Second, request.WorkflowTaskTimeout)
-			s.Equal(time.Hour, request.StartDelay)
-			request.ID = s.targetID("intercepted")
-			request.SignalArgs = []any{"intercepted-signal"}
-			request.Headers = map[string]*common.Payload{"trace": header}
-			request.WorkflowTaskTimeout = 10 * time.Second
-			request.StartDelay = 0
-		},
-	}
-	s.interceptors = []interceptor.WorkerInterceptor{capture}
-	var result string
-	s.runWorkflow(func(ctx workflow.Context) (string, error) {
-		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{
-				WorkflowTaskTimeout: 5 * time.Second, StartDelay: time.Hour,
-			},
-			s.targetID("original"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
-		).Get(ctx, nil)
-		return "caller-result", err
-	}, &result)
-	s.Equal("caller-result", result)
-	var targetResult string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("intercepted"), "").Get(s.ctx, &targetResult))
-	s.Equal("single:workflow-input:intercepted-signal", targetResult)
+type workflowServiceOutbound func(workflow.Context, ws.SignalWithStartWorkflowOptions, string, string, any, string, ...any) workflow.Future
 
-	capture.mu.Lock()
-	calls := append([]interceptor.ExecuteNexusOperationInput(nil), capture.calls...)
-	dispatchCalls, typedCalls := capture.dispatchCalls, capture.typedCalls
-	capture.mu.Unlock()
-	s.Equal(1, dispatchCalls)
-	s.Equal(1, typedCalls)
-	s.Require().Len(calls, 1)
-	s.Equal("temporal.api.workflowservice.v1.WorkflowService", calls[0].Client.Service())
-	s.Equal("SignalWithStartWorkflowExecution", calls[0].Operation)
-	s.Equal(workflow.NexusOperationOptions{}, calls[0].Options)
-	s.Empty(calls[0].NexusHeader)
+func (i workflowServiceOutbound) SignalWithStartWorkflow(
+	ctx workflow.Context,
+	opts ws.SignalWithStartWorkflowOptions,
+	id string,
+	signal string,
+	signalArg any,
+	workflowType string,
+	args ...any,
+) workflow.Future {
+	return i(ctx, opts, id, signal, signalArg, workflowType, args...)
+}
+
+type recordingWorkflowServiceRuntime struct {
+	inputs []interceptor.ExecuteNexusOperationInput
+	future workflow.NexusOperationFuture
+}
+
+func (r *recordingWorkflowServiceRuntime) ExecuteNexusOperation(_ workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
+	r.inputs = append(r.inputs, input)
+	return r.future
+}
+
+func TestWorkflowServiceTypedInterceptors(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	runtime := &recordingWorkflowServiceRuntime{}
+	terminal := workflowServiceOutbound(func(ctx workflow.Context, opts ws.SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflowType string, args ...any) workflow.Future {
+		return implementation.SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow(runtime.ExecuteNexusOperation, ctx, opts, id, signal, signalArg, workflowType, args...)
+	})
+	calls := 0
+	outbound := workflowServiceOutbound(func(ctx workflow.Context, opts ws.SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflowType string, args ...any) workflow.Future {
+		calls++
+		require.Equal(t, "original", id)
+		require.Equal(t, "singleArgWorkflow", workflowType)
+		require.Equal(t, []any{"workflow-input"}, args)
+		require.Equal(t, "wake-up", signal)
+		require.Equal(t, "signal-value", signalArg)
+		require.Equal(t, "target-queue", opts.TaskQueue)
+		require.Equal(t, enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, opts.WorkflowIDReusePolicy)
+		require.Equal(t, 5*time.Second, opts.WorkflowTaskTimeout)
+		require.Equal(t, time.Hour, opts.StartDelay)
+		require.Empty(t, runtime.inputs, "the terminal must not schedule the request before interception")
+		opts.WorkflowTaskTimeout = 10 * time.Second
+		opts.StartDelay = 0
+		opts.StaticSummary = "from interceptor"
+		return implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(terminal, ctx, opts, "intercepted", signal, "intercepted-signal", workflowType, args...)
+	})
+	runID := "target-run"
+	var response ws.SignalWithStartWorkflowResponse
+	env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		future, settable := workflow.NewFuture(ctx)
+		settable.Set(ws.SignalWithStartWorkflowResponse{RunID: &runID}, nil)
+		runtime.future = &sampleNexusFuture{Future: future}
+		return implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(outbound, ctx,
+			ws.SignalWithStartWorkflowOptions{
+				TaskQueue:             "target-queue",
+				WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+				WorkflowTaskTimeout:   5 * time.Second,
+				StartDelay:            time.Hour,
+			},
+			"original", "wake-up", "signal-value", "singleArgWorkflow", "workflow-input",
+		).Get(ctx, &response)
+	})
+	require.NoError(t, env.GetWorkflowError())
+	require.Equal(t, &runID, response.RunID)
+	require.Equal(t, 1, calls)
+	require.Len(t, runtime.inputs, 1)
+	input := runtime.inputs[0]
+	require.Equal(t, "temporal.api.workflowservice.v1.WorkflowService", input.Client.Service())
+	require.Equal(t, "SignalWithStartWorkflowExecution", input.Operation)
+	require.Equal(t, workflow.NexusOperationOptions{}, input.Options)
+	require.Empty(t, input.NexusHeader)
+	request := input.Input.(implementation.SystemNexus_SignalWithStartWorkflowRequest)
+	require.Equal(t, "intercepted", request.ID)
+	require.Equal(t, []any{"intercepted-signal"}, request.SignalArgs)
 
 	dc := commonconverter.WithDataConverterSystemNexusContext(
 		commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
 		converter.GetDefaultDataConverter(),
 	)
-	payload, err := dc.ToPayload(calls[0].Input)
-	s.Require().NoError(err)
+	payload, err := dc.ToPayload(input.Input)
+	require.NoError(t, err)
 	var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
-	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &wire))
-	s.Equal(s.targetID("intercepted"), wire.WorkflowId)
-	s.Equal(10*time.Second, wire.WorkflowTaskTimeout.AsDuration())
-	s.Nil(wire.WorkflowStartDelay)
-	s.Require().NotNil(wire.Header)
-	s.True(proto.Equal(header, wire.Header.Fields["trace"]), "workflow header changed during payload conversion")
+	require.NoError(t, converter.GetDefaultDataConverter().FromPayload(payload, &wire))
+	require.Equal(t, "intercepted", wire.WorkflowId)
+	require.Equal(t, 10*time.Second, wire.WorkflowTaskTimeout.AsDuration())
+	require.Nil(t, wire.WorkflowStartDelay)
+	require.Nil(t, wire.Header)
+	require.NotNil(t, wire.UserMetadata)
+	var summary string
+	require.NoError(t, converter.GetDefaultDataConverter().FromPayload(wire.UserMetadata.Summary, &summary))
+	require.Equal(t, "from interceptor", summary)
 }
 
 func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
@@ -176,80 +211,70 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 	})
 }
 
-type recordingWorkflowServiceRuntime struct {
-	workflowServiceRuntime
-	input  interceptor.ExecuteNexusOperationInput
-	future workflow.NexusOperationFuture
-}
-
-func (r *recordingWorkflowServiceRuntime) ExecuteNexusOperation(_ workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
-	r.input = input
-	return r.future
-}
-
-func TestWorkflowServiceInterceptorForwarding(t *testing.T) {
-	future := &failedWorkflowServiceFuture{}
-	runtime := &recordingWorkflowServiceRuntime{future: future}
-	terminal := &ws.WorkflowOutboundInterceptorTerminal{SystemNexus_WorkflowOutboundRuntime: runtime}
-	base := &ws.WorkflowOutboundInterceptorBase{Next: terminal}
-	request := &ws.SignalWithStartWorkflowRequest{
-		ID: "target", Args: []any{"unencoded"}, SignalArgs: []any{42},
-	}
-	require.Same(t, future, base.SignalWithStartWorkflow(nil, request))
-	require.Equal(t, "temporal.api.workflowservice.v1.WorkflowService", runtime.input.Client.Service())
-	require.Equal(t, "SignalWithStartWorkflowExecution", runtime.input.Operation)
-	require.Equal(t, *request, runtime.input.Input)
-	require.Equal(t, workflow.NexusOperationOptions{}, runtime.input.Options)
-	require.NotNil(t, runtime.input.NexusHeader)
-	require.Empty(t, runtime.input.NexusHeader)
-}
-
-func TestWorkflowServiceInterceptorDispatchErrors(t *testing.T) {
+func TestWorkflowServiceInterceptorShortCircuit(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		service   string
-		operation string
-		input     any
-		want      string
+		name    string
+		options ws.SignalWithStartWorkflowOptions
+		fail    bool
 	}{
 		{
-			name: "unknown service", service: "unknown", operation: "SignalWithStartWorkflowExecution",
-			want: "unsupported system Nexus operation unknown/SignalWithStartWorkflowExecution",
+			name: "zero options",
 		},
 		{
-			name: "unknown operation", service: "temporal.api.workflowservice.v1.WorkflowService", operation: "unknown",
-			want: "unsupported system Nexus operation temporal.api.workflowservice.v1.WorkflowService/unknown",
+			name: "explicit options",
+			options: ws.SignalWithStartWorkflowOptions{
+				TaskQueue:             "target-queue",
+				WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE,
+			},
 		},
 		{
-			name: "wrong request", service: "temporal.api.workflowservice.v1.WorkflowService", operation: "SignalWithStartWorkflowExecution",
-			input: "not a request", want: "expects SystemNexus_SignalWithStartWorkflowRequest, got string",
+			name: "error",
+			fail: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var suite testsuite.WorkflowTestSuite
 			env := suite.NewTestWorkflowEnvironment()
-			env.ExecuteWorkflow(func(ctx workflow.Context) ([]string, error) {
-				terminal := &ws.WorkflowOutboundInterceptorTerminal{
-					SystemNexus_WorkflowOutboundRuntime: &workflowServiceRuntime{},
+			calls := 0
+			var interceptedFuture workflow.Future
+			outbound := workflowServiceOutbound(func(ctx workflow.Context, opts ws.SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflowType string, args ...any) workflow.Future {
+				calls++
+				require.Equal(t, tc.options, opts)
+				require.Equal(t, "original", id)
+				require.Equal(t, "wake-up", signal)
+				require.Equal(t, "signal", signalArg)
+				require.Equal(t, "registered-target", workflowType)
+				require.Equal(t, []any{"input", 42}, args)
+				future, settable := workflow.NewFuture(ctx)
+				if tc.fail {
+					settable.SetError(errors.New("interceptor rejected the call"))
+				} else {
+					runID := "intercepted-run"
+					settable.Set(ws.SignalWithStartWorkflowResponse{RunID: &runID}, nil)
 				}
-				future := terminal.SystemNexus_ExecuteOperation(ctx, nil, ws.ExecuteOperationInput{
-					Service:   tc.service,
-					Operation: tc.operation, Input: tc.input,
-				})
-				resultErr := future.Get(ctx, nil)
-				executionErr := future.GetNexusOperationExecution().Get(ctx, nil)
-				if resultErr == nil || executionErr == nil {
-					return nil, nil
-				}
-				return []string{resultErr.Error(), executionErr.Error()}, nil
+				interceptedFuture = future
+				return future
 			})
-			require.NoError(t, env.GetWorkflowError())
-			var errors []string
-			require.NoError(t, env.GetWorkflowResult(&errors))
-			require.Len(t, errors, 2)
-			for _, err := range errors {
-				require.Contains(t, err, tc.want)
+			env.ExecuteWorkflow(func(ctx workflow.Context) (string, error) {
+				var response ws.SignalWithStartWorkflowResponse
+				future := implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(outbound, ctx, tc.options, "original", "wake-up", "signal", "registered-target", "input", 42)
+				require.Same(t, interceptedFuture, future)
+				err := future.Get(ctx, &response)
+				if err != nil {
+					return "", err
+				}
+				require.NotNil(t, response.RunID)
+				return *response.RunID, nil
+			})
+			require.Equal(t, 1, calls)
+			if tc.fail {
+				require.ErrorContains(t, env.GetWorkflowError(), "interceptor rejected the call")
+				return
 			}
+			require.NoError(t, env.GetWorkflowError())
+			var runID string
+			require.NoError(t, env.GetWorkflowResult(&runID))
+			require.Equal(t, "intercepted-run", runID)
 		})
 	}
 }

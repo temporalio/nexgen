@@ -17,23 +17,6 @@ import (
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
 )
 
-// --- Operations (internal) ---
-
-func systemnexus_signalWithStartWorkflow(ctx internal.Context, request SystemNexus_SignalWithStartWorkflowRequest) internal.Future {
-	c := internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService")
-	fut := c.ExecuteOperation(ctx, "SignalWithStartWorkflowExecution", request, internal.NexusOperationOptions{})
-	result, resultSettable := internal.NewFuture(ctx)
-	internal.Go(ctx, func(ctx internal.Context) {
-		var value SystemNexus_SignalWithStartWorkflowResponse
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
 // --- Operations (public API) ---
 
 type SystemNexus_SignalWithStartWorkflowRequest struct {
@@ -693,56 +676,16 @@ func SystemNexus_SignalWithStartWorkflow(
 	workflow any,
 	args ...any,
 ) internal.Future {
-	var taskQueue string
-	if opts.TaskQueue != "" {
-		taskQueue = opts.TaskQueue
-	} else {
-		taskQueue = internal.GetWorkflowInfo(ctx).TaskQueueName
+	if opts.TaskQueue == "" {
+		opts.TaskQueue = internal.GetWorkflowInfo(ctx).TaskQueueName
 	}
-	var workflowIDReusePolicy enums.WorkflowIdReusePolicy
-	if opts.WorkflowIDReusePolicy != 0 {
-		workflowIDReusePolicy = opts.WorkflowIDReusePolicy
-	} else {
-		workflowIDReusePolicy = enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-	}
-	var userMetadataValue *SystemNexus_UserMetadata
-	if opts.StaticSummary != "" || opts.StaticDetails != "" {
-		var staticSummary *string
-		if opts.StaticSummary != "" {
-			staticSummary = &opts.StaticSummary
-		}
-		var staticDetails *string
-		if opts.StaticDetails != "" {
-			staticDetails = &opts.StaticDetails
-		}
-		userMetadataValue = &SystemNexus_UserMetadata{
-			StaticSummary: staticSummary,
-			StaticDetails: staticDetails,
-		}
+	if opts.WorkflowIDReusePolicy == 0 {
+		opts.WorkflowIDReusePolicy = enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
 	}
 	workflowName := support.WorkflowFunctionName(ctx, workflow)
-	return systemnexus_signalWithStartWorkflow(ctx, SystemNexus_SignalWithStartWorkflowRequest{
-		Workflow:                 workflowName,
-		Args:                     args,
-		ID:                       id,
-		TaskQueue:                taskQueue,
-		Signal:                   signal,
-		SignalArgs:               []any{signalArg},
-		WorkflowExecutionTimeout: opts.WorkflowExecutionTimeout,
-		WorkflowRunTimeout:       opts.WorkflowRunTimeout,
-		WorkflowTaskTimeout:      opts.WorkflowTaskTimeout,
-		WorkflowIDReusePolicy:    workflowIDReusePolicy,
-		WorkflowIDConflictPolicy: opts.WorkflowIDConflictPolicy,
-		RetryPolicy:              opts.RetryPolicy,
-		CronSchedule:             opts.CronSchedule,
-		Memo:                     opts.Memo,
-		TypedSearchAttributes:    opts.TypedSearchAttributes,
-		Priority:                 opts.Priority,
-		VersioningOverride:       opts.VersioningOverride,
-		StartDelay:               opts.StartDelay,
-		UserMetadata:             userMetadataValue,
-		Namespace:                support.WorkflowNamespace(ctx),
-	})
+	return SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow(func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
+		return input.Client.ExecuteOperation(ctx, input.Operation, input.Input, input.Options)
+	}, ctx, opts, id, signal, signalArg, workflowName, args...)
 }
 
 // --- Registry ---
@@ -764,53 +707,69 @@ func init() {
 
 // --- Workflow outbound interceptors ---
 
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SystemNexus_ExecuteOperation(ctx internal.Context, outbound SystemNexus_WorkflowOutboundInterceptor, input SystemNexus_ExecuteOperationInput) internal.NexusOperationFuture {
-	switch {
-	case input.Service == "temporal.api.workflowservice.v1.WorkflowService" && input.Operation == "SignalWithStartWorkflowExecution":
-		request, ok := input.Input.(SystemNexus_SignalWithStartWorkflowRequest)
-		if !ok {
-			return wc.FailedFuture(ctx, fmt.Errorf("system Nexus operation %s/%s expects SystemNexus_SignalWithStartWorkflowRequest, got %T", "temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution", input.Input))
-		}
-		return outbound.SignalWithStartWorkflow(ctx, &request)
-	}
-	return wc.FailedFuture(ctx, fmt.Errorf("unsupported system Nexus operation %s/%s", input.Service, input.Operation))
-}
-
-type SystemNexus_WorkflowOutboundInterceptor interface {
+type systemnexus_workflowOutboundInterceptor interface {
 	// SignalWithStartWorkflow intercepts workflow.SignalWithStartWorkflow.
-	SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture
+	SignalWithStartWorkflow(ctx internal.Context, opts SystemNexus_SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflow string, args ...any) internal.Future
 }
 
-func (w *SystemNexus_WorkflowOutboundInterceptorBase) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
-	return w.Next.SignalWithStartWorkflow(ctx, request)
+// SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow forwards to the next interceptor.
+func SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(next systemnexus_workflowOutboundInterceptor, ctx internal.Context, opts SystemNexus_SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflow string, args ...any) internal.Future {
+	return next.SignalWithStartWorkflow(ctx, opts, id, signal, signalArg, workflow, args...)
 }
 
-func (wc *SystemNexus_WorkflowOutboundInterceptorTerminal) SignalWithStartWorkflow(ctx internal.Context, request *SystemNexus_SignalWithStartWorkflowRequest) internal.NexusOperationFuture {
-	return wc.ExecuteNexusOperation(ctx, internal.ExecuteNexusOperationInput{
+// SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow constructs and schedules the intercepted request.
+func SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow(executeNexusOperation func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture, ctx internal.Context, opts SystemNexus_SignalWithStartWorkflowOptions, id string, signal string, signalArg any, workflow string, args ...any) internal.Future {
+	var userMetadataValue *SystemNexus_UserMetadata
+	if opts.StaticSummary != "" || opts.StaticDetails != "" {
+		var staticSummary *string
+		if opts.StaticSummary != "" {
+			staticSummary = &opts.StaticSummary
+		}
+		var staticDetails *string
+		if opts.StaticDetails != "" {
+			staticDetails = &opts.StaticDetails
+		}
+		userMetadataValue = &SystemNexus_UserMetadata{
+			StaticSummary: staticSummary,
+			StaticDetails: staticDetails,
+		}
+	}
+	request := SystemNexus_SignalWithStartWorkflowRequest{
+		Workflow:                 workflow,
+		Args:                     args,
+		ID:                       id,
+		TaskQueue:                opts.TaskQueue,
+		Signal:                   signal,
+		SignalArgs:               []any{signalArg},
+		WorkflowExecutionTimeout: opts.WorkflowExecutionTimeout,
+		WorkflowRunTimeout:       opts.WorkflowRunTimeout,
+		WorkflowTaskTimeout:      opts.WorkflowTaskTimeout,
+		WorkflowIDReusePolicy:    opts.WorkflowIDReusePolicy,
+		WorkflowIDConflictPolicy: opts.WorkflowIDConflictPolicy,
+		RetryPolicy:              opts.RetryPolicy,
+		CronSchedule:             opts.CronSchedule,
+		Memo:                     opts.Memo,
+		TypedSearchAttributes:    opts.TypedSearchAttributes,
+		Priority:                 opts.Priority,
+		VersioningOverride:       opts.VersioningOverride,
+		StartDelay:               opts.StartDelay,
+		UserMetadata:             userMetadataValue,
+		Namespace:                support.WorkflowNamespace(ctx),
+	}
+	fut := executeNexusOperation(ctx, internal.ExecuteNexusOperationInput{
 		Client:      internal.NewSystemNexusClient("temporal.api.workflowservice.v1.WorkflowService"),
 		Operation:   "SignalWithStartWorkflowExecution",
-		Input:       *request,
+		Input:       request,
 		NexusHeader: nexus.Header{},
 	})
-}
-
-// --- Test-only adapters ---
-
-type SystemNexus_WorkflowOutboundInterceptorBase struct {
-	Next SystemNexus_WorkflowOutboundInterceptor
-}
-
-type SystemNexus_WorkflowOutboundInterceptorTerminal struct {
-	SystemNexus_WorkflowOutboundRuntime
-}
-
-type SystemNexus_ExecuteOperationInput struct {
-	Service   string
-	Operation string
-	Input     any
-}
-
-type SystemNexus_WorkflowOutboundRuntime interface {
-	FailedFuture(ctx internal.Context, err error) internal.NexusOperationFuture
-	ExecuteNexusOperation(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture
+	result, resultSettable := internal.NewFuture(ctx)
+	internal.Go(ctx, func(ctx internal.Context) {
+		var value SystemNexus_SignalWithStartWorkflowResponse
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
+	})
+	return result
 }
