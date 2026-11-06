@@ -135,7 +135,9 @@ Resolves resource-method and resource-return facts from the API spec and
 descriptors. Operations must return resources owned by their service, including
 those held in result records. Return bindings determine shared wire models
 regardless of API targets; resource methods are bound only when an API target is
-selected.
+selected. It rejects integer-width mismatches between resource values and the
+request or result fields they bind to, including constructor fields populated by
+operations that return resources.
 
 ### OperationBindingPass
 

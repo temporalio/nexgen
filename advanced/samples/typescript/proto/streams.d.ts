@@ -1,5 +1,5 @@
 // The protobufjs interfaces and enums of the protos in descriptors/streams/, which no release of
-// `@temporalio/proto` has yet. The generated code only uses them as types.
+// `@temporalio/proto` has yet.
 import type Long from "long";
 
 declare module "@temporalio/proto" {

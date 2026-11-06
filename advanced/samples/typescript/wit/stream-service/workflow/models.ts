@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { google, temporal } from "@temporalio/proto";
-import type Long from "long";
+import Long from "long";
 import * as support from "../../../support/temporal_model_converters";
 
 function requiredField<T>(
@@ -273,8 +273,10 @@ function appendRecordsResponseFromProto(
   proto: temporal.api.streamservice.v1.IAppendRecordsResponse,
 ): AppendRecordsResponse {
   return {
-    firstOffset: proto.firstOffset ?? undefined,
-    lastOffset: proto.lastOffset ?? undefined,
+    firstOffset:
+      proto.firstOffset == null ? undefined : Long.fromValue(proto.firstOffset, false),
+    lastOffset:
+      proto.lastOffset == null ? undefined : Long.fromValue(proto.lastOffset, false),
   };
 }
 
@@ -282,8 +284,10 @@ function appendRecordsResponseToProto(
   model: AppendRecordsResponse,
 ): temporal.api.streamservice.v1.IAppendRecordsResponse {
   return {
-    firstOffset: model.firstOffset,
-    lastOffset: model.lastOffset,
+    firstOffset:
+      model.firstOffset == null ? undefined : Long.fromValue(model.firstOffset, false),
+    lastOffset:
+      model.lastOffset == null ? undefined : Long.fromValue(model.lastOffset, false),
   };
 }
 
@@ -333,7 +337,8 @@ function appendRecordsRequestFromProto<BodyT>(
       "AppendRecordsRequest",
       "records",
     ),
-    sequence: proto.sequence ?? undefined,
+    sequence:
+      proto.sequence == null ? undefined : Long.fromValue(proto.sequence, false),
     producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
     withdrawRun: proto.withdrawRun ?? undefined,
   };
@@ -354,7 +359,8 @@ function appendRecordsRequestToProto<BodyT>(
       "AppendRecordsRequest",
       "records",
     ),
-    sequence: model.sequence,
+    sequence:
+      model.sequence == null ? undefined : Long.fromValue(model.sequence, false),
     producer: model.producer == null ? undefined : producerToProto(model.producer),
     withdrawRun: model.withdrawRun,
   };
@@ -616,7 +622,10 @@ function workflowTaskEpochFromProto(
   proto: temporal.api.stream.v1.IWorkflowTaskEpoch,
 ): WorkflowTaskEpoch {
   return {
-    startedEventId: proto.startedEventId ?? undefined,
+    startedEventId:
+      proto.startedEventId == null
+        ? undefined
+        : Long.fromValue(proto.startedEventId, false),
     attempt: proto.attempt ?? undefined,
     startedTime:
       proto.startedTime == null ? undefined : timestampFromProto(proto.startedTime),
@@ -627,7 +636,10 @@ function workflowTaskEpochToProto(
   model: WorkflowTaskEpoch,
 ): temporal.api.stream.v1.IWorkflowTaskEpoch {
   return {
-    startedEventId: model.startedEventId,
+    startedEventId:
+      model.startedEventId == null
+        ? undefined
+        : Long.fromValue(model.startedEventId, false),
     attempt: model.attempt,
     startedTime:
       model.startedTime == null ? undefined : timestampToProto(model.startedTime),
@@ -652,14 +664,14 @@ export interface Timestamp {
 
 function timestampFromProto(proto: google.protobuf.ITimestamp): Timestamp {
   return {
-    seconds: proto.seconds ?? undefined,
+    seconds: proto.seconds == null ? undefined : Long.fromValue(proto.seconds, false),
     nanos: proto.nanos ?? undefined,
   };
 }
 
 function timestampToProto(model: Timestamp): google.protobuf.ITimestamp {
   return {
-    seconds: model.seconds,
+    seconds: model.seconds == null ? undefined : Long.fromValue(model.seconds, false),
     nanos: model.nanos,
   };
 }
@@ -870,7 +882,8 @@ function readRecordsResponseFromProto<BodyT>(
       "ReadRecordsResponse",
       "records",
     ),
-    nextOffset: proto.nextOffset ?? undefined,
+    nextOffset:
+      proto.nextOffset == null ? undefined : Long.fromValue(proto.nextOffset, false),
     done: proto.done ?? undefined,
   };
 }
@@ -889,7 +902,8 @@ function readRecordsResponseToProto<BodyT>(
       "ReadRecordsResponse",
       "records",
     ),
-    nextOffset: model.nextOffset,
+    nextOffset:
+      model.nextOffset == null ? undefined : Long.fromValue(model.nextOffset, false),
     done: model.done,
   };
 }
@@ -966,7 +980,7 @@ function streamRecordFromProto<BodyT>(
   }
   return {
     item: result,
-    offset: proto.offset ?? undefined,
+    offset: proto.offset == null ? undefined : Long.fromValue(proto.offset, false),
   };
 }
 
@@ -993,7 +1007,7 @@ function streamRecordToProto<BodyT>(
         throw new Error("invalid oneof tag for StreamRecord.item");
     }
   }
-  proto.offset = model.offset;
+  proto.offset = model.offset == null ? undefined : Long.fromValue(model.offset, false);
   return proto;
 }
 
@@ -1123,7 +1137,7 @@ function streamSupersededFromProto(
       "producerId",
     ),
     failedTasks: requiredField(
-      proto.failedTasks?.slice(),
+      proto.failedTasks?.map((value: any) => Long.fromValue(value, false)),
       "StreamSuperseded",
       "failedTasks",
     ),
@@ -1143,7 +1157,7 @@ function streamSupersededToProto(
   return {
     producerId: requiredField(model.producerId, "StreamSuperseded", "producerId"),
     failedTasks: requiredField(
-      model.failedTasks?.slice(),
+      model.failedTasks?.map((value) => Long.fromValue(value, false)),
       "StreamSuperseded",
       "failedTasks",
     ),
@@ -1203,7 +1217,8 @@ function readRecordsRequestFromProto(
 ): ReadRecordsRequest {
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "ReadRecordsRequest", "ref")),
-    fromOffset: proto.fromOffset ?? undefined,
+    fromOffset:
+      proto.fromOffset == null ? undefined : Long.fromValue(proto.fromOffset, false),
     start: proto.start == null ? undefined : (proto.start as number as StreamReadStart),
     maxRecords: proto.maxRecords ?? undefined,
     wait: proto.wait == null ? undefined : support.durationFromProto(proto.wait),
@@ -1212,7 +1227,8 @@ function readRecordsRequestFromProto(
         ? undefined
         : support.durationFromProto(proto.createWait),
     last: proto.last ?? undefined,
-    maxBytes: proto.maxBytes ?? undefined,
+    maxBytes:
+      proto.maxBytes == null ? undefined : Long.fromValue(proto.maxBytes, false),
   };
 }
 
@@ -1221,7 +1237,8 @@ function readRecordsRequestToProto(
 ): temporal.api.streamservice.v1.IReadRecordsRequest {
   return {
     ref: streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref")),
-    fromOffset: model.fromOffset,
+    fromOffset:
+      model.fromOffset == null ? undefined : Long.fromValue(model.fromOffset, false),
     start:
       model.start == null
         ? undefined
@@ -1231,7 +1248,8 @@ function readRecordsRequestToProto(
     createWait:
       model.createWait == null ? undefined : support.durationToProto(model.createWait),
     last: model.last,
-    maxBytes: model.maxBytes,
+    maxBytes:
+      model.maxBytes == null ? undefined : Long.fromValue(model.maxBytes, false),
   };
 }
 
@@ -1263,7 +1281,8 @@ function describeStreamResponseFromProto(
   return {
     status:
       proto.status == null ? undefined : streamStatusFromNumber(proto.status as number),
-    lastOffset: proto.lastOffset ?? undefined,
+    lastOffset:
+      proto.lastOffset == null ? undefined : Long.fromValue(proto.lastOffset, false),
     retention:
       proto.retention == null ? undefined : support.durationFromProto(proto.retention),
   };
@@ -1277,7 +1296,8 @@ function describeStreamResponseToProto(
       model.status == null
         ? undefined
         : (model.status as number as temporal.api.enums.v1.StreamStatus),
-    lastOffset: model.lastOffset,
+    lastOffset:
+      model.lastOffset == null ? undefined : Long.fromValue(model.lastOffset, false),
     retention:
       model.retention == null ? undefined : support.durationToProto(model.retention),
   };

@@ -40,19 +40,23 @@ cargo build-examples --format wit --lang typescript workflow-service
 The definitions-mode JSON-Schema samples (plain data models) live under
 [`samples/typescript`](../../samples/typescript).
 
-## Temporary notification protobuf declarations
+## Protobuf payloads and sample declarations
 
-The notification-service example uses the SDK namespace
-`temporal.api.notificationservice.v1`. Until the TypeScript SDK exports these
-models,
+[`tests/proto-integer-payload.test.ts`](tests/proto-integer-payload.test.ts)
+uses the SDK's `Int64Value` and `UInt64Value` messages to round-trip signed and
+unsigned values outside JavaScript's safe integer range through JSON envelopes
+and binary protobuf serialization. Generated converters return plain properties;
+the test constructs messages at the transport boundary, as System Nexus does.
+The installed SDK does not yet expose that transport, so this is boundary
+coverage rather than a live System Nexus operation.
+
+The notification and Stream protos are newer than the SDK. Sample-only interface
+declarations live in
 [`support/notification-service-proto.d.ts`](support/notification-service-proto.d.ts)
-supplies sample-only interface declarations matching the checked-in descriptor.
-Remove this file and update the SDK dependency **before landing this change**.
-The generator has no fallback types or notification-specific logic.
-
-The notification tests exercise conversion of plain wire objects, including
-generic payloads, failure details, and oneof validation. They do not yet
-exercise notification protobuf binary encoding or SDK message constructors.
+and [`proto/streams.d.ts`](proto/streams.d.ts). Their tests exercise plain
+transfer objects, without runtime constructors or descriptor loading. These
+declarations are not a generator fallback; remove them when the SDK exports the
+same definitions.
 
 The `proto-generic` and `proto-oneof` samples use the SDK's existing protobuf
 models without a shim. Their tests include binary encode/decode round-trips,
