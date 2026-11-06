@@ -36,12 +36,14 @@ from wit.stream_service.both.models import (
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Execution,
     Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamReadStart,
     StreamRecord,
     StreamRef,
+    _CreateStreamRequestTransferTypeConverter,
 )
 
 
@@ -158,7 +160,7 @@ async def test_sdk_factory_needs_no_adapter() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=5),
         },
     )
-    stream = await client.create_stream(stream_ref=ref)
+    stream = await client.create_stream(id=ref.id)
     assert stream.ref == ref
     stored = client.get_stream(ref=ref, created=None)
     assert (await stored.describe()).last_offset == 5
@@ -182,7 +184,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, name)
         assert not hasattr(client, f"_stream_service_{name}")
 
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream(id="s1")
     response = await stream.publish(records=[])
     await stream.close()
 
@@ -222,6 +224,36 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         ref=stream.ref, producer=Producer(id="client:sample")
     )
     assert close.result_type is CloseStreamResponse
+
+
+@pytest.mark.parametrize(
+    ("fields", "ref"),
+    [
+        ({}, StreamRef(id="s1")),
+        (
+            {"backend": "redis", "owner": Execution(business_id="wf-1", run_id="r1")},
+            StreamRef(
+                id="s1",
+                backend="redis",
+                owner=Execution(business_id="wf-1", run_id="r1"),
+            ),
+        ),
+    ],
+)
+async def test_a_create_takes_the_fields_of_the_ref(
+    fields: dict[str, typing.Any], ref: StreamRef
+) -> None:
+    client, answers = connect(Client, {"CreateStream": CreateStreamResult(ref=ref)})
+
+    _ = await client.create_stream(id="s1", **fields)
+
+    request = answers.started[0].arg
+    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
+    wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
+    assert wire.stream_ref.id == "s1"
+    assert wire.stream_ref.backend == fields.get("backend", "")
+    assert wire.stream_ref.HasField("owner") == ("owner" in fields)
+    assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
@@ -267,7 +299,7 @@ async def test_client_only_calls_need_no_workflow_context(
             "DescribeStream": client_models.DescribeStreamResponse(last_offset=8),
         },
     )
-    stream = await client.create_stream(stream_ref=ref)
+    stream = await client.create_stream(id=ref.id)
     response = await stream.describe()
     assert response.last_offset == 8
     assert len(client.created_clients) == 1
@@ -287,7 +319,7 @@ async def test_each_call_gets_a_new_operation_id() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=7),
         },
     )
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream(id="s1")
     _ = await stream.describe()
     _ = await stream.describe()
     ids = [started.id for started in answers.started]
@@ -377,7 +409,7 @@ async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> No
         Client,
         {"CreateStream": CreateStreamResult(ref=ref), "ReadRecords": list(pages)},
     )
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream(id="s1")
 
     read = [
         page

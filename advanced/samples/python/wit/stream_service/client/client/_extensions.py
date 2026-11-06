@@ -12,6 +12,7 @@ import abc
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -83,18 +84,29 @@ class StreamServiceClientExtension(abc.ABC):
     async def create_stream(
         self,
         *,
-        stream_ref: StreamRef,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
     ) -> Stream:
         """
         Args:
-            stream_ref: The ref of the Stream to create. Its id is the Stream id.
+            id: The Stream id, 1 to 4096 bytes.
+            owner: The run chain or Standalone Activity of a bound Stream. Empty if
+                standalone.
+            backend: Registered backend name, empty for the default. The Store never
+                reads it.
             retention: The age after which a Record is dropped. Empty is the Store
                 default.
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
+        stream_ref = StreamRef(
+            id=id,
+            owner=owner,
+            backend=backend,
+        )
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             retention=retention,

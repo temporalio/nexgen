@@ -21,15 +21,23 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="CreateStreamOptions"/> class.
         /// </summary>
-        public CreateStreamOptions(StreamRef streamRef)
+        public CreateStreamOptions(string id)
         {
-            StreamRef = streamRef;
+            Id = id;
         }
 
         /// <summary>
-        /// The ref of the Stream to create. Its id is the Stream id.
+        /// The Stream id, 1 to 4096 bytes.
         /// </summary>
-        public StreamRef StreamRef { get; set; }
+        public string Id { get; set; }
+        /// <summary>
+        /// The run chain or Standalone Activity of a bound Stream. Empty if standalone.
+        /// </summary>
+        public Execution? Owner { get; set; }
+        /// <summary>
+        /// Registered backend name, empty for the default. The Store never reads it.
+        /// </summary>
+        public string? Backend { get; set; }
         /// <summary>
         /// The age after which a Record is dropped. Empty is the Store default.
         /// </summary>
@@ -159,7 +167,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<Stream> CreateStreamAsync(CreateStreamOptions options)
         {
-            var request = new CreateStreamRequest(options.StreamRef, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.RequestId())
+            var request = new CreateStreamRequest(new StreamRef(options.Id) { Owner = options.Owner, Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.RequestId())
             {
                 Retention = options.Retention,
                 IdConflictPolicy = options.IdConflictPolicy,
