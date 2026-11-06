@@ -1,5 +1,4 @@
-//! A resource is generic in each type parameter that it uses, also through records, protos or a
-//! generic resource that it returns. Records and variants get their type parameters the same way.
+//! A resource is generic in each type parameter that it uses, as a record is.
 
 use crate::error::{Error, Result};
 use crate::spec::{
@@ -21,8 +20,7 @@ impl CompilerPass<SelectedFamily, SelectedFamily> for ResourceTypeParameterPass 
     }
 }
 
-/// Sets the type parameters of each resource. A resource that returns a generic resource takes its
-/// parameters too, so the inference repeats until no resource changes.
+/// A resource takes the type parameters of a resource that it returns, so the loop repeats.
 fn infer_resource_type_parameters(spec: &mut ApiSpec<SelectedFamily>) {
     loop {
         let mut changed = false;
@@ -44,8 +42,7 @@ fn infer_resource_type_parameters(spec: &mut ApiSpec<SelectedFamily>) {
     }
 }
 
-/// The type parameters that the resource uses, in the order of their declarations. A method result
-/// or an operation output that is a generic resource gives the type parameters of that resource.
+/// Only a method result or an operation output gives the type parameters of a returned resource.
 fn used_type_parameters(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,

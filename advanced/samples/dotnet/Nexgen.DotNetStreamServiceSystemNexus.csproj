@@ -10,7 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The stream output with its interceptor partial, on a stand-in for the SDK changes. -->
     <Compile Include="wit/stream-service/**/*.cs" />
     <Compile Include="proto/streams/**/*.cs" />
     <Compile Include="TemporalSupport/TemporalSupport.cs" />

@@ -9,16 +9,8 @@ interface holder-service {
   /// @nexus.type-parameter
   type value-t = placeholder;
 
-  record set-request {
-    id: string,
-    value: value-t,
-  }
-
   resource holder {
-    constructor(id: string);
-
-    /// @nexus.operation "set"
-    set: func(value: value-t);
+    constructor(value: value-t);
   }
 
   type holder-result = own<holder>;
@@ -28,6 +20,4 @@ interface holder-service {
   }
 
   open: func(request: open-request) -> holder-result;
-
-  set: func(request: set-request);
 }

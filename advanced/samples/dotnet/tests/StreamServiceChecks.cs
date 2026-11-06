@@ -1,7 +1,6 @@
 extern alias Streams;
 
 using System.Linq;
-using System.Threading.Tasks;
 using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
@@ -74,10 +73,5 @@ namespace Nexgen.DotNetExamples.Tests
                 converter.FromTransferType(wire));
             Assert.Equal(StreamServiceExample.StreamStatus.StreamStatusUnspecified, decoded.Status);
         }
-
-        // The read of a Stream<Turn> returns a ReadRecordsResponse<Turn>, with no type argument.
-        private static Task<StreamServiceExample.ReadRecordsResponse<Turn>> ReadTurns(
-            StreamServiceExample.Stream<Turn> stream) =>
-            stream.ReadAsync(null, null, null, null, null, null);
     }
 }

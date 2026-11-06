@@ -1,5 +1,4 @@
-// The SDK members that the generated System Nexus interceptor partial needs. Temporalio doesn't
-// have them yet, so this stand-in lets a test run the generated dispatch.
+// Temporalio doesn't have the SDK members that the generated interceptor partial needs yet.
 #nullable enable
 
 using System;
@@ -15,42 +14,28 @@ namespace Temporalio.Worker.Interceptors
     public record SystemNexusOperation(string Name, Type InputType, Type OutputType);
 
     public record ScheduleSystemNexusOperationInput(
-        string Service,
-        SystemNexusOperation Operation,
-        object? Arg,
-        IReadOnlyDictionary<string, string>? Headers);
+        string Service, SystemNexusOperation Operation, object? Arg, object? Headers);
 
     public partial class WorkflowOutboundInterceptor
     {
-        private readonly WorkflowOutboundInterceptor? next;
+        protected WorkflowOutboundInterceptor Next => throw new NotSupportedException();
 
-        protected WorkflowOutboundInterceptor(WorkflowOutboundInterceptor next) => this.next = next;
-
-        private protected WorkflowOutboundInterceptor()
-        {
-        }
-
-        protected WorkflowOutboundInterceptor Next =>
-            next ?? throw new InvalidOperationException("The root interceptor has no next one.");
-
-        public virtual Task<NexusWorkflowOperationHandle<TResult>> ScheduleSystemNexusOperationAsync<TResult>(
-            ScheduleSystemNexusOperationInput input) =>
-            Next.ScheduleSystemNexusOperationAsync<TResult>(input);
+        public virtual Task<NexusWorkflowOperationHandle<TResult>>
+            ScheduleSystemNexusOperationAsync<TResult>(ScheduleSystemNexusOperationInput input) =>
+            throw new NotSupportedException();
     }
 }
 
 namespace Temporalio.Worker
 {
-    using Temporalio.Worker.Interceptors;
-
     internal partial class WorkflowInstance
     {
-        private readonly Lazy<WorkflowOutboundInterceptor> outbound;
+        private readonly Lazy<Interceptors.WorkflowOutboundInterceptor> outbound;
 
-        public WorkflowInstance(Func<WorkflowOutboundInterceptor, WorkflowOutboundInterceptor> wrapRoot)
+        public WorkflowInstance()
         {
-            Root = new OutboundImpl(this);
-            outbound = new(() => wrapRoot(Root));
+            Root = new(this);
+            outbound = new(() => Root);
         }
 
         public OutboundImpl Root { get; }
@@ -59,17 +44,17 @@ namespace Temporalio.Worker
             string service, string operationName, object? arg) =>
             StartSystemNexusOperationAsync<TResult>(service, operationName, arg);
 
-        internal partial class OutboundImpl : WorkflowOutboundInterceptor
+        internal partial class OutboundImpl : Interceptors.WorkflowOutboundInterceptor
         {
             private readonly WorkflowInstance instance;
 
             public OutboundImpl(WorkflowInstance instance) => this.instance = instance;
 
-            public List<ScheduleSystemNexusOperationInput> Scheduled { get; } = new();
+            public List<Interceptors.ScheduleSystemNexusOperationInput> Scheduled { get; } = new();
 
-            // The SDK schedules the operation here. The stand-in keeps the input.
-            public override Task<NexusWorkflowOperationHandle<TResult>> ScheduleSystemNexusOperationAsync<TResult>(
-                ScheduleSystemNexusOperationInput input)
+            public override Task<NexusWorkflowOperationHandle<TResult>>
+                ScheduleSystemNexusOperationAsync<TResult>(
+                    Interceptors.ScheduleSystemNexusOperationInput input)
             {
                 Scheduled.Add(input);
                 return Task.FromResult<NexusWorkflowOperationHandle<TResult>>(null!);

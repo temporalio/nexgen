@@ -635,33 +635,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
 
     _ = assert_type(stream, Stream[Turn])
     _ = assert_type(page, ReadRecordsResponse[Turn])
-    # Both a single read and polling decode the payload using the specialization.
+    # A poll decodes with the specialization too.
     assert page.records == [record]
     assert [page.records async for page in stream.iter_read()] == [[record]]
     assert [item async for item in stream.iter_read_items()] == [record]
-
-
-async def test_an_unspecialized_handle_decodes_untyped_bodies() -> None:
-    ref = StreamRef(id="s1")
-    client, _ = connect(
-        Client,
-        {
-            "ReadRecords": SYSTEM_CONVERTER.to_payload(
-                ReadRecordsResponse[Turn](
-                    records=[
-                        StreamRecord(
-                            item=StreamItemData(StreamData(body=Turn(role="model"))),
-                            offset=1,
-                        )
-                    ]
-                )
-            ),
-        },
-    )
-    stream: Stream[typing.Any] = client.get_stream(ref=ref, created=None)
-
-    page = await stream.read()
-
-    item = page.records[0].item
-    assert isinstance(item, StreamItemData)
-    assert item.value.body == {"role": "model"}

@@ -137,11 +137,7 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
     ) -> temporalio.workflow.NexusOperationHandle[
         models.ReadRecordsResponse[typing.Any]
     ]:
-        """Intercept the ReadRecords operation.
-
-        The response decodes with ``output_type``, which has the caller's type
-        arguments. Without it, the generic values decode as ``typing.Any``.
-        """
+        """Intercept the ReadRecords operation."""
         return await self._next_system_nexus_interceptor().start_read_records(
             request, output_type
         )

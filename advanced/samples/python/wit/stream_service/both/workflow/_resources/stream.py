@@ -42,8 +42,7 @@ class Stream(typing.Generic[BodyT]):
 
     @property
     def body_type(self) -> type[BodyT]:
-        # A specialized alias sets __orig_class__ after __init__. A subclass of a
-        # specialized class keeps its type arguments in __orig_bases__.
+        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
         arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
             (
                 typing.get_args(base)
