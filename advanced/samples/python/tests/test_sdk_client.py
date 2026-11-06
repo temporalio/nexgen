@@ -739,3 +739,26 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     assert page.records == [record]
     assert [page.records async for page in stream.iter_read()] == [[record]]
     assert [item async for item in stream.iter_read_items()] == [record]
+
+
+async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
+    client, answers = connect(
+        Client,
+        {
+            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "DescribeStream": DescribeStreamResponse(last_offset=5),
+        },
+    )
+    timeout = datetime.timedelta(seconds=3)
+
+    stream = await client.create_stream(
+        stream_ref=StreamRef(id="s1"), rpc_timeout=timeout
+    )
+    _ = await stream.describe(rpc_metadata={"authorization": "token"})
+
+    assert [
+        (started.rpc_metadata, started.rpc_timeout) for started in answers.started
+    ] == [
+        ({}, timeout),
+        ({"authorization": "token"}, None),
+    ]

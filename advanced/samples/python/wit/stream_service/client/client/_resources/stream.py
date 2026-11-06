@@ -76,6 +76,8 @@ class Stream(typing.Generic[BodyT]):
     async def publish(
         self,
         *records: BodyT,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> int:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
@@ -88,12 +90,17 @@ class Stream(typing.Generic[BodyT]):
             operation=StreamService.append_records,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
         return _support.last_offset(result)
 
     async def close(
         self,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
@@ -104,6 +111,8 @@ class Stream(typing.Generic[BodyT]):
             operation=StreamService.close_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         _ = await handle.result()
 
@@ -115,6 +124,9 @@ class Stream(typing.Generic[BodyT]):
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
@@ -131,6 +143,8 @@ class Stream(typing.Generic[BodyT]):
             arg=request,
             id=f"{_uuid.uuid4()}",
             result_type=ReadRecordsResponse[self.body_type],
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         return await handle.result()
 
@@ -142,6 +156,9 @@ class Stream(typing.Generic[BodyT]):
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
         """Yield each response of ``read`` until the poll helper stops.
 
@@ -177,6 +194,8 @@ class Stream(typing.Generic[BodyT]):
                 arg=request,
                 id=f"{_uuid.uuid4()}",
                 result_type=ReadRecordsResponse[self.body_type],
+                rpc_metadata=rpc_metadata or {},
+                rpc_timeout=rpc_timeout,
             )
             response = await operation_handle.result()
             next_request = _support.next_read_request(request, response)
@@ -193,6 +212,9 @@ class Stream(typing.Generic[BodyT]):
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
         """Yield each item of ``iter_read``, page by page.
 
@@ -233,6 +255,8 @@ class Stream(typing.Generic[BodyT]):
                 wait=wait,
                 create_wait=create_wait,
                 max_bytes=max_bytes,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             ),
             lambda response: response.records,
             _support.next_read_request,
@@ -241,6 +265,9 @@ class Stream(typing.Generic[BodyT]):
 
     async def describe(
         self,
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> DescribeStreamResponse:
         """Describe the Stream's status, newest offset and Retention."""
         request = DescribeStreamRequest(
@@ -250,6 +277,8 @@ class Stream(typing.Generic[BodyT]):
             operation=StreamService.describe_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         return await handle.result()
 
