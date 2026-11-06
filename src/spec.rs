@@ -733,8 +733,7 @@ impl<F: TypeFamily> OperationSpec<F> {
 pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub doc: F::Text,
-    /// The type parameters that the resource uses, in the order of their declarations.
-    /// `ResourceTypeParameterPass` infers them.
+    /// `ResourceTypeParameterPass` infers them, in the order of their declarations.
     pub type_parameters: Vec<TypeParameterSpec>,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
@@ -1677,8 +1676,7 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
 pub struct TypeParameterSpec {
     pub name: String,
     pub full_name: String,
-    /// The position of the alias among the declarations of its interface. A generic resource
-    /// takes its type parameters in this order, so a moved method doesn't reorder them.
+    /// A generic resource orders its type parameters by this, which a moved method doesn't change.
     pub declaration_index: usize,
 }
 
@@ -2052,8 +2050,7 @@ where
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
-    /// Like `type_parameters`, but also walks the record behind each proto type. Before planning, a
-    /// proto-backed record appears as its proto type, so the plain walk stops there.
+    /// Before planning, a proto-backed record appears as its proto type, so this walks the record.
     pub(crate) fn type_parameters_through_protos(
         &self,
         value: &TypeSpec<F>,

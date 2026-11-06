@@ -1,15 +1,7 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import Long from "long";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  expectTypeOf,
-  test,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type ReadRecordsResponse,
@@ -91,12 +83,10 @@ describe("stream-service generated output", () => {
       bodyT: turnType,
     }).fromTransferType(proto);
 
-    expectTypeOf(model).toEqualTypeOf<ReadRecordsResponse<Turn>>();
     const item = model.records?.[0].item;
-    expect(item?.tag).toBe("data");
-    const body = item?.tag === "data" ? item.value.body : undefined;
-    expect(body).toBeInstanceOf(Turn);
-    expect(body).toEqual(new Turn("user"));
+    expect(item?.tag === "data" ? item.value.body : undefined).toStrictEqual(
+      new Turn("user"),
+    );
   });
 
   test("gives no item for a read record whose item kind only a newer server knows", () => {

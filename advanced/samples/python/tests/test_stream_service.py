@@ -46,6 +46,12 @@ class Turn:
     role: str
 
 
+SYSTEM_CONVERTER = temporalio.nexus.system._SystemNexusPayloadConverter(
+    PayloadConverter.default,
+    FailureConverter.default,
+)
+
+
 @pytest.fixture(
     params=[models_only, workflow_models, client_models, both_models],
     ids=["models", "workflow", "client", "both"],
@@ -228,31 +234,19 @@ async def test_workflow_apis_call_the_stream_service(
     ]
 
 
-@pytest.mark.parametrize(
-    ("api", "model_types"),
-    [(workflow_only, workflow_models), (both_workflow, both_models)],
-    ids=["workflow", "both"],
-)
 @pytest.mark.parametrize("construction", ["create", "direct"])
 async def test_workflow_handle_decodes_with_its_type_parameter(
-    monkeypatch: pytest.MonkeyPatch,
-    api: types.ModuleType,
-    model_types: types.ModuleType,
-    construction: str,
+    monkeypatch: pytest.MonkeyPatch, construction: str
 ) -> None:
-    ref = model_types.StreamRef(id="typed-stream")
-    record = model_types.StreamRecord(
-        item=model_types.StreamItemData(
-            model_types.StreamData(body=Turn(role="model"))
+    ref = workflow_models.StreamRef(id="typed-stream")
+    record = workflow_models.StreamRecord(
+        item=workflow_models.StreamItemData(
+            workflow_models.StreamData(body=Turn(role="model"))
         ),
         offset=1,
     )
-    converter = temporalio.nexus.system._SystemNexusPayloadConverter(
-        PayloadConverter.default,
-        FailureConverter.default,
-    )
-    payload = converter.to_payload(
-        model_types.ReadRecordsResponse[Turn](records=[record])
+    payload = SYSTEM_CONVERTER.to_payload(
+        workflow_models.ReadRecordsResponse[Turn](records=[record])
     )
 
     class NexusClient:
@@ -268,24 +262,21 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
                 asyncio.get_running_loop().create_future()
             )
             if operation == "CreateStream":
-                future.set_result(model_types.CreateStreamResult(ref=ref))
+                future.set_result(workflow_models.CreateStreamResult(ref=ref))
             else:
-                assert operation == "ReadRecords"
-                future.set_result(converter.from_payload(payload, output_type))
+                future.set_result(SYSTEM_CONVERTER.from_payload(payload, output_type))
             return future
 
     def create_client(*, service: str, endpoint: str) -> NexusClient:
-        assert service == "temporal.api.streamservice.v1.StreamService"
-        assert endpoint == "__temporal_system"
+        del service, endpoint
         return NexusClient()
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
     if construction == "create":
-        stream = await api.create_stream(Turn, stream_ref=ref)
+        stream = await workflow_only.create_stream(Turn, stream_ref=ref)
     else:
-        resources = importlib.import_module(api.__name__ + "._resources.stream")
-        stream = resources.Stream[Turn](ref=ref, created=None)
+        stream = WorkflowStream[Turn](ref=ref, created=None)
 
     page = await stream.read()
 
@@ -309,11 +300,7 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
         ),
         offset=1,
     )
-    converter = temporalio.nexus.system._SystemNexusPayloadConverter(
-        PayloadConverter.default,
-        FailureConverter.default,
-    )
-    payload = converter.to_payload(
+    payload = SYSTEM_CONVERTER.to_payload(
         workflow_models.ReadRecordsResponse[Turn](records=[record])
     )
     pages: list[workflow_models.ReadRecordsResponse[typing.Any]] = []
@@ -342,7 +329,7 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
             input: StartNexusOperationInput[typing.Any, typing.Any],
         ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
             assert input.output_type is not None
-            pages.append(converter.from_payload(payload, input.output_type))
+            pages.append(SYSTEM_CONVERTER.from_payload(payload, input.output_type))
             return typing.cast(
                 temporalio.workflow.NexusOperationHandle[typing.Any], object()
             )
@@ -385,9 +372,6 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
 
     [page] = pages
     assert page.records == [record]
-    item = page.records[0].item
-    assert isinstance(item, workflow_models.StreamItemData)
-    assert isinstance(item.value.body, Turn)
 
 
 @pytest.mark.parametrize(

@@ -1455,7 +1455,6 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    /// The type parameters of an operation method, from its request and its runtime types.
     fn operation_type_parameter_names(&self, operation: &PlannedOperation) -> Vec<String> {
         let mut names = self
             .operation_model_parameters(operation)
@@ -1471,8 +1470,7 @@ impl<'a> ApiPlanner<'a> {
         names
     }
 
-    /// Whether the operation starts by name. The service interface has `object` for each type
-    /// argument, and C# generics are invariant, so a call through it can't keep the caller's types.
+    /// The service interface has `object` type arguments, so only a call by name keeps the types.
     fn operation_starts_by_name(&self, operation: &PlannedOperation) -> bool {
         !self.operation_model_parameters(operation).is_empty()
             || operation.output_type().is_some_and(|output| {
@@ -2709,8 +2707,7 @@ impl<'a> ApiPlanner<'a> {
         output
     }
 
-    /// Whether the request or the response is a generic model. C# generics are invariant, so no
-    /// typed hook takes each type argument, and the generic hook gets the operation.
+    /// C# generics are invariant, so no typed hook takes each type argument of a generic model.
     fn system_nexus_has_generic_model(&self, operation: &PlannedOperation) -> bool {
         (self.operation_has_input(operation)
             && self
@@ -2721,7 +2718,6 @@ impl<'a> ApiPlanner<'a> {
                 .is_some_and(|output| self.dotnet_open_generic_model_type(output).is_some())
     }
 
-    /// The open type of a generic model, such as `AppendRecordsRequest<>`.
     fn dotnet_open_generic_model_type(&self, model_type: &PlannedType) -> Option<String> {
         let PlannedType::Record(record) = model_type else {
             return None;
@@ -2740,7 +2736,6 @@ impl<'a> ApiPlanner<'a> {
 const SYSTEM_NEXUS_ARGUMENT_EXCEPTION: &str = "                {\n                    \
     throw new System.ArgumentException(\"System Nexus operation expects a ";
 
-/// Starts the operation through the generic hook, with the types of the call.
 fn render_system_nexus_generic_hook_call(output: &mut String, indent: &str) {
     for line in [
         "return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(",
@@ -3526,8 +3521,7 @@ fn render_flattened_method_body(
     output.push_str("    }\n\n");
 }
 
-/// The type arguments of an operation call. A runtime type isn't in the request, so C# can't infer
-/// it.
+/// A runtime type isn't in the request, so C# can't infer it.
 fn flattened_call_type_arguments(
     operation: &PlannedOperation,
     model: &PlannedModel,
@@ -4133,7 +4127,6 @@ fn resource_method_request_model_init_expr(
     ))
 }
 
-/// A type name with the C# names of its type parameters, such as `Stream<TBody>`.
 fn csharp_generic_type(type_name: &str, parameters: &[crate::spec::TypeParameterSpec]) -> String {
     let type_name = csharp_type_name(type_name);
     if parameters.is_empty() {

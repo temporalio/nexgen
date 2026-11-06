@@ -1,6 +1,0 @@
-descriptors = "temporal"
-inputs = ["input.wit", "../../../inputs/deps"]
-
-[error]
-kind = "invalid-wit"
-contains = ["record `job-service.create-job-result` field `job` holds the generic resource `job`, which is not supported"]

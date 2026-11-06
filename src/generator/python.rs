@@ -2144,8 +2144,7 @@ impl<'a> ApiPlanner<'a> {
             .iter()
             .map(|parameter| parameter.name.clone())
             .collect::<Vec<_>>();
-        // The start call casts the handle when `output_type` is a generic model with no type
-        // arguments.
+        // The start call casts the handle when `output_type` is a generic model with no arguments.
         let generic_model_types = model_output_parameters
             .iter()
             .any(|usage| !runtime_type_arguments.contains(&usage.parameter.name));
@@ -3525,15 +3524,12 @@ struct RenderedOperation<'a> {
     client_unpacked_input: Option<RenderedUnpackedInput>,
     model_input_type_parameters: Vec<String>,
     generic_model_types: bool,
-    /// The type parameters that the call takes as runtime types, by TypeVar name.
     runtime_type_arguments: Vec<String>,
-    /// The type parameters of a record output, in order.
     output_record_type_parameters: Vec<String>,
 }
 
 impl RenderedOperation<'_> {
-    /// The `output_type` of the start call. The data converter decodes a generic output with the
-    /// runtime types in it. `receiver` is `self.` in a resource method.
+    /// The data converter decodes a generic output with the runtime types in `output_type`.
     fn output_type_expr_for(&self, receiver: &str) -> String {
         if !self
             .output_record_type_parameters
@@ -3556,7 +3552,6 @@ impl RenderedOperation<'_> {
         python_type_annotation_with_arguments(&self.output_type_expr, &arguments)
     }
 
-    /// The `result_type` of a client start call, when the output has runtime types.
     fn runtime_result_type(&self, receiver: &str) -> Option<String> {
         self.output_record_type_parameters
             .iter()
@@ -3564,7 +3559,6 @@ impl RenderedOperation<'_> {
             .then(|| self.output_type_expr_for(receiver))
     }
 
-    /// The runtime type arguments that a call passes on after its request.
     fn runtime_type_args(&self, receiver: &str) -> String {
         self.runtime_type_arguments
             .iter()
@@ -3572,7 +3566,6 @@ impl RenderedOperation<'_> {
             .collect()
     }
 
-    /// The parameters of the runtime type arguments, one line each at `indent`.
     fn render_runtime_type_parameters(&self, output: &mut String, indent: &str) {
         for name in &self.runtime_type_arguments {
             output.push_str(indent);
@@ -3583,7 +3576,6 @@ impl RenderedOperation<'_> {
         }
     }
 
-    /// Specialize a returned resource with the runtime types from the call or enclosing resource.
     fn render_resource_specialization(&self, output: &mut String, receiver: &str) {
         let arguments = self
             .runtime_type_arguments
@@ -4182,7 +4174,6 @@ fn python_type_annotation_with_arguments(name: &str, arguments: &[String]) -> St
     }
 }
 
-/// The runtime type argument of a type parameter, such as `body_type` for `BodyT`.
 fn python_runtime_type_argument_name(type_var: &str) -> String {
     let stem = type_var
         .strip_suffix('T')
@@ -5794,8 +5785,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
     output.push_str(
         "async def _start_system_nexus_operation(\n    interceptor: _SystemNexusWorkflowOutboundInterceptorBase,\n    input: StartNexusOperationInput[_InputT, _OutputT],\n) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n",
     );
-    // An interceptor gets each type argument of a generic model, so its type refs have
-    // `typing.Any` for each one.
+    // An interceptor gets every type argument of a generic model, so its refs use `typing.Any`.
     for (service, operation) in &operations {
         let output_type = system_nexus_type_expr(&operation.descriptor_output_ref);
         output.push_str("    if input.service == ");
@@ -5836,15 +5826,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str("]:\n");
         output.push_str("        \"\"\"Intercept the ");
         output.push_str(operation.name);
-        output.push_str(" operation.");
-        if generic_output {
-            output.push_str(
-                "\n\n        \
-                 The response decodes with ``output_type``, which has the caller's type\n        \
-                 arguments. Without it, the generic values decode as ``typing.Any``.\n        ",
-            );
-        }
-        output.push_str("\"\"\"\n");
+        output.push_str(" operation.\"\"\"\n");
         output.push_str("        return await self._next_system_nexus_interceptor().start_");
         output.push_str(&operation.attr_name);
         output.push_str(if generic_output {
@@ -5877,8 +5859,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str(&python_string_literal(service.wire_name));
         output.push_str(",\n                operation=");
         output.push_str(&python_string_literal(operation.wire_name));
-        // The SDK decodes the result with `output_type`. Without the caller's type arguments, the
-        // generic values of a response decode as `typing.Any`.
+        // With no caller `output_type`, the generic values of a response decode as `typing.Any`.
         output.push_str(",\n                input=request,\n                output_type=");
         output.push_str(&system_nexus_output_class_expr(operation, &output_type));
         if system_nexus_generic_output(operation) {
@@ -6614,8 +6595,7 @@ fn validate_rpc_option_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// A runtime type argument takes its name from its type parameter, so a field, a method, a request
-/// field or another runtime type with that name would make a duplicate argument or member.
+/// A runtime type takes its name from its type parameter, so it can clash with another name.
 fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Result<()> {
     let check = |taken: &mut BTreeMap<String, String>, parameter: &str| {
         let name = python_runtime_type_argument_name(parameter);
@@ -7055,8 +7035,7 @@ fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &
     }
 }
 
-/// Python sets `__orig_class__` after `__init__`, so a property reads the type arguments when a
-/// call needs them. A handle with no type argument decodes its generic values as `typing.Any`.
+/// Python sets `__orig_class__` after `__init__`, so a property reads the type arguments later.
 fn render_runtime_type_properties(
     output: &mut String,
     resource: &PlannedResource,
@@ -7071,8 +7050,7 @@ fn render_runtime_type_properties(
         ));
         output.push_str(
             "        \
-             # A specialized alias sets __orig_class__ after __init__. A subclass of a\n        \
-             # specialized class keeps its type arguments in __orig_bases__.\n",
+             # A subclass of a specialized class has no __orig_class__, only __orig_bases__.\n",
         );
         output.push_str(&format!(
             "        \
@@ -8854,8 +8832,7 @@ fn render_client_poll_loop(
     start_line(output, target, "        request = next_request\n");
 }
 
-/// The `operation` of a client start call. Only the overload that takes the operation name takes
-/// a `result_type`, which a generic output needs for its runtime types.
+/// Only the overload that takes the operation name takes the `result_type` of a generic output.
 fn client_start_operation_arg(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,

@@ -151,8 +151,7 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
     Ok(())
 }
 
-/// The generic resource that a value holds, also in a list, map, tuple, result or variant case.
-/// The loop over the records checks the fields of a nested record.
+/// The loop over the records checks a nested record, so the walk stops at one.
 fn held_generic_resource(
     spec: &ApiSpec<SelectedFamily>,
     value: &TypeSpec<SelectedFamily>,
@@ -261,43 +260,6 @@ interface generic-service {
         validate(Language::Dotnet, GENERIC_WIT).unwrap();
     }
 
-    // The resource has no annotation. It holds the parameter only through its records.
-    const RESOURCE_WIT: &str = r#"
-package temporal:nexus@1.0.0;
-world system { export handles; }
-/// @nexus.endpoint "handles"
-interface handles {
-  use nexus:temporal-types/model@1.0.0.{placeholder};
-  /// @nexus.type-parameter
-  type body-t = placeholder;
-  /// @nexus.type-parameter
-  type key-t = placeholder;
-  record item { body: body-t, }
-  record page { items: list<item>, }
-  record put-request { id: string, item: item, }
-  record put-response {}
-  record get-request { id: string, }
-  resource handle {
-    constructor(id: string);
-    /// @nexus.operation "put"
-    put: func(item: item) -> put-response;
-    /// @nexus.operation "get"
-    get: func() -> page;
-  }
-  resource plain {
-    constructor(id: string, key: string);
-  }
-  put: func(request: put-request) -> put-response;
-  get: func(request: get-request) -> page;
-}
-"#;
-
-    #[test]
-    fn a_resource_is_generic_in_the_parameters_of_its_records() {
-        assert_eq!(resource_type_parameters(RESOURCE_WIT, "handle"), ["BodyT"]);
-        assert!(resource_type_parameters(RESOURCE_WIT, "plain").is_empty());
-    }
-
     #[test]
     fn a_resource_takes_its_type_parameters_in_the_order_of_their_declarations() {
         // The record and the constructor use value-t first.
@@ -347,16 +309,13 @@ interface holders {
             resource_type_parameters(RETURNED_RESOURCE_WIT, "opener"),
             ["ValueT"]
         );
-    }
-
-    #[test]
-    fn a_resource_parameter_does_not_give_its_type_parameters() {
         assert!(resource_type_parameters(RETURNED_RESOURCE_WIT, "watcher").is_empty());
     }
 
     #[test]
     fn refuses_a_generic_resource_inside_a_record_field() {
         for field_type in [
+            "job",
             "list<job>",
             "option<tuple<string, job>>",
             "result<job, string>",

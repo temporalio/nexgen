@@ -3001,14 +3001,11 @@ struct RenderedOperation<'a> {
     output_model_name: Option<String>,
     output_transfer_type_converter: Option<String>,
     serialization_context_expr: Option<String>,
-    /// The type parameters that the call takes as runtime types, by name.
     runtime_type_parameters: Vec<String>,
-    /// The type parameters of a record output, in order.
     output_record_type_parameters: Vec<String>,
 }
 
 impl RenderedOperation<'_> {
-    /// The type parameters of the operation function, from the request and the runtime types.
     fn function_type_parameters(&self) -> Vec<RenderedTypeParameter> {
         let mut parameters = self
             .input
@@ -3029,7 +3026,6 @@ impl RenderedOperation<'_> {
         parameters
     }
 
-    /// The parameters of the runtime types, one line each at `indent`.
     fn render_runtime_type_parameters(&self, output: &mut String, indent: &str) {
         for name in &self.runtime_type_parameters {
             output.push_str(indent);
@@ -3040,7 +3036,6 @@ impl RenderedOperation<'_> {
         }
     }
 
-    /// The runtime types that a call passes on after its request.
     fn runtime_type_args(&self, receiver: &str) -> String {
         self.runtime_type_parameters
             .iter()
@@ -3053,8 +3048,7 @@ impl RenderedOperation<'_> {
             .collect()
     }
 
-    /// The operation to start. Its type info is static, so a generic output with runtime types
-    /// takes a converter from the model's factory.
+    /// The type info of an operation is static, so a generic output takes a converter factory.
     fn definition_expr(&self, service: &RenderedService<'_>, receiver: &str) -> String {
         let definition = format!("{}.operations.{}", service.attr_name, self.attr_name);
         let Some(model_name) = &self.output_model_name else {
@@ -3100,8 +3094,7 @@ impl RenderedOperation<'_> {
     }
 }
 
-/// A runtime type gives its name to a constructor parameter, a getter and an operation parameter.
-/// So a field, a method or another runtime type with that name would make a duplicate.
+/// A runtime type takes its name from its type parameter, so it can clash with another name.
 fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Result<()> {
     let check = |taken: &mut BTreeMap<String, String>, parameter: &str| {
         let name = typescript_runtime_type_argument_name(parameter);
@@ -3140,7 +3133,6 @@ fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Res
     Ok(())
 }
 
-/// The runtime type of a type parameter, such as `bodyType` for `BodyT`.
 fn typescript_runtime_type_argument_name(type_parameter: &str) -> String {
     let stem = type_parameter
         .strip_suffix('T')
@@ -3149,8 +3141,7 @@ fn typescript_runtime_type_argument_name(type_parameter: &str) -> String {
     format!("{}Type", stem.to_lower_camel_case())
 }
 
-/// The class name with its type parameters. A handle built with no runtime type decodes as the
-/// payload converter's plain value, so the default is `unknown`.
+/// With no runtime type, a handle decodes plain values, so each default is `unknown`.
 fn resource_class_head(resource: &PlannedResource) -> String {
     let parameters = resource_type_parameter_names(resource)
         .into_iter()
@@ -3159,8 +3150,7 @@ fn resource_class_head(resource: &PlannedResource) -> String {
     generic_type_annotation(&resource.type_name, &parameters)
 }
 
-/// A private field for the runtime type of each type parameter. The model converters decode the
-/// generic values of a response with them, and the payload converter doesn't encode them.
+/// The fields are private, so the payload converter doesn't encode them with the handle.
 fn render_resource_runtime_type_fields(output: &mut String, resource: &PlannedResource) {
     for name in resource_type_parameter_names(resource) {
         output.push_str("  readonly #");
@@ -4291,8 +4281,7 @@ fn render_operation_registry_module(
     render_generated_module(imports, body)
 }
 
-// An interceptor gets each type argument of a generic model, so it has `unknown` for each one.
-// Then the hook must narrow a value before it uses it.
+// An interceptor gets every type argument, and `unknown` makes the hook narrow a value first.
 fn system_nexus_interceptor_input_annotation(operation: &RenderedOperation<'_>) -> String {
     operation.input.as_ref().map_or_else(
         || "undefined".to_string(),
@@ -5075,7 +5064,6 @@ fn resource_type_names(services: &[RenderedService<'_>]) -> Vec<String> {
         .collect()
 }
 
-/// The converter factories of generic proto-backed models.
 fn model_converter_factory_names(models: &[&RenderedModel]) -> Vec<String> {
     models
         .iter()
