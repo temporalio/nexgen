@@ -1,1 +1,2 @@
-A resource that uses a type parameter, also through its records, is generic in it with no annotation, and its calls decode generic response values with their runtime types. Go and Java refuse a generic resource.
+A resource that uses a type parameter, also through its records, is generic in it with no annotation. Its calls decode generic response values with their runtime types. Go and Java refuse a generic resource.
+A Python handle takes its runtime types from its type arguments, as in `Stream[Turn](...)` or `class TurnStream(Stream[Turn])`. A factory takes them as arguments, as in `create_stream(Turn, ...)`.
