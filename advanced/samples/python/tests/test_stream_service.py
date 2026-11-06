@@ -27,6 +27,7 @@ from wit.stream_service.client import models as client_models
 from wit.stream_service.both import models as both_models
 from wit.stream_service import workflow as workflow_only
 from wit.stream_service.both import workflow as both_workflow
+from wit.stream_service.workflow._resources.stream import Stream as WorkflowStream
 from wit.stream_service.workflow._system_nexus_interceptor import (
     _start_system_nexus_operation,
     _SystemNexusWorkflowOutboundInterceptorBase,
@@ -289,6 +290,16 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
     page = await stream.read()
 
     assert page.records == [record]
+
+
+def test_a_subclass_of_a_specialized_handle_takes_its_type_argument() -> None:
+    class TurnStream(WorkflowStream[Turn]):
+        pass
+
+    ref = workflow_models.StreamRef(id="typed-stream")
+
+    assert TurnStream(ref=ref, created=None).body_type is Turn
+    assert WorkflowStream(ref=ref, created=None).body_type is typing.Any
 
 
 async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:

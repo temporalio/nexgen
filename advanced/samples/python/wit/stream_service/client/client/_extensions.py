@@ -50,7 +50,8 @@ class StreamServiceClientExtension(abc.ABC):
         body_type: type[BodyT] | None = None,
     ) -> Stream[BodyT]:
         """Return the ``Stream`` handle that has these identity fields."""
-        body_type = body_type or typing.cast("type[BodyT]", typing.Any)
+        if body_type is None:
+            body_type = typing.cast("type[BodyT]", typing.Any)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
