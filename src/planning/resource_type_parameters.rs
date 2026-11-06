@@ -1,6 +1,5 @@
-//! Infer the type parameters of each resource from the types that it uses, as records and
-//! variants infer theirs. A resource that uses a type parameter, also through records, protos or
-//! a generic resource that it returns, is generic in it.
+//! A resource is generic in each type parameter that it uses, also through records, protos or a
+//! generic resource that it returns. Records and variants get their type parameters the same way.
 
 use crate::error::{Error, Result};
 use crate::spec::{
@@ -45,9 +44,8 @@ fn infer_resource_type_parameters(spec: &mut ApiSpec<SelectedFamily>) {
     }
 }
 
-/// The type parameters of the resource's fields, of its methods, and of the operations that they
-/// bind, in the order of their declarations. A method result or an operation output that is a
-/// generic resource also gives the type parameters of that resource.
+/// The type parameters that the resource uses, in the order of their declarations. A method result
+/// or an operation output that is a generic resource gives the type parameters of that resource.
 fn used_type_parameters(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,

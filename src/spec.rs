@@ -733,8 +733,8 @@ impl<F: TypeFamily> OperationSpec<F> {
 pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub name: String,
     pub doc: F::Text,
-    /// The type parameters that the resource uses, in order. `ResourceTypeParameterPass` infers
-    /// them.
+    /// The type parameters that the resource uses, in the order of their declarations.
+    /// `ResourceTypeParameterPass` infers them.
     pub type_parameters: Vec<TypeParameterSpec>,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
@@ -2053,7 +2053,7 @@ where
     F::Variant: AsRef<str>,
 {
     /// Like `type_parameters`, but also walks the record behind each proto type. Before planning, a
-    /// proto-backed record is named by its proto type, so the plain walk stops there.
+    /// proto-backed record appears as its proto type, so the plain walk stops there.
     pub(crate) fn type_parameters_through_protos(
         &self,
         value: &TypeSpec<F>,

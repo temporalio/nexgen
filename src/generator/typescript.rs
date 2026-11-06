@@ -3100,10 +3100,8 @@ impl RenderedOperation<'_> {
     }
 }
 
-/// A resource's constructor takes its fields and then a runtime type for each type parameter, and
-/// a getter of the same name gives the runtime type back. An operation takes its request and then
-/// the runtime types. So a field, a method or another runtime type with that name would make a
-/// duplicate parameter or member.
+/// A runtime type gives its name to a constructor parameter, a getter and an operation parameter.
+/// So a field, a method or another runtime type with that name would make a duplicate.
 fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Result<()> {
     let check = |taken: &mut BTreeMap<String, String>, parameter: &str| {
         let name = typescript_runtime_type_argument_name(parameter);
@@ -4293,8 +4291,8 @@ fn render_operation_registry_module(
     render_generated_module(imports, body)
 }
 
-// An interceptor handles every type argument of a generic model, so it erases them. `unknown`
-// makes the hook narrow a value before it uses it.
+// An interceptor gets each type argument of a generic model, so it has `unknown` for each one.
+// Then the hook must narrow a value before it uses it.
 fn system_nexus_interceptor_input_annotation(operation: &RenderedOperation<'_>) -> String {
     operation.input.as_ref().map_or_else(
         || "undefined".to_string(),
