@@ -1480,6 +1480,27 @@ impl<'a> ApiPlanner<'a> {
         file_name: Option<PathBuf>,
     ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
+        for service in &self.api_plan.services {
+            for operation in &service.operations {
+                interceptor::validate_context_propagation_mode(operation, &self.package)?;
+                if operation.context_propagation_header.value().is_some()
+                    && service.resources.iter().any(|resource| {
+                        resource.data.methods.iter().any(|method| {
+                            matches!(
+                                &method.binding,
+                                PlannedResourceMethodBinding::Operation { operation_name, .. }
+                                    if operation_name == &operation.name
+                            )
+                        })
+                    })
+                {
+                    return Err(interceptor::context_propagation_error(
+                        &operation.name,
+                        "operations bound to resource methods do not support context propagation",
+                    ));
+                }
+            }
+        }
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
         {
@@ -1548,6 +1569,12 @@ impl<'a> ApiPlanner<'a> {
                     context: format!("operation `{}`", operation.name),
                     reason: "serialization-context requires a proto-backed operation".to_string(),
                 });
+            }
+            if operation.context_propagation_header.is_some() && operation.wire_binding.is_none() {
+                return Err(interceptor::context_propagation_error(
+                    operation.name,
+                    "requires a proto-backed operation",
+                ));
             }
         }
 
@@ -2056,6 +2083,14 @@ impl<'a> ApiPlanner<'a> {
                     .collect()
             })
             .unwrap_or_default();
+        let context_propagation_header =
+            interceptor::context_propagation_header(operation, self.api_plan)?;
+        if context_propagation_header.is_some() && unpacked_input.is_none() {
+            return Err(interceptor::context_propagation_error(
+                &operation.name,
+                "requires a generated request record",
+            ));
+        }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -2066,6 +2101,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
+            context_propagation_header,
             sourced_fields,
             output_transform_expr: go_output_transform
                 .map(|(_, expr)| self.package.alias_workflow_expr(expr)),
@@ -2758,6 +2794,8 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<String>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    /// Resolved Go request field receiving propagated context headers.
+    context_propagation_header: Option<String>,
     /// The Go name and source expression of each sourced field of the request for the Workflow
     /// API. The public wrapper fills them, and a resource method fills those that it has no value
     /// for, so a resource field wins over its source.
@@ -6238,6 +6276,9 @@ fn render_convenience_wrapper(
     output.push_str(" {\n");
 
     if package.workflow_interceptors {
+        if operation.context_propagation_header.is_some() {
+            output.push_str("\tassertNotInReadOnlyState(ctx)\n");
+        }
         interceptor::render_defaults(output, params);
         render_function_name_inlining(output, params, package);
         interceptor::render_call(output, operation, package);
@@ -6312,6 +6353,9 @@ fn render_operation_request(
         output.push_str(": ");
         output.push_str(expression);
         output.push_str(",\n");
+    }
+    if let Some(field) = &operation.context_propagation_header {
+        output.push_str(&format!("\t\t{field}: _nexgenHeader.Fields,\n"));
     }
     output.push_str("\t}");
 }
