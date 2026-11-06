@@ -1182,8 +1182,11 @@ fn build_fields_from_record(
                     flattened_annotation: None,
                     field_type,
                     required: false,
-                    origin: LanguageFieldOrigins {
-                        default: Some(FieldOrigin::Omitted),
+                    origin: LanguageFieldPolicies {
+                        default: Some(FieldPolicy {
+                            omitted: true,
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     },
                     function: None,
@@ -1203,7 +1206,7 @@ fn build_fields_from_record(
         let api_omit_targets = api_omit_directive
             .map(|directive| build_origin_targets(directive, path, &field_context, "api-omit"))
             .transpose()?;
-        let origin = build_field_origins(
+        let origin = build_field_policies(
             &directives,
             api_omit_targets.as_deref(),
             path,
@@ -1224,7 +1227,7 @@ fn build_fields_from_record(
         }
         let sourced = origin
             .for_language(language)
-            .is_some_and(FieldOrigin::is_sourced);
+            .is_some_and(FieldPolicy::is_sourced);
         if api_omit_targets.is_some() && required && !is_list_type(resolve, &field.ty) {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
@@ -1711,18 +1714,14 @@ pub(crate) fn find_proto_name_for_type_def(
     directive_value(&directives, "proto", path, context, "value")
 }
 
-fn build_field_origins(
+fn build_field_policies(
     directives: &[Directive],
     api_omit_targets: Option<&[GenerationTarget]>,
     path: &Path,
     context: &str,
-) -> Result<LanguageFieldOrigins> {
-    let mut origins = LanguageFieldOrigins::default();
+) -> Result<LanguageFieldPolicies> {
+    let mut policies = LanguageFieldPolicies::default();
     let api_omitted = api_omit_targets.is_some();
-    // An api-omit of some targets lets the others take a source or a parameter.
-    let api_omitted_targets = api_omit_targets
-        .filter(|targets| *targets != [GenerationTarget::Workflow, GenerationTarget::Client])
-        .map(|targets| targets.iter().copied().collect::<BTreeSet<_>>());
     let sources = origin_directives(directives, "source", path, context)?;
     let defaults = origin_directives(directives, "default", path, context)?
         .into_iter()
@@ -1731,12 +1730,13 @@ fn build_field_origins(
         })
         .collect::<Result<Vec<_>>>()?;
     if api_omitted {
-        origins.default = Some(match &api_omitted_targets {
-            Some(api_omitted) => FieldOrigin::ByTarget {
-                sources: BTreeMap::new(),
-                api_omitted: api_omitted.clone(),
-            },
-            None => FieldOrigin::ApiOmitted,
+        policies.default = Some(FieldPolicy {
+            omitted: false,
+            origin: api_omit_targets
+                .unwrap_or_default()
+                .iter()
+                .map(|&target| (target, FieldOrigin::Omitted))
+                .collect(),
         });
         if !defaults.is_empty() {
             return Err(Error::InvalidWitDirective {
@@ -1783,51 +1783,39 @@ fn build_field_origins(
                 reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
             });
         }
-        let origin = if !source_expressions.is_empty() {
-            match &api_omitted_targets {
-                Some(api_omitted)
-                    if !api_omitted
-                        .iter()
-                        .any(|target| source_expressions.contains_key(target)) =>
-                {
-                    Some(FieldOrigin::ByTarget {
-                        sources: source_expressions,
-                        api_omitted: api_omitted.clone(),
-                    })
-                }
-                Some(_) => {
-                    return Err(Error::InvalidWitDirective {
-                        path: path.to_path_buf(),
-                        context: context.to_string(),
-                        directive: "@nexus.api-omit".to_string(),
-                        reason: "cannot be combined with `@nexus.source` for the same target"
-                            .to_string(),
-                    });
-                }
-                None if api_omitted => {
-                    return Err(Error::InvalidWitDirective {
-                        path: path.to_path_buf(),
-                        context: context.to_string(),
-                        directive: "@nexus.api-omit".to_string(),
-                        reason: "cannot be combined with `@nexus.source`".to_string(),
-                    });
-                }
-                None => Some(FieldOrigin::Source {
-                    expressions: source_expressions,
-                }),
-            }
-        } else if !default_expressions.is_empty() {
-            Some(FieldOrigin::Default {
-                expressions: default_expressions,
-            })
-        } else {
-            None
-        };
-        if let Some(origin) = origin {
-            origins.by_language.insert(language, origin);
+        if source_expressions.is_empty() && default_expressions.is_empty() {
+            continue;
         }
+        let mut policy = policies.default.clone().unwrap_or_default();
+        if source_expressions
+            .keys()
+            .any(|&target| policy.api_omitted_for(target))
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: "@nexus.api-omit".to_string(),
+                reason: if api_omit_targets.is_some_and(|targets| targets.len() == 2) {
+                    "cannot be combined with `@nexus.source`"
+                } else {
+                    "cannot be combined with `@nexus.source` for the same target"
+                }
+                .to_string(),
+            });
+        }
+        policy.origin.extend(
+            source_expressions
+                .into_iter()
+                .map(|(target, expression)| (target, FieldOrigin::Source(expression))),
+        );
+        policy.origin.extend(
+            default_expressions
+                .into_iter()
+                .map(|(target, expression)| (target, FieldOrigin::Default(expression))),
+        );
+        policies.by_language.insert(language, policy);
     }
-    Ok(origins)
+    Ok(policies)
 }
 
 /// Repeated origin directives have no ordering or override precedence.
@@ -3785,8 +3773,8 @@ mod tests {
     use crate::error::Error;
     use crate::language::Language;
     use crate::spec::{
-        CompilerPass, ExternalTypeSourceSpec, ExternalVariantSourceSpec, LanguageStringSpec,
-        ProtoOneofSpec, ProtoTypeSpec,
+        CompilerPass, ExternalTypeSourceSpec, ExternalVariantSourceSpec, FieldOrigin,
+        LanguageStringSpec, ProtoOneofSpec, ProtoTypeSpec,
     };
 
     use super::{
@@ -4227,6 +4215,98 @@ interface example {
             assert_eq!(source.default_for(GenerationTarget::Workflow), None);
             assert_eq!(default.source_for(GenerationTarget::Client), None);
         }
+    }
+
+    #[test]
+    fn lowers_api_omission_and_sources_to_independent_target_policies() {
+        let wit = r#"
+package test:policies@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.api-omit targets="workflow"
+    last: option<s32>,
+    /// @nexus.api-omit targets="workflow"
+    /// @nexus.source targets="client" python="client_source()"
+    owner: option<string>,
+    /// @nexus.api-omit
+    hidden: option<string>,
+  }
+  submit: func(request: request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let record = spec
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        for language in [Language::Python, Language::Go] {
+            let last = record.fields["last"].origin.for_language(language).unwrap();
+            assert!(!last.is_omitted());
+            assert_eq!(
+                last.origin_for(GenerationTarget::Workflow),
+                &FieldOrigin::Omitted
+            );
+            assert_eq!(
+                last.origin_for(GenerationTarget::Client),
+                &FieldOrigin::Parameter
+            );
+            assert_eq!(last.origin.len(), 1);
+            let owner = record.fields["owner"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            assert!(owner.api_omitted_for(GenerationTarget::Workflow));
+            if language == Language::Python {
+                assert_eq!(
+                    owner.source_for(GenerationTarget::Client),
+                    Some("client_source()")
+                );
+                assert_eq!(owner.origin.len(), 2);
+            } else {
+                assert_eq!(
+                    owner.origin_for(GenerationTarget::Client),
+                    &FieldOrigin::Parameter
+                );
+                assert_eq!(owner.origin.len(), 1);
+            }
+            let hidden = record.fields["hidden"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            assert!(!hidden.is_omitted());
+            assert!(hidden.api_omitted_for(GenerationTarget::Workflow));
+            assert!(hidden.api_omitted_for(GenerationTarget::Client));
+        }
+        let selected = crate::planning::select_spec(spec, Language::Python);
+        let record = selected
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        assert_eq!(record.api_fields(GenerationTarget::Workflow).count(), 0);
+        assert_eq!(
+            record
+                .api_fields(GenerationTarget::Client)
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>(),
+            ["last"]
+        );
+        assert_eq!(
+            record
+                .model_fields()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>(),
+            ["last", "hidden"]
+        );
+        assert_eq!(
+            record
+                .sources_for(GenerationTarget::Client)
+                .map(|(name, _, source)| (name, source))
+                .collect::<Vec<_>>(),
+            [("owner", "client_source()")]
+        );
     }
 
     #[test]

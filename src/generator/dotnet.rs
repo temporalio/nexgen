@@ -23,7 +23,7 @@ use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
     ResolvedResourceBindingSource,
 };
-use crate::spec::FieldOrigin;
+use crate::spec::FieldPolicy;
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
@@ -4131,8 +4131,8 @@ fn resource_return_binding_expr(
             proto_field_name: _,
             origin,
         } => {
-            if matches!(origin, Some(FieldOrigin::Omitted))
-                || origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+            if origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || origin.as_ref().is_some_and(FieldPolicy::is_sourced)
             {
                 let expr = format!("{request_expr}.{}", csharp_type_name(field_name));
                 optional_resource_binding_expr(resource, binding, expr, api_plan)

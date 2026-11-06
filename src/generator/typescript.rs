@@ -28,7 +28,7 @@ use crate::planning::{
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldExpression,
-    FieldOrigin, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec,
+    FieldPolicy, FlagsSpec, FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, IntSpec,
     LanguageImportSpec, LanguageImportStyle, ModulePath, OperationSpec, RecordFieldSpec,
     RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
@@ -740,7 +740,7 @@ impl<'a> ApiPlanner<'a> {
         let sourced_fields = planned_model
             .sourced_fields()
             .map(|(field_name, field, expressions)| {
-                self.build_sourced_field(&planned_model, field_name, field, expressions)
+                self.build_sourced_field(&planned_model, field_name, field, &expressions)
             })
             .collect();
 
@@ -1300,7 +1300,7 @@ impl<'a> ApiPlanner<'a> {
         record: &RecordSpec<PlannedFamily>,
         field_name: &str,
         field: &RecordFieldSpec<PlannedFamily>,
-        expressions: &BTreeMap<GenerationTarget, FieldExpression>,
+        expressions: &BTreeMap<GenerationTarget, &FieldExpression>,
     ) -> RenderedSourcedField {
         let source_expressions = expressions
             .iter()
@@ -6631,8 +6631,8 @@ fn resource_return_binding_expr_typescript(
             proto_field_name,
             origin,
         } => {
-            if matches!(origin, Some(FieldOrigin::Omitted))
-                || origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+            if origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || origin.as_ref().is_some_and(FieldPolicy::is_sourced)
             {
                 let expr = format!(
                     "request.{}",
