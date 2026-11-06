@@ -1996,8 +1996,9 @@ holds such a record is generic too.
 - .NET. A call of `Stream<TBody>` takes the type argument, as in
   `CreateStreamAsync<Turn>(options)`.
 
-Go and Java refuse a generic resource. nexgen also refuses a generic resource in
-a record field or in the result of an operation with no `@nexus.proto` message.
+Go and Java refuse a generic resource. A record field can't hold a generic
+resource yet, also in a list, map, tuple, result or variant case. An operation
+with no `@nexus.proto` message can't return a generic resource yet.
 
 ---
 
