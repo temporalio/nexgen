@@ -3354,12 +3354,24 @@ fn build_operation_poll(
         ));
     }
     let resume = directive_language_string_for_key(directive, "resume");
-    for helper in resume.default.iter().chain(resume.by_language.values()) {
-        if !is_valid_support_helper_path(helper) {
-            return Err(invalid(format!(
-                "invalid `resume` support helper `{helper}`"
-            )));
+    let transform = directive_language_string_for_key(directive, "transform");
+    for (key, helpers) in [("resume", &resume), ("transform", &transform)] {
+        for helper in helpers.default.iter().chain(helpers.by_language.values()) {
+            if !is_valid_support_helper_path(helper) {
+                return Err(invalid(format!(
+                    "invalid `{key}` support helper `{helper}`"
+                )));
+            }
         }
+    }
+    let item_type = directive_prefixed_language_string(directive, "type");
+    // The other languages' values are gone after language selection, so the checks are here.
+    if item_type
+        .by_language
+        .keys()
+        .any(|language| transform.for_language(*language).is_none())
+    {
+        return Err(invalid("`type` needs `transform`".to_string()));
     }
     let items = match directive.value("items") {
         Some(items) => {
@@ -3393,9 +3405,11 @@ fn build_operation_poll(
                 &field_context,
             )?)
         }
-        // The other languages' helpers are gone after language selection, so the check is here.
         None if !resume.is_empty() => {
             return Err(invalid("`resume` needs `items`".to_string()));
+        }
+        None if !transform.is_empty() => {
+            return Err(invalid("`transform` needs `items`".to_string()));
         }
         None => None,
     };
@@ -3404,6 +3418,8 @@ fn build_operation_poll(
         targets,
         items,
         resume,
+        transform,
+        item_type,
     }))
 }
 

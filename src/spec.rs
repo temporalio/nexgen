@@ -1491,6 +1491,11 @@ pub struct OperationPollSpec<F: TypeFamily = AuthoredFamily> {
     /// The support helper that turns a page's request and one of its items into the request that
     /// resumes after that item.
     pub resume: F::Text,
+    /// The support helper that makes a new item transform for each iteration. The transform maps
+    /// one item to the items that the item iterator yields in its place.
+    pub transform: F::Text,
+    /// The type of the items that the transform yields. Empty when it is the item type.
+    pub item_type: F::Text,
 }
 
 impl<F: TypeFamily> OperationPollSpec<F> {
@@ -1503,6 +1508,8 @@ impl<F: TypeFamily> OperationPollSpec<F> {
             targets: self.targets,
             items: self.items,
             resume: map.map_text(self.resume),
+            transform: map.map_text(self.transform),
+            item_type: map.map_text(self.item_type),
         }
     }
 }

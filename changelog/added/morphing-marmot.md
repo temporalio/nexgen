@@ -1,0 +1,1 @@
+`@nexus.poll python-transform="<helper>"` gives each Python `iter_<name>_items` call a new transform from the support helper. The transform maps each item to zero or more items to yield in its place, and `python-type="<type>"` names their type when it isn't the item type.

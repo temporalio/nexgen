@@ -423,12 +423,14 @@ interface stream-service {
   close-stream: func(request: close-stream-request) -> close-stream-response;
 
   // A WIT stream can't cross a Nexus call, so a read is a request and a response. The SDK's support
-  // helper builds the next request from a page for the poll iterator.
+  // helper builds the next request from a page for the poll iterator. Its item transform skips an
+  // item kind that the SDK doesn't know and gives the Records that a Superseded item withdraws.
   /// @nexus.doc
   ///   "A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity."
   /// @nexus.operation name="ReadRecords"
   /// @nexus.poll python="next_read_request" items="records" python-resume="resume_read_request"
-  ///   targets="client"
+  ///   python-transform="read_item_transform"
+  ///   python-type="_support.Record[BodyT] | _support.Superseded" targets="client"
   // TODO: implement polling for typescript="nextReadRequest" dotnet="StreamPoll.NextReadRequest".
   read-records: func(request: read-records-request) -> read-records-response;
 

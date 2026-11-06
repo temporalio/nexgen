@@ -21,6 +21,7 @@ import temporalio.workflow
 from temporalio.api.common.v1 import Payload
 from typing_extensions import assert_type, override
 
+from temporal_support import Record, Superseded
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
@@ -46,9 +47,11 @@ from wit.stream_service.both.models import (
     ReadRecordsResponse,
     StreamData,
     StreamItemData,
+    StreamItemSuperseded,
     StreamReadStart,
     StreamRecord,
     StreamRef,
+    StreamSuperseded,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -593,6 +596,16 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     ]
 
 
+def data_record(offset: int, producer: str = "p") -> StreamRecord[str]:
+    data = StreamData(body=f"r{offset}", producer=Producer(id=producer))
+    return StreamRecord[str](item=StreamItemData(data), offset=offset)
+
+
+def superseded_record(offset: int, producer: str) -> StreamRecord[str]:
+    superseded = StreamSuperseded(producer_id=producer, failed_tasks=[])
+    return StreamRecord[str](item=StreamItemSuperseded(superseded), offset=offset)
+
+
 async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None:
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
@@ -601,15 +614,11 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
         {
             "ReadRecords": [
                 ReadRecordsResponse[str](
-                    records=[
-                        StreamRecord[str](offset=10),
-                        StreamRecord[str](offset=12),
-                    ],
-                    next_offset=15,
+                    records=[data_record(10), data_record(12)], next_offset=15
                 ),
                 ReadRecordsResponse[str](records=[], next_offset=15),
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=20)], next_offset=21, done=True
+                    records=[data_record(20)], next_offset=21, done=True
                 ),
             ]
         },
@@ -641,11 +650,10 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
         {
             "ReadRecords": [
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=1), StreamRecord[str](offset=2)],
-                    next_offset=3,
+                    records=[data_record(1), data_record(2)], next_offset=3
                 ),
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=2)], next_offset=3, done=True
+                    records=[data_record(2)], next_offset=3, done=True
                 ),
             ]
         },
@@ -675,8 +683,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
         {
             "ReadRecords": [
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=1), StreamRecord[str](offset=2)],
-                    next_offset=3,
+                    records=[data_record(1), data_record(2)], next_offset=3
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
             ]
@@ -697,6 +704,61 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
     ]
 
 
+async def test_read_items_skip_unknown_kinds_and_give_what_is_withdrawn() -> None:
+    ref = StreamRef(id="s1")
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse[str](
+                    records=[
+                        data_record(1, producer="a"),
+                        StreamRecord[str](offset=2),
+                        data_record(3, producer="b"),
+                        StreamRecord[str](offset=4),
+                    ],
+                    next_offset=5,
+                ),
+                ReadRecordsResponse[str](
+                    records=[superseded_record(5, producer="a"), data_record(6)],
+                    next_offset=7,
+                    done=True,
+                ),
+                ReadRecordsResponse[str](
+                    records=[superseded_record(5, producer="a")],
+                    next_offset=6,
+                    done=True,
+                ),
+            ]
+        },
+    )
+    stream = client.get_stream(ref=ref, body_type=str)
+
+    read = stream.iter_read_items(from_offset=1)
+    seen = [
+        (item, read.next_request and read.next_request.from_offset)
+        async for item in read
+    ]
+
+    _ = assert_type(read, PollIterator[ReadRecordsRequest, Record[str] | Superseded])
+
+    # An item of an unknown kind is skipped, and the read still resumes past it.
+    assert seen == [
+        (Record(offset=1, body="r1"), 2),
+        (Record(offset=3, body="r3"), 5),
+        (Superseded(offset=5, withdrawn=[1]), 6),
+        (Record(offset=6, body="r6"), None),
+    ]
+    # A new iteration knows only its own Records.
+    resumed = stream.iter_read_items(from_offset=5)
+    assert [item async for item in resumed] == [Superseded(offset=5, withdrawn=[])]
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(ref=ref, from_offset=1),
+        ReadRecordsRequest(ref=ref, from_offset=5),
+        ReadRecordsRequest(ref=ref, from_offset=5),
+    ]
+
+
 async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -> None:
     async def pages() -> collections.abc.AsyncGenerator[list[int], None]:
         yield [1, 2]
@@ -713,6 +775,33 @@ async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -
     seen = [(item, read.next_request) async for item in read]
 
     assert seen == [(1, "first"), (2, "second"), (3, None)]
+
+
+async def test_the_next_request_passes_an_item_after_the_last_item_made_of_it() -> None:
+    async def pages() -> collections.abc.AsyncGenerator[list[int], None]:
+        yield [1, 2, 3]
+        yield [4]
+
+    # A request is the item to resume after, and the second page's request is 10.
+    read = PollIterator(
+        0,
+        pages(),
+        lambda page: page,
+        lambda request, _page: 10 if request == 0 else None,
+        lambda _request, item: item,
+        lambda item: [] if item == 2 else [f"{item}a", f"{item}b"],
+    )
+
+    seen = [(item, read.next_request) async for item in read]
+
+    assert seen == [
+        ("1a", 0),
+        ("1b", 1),
+        ("3a", 2),
+        ("3b", 10),
+        ("4a", 10),
+        ("4b", None),
+    ]
 
 
 def test_only_the_client_target_has_the_read_poll() -> None:
@@ -783,4 +872,6 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     # A poll decodes with the specialization too.
     assert page.records == [record]
     assert [page.records async for page in stream.iter_read()] == [[record]]
-    assert [item async for item in stream.iter_read_items()] == [record]
+    assert [item async for item in stream.iter_read_items()] == [
+        Record(offset=1, body=Turn(role="model"))
+    ]

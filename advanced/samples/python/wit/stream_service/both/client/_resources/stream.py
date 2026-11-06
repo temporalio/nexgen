@@ -19,7 +19,6 @@ from ...models import (
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamReadStart,
-    StreamRecord,
     StreamRef,
 )
 import temporal_support as _support
@@ -202,11 +201,12 @@ class Stream(typing.Generic[BodyT]):
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
+    ) -> PollIterator[ReadRecordsRequest, _support.Record[BodyT] | _support.Superseded]:
         """Yield each item of ``iter_read``, page by page.
 
-        ``next_request`` resumes after the last item that the iterator yielded. It is
-        ``None`` after the last page.
+        A new transform from ``read_item_transform`` maps each item to the items that
+        the iterator yields. ``next_request`` resumes after the last item that the
+        iterator yielded. It is ``None`` after the last page.
 
         Read one page of Records. The poll iterator reads them all.
 
@@ -248,6 +248,7 @@ class Stream(typing.Generic[BodyT]):
             lambda response: response.records,
             _support.next_read_request,
             _support.resume_read_request,
+            _support.read_item_transform(),
         )
 
     async def describe(

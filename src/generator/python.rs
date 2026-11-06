@@ -2059,7 +2059,7 @@ impl<'a> ApiPlanner<'a> {
             Some(&poll_items_summary(
                 &method_name,
                 method.doc.as_deref(),
-                operation.poll_resume().is_some(),
+                operation,
             )),
             &args,
             None,
@@ -2471,8 +2471,9 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    /// The response attribute of the `items` field, and the annotation of one of its items. The
-    /// poll pass has checked that the field is a list.
+    /// The response attribute of the `items` field, and the annotation of what the item iterator
+    /// yields. That is the transform's type, or else the type of one item of the field. The poll
+    /// pass has checked that the field is a list.
     fn resolve_poll_items(
         &mut self,
         operation: &OperationSpec<PlannedFamily>,
@@ -2493,8 +2494,15 @@ impl<'a> ApiPlanner<'a> {
         let PlannedType::List(item) = list else {
             panic!("the `items` field should be a list");
         };
-        let item = self.resolve_planned_value_type(item)?;
-        Ok((python_field_name(&field.name), item.annotation))
+        let item = match operation
+            .poll
+            .as_ref()
+            .and_then(|poll| poll.item_type.value())
+        {
+            Some(item_type) => item_type.to_string(),
+            None => self.resolve_planned_value_type(item)?.annotation,
+        };
+        Ok((python_field_name(&field.name), item))
     }
 
     fn resolve_output_annotation(&mut self, model_type: &PlannedType) -> Result<String> {
@@ -3827,6 +3835,11 @@ impl RenderedOperation<'_> {
         self.poll
             .and_then(|poll| poll.resume.value())
             .map(|helper| format!("_support.{helper}"))
+    }
+
+    /// The support helper that makes the item transform of an iteration, when the poll has one.
+    fn poll_transform(&self) -> Option<&str> {
+        self.poll.and_then(|poll| poll.transform.value())
     }
 
     /// The poll helper, when the target gets the poll.
@@ -6734,6 +6747,7 @@ import typing
 
 _PollRequestT = typing.TypeVar("_PollRequestT")
 _PollResponseT = typing.TypeVar("_PollResponseT")
+_PollPageItemT = typing.TypeVar("_PollPageItemT")
 _PollItemT = typing.TypeVar("_PollItemT")
 
 
@@ -6744,8 +6758,12 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
     ``next_request`` is the request to resume with. After an item, the resume helper gives
     it. Without a resume helper, it reads the item's page again. After a page's last item,
     it is the page helper's request, which is ``None`` after the last page.
+
+    A transform yields zero or more items in place of each item of a page. ``next_request``
+    reads a page item again until the iterator yields the last item made of it.
     """
 
+    @typing.overload
     def __init__(
         self,
         request: _PollRequestT,
@@ -6758,31 +6776,83 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
         ],
         resume: collections.abc.Callable[[_PollRequestT, _PollItemT], _PollRequestT]
         | None,
+    ) -> None: ...
+
+    @typing.overload
+    def __init__(
+        self,
+        request: _PollRequestT,
+        pages: collections.abc.AsyncIterator[_PollResponseT],
+        items: collections.abc.Callable[
+            [_PollResponseT], collections.abc.Sequence[_PollPageItemT] | None
+        ],
+        next_page: collections.abc.Callable[
+            [_PollRequestT, _PollResponseT], _PollRequestT | None
+        ],
+        resume: collections.abc.Callable[[_PollRequestT, _PollPageItemT], _PollRequestT]
+        | None,
+        transform: collections.abc.Callable[
+            [_PollPageItemT], collections.abc.Iterable[_PollItemT]
+        ],
+    ) -> None: ...
+
+    def __init__(
+        self,
+        request: _PollRequestT,
+        pages: collections.abc.AsyncIterator[typing.Any],
+        items: collections.abc.Callable[
+            [typing.Any], collections.abc.Sequence[typing.Any] | None
+        ],
+        next_page: collections.abc.Callable[
+            [_PollRequestT, typing.Any], _PollRequestT | None
+        ],
+        resume: collections.abc.Callable[[_PollRequestT, typing.Any], _PollRequestT]
+        | None,
+        transform: collections.abc.Callable[
+            [typing.Any], collections.abc.Iterable[_PollItemT]
+        ]
+        | None = None,
     ) -> None:
         async def read(
             page_request: _PollRequestT,
-        ) -> tuple[_PollRequestT | None, collections.deque[_PollItemT]]:
+        ) -> tuple[
+            _PollRequestT | None,
+            collections.deque[tuple[_PollItemT, _PollRequestT | None]],
+        ]:
             response = await anext(pages)
             # The page iterator keeps its requests to itself, so the page helper runs here
-            # again. It runs before the caller gets an item, so a changed item can't change
-            # the next request.
-            return next_page(page_request, response), collections.deque(
-                items(response) or ()
+            # again. The helpers run before the caller gets an item, so a changed item can't
+            # change a request.
+            page_next = next_page(page_request, response)
+            # Each entry is an item and the request to resume with after it.
+            page: collections.deque[tuple[_PollItemT, _PollRequestT | None]] = (
+                collections.deque()
             )
+            after = page_request
+            for page_item in items(response) or ():
+                before = after
+                if resume is not None:
+                    after = resume(page_request, page_item)
+                made = [page_item] if transform is None else list(transform(page_item))
+                page.extend((item, before) for item in made[:-1])
+                page.extend((item, after) for item in made[-1:])
+            if page:
+                page[-1] = (page[-1][0], page_next)
+            return page_next, page
 
         self.next_request: _PollRequestT | None = request
         self._read: collections.abc.Callable[
             [_PollRequestT],
             collections.abc.Awaitable[
-                tuple[_PollRequestT | None, collections.deque[_PollItemT]]
+                tuple[
+                    _PollRequestT | None,
+                    collections.deque[tuple[_PollItemT, _PollRequestT | None]],
+                ]
             ],
         ] = read
-        self._resume: (
-            collections.abc.Callable[[_PollRequestT, _PollItemT], _PollRequestT] | None
-        ) = resume
-        self._page: collections.deque[_PollItemT] = collections.deque()
-        self._page_request: _PollRequestT = request
-        self._page_next: _PollRequestT | None = None
+        self._page: collections.deque[tuple[_PollItemT, _PollRequestT | None]] = (
+            collections.deque()
+        )
 
     def __aiter__(self) -> PollIterator[_PollRequestT, _PollItemT]:
         return self
@@ -6791,15 +6861,10 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
         while not self._page:
             if self.next_request is None:
                 raise StopAsyncIteration
-            self._page_request = self.next_request
-            self._page_next, self._page = await self._read(self._page_request)
+            page_next, self._page = await self._read(self.next_request)
             if not self._page:
-                self.next_request = self._page_next
-        item = self._page.popleft()
-        if not self._page:
-            self.next_request = self._page_next
-        elif self._resume is not None:
-            self.next_request = self._resume(self._page_request, item)
+                self.next_request = page_next
+        item, self.next_request = self._page.popleft()
         return item
 "#;
 
@@ -9064,16 +9129,25 @@ fn poll_iterator_names(
     names
 }
 
-fn poll_items_summary(name: &str, doc: Option<&str>, resume: bool) -> String {
-    let next_request = if resume {
+fn poll_items_summary(name: &str, doc: Option<&str>, operation: &RenderedOperation<'_>) -> String {
+    let next_request = if operation.poll_resume().is_some() {
         "``next_request`` resumes after the last item that the iterator yielded."
     } else {
         "``next_request`` reads the page of the last item again, until the iterator yields the \
          page's last item."
     };
+    let transform = operation
+        .poll_transform()
+        .map(|helper| {
+            format!(
+                "A new transform from ``{helper}`` maps each item to the items that the iterator \
+                 yields. "
+            )
+        })
+        .unwrap_or_default();
     let summary = format!(
-        "Yield each item of ``{}``, page by page.\n\n{next_request} It is ``None`` after the \
-         last page.",
+        "Yield each item of ``{}``, page by page.\n\n{transform}{next_request} It is ``None`` \
+         after the last page.",
         poll_function_name(name)
     );
     match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
@@ -9156,7 +9230,7 @@ fn render_operation_poll_items_function(
         Some(&poll_items_summary(
             &operation.attr_name,
             operation.doc.as_deref(),
-            operation.poll_resume().is_some(),
+            operation,
         )),
         &args,
         None,
@@ -9205,6 +9279,10 @@ fn render_poll_items_return(
         return;
     };
     let resume = operation.poll_resume();
+    // Each call makes a new transform, so each iteration starts with new state.
+    let transform = operation
+        .poll_transform()
+        .map(|helper| format!("_support.{helper}()"));
     output.push_str(indent);
     output.push_str("return PollIterator(\n");
     for arg in [
@@ -9213,7 +9291,10 @@ fn render_poll_items_return(
         &format!("lambda response: response.{items_attr}"),
         next_expr,
         resume.as_deref().unwrap_or("None"),
-    ] {
+    ]
+    .into_iter()
+    .chain(transform.as_deref())
+    {
         output.push_str(indent);
         output.push_str("    ");
         output.push_str(arg);

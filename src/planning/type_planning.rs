@@ -663,6 +663,8 @@ impl<'a> TypePlanningContext<'a> {
                 targets: poll.targets.clone(),
                 items: poll.items.clone(),
                 resume: poll.resume.clone(),
+                transform: poll.transform.clone(),
+                item_type: poll.item_type.clone(),
             }),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(

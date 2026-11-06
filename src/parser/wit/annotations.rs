@@ -247,8 +247,8 @@ const CATALOG: &[Annotation] = {
         Annotation {
             name: "poll",
             sites: &[Function],
-            keys: &["value", "import", "targets", "items", "resume"],
-            language_keys: &["", "import", "resume"],
+            keys: &["value", "import", "targets", "items", "resume", "transform"],
+            language_keys: &["", "import", "resume", "transform", "type"],
             repeatable: false,
             languages: Some(&[Language::Python]),
             system_nexus: true,
