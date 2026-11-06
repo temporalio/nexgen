@@ -1,0 +1,30 @@
+package test:python-resource-call@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    /// @nexus.operation "cancel-job"
+    /// @nexus.close
+    cancel: func(reason: option<string>);
+  }
+
+  type job-result = own<job>;
+
+  record cancel-job-request {
+    job-id: string,
+    reason: option<string>,
+  }
+
+  record resource-call-request {
+    job-id: string,
+  }
+
+  cancel-job: func(request: cancel-job-request);
+
+  // The function of this operation has the name of the decorator that its own module imports.
+  resource-call: func(request: resource-call-request) -> job-result;
+}

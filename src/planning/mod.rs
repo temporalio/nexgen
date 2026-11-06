@@ -171,6 +171,8 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) doc: Option<String>,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
+    /// Set by `@nexus.close`. The end of an `async with` block calls this method.
+    pub(crate) close: bool,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
 }
 

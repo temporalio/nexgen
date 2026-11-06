@@ -17,6 +17,7 @@ from ..models import (
 )
 from ._resources.stream import Stream
 import temporal_support as _support
+from .._resource_call import resource_call
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
@@ -73,6 +74,7 @@ class _CreateStream(typing.Generic[BodyT]):
     def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
         return _CreateStream(self._extension, body_type)
 
+    @resource_call
     async def __call__(
         self,
         *,

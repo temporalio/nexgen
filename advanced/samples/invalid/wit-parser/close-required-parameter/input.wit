@@ -1,0 +1,14 @@
+package test:close-required-parameter@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(id: string);
+
+    // The end of a block calls the close with no reason.
+    /// @nexus.close
+    close: func(reason: string);
+  }
+}

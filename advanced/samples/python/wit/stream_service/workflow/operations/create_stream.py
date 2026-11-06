@@ -15,6 +15,7 @@ from ..models import (
 )
 from .._resources import Stream
 import temporal_support as _support
+from .._resource_call import resource_call
 
 
 BodyT = typing.TypeVar("BodyT")
@@ -57,6 +58,7 @@ class _CreateStream(typing.Generic[BodyT]):
     def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
         return _CreateStream(body_type)
 
+    @resource_call
     async def __call__(
         self,
         *,

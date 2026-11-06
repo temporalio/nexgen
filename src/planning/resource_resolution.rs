@@ -112,6 +112,7 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) doc: SelectedTextSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
+    pub(crate) close: bool,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -409,6 +410,7 @@ fn resolve_resource_method(
             doc: method.doc.clone(),
             params: method.params.clone(),
             result: method.result.clone(),
+            close: method.close,
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
@@ -436,6 +438,15 @@ fn resolve_resource_method(
     }
 
     let binding = match matching_operations.len() {
+        // A stub close method would fail at the end of each scope.
+        0 if method.close => {
+            return Err(Error::InvalidResourceMethod {
+                service: service.name.clone(),
+                resource: resource.name.to_upper_camel_case(),
+                method: method.name.to_string(),
+                reason: "has `@nexus.close`, but binds to no operation".to_string(),
+            });
+        }
         0 => ResolvedResourceMethodBinding::Stub,
         1 => {
             let (operation_name, request_plan) = matching_operations.pop().expect("len checked");
@@ -464,6 +475,7 @@ fn resolve_resource_method(
         doc: method.doc.clone(),
         params: method.params.clone(),
         result: method.result.clone(),
+        close: method.close,
         binding,
     })
 }
