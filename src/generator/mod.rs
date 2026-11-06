@@ -1011,4 +1011,87 @@ interface example-service {
         );
         assert!(generated.files[&PathBuf::from("services.py")].contains("class ExampleService"));
     }
+
+    #[test]
+    fn a_runtime_type_argument_name_must_be_free() {
+        let pair = r#"
+  /// @nexus.type-parameter
+  type body = placeholder;
+  /// @nexus.type-parameter
+  type body-t = placeholder;
+  resource pair {
+    constructor(first: body, second: body-t);
+  }"#;
+        let method = r#"
+  /// @nexus.type-parameter
+  type body-t = placeholder;
+  resource holder {
+    constructor(body: body-t);
+    body-type: func() -> string;
+  }"#;
+        for (language, items, name, conflicting) in [
+            (
+                Language::Python,
+                pair,
+                "body_type",
+                "the runtime type of `Body`",
+            ),
+            (
+                Language::TypeScript,
+                pair,
+                "bodyType",
+                "the runtime type of `Body`",
+            ),
+            (
+                Language::Python,
+                method,
+                "body_type",
+                "method `body-type` of resource `holder`",
+            ),
+            (
+                Language::TypeScript,
+                method,
+                "bodyType",
+                "method `body-type` of resource `holder`",
+            ),
+        ] {
+            let wit = format!(
+                "package test:names@1.0.0;\nworld system {{ export names; }}\n\
+                 interface names {{\n  type placeholder = string;\n{items}\n}}\n"
+            );
+            let spec = crate::parser::parse_api_spec_from_wit_for_language(
+                language,
+                &wit,
+                PathBuf::from("inline.wit"),
+            )
+            .unwrap();
+            let descriptors =
+                DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() })
+                    .unwrap();
+            let error = generate_files_for_tree_with_targets_and_options(
+                language,
+                ApiSpecTree::single(spec),
+                &descriptors,
+                &[GenerationTarget::Workflow],
+                GenerateFilesOptions {
+                    support_package: Some("support".to_string()),
+                    ..GenerateFilesOptions::default()
+                },
+            )
+            .unwrap_err();
+            let crate::error::Error::RuntimeTypeArgumentNameConflict {
+                name: actual_name,
+                conflicting: actual_conflicting,
+                ..
+            } = &error
+            else {
+                panic!("{language:?}: expected a runtime type name conflict, got {error}");
+            };
+            assert_eq!(
+                (actual_name.as_str(), actual_conflicting.as_str()),
+                (name, conflicting),
+                "{language:?}"
+            );
+        }
+    }
 }

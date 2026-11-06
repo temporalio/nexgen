@@ -3100,23 +3100,42 @@ impl RenderedOperation<'_> {
     }
 }
 
-/// A resource's constructor takes its fields and then a runtime type for each type parameter,
-/// so a field with the runtime type's name would make a duplicate parameter.
+/// A resource's constructor takes its fields and then a runtime type for each type parameter, and
+/// a getter of the same name gives the runtime type back. An operation takes its request and then
+/// the runtime types. So a field, a method or another runtime type with that name would make a
+/// duplicate parameter or member.
 fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Result<()> {
-    for resource in services.iter().flat_map(|service| &service.resources) {
-        for parameter in resource_type_parameter_names(resource) {
-            let name = typescript_runtime_type_argument_name(&parameter);
-            if let Some(field) = resource
-                .fields
-                .iter()
-                .find(|field| typescript_generated_field_name(&field.name) == name)
-            {
-                return Err(Error::RuntimeTypeArgumentNameConflict {
-                    language: Language::TypeScript,
-                    name,
-                    parameter,
-                    conflicting: format!("field `{}` of resource `{}`", field.name, resource.name),
-                });
+    let check = |taken: &mut BTreeMap<String, String>, parameter: &str| {
+        let name = typescript_runtime_type_argument_name(parameter);
+        match taken.insert(name.clone(), format!("the runtime type of `{parameter}`")) {
+            Some(conflicting) => Err(Error::RuntimeTypeArgumentNameConflict {
+                language: Language::TypeScript,
+                name,
+                parameter: parameter.to_string(),
+                conflicting,
+            }),
+            None => Ok(()),
+        }
+    };
+    for service in services {
+        for resource in &service.resources {
+            let fields = resource.fields.iter().map(|field| {
+                let owner = format!("field `{}` of resource `{}`", field.name, resource.name);
+                (typescript_generated_field_name(&field.name), owner)
+            });
+            let methods = resource.methods.iter().map(|method| {
+                let owner = format!("method `{}` of resource `{}`", method.name, resource.name);
+                (typescript_generated_field_name(&method.name), owner)
+            });
+            let mut taken = fields.chain(methods).collect();
+            for parameter in resource_type_parameter_names(resource) {
+                check(&mut taken, &parameter)?;
+            }
+        }
+        for operation in &service.operations {
+            let mut taken = BTreeMap::new();
+            for parameter in &operation.runtime_type_parameters {
+                check(&mut taken, parameter)?;
             }
         }
     }

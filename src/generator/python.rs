@@ -6574,48 +6574,54 @@ fn validate_rpc_option_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// A runtime type argument takes its name from its type parameter, so a field or parameter with
-/// that name would make a duplicate argument or attribute.
+/// A runtime type argument takes its name from its type parameter, so a field, a method, a request
+/// field or another runtime type with that name would make a duplicate argument or member.
 fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Result<()> {
-    let conflict = |parameter: &str, conflicting: String| Error::RuntimeTypeArgumentNameConflict {
-        language: Language::Python,
-        name: python_runtime_type_argument_name(parameter),
-        parameter: parameter.to_string(),
-        conflicting,
+    let check = |taken: &mut BTreeMap<String, String>, parameter: &str| {
+        let name = python_runtime_type_argument_name(parameter);
+        match taken.insert(name.clone(), format!("the runtime type of `{parameter}`")) {
+            Some(conflicting) => Err(Error::RuntimeTypeArgumentNameConflict {
+                language: Language::Python,
+                name,
+                parameter: parameter.to_string(),
+                conflicting,
+            }),
+            None => Ok(()),
+        }
     };
     for service in services {
         for resource in &service.resources {
+            let fields = resource.fields.iter().map(|field| {
+                let owner = format!("field `{}` of resource `{}`", field.name, resource.name);
+                (python_field_name(&field.name), owner)
+            });
+            let methods = resource.methods.iter().map(|method| {
+                let owner = format!("method `{}` of resource `{}`", method.name, resource.name);
+                (python_field_name(&method.name), owner)
+            });
+            let mut taken = fields.chain(methods).collect();
             for parameter in resource_type_variable_names(resource) {
-                let name = python_runtime_type_argument_name(&parameter);
-                if let Some(field) = resource
-                    .fields
-                    .iter()
-                    .find(|field| python_field_name(&field.name) == name)
-                {
-                    return Err(conflict(
-                        &parameter,
-                        format!("field `{}` of resource `{}`", field.name, resource.name),
-                    ));
-                }
+                check(&mut taken, &parameter)?;
             }
         }
         for operation in &service.operations {
+            let mut taken = operation
+                .unpacked_input
+                .iter()
+                .chain(&operation.client_unpacked_input)
+                .flat_map(|input| {
+                    let owner = format!(
+                        "a field of `{}`, the request of `{}`",
+                        input.model_name, operation.name
+                    );
+                    input
+                        .parameters
+                        .iter()
+                        .map(move |field| (field.attr_name.clone(), owner.clone()))
+                })
+                .collect();
             for parameter in &operation.runtime_type_arguments {
-                let name = python_runtime_type_argument_name(parameter);
-                if let Some(input) = operation
-                    .unpacked_input
-                    .iter()
-                    .chain(&operation.client_unpacked_input)
-                    .find(|input| input.parameters.iter().any(|field| field.attr_name == name))
-                {
-                    return Err(conflict(
-                        parameter,
-                        format!(
-                            "a field of `{}`, the request of `{}`",
-                            input.model_name, operation.name
-                        ),
-                    ));
-                }
+                check(&mut taken, parameter)?;
             }
         }
     }
