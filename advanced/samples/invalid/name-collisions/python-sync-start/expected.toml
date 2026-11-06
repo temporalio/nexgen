@@ -4,7 +4,5 @@ targets = ["workflow"]
 [error]
 kind = "python-generated-name-conflict"
 contains = [
-  "`start_cancel`",
-  "the sync start of operation `JobService.Cancel`",
-  "the function of operation `JobService.StartCancel`",
+  "Python generated name `start_cancel` for the sync start of operation `JobService.Cancel` conflicts with the function of operation `JobService.StartCancel`",
 ]
