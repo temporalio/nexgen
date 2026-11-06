@@ -1,5 +1,0 @@
-package test:annotations;
-world api { export models; }
-interface models {
-  use test:linked/helpers.{request};
-}

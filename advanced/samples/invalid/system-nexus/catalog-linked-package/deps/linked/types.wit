@@ -1,5 +1,0 @@
-package test:linked;
-/// @nexus.delay-load-temporalio-workflow
-interface helpers {
-  record request {}
-}

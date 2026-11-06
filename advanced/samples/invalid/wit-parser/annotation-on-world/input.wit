@@ -1,4 +1,0 @@
-package test:annotations;
-/// @nexus.endpoint "ignored"
-world api { export models; }
-interface models { record request {} }

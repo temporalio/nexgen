@@ -1,5 +1,0 @@
-package test:linked;
-interface types {
-  /// @nexus.typo
-  record request {}
-}

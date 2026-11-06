@@ -3,30 +3,30 @@
 package workflowservice_facade
 
 import (
-	implementation "go.temporal.io/sdk/advanced/samples/go/workflowservice"
-	internal "go.temporal.io/sdk/internal"
+	"go.temporal.io/sdk/advanced/samples/go/workflowservice"
+	"go.temporal.io/sdk/internal"
 )
 
 // Request fields for signaling a workflow, starting it first if needed.
-type SignalWithStartWorkflowRequest = implementation.SystemNexus_SignalWithStartWorkflowRequest
+type SignalWithStartWorkflowRequest = workflowservice.SystemNexus_SignalWithStartWorkflowRequest
 
 // Static metadata for a workflow execution.
-type UserMetadata = implementation.SystemNexus_UserMetadata
+type UserMetadata = workflowservice.SystemNexus_UserMetadata
 
 // Result of signaling a workflow and starting it if needed.
-type SignalWithStartWorkflowResponse = implementation.SystemNexus_SignalWithStartWorkflowResponse
+type SignalWithStartWorkflowResponse = workflowservice.SystemNexus_SignalWithStartWorkflowResponse
 
-type WorkflowOutboundInterceptor = implementation.SystemNexus_WorkflowOutboundInterceptor
+type WorkflowOutboundInterceptor = workflowservice.SystemNexus_WorkflowOutboundInterceptor
 
-type WorkflowOutboundInterceptorBase = implementation.SystemNexus_WorkflowOutboundInterceptorBase
+type WorkflowOutboundInterceptorBase = workflowservice.SystemNexus_WorkflowOutboundInterceptorBase
 
-type WorkflowOutboundInterceptorTerminal = implementation.SystemNexus_WorkflowOutboundInterceptorTerminal
+type WorkflowOutboundInterceptorTerminal = workflowservice.SystemNexus_WorkflowOutboundInterceptorTerminal
 
-type WorkflowOutboundRuntime = implementation.SystemNexus_WorkflowOutboundRuntime
+type WorkflowOutboundRuntime = workflowservice.SystemNexus_WorkflowOutboundRuntime
 
-type ExecuteOperationInput = implementation.SystemNexus_ExecuteOperationInput
+type ExecuteOperationInput = workflowservice.SystemNexus_ExecuteOperationInput
 
-type SignalWithStartWorkflowOptions = implementation.SystemNexus_SignalWithStartWorkflowOptions
+type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
 // Signal a workflow, starting it first if needed. Encode payloads with the configured
 // data converter.
@@ -45,5 +45,5 @@ func SignalWithStartWorkflow(
 	workflowValue any,
 	args ...any,
 ) internal.Future {
-	return implementation.SystemNexus_SignalWithStartWorkflow(ctx, opts, signal, signalArg, workflowValue, args...)
+	return workflowservice.SystemNexus_SignalWithStartWorkflow(ctx, opts, signal, signalArg, workflowValue, args...)
 }

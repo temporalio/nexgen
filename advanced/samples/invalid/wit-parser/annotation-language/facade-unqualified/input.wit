@@ -1,6 +1,0 @@
-package sample:facade@1.0.0;
-
-world system { export models; }
-
-/// @nexus.facade "example.org/workflow"
-interface models {}

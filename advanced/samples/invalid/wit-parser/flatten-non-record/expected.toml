@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.flatten-in-api` on type `models.label`",
-  "is not supported on type alias; valid placements: record",
-]

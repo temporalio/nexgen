@@ -1,4 +1,5 @@
 languages = ["go"]
+system_nexus = true
 targets = ["workflow"]
 
 [error]

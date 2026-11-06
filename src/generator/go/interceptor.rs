@@ -40,9 +40,15 @@ pub(super) fn render(
 
     let sdk = package.is_self_import("go.temporal.io/sdk/internal");
     let context = package.workflow_context_type();
-    let future = package.workflow_reference("NexusOperationFuture");
-    let execute_input = package.workflow_reference("ExecuteNexusOperationInput");
-    let new_client = package.workflow_reference("NewSystemNexusClient");
+    let future = package
+        .sdk_reference(SdkSymbol::NexusOperationFuture)
+        .expression;
+    let execute_input = package
+        .sdk_reference(SdkSymbol::ExecuteNexusOperationInput)
+        .expression;
+    let new_client = package
+        .sdk_reference(SdkSymbol::NewSystemNexusClient)
+        .expression;
     let [
         standalone_interface,
         standalone_base,

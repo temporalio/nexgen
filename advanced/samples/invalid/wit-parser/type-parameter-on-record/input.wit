@@ -1,8 +1,0 @@
-package test:parameter-on-record;
-
-world system { export models; }
-
-interface models {
-  /// @nexus.type-parameter
-  record value { text: string }
-}

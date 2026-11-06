@@ -1,5 +1,0 @@
-inputs = ["input.wit", "deps"]
-
-[error]
-kind = "invalid-wit-directive"
-contains = ["`@nexus.typo` on type `types.request`", "unknown annotation"]

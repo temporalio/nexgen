@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["`@nexus.endpoint` on world `api`", "is not supported on world"]

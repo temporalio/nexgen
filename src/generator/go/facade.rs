@@ -8,12 +8,29 @@ struct TypeReference {
 
 impl TypeReference {
     fn implementation(name: &str, options: &GoFacadeOptions) -> Self {
+        let qualifier = go_package_name(
+            options
+                .implementation_import_path
+                .rsplit('/')
+                .next()
+                .unwrap(),
+        );
         Self {
-            expression: format!("implementation.{name}"),
-            import: Some((
-                options.implementation_import_path.clone(),
-                "implementation".to_string(),
-            )),
+            expression: format!("{qualifier}.{name}"),
+            import: Some((options.implementation_import_path.clone(), qualifier)),
+        }
+    }
+
+    fn sdk(symbol: SdkSymbol, options: &GoFacadeOptions) -> Self {
+        let reference = symbol.resolve(
+            Some(&options.import_path),
+            crate::nexgen_config::current().system_nexus,
+        );
+        Self {
+            expression: reference.expression,
+            import: reference
+                .import
+                .map(|(path, alias)| (path.to_string(), alias.to_string())),
         }
     }
 
@@ -90,12 +107,12 @@ impl<'a> TypeScope<'a> {
                 options.implementation_import_path.clone(),
             );
         }
-        if package.is_self_import(package.workflow_import()) {
-            for name in ["Context", "Future"] {
-                scope.declarations.insert(
-                    name.to_string(),
-                    TypeReference::implementation(name, options),
-                );
+        for symbol in [SdkSymbol::Context, SdkSymbol::Future] {
+            let reference = package.sdk_reference(symbol);
+            if reference.import.is_none() {
+                scope
+                    .declarations
+                    .insert(reference.expression, TypeReference::sdk(symbol, options));
             }
         }
         scope
@@ -142,7 +159,11 @@ impl<'a> TypeScope<'a> {
                     }
                     if let Some(path) = self.imports.get(name) {
                         let member = &expression[member_start..index];
-                        let reference = if path == &self.options.implementation_import_path {
+                        let reference = if let Some(symbol) = SdkSymbol::find(path, member) {
+                            TypeReference::sdk(symbol, self.options)
+                        } else if path == &self.options.import_path {
+                            TypeReference::local(member)
+                        } else if path == &self.options.implementation_import_path {
                             TypeReference::implementation(member, self.options)
                         } else {
                             TypeReference {
@@ -180,7 +201,7 @@ impl<'a> TypeScope<'a> {
             if let TypePart::Reference(reference) = part
                 && let Some((path, _)) = &reference.import
                 && path == &self.options.implementation_import_path
-                && let Some(name) = reference.expression.strip_prefix("implementation.")
+                && let Some((_, name)) = reference.expression.split_once('.')
             {
                 self.declarations
                     .insert(name.to_string(), reference.clone());
@@ -611,7 +632,12 @@ fn render_plan(plan: &FacadePlan) -> String {
     if !plan.imports.is_empty() {
         output.push_str("\nimport (\n");
         for (path, alias) in &plan.imports {
-            output.push_str(&format!("\t{alias} {path:?}\n"));
+            let package_name = go_package_name(path.rsplit('/').next().unwrap());
+            if alias == &package_name {
+                output.push_str(&format!("\t{path:?}\n"));
+            } else {
+                output.push_str(&format!("\t{alias} {path:?}\n"));
+            }
         }
         output.push_str(")\n");
     }
@@ -713,6 +739,7 @@ mod tests {
     fn options() -> GoFacadeOptions {
         GoFacadeOptions {
             package_name: "workflow".to_string(),
+            import_path: "example.org/sdk/workflow".to_string(),
             implementation_import_path: "example.org/sdk/internal".to_string(),
         }
     }
@@ -795,10 +822,7 @@ mod tests {
         });
         assert_eq!(
             plan.imports,
-            BTreeMap::from([(
-                options.implementation_import_path,
-                "implementation".to_string(),
-            )]),
+            BTreeMap::from([(options.implementation_import_path, "internal".to_string(),)]),
         );
     }
 
@@ -834,6 +858,62 @@ mod tests {
                 TypePart::Syntax("*".to_string()),
                 TypePart::Reference(TypeReference::implementation("Custom", &options)),
             ],
+        );
+    }
+
+    #[test]
+    fn sdk_workflow_facade_uses_existing_local_types() {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![],
+        });
+        let options = GoFacadeOptions {
+            package_name: "workflow".to_string(),
+            import_path: "go.temporal.io/sdk/workflow".to_string(),
+            implementation_import_path: "go.temporal.io/sdk/internal".to_string(),
+        };
+        let mut package = package();
+        package.import_path = Some(options.implementation_import_path.clone());
+        let scope = TypeScope::new(&options, &package, &BTreeSet::new(), &[]);
+        for (expression, name) in [
+            ("Context", "Context"),
+            ("Future", "Future"),
+            ("internal.Context", "Context"),
+            ("internal.Future", "Future"),
+        ] {
+            assert_eq!(
+                scope.resolve(expression, &BTreeSet::new()).parts,
+                vec![TypePart::Reference(TypeReference::local(name))],
+            );
+        }
+        assert_eq!(
+            scope.resolve("internal.Custom", &BTreeSet::new()).parts,
+            vec![TypePart::Reference(TypeReference::implementation(
+                "Custom", &options
+            ))],
+        );
+    }
+
+    #[test]
+    fn other_workflow_packages_keep_sdk_qualifiers() {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![],
+        });
+        let mut options = options();
+        options.implementation_import_path = "go.temporal.io/sdk/internal".to_string();
+        let mut package = package();
+        package.import_path = Some(options.implementation_import_path.clone());
+        let scope = TypeScope::new(&options, &package, &BTreeSet::new(), &[]);
+        assert_eq!(
+            scope.resolve("internal.Future", &BTreeSet::new()).parts,
+            vec![TypePart::Reference(TypeReference {
+                expression: "internal.Future".to_string(),
+                import: Some((
+                    "go.temporal.io/sdk/internal".to_string(),
+                    "internal".to_string()
+                )),
+            })],
         );
     }
 }

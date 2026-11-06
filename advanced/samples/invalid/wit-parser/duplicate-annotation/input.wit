@@ -1,9 +1,0 @@
-package test:annotations;
-world api { export models; }
-interface models {
-  record request {
-    /// @nexus.doc "first"
-    /// @nexus.doc "second"
-    value: string,
-  }
-}

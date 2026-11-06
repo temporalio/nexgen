@@ -1,4 +1,5 @@
 languages = ["go"]
+system_nexus = true
 
 [error]
 kind = "invalid-wit-directive"
