@@ -216,6 +216,7 @@ async def read_records(
         max_bytes: The maximum Record bytes in a page. A larger Record is still returned
             alone.
     """
+    # None here means the caller gave no runtime type, so reads decode as Any.
     if body_type is None:
         body_type = typing.cast("type[BodyT]", typing.Any)
     request = ReadRecordsRequest(

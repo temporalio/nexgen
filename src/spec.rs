@@ -1676,8 +1676,6 @@ impl<N: AsRef<str>> AsRef<str> for JsonModelSpec<N> {
 pub struct TypeParameterSpec {
     pub name: String,
     pub full_name: String,
-    /// A generic resource orders its type parameters by this, which a moved method doesn't change.
-    pub declaration_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

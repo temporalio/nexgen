@@ -7081,7 +7081,8 @@ fn render_runtime_type_fallbacks(output: &mut String, indent: &str, type_variabl
     for name in type_variables {
         let argument = python_runtime_type_argument_name(name);
         output.push_str(&format!(
-            "{indent}if {argument} is None:\n{indent}    \
+            "{indent}# None here means the caller gave no runtime type, so reads decode as Any.\n\
+             {indent}if {argument} is None:\n{indent}    \
              {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
         ));
     }

@@ -51,6 +51,7 @@ class StreamServiceClientExtension(abc.ABC):
         body_type: type[BodyT] | None = None,
     ) -> Stream[BodyT]:
         """Return the ``Stream`` handle that has these identity fields."""
+        # None here means the caller gave no runtime type, so reads decode as Any.
         if body_type is None:
             body_type = typing.cast("type[BodyT]", typing.Any)
         return Stream[body_type](
@@ -109,6 +110,7 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
+        # None here means the caller gave no runtime type, so reads decode as Any.
         if body_type is None:
             body_type = typing.cast("type[BodyT]", typing.Any)
         request = CreateStreamRequest(

@@ -77,9 +77,8 @@ fn used_type_parameters(
         .map(|usage| usage.parameter)
         .chain(returned)
         .collect::<Vec<_>>();
-    parameters.sort_by(|left, right| {
-        (left.declaration_index, &left.full_name).cmp(&(right.declaration_index, &right.full_name))
-    });
+    // `full_name` is a type parameter's identity, so this order stays stable when a method moves.
+    parameters.sort_by(|left, right| left.full_name.cmp(&right.full_name));
     parameters.dedup();
     parameters
 }

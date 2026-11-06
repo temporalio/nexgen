@@ -1412,17 +1412,9 @@ fn resolve_authored_field_type_spec(
             let directives =
                 parse_directives(type_def.docs.contents.as_deref(), path, &type_context)?;
             if directive(&directives, "type-parameter", path, &type_context)?.is_some() {
-                let declaration_index = match type_def.owner {
-                    TypeOwner::Interface(interface_id) => resolve.interfaces[interface_id]
-                        .types
-                        .get_index_of(type_name)
-                        .unwrap_or_default(),
-                    TypeOwner::World(_) | TypeOwner::None => 0,
-                };
                 return Ok(TypeSpec::TypeParameter(TypeParameterSpec {
                     name: type_name.to_upper_camel_case(),
                     full_name: wit_type_full_name(resolve, *id),
-                    declaration_index,
                 }));
             }
             if !matches!(type_def.kind, TypeDefKind::Variant(_))
