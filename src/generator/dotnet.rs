@@ -2551,6 +2551,9 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("namespace Temporalio.Worker.Interceptors\n{\n\n    public partial class WorkflowOutboundInterceptor\n    {\n");
         for service in &self.api_plan.services {
             for operation in &service.operations {
+                if self.system_nexus_has_generic_model(operation) {
+                    continue;
+                }
                 let request_type = if self.operation_has_input(operation) {
                     self.dotnet_erased_model_type(operation.input_model())
                 } else {
@@ -2592,35 +2595,72 @@ impl<'a> ApiPlanner<'a> {
                 if !self.operation_has_input(operation) {
                     continue;
                 }
+                let generic_request = self.dotnet_open_generic_model_type(operation.input_model());
+                let generic_response = operation
+                    .output_type()
+                    .and_then(|output| self.dotnet_open_generic_model_type(output));
+                let generic = generic_request.is_some() || generic_response.is_some();
                 let request_type = self.dotnet_erased_model_type(operation.input_model());
                 let response_type = self.operation_registry_response_type(operation);
                 output.push_str("            if (service == ");
                 output.push_str(&csharp_string_literal(&service.wire_name));
                 output.push_str(" &&\n                operationName == ");
                 output.push_str(&csharp_string_literal(&operation.wire_name));
-                output.push_str(")\n            {\n                if (arg is not ");
-                output.push_str(&request_type);
-                output.push_str(" request)\n                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
-                output.push_str(&request_type);
+                output.push_str(")\n            {\n");
+                let expected_request = match &generic_request {
+                    Some(definition) => {
+                        output.push_str("                if (arg is null || !arg.GetType().IsGenericType ||\n                    arg.GetType().GetGenericTypeDefinition() != typeof(");
+                        output.push_str(definition);
+                        output.push_str("))\n");
+                        definition
+                    }
+                    None => {
+                        output.push_str("                if (arg is not ");
+                        output.push_str(&request_type);
+                        output.push_str(if generic { ")\n" } else { " request)\n" });
+                        &request_type
+                    }
+                };
+                output.push_str("                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
+                output.push_str(expected_request);
                 output.push_str(" request.\", nameof(arg));\n                }\n");
-                output.push_str("                if (typeof(TResult) != typeof(");
-                output.push_str(&response_type);
-                output.push_str("))\n                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
-                output.push_str(&response_type);
-                output.push_str(
-                    " result.\");\n                }\n                var handle = outbound.Value.",
-                );
-                output.push_str(&csharp_operation_ident(operation));
-                output.push_str("Async(request);\n                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n            }\n");
+                let expected_response = match &generic_response {
+                    Some(definition) => {
+                        output.push_str("                if (!typeof(TResult).IsGenericType ||\n                    typeof(TResult).GetGenericTypeDefinition() != typeof(");
+                        output.push_str(definition);
+                        output.push_str("))\n");
+                        definition
+                    }
+                    None => {
+                        output.push_str("                if (typeof(TResult) != typeof(");
+                        output.push_str(&response_type);
+                        output.push_str("))\n");
+                        &response_type
+                    }
+                };
+                output.push_str("                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
+                output.push_str(expected_response);
+                output.push_str(" result.\");\n                }\n");
+                if generic {
+                    render_system_nexus_generic_hook_call(&mut output, "                ");
+                } else {
+                    output.push_str("                var handle = outbound.Value.");
+                    output.push_str(&csharp_operation_ident(operation));
+                    output.push_str("Async(request);\n                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n");
+                }
+                output.push_str("            }\n");
             }
         }
         // The generic hook gets each operation outside the generated set. Then a plugin
         // outside the SDK can serve its own System Nexus service.
-        output.push_str("            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(\n                Service: service,\n                Operation: new(\n                    operationName,\n                    arg?.GetType() ?? typeof(object),\n                    typeof(TResult)),\n                Arg: arg,\n                Headers: null));\n        }\n\n");
+        render_system_nexus_generic_hook_call(&mut output, "            ");
+        output.push_str("        }\n\n");
         output.push_str("        internal partial class OutboundImpl\n        {\n");
         for service in &self.api_plan.services {
             for operation in &service.operations {
-                if !self.operation_has_input(operation) {
+                if !self.operation_has_input(operation)
+                    || self.system_nexus_has_generic_model(operation)
+                {
                     continue;
                 }
                 let request_type = self.dotnet_erased_model_type(operation.input_model());
@@ -2653,6 +2693,52 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str("        }\n    }\n}\n");
         output
+    }
+
+    /// Whether the request or the response of an operation is a generic model. C# generics are
+    /// invariant, so a typed hook can't take every type argument. The generic hook gets such an
+    /// operation with the types of the call.
+    fn system_nexus_has_generic_model(&self, operation: &PlannedOperation) -> bool {
+        (self.operation_has_input(operation)
+            && self
+                .dotnet_open_generic_model_type(operation.input_model())
+                .is_some())
+            || operation
+                .output_type()
+                .is_some_and(|output| self.dotnet_open_generic_model_type(output).is_some())
+    }
+
+    /// The open type of a generic model, such as `AppendRecordsRequest<>`.
+    fn dotnet_open_generic_model_type(&self, model_type: &PlannedType) -> Option<String> {
+        let PlannedType::Record(record) = model_type else {
+            return None;
+        };
+        let parameters = self.api_plan.record_type_parameters(&record.full_name);
+        (!parameters.is_empty()).then(|| {
+            format!(
+                "{}<{}>",
+                csharp_type_name(&record.model_name),
+                ",".repeat(parameters.len() - 1)
+            )
+        })
+    }
+}
+
+/// Starts the operation through the generic hook, with the types of the call.
+fn render_system_nexus_generic_hook_call(output: &mut String, indent: &str) {
+    for line in [
+        "return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(",
+        "    Service: service,",
+        "    Operation: new(",
+        "        operationName,",
+        "        arg?.GetType() ?? typeof(object),",
+        "        typeof(TResult)),",
+        "    Arg: arg,",
+        "    Headers: null));",
+    ] {
+        output.push_str(indent);
+        output.push_str(line);
+        output.push('\n');
     }
 }
 
