@@ -1,15 +1,35 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import Long from "long";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  test,
+  vi,
+} from "vitest";
 
 import {
   type ReadRecordsResponse,
   StreamStatus,
+  createReadRecordsResponseTransferTypeConverter,
   describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
+
+class Turn {
+  constructor(readonly role: string) {}
+}
+
+const turnType: common.TypeInfo<Turn, { role: string }> = {
+  transferTypeConverter: {
+    toTransferType: (turn) => ({ role: turn.role }),
+    fromTransferType: (value) => new Turn(value.role),
+  },
+};
 
 // A body goes through the payload converter of the Workflow.
 beforeEach(() => {
@@ -53,6 +73,30 @@ describe("stream-service generated output", () => {
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
     );
+  });
+
+  // A Stream<Turn> read gives its runtime type to this converter.
+  test("decodes the bodies of a read with the runtime type of its stream", () => {
+    const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
+      records: [
+        {
+          item: "data",
+          data: { body: common.defaultPayloadConverter.toPayload({ role: "user" }) },
+          offset: Long.fromNumber(1),
+        },
+      ],
+    };
+
+    const model = createReadRecordsResponseTransferTypeConverter({
+      bodyT: turnType,
+    }).fromTransferType(proto);
+
+    expectTypeOf(model).toEqualTypeOf<ReadRecordsResponse<Turn>>();
+    const item = model.records?.[0].item;
+    expect(item?.tag).toBe("data");
+    const body = item?.tag === "data" ? item.value.body : undefined;
+    expect(body).toBeInstanceOf(Turn);
+    expect(body).toEqual(new Turn("user"));
   });
 
   test("gives no item for a read record whose item kind only a newer server knows", () => {

@@ -338,8 +338,10 @@ def test_a_resource_is_not_data_but_its_identity_field_is() -> None:
     with pytest.raises(TypeError, match="not JSON serializable"):
         _ = converter.to_payload(stream)
     payload = converter.to_payload(stream.ref)
+    # A generic alias fails for another reason, so the test decodes to the bare class.
+    handle_class: type[workflow_resources.Stream[str]] = workflow_resources.Stream
     with pytest.raises(TypeError, match="Unserializable type"):
-        _ = converter.from_payload(payload, workflow_resources.Stream[str])
+        _ = converter.from_payload(payload, handle_class)
     # Code passes the identity field and builds the handle explicitly.
     decoded = converter.from_payload(payload, StreamRef)
     assert decoded == ref
