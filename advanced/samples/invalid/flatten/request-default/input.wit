@@ -14,8 +14,8 @@ interface history-service {
 
   /// @nexus.proto "temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest"
   record get-history-request {
-    // A TypeScript default builds the request in another way.
-    /// @nexus.default typescript="'default'"
+    // A request default lets the whole request be omitted, which flattening can't allow.
+    /// @nexus.default python="'default'" typescript="'default'" go="\"default\"" dotnet="\"default\""
     namespace: string,
     /// @nexus.flatten-in-api
     execution: option<workflow-execution>,

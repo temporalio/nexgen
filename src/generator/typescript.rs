@@ -505,16 +505,6 @@ impl<'a> ApiPlanner<'a> {
             }
         });
 
-        if let Some(input) = &rendered_input
-            && !input.flattened_fields.is_empty()
-            && input.default_initialization.is_some()
-        {
-            return Err(Error::UnsupportedTypeScriptFlatten {
-                operation: operation.name.clone(),
-                reason: "its request has a `@nexus.default` too".to_string(),
-            });
-        }
-
         // The final public return annotation may already contain type arguments.
         // Service definitions and operation handles apply their own arguments, so
         // start from the generated model's unparameterized transfer annotation.

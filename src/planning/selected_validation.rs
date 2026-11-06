@@ -6,9 +6,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FieldOrigin, FunctionArgsSpec,
-    FunctionResultSpec, RecordFieldSpec, RecordSpec, SelectedFamily, TypeSpec,
+    FunctionResultSpec, OperationSpec, RecordFieldSpec, RecordSpec, SelectedFamily, TypeSpec,
 };
 
 pub(crate) struct SelectedValidationPass;
@@ -116,6 +117,26 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
         }
         validate_flattened_field_names(spec, record, &invalid)?;
     }
+    // Flattening spreads a request's fields as call arguments, so the request can't
+    // also carry a default that would let the whole request be omitted.
+    for service in &spec.services {
+        for operation in &service.operations {
+            let Some(record) = operation_input_record(spec, operation) else {
+                continue;
+            };
+            let flattens = record.fields.values().any(|field| field.flatten_in_api);
+            let has_default = record
+                .fields
+                .values()
+                .any(|field| field.default_for(GenerationTarget::Workflow).is_some());
+            if flattens && has_default {
+                return Err(Error::UnsupportedFlatten {
+                    operation: operation.name.clone(),
+                    reason: "its request has a `@nexus.default` too".to_string(),
+                });
+            }
+        }
+    }
     // A resource method builds the whole request, so it can't bind a flattened call.
     for service in &spec.services {
         for method in service
@@ -130,15 +151,7 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
             else {
                 continue;
             };
-            let flattens = operation
-                .input_type()
-                .and_then(|input| match input.without_option() {
-                    TypeSpec::Record(record) => spec.record(record.as_str()),
-                    TypeSpec::External(ExternalTypeSpec::Proto(proto)) => {
-                        spec.record_for_proto(proto.as_str())
-                    }
-                    _ => None,
-                })
+            let flattens = operation_input_record(spec, operation)
                 .is_some_and(|record| record.fields.values().any(|field| field.flatten_in_api));
             if flattens {
                 return Err(invalid(format!(
@@ -150,6 +163,21 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
     }
 
     Ok(())
+}
+
+fn operation_input_record<'a>(
+    spec: &'a ApiSpec<SelectedFamily>,
+    operation: &OperationSpec<SelectedFamily>,
+) -> Option<&'a RecordSpec<SelectedFamily>> {
+    operation
+        .input_type()
+        .and_then(|input| match input.without_option() {
+            TypeSpec::Record(record) => spec.record(record.as_str()),
+            TypeSpec::External(ExternalTypeSpec::Proto(proto)) => {
+                spec.record_for_proto(proto.as_str())
+            }
+            _ => None,
+        })
 }
 
 fn flattened_record<'a>(
