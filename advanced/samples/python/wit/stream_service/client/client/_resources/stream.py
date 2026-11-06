@@ -49,8 +49,17 @@ class Stream(typing.Generic[BodyT]):
 
     @property
     def body_type(self) -> type[BodyT]:
-        # Generic aliases attach their concrete types after __init__.
-        arguments = typing.get_args(getattr(self, "__orig_class__", None))
+        # A specialized alias sets __orig_class__ after __init__. A subclass of a
+        # specialized class keeps its type arguments in __orig_bases__.
+        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
+            (
+                typing.get_args(base)
+                for klass in type(self).__mro__
+                for base in vars(klass).get("__orig_bases__", ())
+                if typing.get_origin(base) is Stream
+            ),
+            (),
+        )
         return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
 
     async def publish(

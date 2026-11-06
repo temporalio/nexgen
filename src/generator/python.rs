@@ -1266,7 +1266,7 @@ impl<'a> ApiPlanner<'a> {
         for name in &type_variables {
             let argument = python_runtime_type_argument_name(name);
             output.push_str(&format!(
-                "        {argument} = {argument} or typing.cast(\"type[{name}]\", typing.Any)\n"
+                "        if {argument} is None:\n            {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
             ));
         }
         output.push_str("        return ");
@@ -6923,22 +6923,30 @@ fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &
     }
 }
 
-/// Python attaches __orig_class__ after construction, so resolve type arguments lazily.
-/// Unspecialized handles retain the existing untyped decoding behavior.
+/// Python sets `__orig_class__` after `__init__`, so a property reads the type arguments when a
+/// call needs them. A handle with no type argument decodes its generic values as `typing.Any`.
 fn render_runtime_type_properties(
     output: &mut String,
     resource: &PlannedResource,
     type_variables: &[String],
 ) {
     let receiver = resource_client_identifier(resource, "self");
+    let class = &resource.type_name;
     for (index, name) in type_variables.iter().enumerate() {
         let argument = python_runtime_type_argument_name(name);
         output.push_str(&format!(
             "\n    @property\n    def {argument}({receiver}) -> type[{name}]:\n"
         ));
-        output.push_str("        # Generic aliases attach their concrete types after __init__.\n");
+        output.push_str(
+            "        # A specialized alias sets __orig_class__ after __init__. A subclass of a\n        \
+             # specialized class keeps its type arguments in __orig_bases__.\n",
+        );
         output.push_str(&format!(
-            "        arguments = typing.get_args(getattr({receiver}, \"__orig_class__\", None))\n"
+            "        arguments = typing.get_args(getattr({receiver}, \"__orig_class__\", None)) or next(\n            \
+             (\n                typing.get_args(base)\n                \
+             for klass in type({receiver}).__mro__\n                \
+             for base in vars(klass).get(\"__orig_bases__\", ())\n                \
+             if typing.get_origin(base) is {class}\n            ),\n            (),\n        )\n"
         ));
         output.push_str(&format!(
             "        return typing.cast(\"type[{name}]\", arguments[{index}] if arguments else typing.Any)\n"
