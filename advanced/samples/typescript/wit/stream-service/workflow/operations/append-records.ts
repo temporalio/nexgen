@@ -7,9 +7,9 @@ import * as support from "../../../../support/temporal_model_converters";
 
 type AppendRecordsInput = AppendRecordsRequest extends infer Input
   ? Input extends unknown
-    ? Omit<Input, "producer" | "withdraw_run"> & {
+    ? Omit<Input, "producer" | "withdrawRun"> & {
         producer?: never;
-        withdraw_run?: never;
+        withdrawRun?: never;
       }
     : never
   : never;

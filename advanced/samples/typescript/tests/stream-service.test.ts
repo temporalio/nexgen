@@ -1,7 +1,7 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import Long from "long";
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type ReadRecordsResponse,
@@ -10,8 +10,18 @@ import {
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
+import { Stream } from "../wit/stream-service/workflow/resources.ts";
+
+const startOperation = vi.hoisted(() => vi.fn());
+vi.mock("@temporalio/workflow", () => ({
+  createNexusServiceClient: () => ({ startOperation }),
+}));
 
 describe("stream-service generated output", () => {
+  beforeEach(() => {
+    startOperation.mockReset();
+  });
+
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
   // compile when those declarations drift from what they read and write.
   test("maps each read item kind through the proto oneof", () => {
@@ -75,6 +85,28 @@ describe("stream-service generated output", () => {
     expect(readRecordsRequestTransferTypeConverter.toTransferType(model).ref?.id).toBe(
       "stream-1",
     );
+  });
+
+  test("preserves offsets above 2^53 through resource calls and proto conversion", async () => {
+    const offset = Long.fromString("1880158843699200005");
+    startOperation.mockResolvedValue({
+      result: async () => ({ records: [], nextOffset: offset.add(1) }),
+    });
+    const stream = new Stream({ id: "stream-1" }, undefined);
+
+    const page = await stream.read(offset);
+    await stream.read(page.nextOffset);
+
+    const requests = startOperation.mock.calls.map(([, request]) => request);
+    expect(requests.map((request) => request.fromOffset.toString())).toEqual([
+      "1880158843699200005",
+      "1880158843699200006",
+    ]);
+    for (const request of requests) {
+      const proto = readRecordsRequestTransferTypeConverter.toTransferType(request);
+      const model = readRecordsRequestTransferTypeConverter.fromTransferType(proto);
+      expect(model.fromOffset?.equals(request.fromOffset)).toBe(true);
+    }
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {
