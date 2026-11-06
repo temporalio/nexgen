@@ -1,0 +1,13 @@
+package temporal:api-omit-and-source@1.0.0;
+
+world system { export example; }
+
+interface example {
+  record request {
+    /// @nexus.source targets="client" value="client()"
+    /// @nexus.api-omit targets="client"
+    owner: option<string>,
+  }
+
+  submit: func(request: request);
+}

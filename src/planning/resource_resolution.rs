@@ -9,7 +9,7 @@ use prost_types::field_descriptor_proto::Type;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldOrigin, JsonModelSpec, OperationSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, JsonModelSpec, OperationSpec,
     RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
     ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
     TypeFamily, TypeSpec,
@@ -25,7 +25,7 @@ pub(crate) struct ResourceBoundData {
 }
 
 impl TypeFamily for ResourceBoundFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = ResourceBoundData;
     type Record = Symbol;
     type Enum = Symbol;
@@ -50,8 +50,8 @@ struct ResourceBindingMapper {
 impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMapper {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) -> ResourceBoundData {
@@ -152,7 +152,7 @@ pub enum ResolvedResourceBindingSource {
     RequestField {
         field_name: String,
         proto_field_name: String,
-        origin: Option<FieldOrigin>,
+        origin: Option<FieldPolicy>,
     },
     ResultField {
         field_name: String,
@@ -186,7 +186,7 @@ struct MessageFieldInfo {
     proto_name: String,
     api_name: String,
     required: bool,
-    origin: Option<FieldOrigin>,
+    origin: Option<FieldPolicy>,
     message_name: Option<String>,
 }
 
@@ -569,7 +569,7 @@ fn synthesize_request_plan(
             && !field
                 .origin
                 .as_ref()
-                .is_some_and(FieldOrigin::can_initialize)
+                .is_some_and(FieldPolicy::can_initialize)
         {
             return Ok(None);
         }
@@ -632,7 +632,7 @@ fn synthesize_record_request_plan(
             && !field
                 .origin
                 .as_ref()
-                .is_some_and(FieldOrigin::can_initialize)
+                .is_some_and(FieldPolicy::can_initialize)
         {
             return Ok(None);
         }
@@ -660,7 +660,7 @@ fn visible_message_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_message_fields(spec, descriptors, message_name)?
         .into_iter()
-        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .collect())
 }
 
@@ -670,7 +670,7 @@ fn visible_record_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_record_fields(spec, record_name)?
         .into_iter()
-        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .collect())
 }
 
@@ -728,7 +728,7 @@ fn all_record_fields(
     record
         .fields
         .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .map(|(field_name, field)| build_record_field_info(field_name, field, spec))
         .collect()
 }
