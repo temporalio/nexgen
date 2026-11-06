@@ -15,7 +15,7 @@ import pytest
 from temporalio.api.enums.v1 import stream_pb2
 from temporalio.api.stream.v1 import message_pb2
 from temporalio.api.streamservice.v1 import request_response_pb2
-from temporalio.converter import PayloadConverter
+from temporalio.converter import FailureConverter, PayloadConverter
 import temporalio.nexus.system
 import temporalio.workflow
 
@@ -31,6 +31,11 @@ from wit.stream_service.both import workflow as both_workflow
 class FakeWorkflowInfo:
     run_id: str
     attempt: int = 1
+
+
+@dataclasses.dataclass
+class Turn:
+    role: str
 
 
 @pytest.fixture(
@@ -213,6 +218,70 @@ async def test_workflow_apis_call_the_stream_service(
     assert [(name, dataclasses.asdict(arg)) for name, arg in calls] == [
         (name, dataclasses.asdict(arg)) for name, arg in expected
     ]
+
+
+@pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+@pytest.mark.parametrize("construction", ["create", "direct"])
+async def test_workflow_handle_decodes_with_its_type_parameter(
+    monkeypatch: pytest.MonkeyPatch,
+    api: types.ModuleType,
+    model_types: types.ModuleType,
+    construction: str,
+) -> None:
+    ref = model_types.StreamRef(id="typed-stream")
+    record = model_types.StreamRecord(
+        item=model_types.StreamItemData(
+            model_types.StreamData(body=Turn(role="model"))
+        ),
+        offset=1,
+    )
+    converter = temporalio.nexus.system._SystemNexusPayloadConverter(
+        PayloadConverter.default,
+        FailureConverter.default,
+    )
+    payload = converter.to_payload(
+        model_types.ReadRecordsResponse[Turn](records=[record])
+    )
+
+    class NexusClient:
+        async def start_operation(
+            self,
+            operation: str,
+            input: typing.Any,
+            *,
+            output_type: type[typing.Any],
+        ) -> collections.abc.Awaitable[typing.Any]:
+            del input
+            future: asyncio.Future[typing.Any] = (
+                asyncio.get_running_loop().create_future()
+            )
+            if operation == "CreateStream":
+                future.set_result(model_types.CreateStreamResult(ref=ref))
+            else:
+                assert operation == "ReadRecords"
+                future.set_result(converter.from_payload(payload, output_type))
+            return future
+
+    def create_client(*, service: str, endpoint: str) -> NexusClient:
+        assert service == "temporal.api.streamservice.v1.StreamService"
+        assert endpoint == "__temporal_system"
+        return NexusClient()
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+    if construction == "create":
+        stream = await api.create_stream(Turn, stream_ref=ref)
+    else:
+        resources = importlib.import_module(api.__name__ + "._resources.stream")
+        stream = resources.Stream[Turn](ref=ref, created=None)
+
+    page = await stream.read()
+
+    assert page.records == [record]
 
 
 @pytest.mark.parametrize(

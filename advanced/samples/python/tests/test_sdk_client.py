@@ -622,7 +622,10 @@ async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
     ]
 
 
-async def test_a_handle_decodes_its_bodies_with_its_body_type() -> None:
+@pytest.mark.parametrize("construction", ["create", "get", "direct"])
+async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
+    construction: str,
+) -> None:
     ref = StreamRef(id="s1")
     record = StreamRecord(
         item=StreamItemData(StreamData(body=Turn(role="model"))), offset=1
@@ -632,15 +635,54 @@ async def test_a_handle_decodes_its_bodies_with_its_body_type() -> None:
         {
             "CreateStream": CreateStreamResult(ref=ref),
             "ReadRecords": SYSTEM_CONVERTER.to_payload(
-                ReadRecordsResponse[Turn](records=[record])
+                ReadRecordsResponse[Turn](records=[record], done=True)
             ),
         },
     )
 
-    stream = await client.create_stream(Turn, stream_ref=StreamRef(id="s1"))
+    if construction == "create":
+        stream = await client.create_stream(Turn, stream_ref=ref)
+    elif construction == "get":
+        stream = client.get_stream(ref=ref, created=None, body_type=Turn)
+    else:
+        stream = Stream[Turn](
+            client.create_nexus_client(
+                service=STREAM_SERVICE, endpoint=SYSTEM_ENDPOINT
+            ),
+            ref=ref,
+            created=None,
+        )
     page = await stream.read()
 
     _ = assert_type(stream, Stream[Turn])
     _ = assert_type(page, ReadRecordsResponse[Turn])
-    # The body arrives as a payload, and the handle's body type decodes it.
+    # Both a single read and polling decode the payload using the specialization.
     assert page.records == [record]
+    assert [page.records async for page in stream.iter_read()] == [[record]]
+    assert [item async for item in stream.iter_read_items()] == [record]
+
+
+async def test_an_unspecialized_handle_decodes_untyped_bodies() -> None:
+    ref = StreamRef(id="s1")
+    client, _ = connect(
+        Client,
+        {
+            "ReadRecords": SYSTEM_CONVERTER.to_payload(
+                ReadRecordsResponse[Turn](
+                    records=[
+                        StreamRecord(
+                            item=StreamItemData(StreamData(body=Turn(role="model"))),
+                            offset=1,
+                        )
+                    ]
+                )
+            ),
+        },
+    )
+    stream: Stream[typing.Any] = client.get_stream(ref=ref, created=None)
+
+    page = await stream.read()
+
+    item = page.records[0].item
+    assert isinstance(item, StreamItemData)
+    assert item.value.body == {"role": "model"}
