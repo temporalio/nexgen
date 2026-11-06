@@ -1,8 +1,0 @@
-package test:annotations;
-world api { export models; }
-interface models {
-  record request {
-    /// @nexus.type python="str" python-from="ignored"
-    value: string,
-  }
-}

@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["`@nexus.endpoint` on type `models.request`", "is not supported on record; valid placements: interface"]

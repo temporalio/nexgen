@@ -1,8 +1,0 @@
-languages = ["python", "typescript", "dotnet"]
-
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.facade` on interface `models`",
-  "valid languages: go",
-]

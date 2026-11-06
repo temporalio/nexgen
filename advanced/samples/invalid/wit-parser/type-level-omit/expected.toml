@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.omit` on type `models.activity-options`",
-  "mark record fields with `@nexus.omit`; type-level omit is no longer supported",
-]

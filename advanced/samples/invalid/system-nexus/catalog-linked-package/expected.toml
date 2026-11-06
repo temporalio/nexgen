@@ -1,5 +1,0 @@
-inputs = ["input.wit", "deps"]
-
-[error]
-kind = "system-nexus-required"
-contains = ["delay-load-temporalio-workflow on interface `helpers` requires System Nexus mode (--system-nexus)"]

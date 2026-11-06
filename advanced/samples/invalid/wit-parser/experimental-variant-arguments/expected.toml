@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.experimental` on type `models.preview`",
-  "does not take arguments",
-]

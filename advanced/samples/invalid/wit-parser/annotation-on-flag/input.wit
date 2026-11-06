@@ -1,8 +1,0 @@
-package test:annotations;
-world api { export models; }
-interface models {
-  flags permissions {
-    /// @nexus.doc "ignored"
-    read,
-  }
-}

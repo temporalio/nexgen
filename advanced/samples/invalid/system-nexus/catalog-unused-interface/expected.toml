@@ -1,5 +1,5 @@
-languages = ["dotnet"]
+languages = ["go"]
 
 [error]
 kind = "system-nexus-required"
-contains = ["operations-class on interface `unused` requires System Nexus mode (--system-nexus)"]
+contains = ["facade on interface `unused` requires System Nexus mode (--system-nexus)"]

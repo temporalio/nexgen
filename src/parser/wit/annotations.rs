@@ -90,7 +90,7 @@ const CATALOG: &[Annotation] = {
             language_keys: &[""],
             repeatable: false,
             languages: Some(&[Language::Go]),
-            system_nexus: false,
+            system_nexus: true,
         },
         Annotation {
             name: "operations-class",

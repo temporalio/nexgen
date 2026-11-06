@@ -1744,7 +1744,7 @@ The catalog currently declares these restrictions:
 | Annotation                              | Language restriction | System Nexus            |
 | --------------------------------------- | -------------------- | ----------------------- |
 | `@nexus.namespace`                      | dotnet, go           | not required by catalog |
-| `@nexus.facade`                         | go                   | not required by catalog |
+| `@nexus.facade`                         | go                   | required                |
 | `@nexus.operations-class`               | dotnet               | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
@@ -1799,8 +1799,9 @@ Operation-bearing .NET WIT services use the module-derived namespace.
 `@nexus.facade go="<import-path>"`
 
 Generates a Go facade of type aliases, constants, and forwarding functions.
-Requires `@nexus.namespace` for Go and `--targets workflow`. Use `go=` in
-multi-language WIT files so the annotation is inactive for other languages:
+Requires `--system-nexus`, `@nexus.namespace` for Go, and `--targets workflow`.
+Use `go=` in multi-language WIT files so the annotation is inactive for other
+languages:
 
 ```wit
 /// @nexus.namespace go="go.temporal.io/sdk/internal"
@@ -1810,8 +1811,8 @@ interface workflow-service { ... }
 
 Nexgen emits `<name>.go` and `<name>_facade.go` side by side under `--output`.
 Place them into their respective packages before compiling. Each import path's
-final segment determines its package name. In System Nexus mode, facade names
-omit the implementation's `SystemNexus_` prefix.
+final segment determines its package name. Facade names omit the
+implementation's `SystemNexus_` prefix.
 
 ---
 
