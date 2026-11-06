@@ -38,7 +38,13 @@ namespace Nexgen.DotNetExamples.Tests
                 new StreamServiceExample.StreamRecord<Turn>
                 {
                     Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
-                        new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
+                        new StreamServiceExample.StreamSuperseded
+                        {
+                            Writer = new StreamServiceExample.StreamWriter(new long[] { 7 })
+                            {
+                                Producer = new StreamServiceExample.Producer("workflow-1"),
+                            },
+                        }),
                     Offset = 2,
                 },
             });
@@ -54,8 +60,8 @@ namespace Nexgen.DotNetExamples.Tests
                 ToPayload(model));
             var superseded = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Superseded>(
                 decoded.Records[0].Item);
-            Assert.Equal("workflow-1", superseded.Value.ProducerId);
-            Assert.Equal(new long[] { 7 }, superseded.Value.FailedTasks);
+            Assert.Equal("workflow-1", superseded.Value.Writer?.Producer?.Id);
+            Assert.Equal(new long[] { 7 }, superseded.Value.Writer?.FailedTasks);
             Assert.Equal(2, decoded.Records[0].Offset);
         }
 

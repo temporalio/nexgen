@@ -7,7 +7,7 @@ import * as support from "../../../../support/temporal_model_converters";
 
 type CloseStreamInput = CloseStreamRequest extends infer Input
   ? Input extends unknown
-    ? Omit<Input, "producer"> & { producer?: never }
+    ? Omit<Input, "writer"> & { writer?: never }
     : never
   : never;
 
@@ -19,7 +19,7 @@ export async function closeStream(
 ): Promise<nexus.NexusOperationHandle<CloseStreamResponse>> {
   const request = {
     ...requestInput,
-    producer: support.workflowProducer(),
+    writer: support.workflowWriter(),
   } as CloseStreamRequest;
   const client = nexus.createNexusServiceClient({
     service: streamService,

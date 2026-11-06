@@ -2,11 +2,16 @@
 
 import * as workflow from "@temporalio/workflow";
 
-import type { Producer } from "../wit/stream-service/workflow/models";
+import type { StreamWriter } from "../wit/stream-service/workflow/models";
 
-export function workflowProducer(): Producer {
+/** The run's Workflow Producer, with the run that a retry run retries. */
+export function workflowWriter(): StreamWriter {
   const runId = workflow.workflowInfo().runId;
-  return { id: `wf:${runId}`, runId };
+  return {
+    producer: { id: `wf:${runId}`, runId },
+    failedTasks: [],
+    withdrawRun: withdrawRun(),
+  };
 }
 
 /** The run that a retry run's Workflow retries. Undefined elsewhere. */

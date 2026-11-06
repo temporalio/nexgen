@@ -38,52 +38,47 @@ namespace Temporalio.Api.StreamService.V1 {
             "bnVtcy52MS5TdHJlYW1JZENvbmZsaWN0UG9saWN5EhIKCnJlcXVlc3RfaWQY",
             "CSABKAkiVwoUQ3JlYXRlU3RyZWFtUmVzcG9uc2USLgoDcmVmGAEgASgLMiEu",
             "dGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSDwoHY3JlYXRlZBgC",
-            "IAEoCCL8AgoUQXBwZW5kUmVjb3Jkc1JlcXVlc3QSEQoJbmFtZXNwYWNlGAEg",
+            "IAEoCCKGAgoUQXBwZW5kUmVjb3Jkc1JlcXVlc3QSEQoJbmFtZXNwYWNlGAEg",
             "ASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuU3Ry",
-            "ZWFtUmVmEjIKCHByb2R1Y2VyGAMgASgLMiAudGVtcG9yYWwuYXBpLnN0cmVh",
-            "bS52MS5Qcm9kdWNlchIQCghzZXF1ZW5jZRgEIAEoAxI1CgdyZWNvcmRzGAUg",
-            "AygLMiQudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5BcHBlbmRSZWNvcmQSSgoX",
-            "cHJldmlvdXNfY29tcGxldGVkX3Rhc2sYBiABKAsyKS50ZW1wb3JhbC5hcGku",
-            "c3RyZWFtLnYxLldvcmtmbG93VGFza0Vwb2NoEhQKDGZhaWxlZF90YXNrcxgH",
-            "IAMoAxIUCgx3aXRoZHJhd19ydW4YCCABKAkSGAoQZGVmZXJfd2l0aGRyYXdh",
-            "bBgJIAEoCBISCgp0YXNrX3Rva2VuGAogASgMIkIKFUFwcGVuZFJlY29yZHNS",
-            "ZXNwb25zZRIUCgxmaXJzdF9vZmZzZXQYASABKAMSEwoLbGFzdF9vZmZzZXQY",
-            "AiABKAMilwIKEkNsb3NlU3RyZWFtUmVxdWVzdBIRCgluYW1lc3BhY2UYASAB",
-            "KAkSLgoDcmVmGAIgASgLMiEudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJl",
-            "YW1SZWYSMgoIcHJvZHVjZXIYAyABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFt",
-            "LnYxLlByb2R1Y2VyEkoKF3ByZXZpb3VzX2NvbXBsZXRlZF90YXNrGAQgASgL",
-            "MikudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Xb3JrZmxvd1Rhc2tFcG9jaBIU",
-            "CgxmYWlsZWRfdGFza3MYBSADKAMSFAoMd2l0aGRyYXdfcnVuGAYgASgJEhIK",
-            "CnRhc2tfdG9rZW4YByABKAwiFQoTQ2xvc2VTdHJlYW1SZXNwb25zZSLsAgoS",
-            "UmVhZFJlY29yZHNSZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYY",
-            "AiABKAsyIS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlN0cmVhbVJlZhITCgtm",
-            "cm9tX29mZnNldBgDIAEoAxI1CgVzdGFydBgEIAEoDjImLnRlbXBvcmFsLmFw",
-            "aS5lbnVtcy52MS5TdHJlYW1SZWFkU3RhcnQSEwoLbWF4X3JlY29yZHMYBSAB",
-            "KAUSJwoEd2FpdBgGIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIu",
-            "CgtjcmVhdGVfd2FpdBgHIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlv",
-            "bhIRCgl0b19vZmZzZXQYCCABKAMSEQoJd2FrZV9vbmx5GAkgASgIEgwKBGxh",
-            "c3QYCiABKAUSEQoJbWF4X2J5dGVzGAsgASgDEhIKCmZsb29yX2Zyb20YDCAB",
-            "KAMikgEKE1JlYWRSZWNvcmRzUmVzcG9uc2USNQoHcmVjb3JkcxgBIAMoCzIk",
-            "LnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuU3RyZWFtUmVjb3JkEhMKC25leHRf",
-            "b2Zmc2V0GAIgASgDEgwKBGRvbmUYAyABKAgSIQoZY29udGludWVfYXNfbmV3",
-            "X3N1Z2dlc3RlZBgEIAEoCCJaChVEZXNjcmliZVN0cmVhbVJlcXVlc3QSEQoJ",
-            "bmFtZXNwYWNlGAEgASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5z",
-            "dHJlYW0udjEuU3RyZWFtUmVmIpABChZEZXNjcmliZVN0cmVhbVJlc3BvbnNl",
-            "EjMKBnN0YXR1cxgBIAEoDjIjLnRlbXBvcmFsLmFwaS5lbnVtcy52MS5TdHJl",
-            "YW1TdGF0dXMSEwoLbGFzdF9vZmZzZXQYAiABKAMSLAoJcmV0ZW50aW9uGAMg",
-            "ASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQrQBCiBpby50ZW1wb3Jh",
-            "bC5hcGkuc3RyZWFtc2VydmljZS52MUIUUmVxdWVzdFJlc3BvbnNlUHJvdG9Q",
-            "AVoxZ28udGVtcG9yYWwuaW8vYXBpL3N0cmVhbXNlcnZpY2UvdjE7c3RyZWFt",
-            "c2VydmljZaoCH1RlbXBvcmFsaW8uQXBpLlN0cmVhbVNlcnZpY2UuVjHqAiJU",
-            "ZW1wb3JhbGlvOjpBcGk6OlN0cmVhbVNlcnZpY2U6OlYxYgZwcm90bzM="));
+            "ZWFtUmVmEjQKBndyaXRlchgDIAEoCzIkLnRlbXBvcmFsLmFwaS5zdHJlYW0u",
+            "djEuU3RyZWFtV3JpdGVyEhAKCHNlcXVlbmNlGAQgASgDEjUKB3JlY29yZHMY",
+            "BSADKAsyJC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkFwcGVuZFJlY29yZBIY",
+            "ChBkZWZlcl93aXRoZHJhd2FsGAYgASgIEhIKCnRhc2tfdG9rZW4YByABKAwi",
+            "QgoVQXBwZW5kUmVjb3Jkc1Jlc3BvbnNlEhQKDGZpcnN0X29mZnNldBgBIAEo",
+            "AxITCgtsYXN0X29mZnNldBgCIAEoAyKhAQoSQ2xvc2VTdHJlYW1SZXF1ZXN0",
+            "EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3JhbC5h",
+            "cGkuc3RyZWFtLnYxLlN0cmVhbVJlZhI0CgZ3cml0ZXIYAyABKAsyJC50ZW1w",
+            "b3JhbC5hcGkuc3RyZWFtLnYxLlN0cmVhbVdyaXRlchISCgp0YXNrX3Rva2Vu",
+            "GAQgASgMIhUKE0Nsb3NlU3RyZWFtUmVzcG9uc2Ui7AIKElJlYWRSZWNvcmRz",
+            "UmVxdWVzdBIRCgluYW1lc3BhY2UYASABKAkSLgoDcmVmGAIgASgLMiEudGVt",
+            "cG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSEwoLZnJvbV9vZmZzZXQY",
+            "AyABKAMSNQoFc3RhcnQYBCABKA4yJi50ZW1wb3JhbC5hcGkuZW51bXMudjEu",
+            "U3RyZWFtUmVhZFN0YXJ0EhMKC21heF9yZWNvcmRzGAUgASgFEicKBHdhaXQY",
+            "BiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLgoLY3JlYXRlX3dh",
+            "aXQYByABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SEQoJdG9fb2Zm",
+            "c2V0GAggASgDEhEKCXdha2Vfb25seRgJIAEoCBIMCgRsYXN0GAogASgFEhEK",
+            "CW1heF9ieXRlcxgLIAEoAxISCgpmbG9vcl9mcm9tGAwgASgDIpIBChNSZWFk",
+            "UmVjb3Jkc1Jlc3BvbnNlEjUKB3JlY29yZHMYASADKAsyJC50ZW1wb3JhbC5h",
+            "cGkuc3RyZWFtLnYxLlN0cmVhbVJlY29yZBITCgtuZXh0X29mZnNldBgCIAEo",
+            "AxIMCgRkb25lGAMgASgIEiEKGWNvbnRpbnVlX2FzX25ld19zdWdnZXN0ZWQY",
+            "BCABKAgiWgoVRGVzY3JpYmVTdHJlYW1SZXF1ZXN0EhEKCW5hbWVzcGFjZRgB",
+            "IAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlN0",
+            "cmVhbVJlZiKQAQoWRGVzY3JpYmVTdHJlYW1SZXNwb25zZRIzCgZzdGF0dXMY",
+            "ASABKA4yIy50ZW1wb3JhbC5hcGkuZW51bXMudjEuU3RyZWFtU3RhdHVzEhMK",
+            "C2xhc3Rfb2Zmc2V0GAIgASgDEiwKCXJldGVudGlvbhgDIAEoCzIZLmdvb2ds",
+            "ZS5wcm90b2J1Zi5EdXJhdGlvbkK0AQogaW8udGVtcG9yYWwuYXBpLnN0cmVh",
+            "bXNlcnZpY2UudjFCFFJlcXVlc3RSZXNwb25zZVByb3RvUAFaMWdvLnRlbXBv",
+            "cmFsLmlvL2FwaS9zdHJlYW1zZXJ2aWNlL3YxO3N0cmVhbXNlcnZpY2WqAh9U",
+            "ZW1wb3JhbGlvLkFwaS5TdHJlYW1TZXJ2aWNlLlYx6gIiVGVtcG9yYWxpbzo6",
+            "QXBpOjpTdHJlYW1TZXJ2aWNlOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamRequest), global::Temporalio.Api.StreamService.V1.CreateStreamRequest.Parser, new[]{ "Namespace", "StreamRef", "Retention", "WithdrawRun", "Owner", "CloseWithRun", "TaskToken", "IdConflictPolicy", "RequestId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamResponse), global::Temporalio.Api.StreamService.V1.CreateStreamResponse.Parser, new[]{ "Ref", "Created" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "Sequence", "Records", "PreviousCompletedTask", "FailedTasks", "WithdrawRun", "DeferWithdrawal", "TaskToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Ref", "Writer", "Sequence", "Records", "DeferWithdrawal", "TaskToken" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsResponse), global::Temporalio.Api.StreamService.V1.AppendRecordsResponse.Parser, new[]{ "FirstOffset", "LastOffset" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "PreviousCompletedTask", "FailedTasks", "WithdrawRun", "TaskToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Writer", "TaskToken" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamResponse), global::Temporalio.Api.StreamService.V1.CloseStreamResponse.Parser, null, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "Start", "MaxRecords", "Wait", "CreateWait", "ToOffset", "WakeOnly", "Last", "MaxBytes", "FloorFrom" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsResponse), global::Temporalio.Api.StreamService.V1.ReadRecordsResponse.Parser, new[]{ "Records", "NextOffset", "Done", "ContinueAsNewSuggested" }, null, null, null, null),
@@ -954,12 +949,9 @@ namespace Temporalio.Api.StreamService.V1 {
     public AppendRecordsRequest(AppendRecordsRequest other) : this() {
       namespace_ = other.namespace_;
       ref_ = other.ref_ != null ? other.ref_.Clone() : null;
-      producer_ = other.producer_ != null ? other.producer_.Clone() : null;
+      writer_ = other.writer_ != null ? other.writer_.Clone() : null;
       sequence_ = other.sequence_;
       records_ = other.records_.Clone();
-      previousCompletedTask_ = other.previousCompletedTask_ != null ? other.previousCompletedTask_.Clone() : null;
-      failedTasks_ = other.failedTasks_.Clone();
-      withdrawRun_ = other.withdrawRun_;
       deferWithdrawal_ = other.deferWithdrawal_;
       taskToken_ = other.taskToken_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -995,18 +987,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "producer" field.</summary>
-    public const int ProducerFieldNumber = 3;
-    private global::Temporalio.Api.Stream.V1.Producer producer_;
+    /// <summary>Field number for the "writer" field.</summary>
+    public const int WriterFieldNumber = 3;
+    private global::Temporalio.Api.Stream.V1.StreamWriter writer_;
     /// <summary>
     /// Required outside a Workflow. In a Workflow the transport sets it.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.Producer Producer {
-      get { return producer_; }
+    public global::Temporalio.Api.Stream.V1.StreamWriter Writer {
+      get { return writer_; }
       set {
-        producer_ = value;
+        writer_ = value;
       }
     }
 
@@ -1037,59 +1029,12 @@ namespace Temporalio.Api.StreamService.V1 {
       get { return records_; }
     }
 
-    /// <summary>Field number for the "previous_completed_task" field.</summary>
-    public const int PreviousCompletedTaskFieldNumber = 6;
-    private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch previousCompletedTask_;
-    /// <summary>
-    /// The run's last completed Workflow Task, from a Local Activity's start. Its started_event_id
-    /// is 0 before the first. The batch withdraws the run's Local Activity Records whose Workflow
-    /// Task never completed.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch PreviousCompletedTask {
-      get { return previousCompletedTask_; }
-      set {
-        previousCompletedTask_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "failed_tasks" field.</summary>
-    public const int FailedTasksFieldNumber = 7;
-    private static readonly pb::FieldCodec<long> _repeated_failedTasks_codec
-        = pb::FieldCodec.ForInt64(58);
-    private readonly pbc::RepeatedField<long> failedTasks_ = new pbc::RepeatedField<long>();
-    /// <summary>
-    /// The started event ids of the run's failed or timed out Workflow Tasks, from a Local
-    /// Activity's start. The batch withdraws the run's Local Activity Records of these tasks.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<long> FailedTasks {
-      get { return failedTasks_; }
-    }
-
-    /// <summary>Field number for the "withdraw_run" field.</summary>
-    public const int WithdrawRunFieldNumber = 8;
-    private string withdrawRun_ = "";
-    /// <summary>
-    /// Local Activity only. The previous run on a retry run's first batch, to withdraw its Records.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string WithdrawRun {
-      get { return withdrawRun_; }
-      set {
-        withdrawRun_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
     /// <summary>Field number for the "defer_withdrawal" field.</summary>
-    public const int DeferWithdrawalFieldNumber = 9;
+    public const int DeferWithdrawalFieldNumber = 6;
     private bool deferWithdrawal_;
     /// <summary>
     /// Only read by the server, on a Workflow Producer's batch. The batch withdraws no Workflow
-    /// Task and keeps no task facts, but withdraw_run still applies.
+    /// Task and keeps no task facts, but the writer's withdraw_run still applies.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1101,7 +1046,7 @@ namespace Temporalio.Api.StreamService.V1 {
     }
 
     /// <summary>Field number for the "task_token" field.</summary>
-    public const int TaskTokenFieldNumber = 10;
+    public const int TaskTokenFieldNumber = 7;
     private pb::ByteString taskToken_ = pb::ByteString.Empty;
     /// <summary>
     /// Only read by the server. The server checks the Producer against the Activity's current
@@ -1133,12 +1078,9 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (Namespace != other.Namespace) return false;
       if (!object.Equals(Ref, other.Ref)) return false;
-      if (!object.Equals(Producer, other.Producer)) return false;
+      if (!object.Equals(Writer, other.Writer)) return false;
       if (Sequence != other.Sequence) return false;
       if(!records_.Equals(other.records_)) return false;
-      if (!object.Equals(PreviousCompletedTask, other.PreviousCompletedTask)) return false;
-      if(!failedTasks_.Equals(other.failedTasks_)) return false;
-      if (WithdrawRun != other.WithdrawRun) return false;
       if (DeferWithdrawal != other.DeferWithdrawal) return false;
       if (TaskToken != other.TaskToken) return false;
       return Equals(_unknownFields, other._unknownFields);
@@ -1150,12 +1092,9 @@ namespace Temporalio.Api.StreamService.V1 {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
       if (ref_ != null) hash ^= Ref.GetHashCode();
-      if (producer_ != null) hash ^= Producer.GetHashCode();
+      if (writer_ != null) hash ^= Writer.GetHashCode();
       if (Sequence != 0L) hash ^= Sequence.GetHashCode();
       hash ^= records_.GetHashCode();
-      if (previousCompletedTask_ != null) hash ^= PreviousCompletedTask.GetHashCode();
-      hash ^= failedTasks_.GetHashCode();
-      if (WithdrawRun.Length != 0) hash ^= WithdrawRun.GetHashCode();
       if (DeferWithdrawal != false) hash ^= DeferWithdrawal.GetHashCode();
       if (TaskToken.Length != 0) hash ^= TaskToken.GetHashCode();
       if (_unknownFields != null) {
@@ -1184,30 +1123,21 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (producer_ != null) {
+      if (writer_ != null) {
         output.WriteRawTag(26);
-        output.WriteMessage(Producer);
+        output.WriteMessage(Writer);
       }
       if (Sequence != 0L) {
         output.WriteRawTag(32);
         output.WriteInt64(Sequence);
       }
       records_.WriteTo(output, _repeated_records_codec);
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(50);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(66);
-        output.WriteString(WithdrawRun);
-      }
       if (DeferWithdrawal != false) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(48);
         output.WriteBool(DeferWithdrawal);
       }
       if (TaskToken.Length != 0) {
-        output.WriteRawTag(82);
+        output.WriteRawTag(58);
         output.WriteBytes(TaskToken);
       }
       if (_unknownFields != null) {
@@ -1228,30 +1158,21 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (producer_ != null) {
+      if (writer_ != null) {
         output.WriteRawTag(26);
-        output.WriteMessage(Producer);
+        output.WriteMessage(Writer);
       }
       if (Sequence != 0L) {
         output.WriteRawTag(32);
         output.WriteInt64(Sequence);
       }
       records_.WriteTo(ref output, _repeated_records_codec);
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(50);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(ref output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(66);
-        output.WriteString(WithdrawRun);
-      }
       if (DeferWithdrawal != false) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(48);
         output.WriteBool(DeferWithdrawal);
       }
       if (TaskToken.Length != 0) {
-        output.WriteRawTag(82);
+        output.WriteRawTag(58);
         output.WriteBytes(TaskToken);
       }
       if (_unknownFields != null) {
@@ -1270,20 +1191,13 @@ namespace Temporalio.Api.StreamService.V1 {
       if (ref_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
       }
-      if (producer_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
+      if (writer_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Writer);
       }
       if (Sequence != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(Sequence);
       }
       size += records_.CalculateSize(_repeated_records_codec);
-      if (previousCompletedTask_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(PreviousCompletedTask);
-      }
-      size += failedTasks_.CalculateSize(_repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(WithdrawRun);
-      }
       if (DeferWithdrawal != false) {
         size += 1 + 1;
       }
@@ -1311,26 +1225,16 @@ namespace Temporalio.Api.StreamService.V1 {
         }
         Ref.MergeFrom(other.Ref);
       }
-      if (other.producer_ != null) {
-        if (producer_ == null) {
-          Producer = new global::Temporalio.Api.Stream.V1.Producer();
+      if (other.writer_ != null) {
+        if (writer_ == null) {
+          Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
         }
-        Producer.MergeFrom(other.Producer);
+        Writer.MergeFrom(other.Writer);
       }
       if (other.Sequence != 0L) {
         Sequence = other.Sequence;
       }
       records_.Add(other.records_);
-      if (other.previousCompletedTask_ != null) {
-        if (previousCompletedTask_ == null) {
-          PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-        }
-        PreviousCompletedTask.MergeFrom(other.PreviousCompletedTask);
-      }
-      failedTasks_.Add(other.failedTasks_);
-      if (other.WithdrawRun.Length != 0) {
-        WithdrawRun = other.WithdrawRun;
-      }
       if (other.DeferWithdrawal != false) {
         DeferWithdrawal = other.DeferWithdrawal;
       }
@@ -1368,10 +1272,10 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 26: {
-            if (producer_ == null) {
-              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            if (writer_ == null) {
+              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
             }
-            input.ReadMessage(Producer);
+            input.ReadMessage(Writer);
             break;
           }
           case 32: {
@@ -1382,27 +1286,11 @@ namespace Temporalio.Api.StreamService.V1 {
             records_.AddEntriesFrom(input, _repeated_records_codec);
             break;
           }
-          case 50: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 58:
-          case 56: {
-            failedTasks_.AddEntriesFrom(input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 66: {
-            WithdrawRun = input.ReadString();
-            break;
-          }
-          case 72: {
+          case 48: {
             DeferWithdrawal = input.ReadBool();
             break;
           }
-          case 82: {
+          case 58: {
             TaskToken = input.ReadBytes();
             break;
           }
@@ -1437,10 +1325,10 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 26: {
-            if (producer_ == null) {
-              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            if (writer_ == null) {
+              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
             }
-            input.ReadMessage(Producer);
+            input.ReadMessage(Writer);
             break;
           }
           case 32: {
@@ -1451,27 +1339,11 @@ namespace Temporalio.Api.StreamService.V1 {
             records_.AddEntriesFrom(ref input, _repeated_records_codec);
             break;
           }
-          case 50: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 58:
-          case 56: {
-            failedTasks_.AddEntriesFrom(ref input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 66: {
-            WithdrawRun = input.ReadString();
-            break;
-          }
-          case 72: {
+          case 48: {
             DeferWithdrawal = input.ReadBool();
             break;
           }
-          case 82: {
+          case 58: {
             TaskToken = input.ReadBytes();
             break;
           }
@@ -1765,10 +1637,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public CloseStreamRequest(CloseStreamRequest other) : this() {
       namespace_ = other.namespace_;
       ref_ = other.ref_ != null ? other.ref_.Clone() : null;
-      producer_ = other.producer_ != null ? other.producer_.Clone() : null;
-      previousCompletedTask_ = other.previousCompletedTask_ != null ? other.previousCompletedTask_.Clone() : null;
-      failedTasks_ = other.failedTasks_.Clone();
-      withdrawRun_ = other.withdrawRun_;
+      writer_ = other.writer_ != null ? other.writer_.Clone() : null;
       taskToken_ = other.taskToken_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -1803,67 +1672,24 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "producer" field.</summary>
-    public const int ProducerFieldNumber = 3;
-    private global::Temporalio.Api.Stream.V1.Producer producer_;
+    /// <summary>Field number for the "writer" field.</summary>
+    public const int WriterFieldNumber = 3;
+    private global::Temporalio.Api.Stream.V1.StreamWriter writer_;
     /// <summary>
-    /// The Producer that closes the Stream.
+    /// The writer that closes the Stream. An SDK Store reads only its Producer, and the server
+    /// also reads its withdrawal fields.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.Producer Producer {
-      get { return producer_; }
+    public global::Temporalio.Api.Stream.V1.StreamWriter Writer {
+      get { return writer_; }
       set {
-        producer_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "previous_completed_task" field.</summary>
-    public const int PreviousCompletedTaskFieldNumber = 4;
-    private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch previousCompletedTask_;
-    /// <summary>
-    /// Only read by the server. The run's last completed Workflow Task, as on the append.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch PreviousCompletedTask {
-      get { return previousCompletedTask_; }
-      set {
-        previousCompletedTask_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "failed_tasks" field.</summary>
-    public const int FailedTasksFieldNumber = 5;
-    private static readonly pb::FieldCodec<long> _repeated_failedTasks_codec
-        = pb::FieldCodec.ForInt64(42);
-    private readonly pbc::RepeatedField<long> failedTasks_ = new pbc::RepeatedField<long>();
-    /// <summary>
-    /// Only read by the server. The run's failed or timed out Workflow Tasks, as on the append.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<long> FailedTasks {
-      get { return failedTasks_; }
-    }
-
-    /// <summary>Field number for the "withdraw_run" field.</summary>
-    public const int WithdrawRunFieldNumber = 6;
-    private string withdrawRun_ = "";
-    /// <summary>
-    /// Only read by the server. The previous run on a retry run's close, to withdraw its Records.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string WithdrawRun {
-      get { return withdrawRun_; }
-      set {
-        withdrawRun_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        writer_ = value;
       }
     }
 
     /// <summary>Field number for the "task_token" field.</summary>
-    public const int TaskTokenFieldNumber = 7;
+    public const int TaskTokenFieldNumber = 4;
     private pb::ByteString taskToken_ = pb::ByteString.Empty;
     /// <summary>
     /// Only read by the server. It checks the token as on the append.
@@ -1894,10 +1720,7 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (Namespace != other.Namespace) return false;
       if (!object.Equals(Ref, other.Ref)) return false;
-      if (!object.Equals(Producer, other.Producer)) return false;
-      if (!object.Equals(PreviousCompletedTask, other.PreviousCompletedTask)) return false;
-      if(!failedTasks_.Equals(other.failedTasks_)) return false;
-      if (WithdrawRun != other.WithdrawRun) return false;
+      if (!object.Equals(Writer, other.Writer)) return false;
       if (TaskToken != other.TaskToken) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -1908,10 +1731,7 @@ namespace Temporalio.Api.StreamService.V1 {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
       if (ref_ != null) hash ^= Ref.GetHashCode();
-      if (producer_ != null) hash ^= Producer.GetHashCode();
-      if (previousCompletedTask_ != null) hash ^= PreviousCompletedTask.GetHashCode();
-      hash ^= failedTasks_.GetHashCode();
-      if (WithdrawRun.Length != 0) hash ^= WithdrawRun.GetHashCode();
+      if (writer_ != null) hash ^= Writer.GetHashCode();
       if (TaskToken.Length != 0) hash ^= TaskToken.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -1939,21 +1759,12 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (producer_ != null) {
+      if (writer_ != null) {
         output.WriteRawTag(26);
-        output.WriteMessage(Producer);
-      }
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(34);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(50);
-        output.WriteString(WithdrawRun);
+        output.WriteMessage(Writer);
       }
       if (TaskToken.Length != 0) {
-        output.WriteRawTag(58);
+        output.WriteRawTag(34);
         output.WriteBytes(TaskToken);
       }
       if (_unknownFields != null) {
@@ -1974,21 +1785,12 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (producer_ != null) {
+      if (writer_ != null) {
         output.WriteRawTag(26);
-        output.WriteMessage(Producer);
-      }
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(34);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(ref output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(50);
-        output.WriteString(WithdrawRun);
+        output.WriteMessage(Writer);
       }
       if (TaskToken.Length != 0) {
-        output.WriteRawTag(58);
+        output.WriteRawTag(34);
         output.WriteBytes(TaskToken);
       }
       if (_unknownFields != null) {
@@ -2007,15 +1809,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (ref_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
       }
-      if (producer_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
-      }
-      if (previousCompletedTask_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(PreviousCompletedTask);
-      }
-      size += failedTasks_.CalculateSize(_repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(WithdrawRun);
+      if (writer_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Writer);
       }
       if (TaskToken.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(TaskToken);
@@ -2041,21 +1836,11 @@ namespace Temporalio.Api.StreamService.V1 {
         }
         Ref.MergeFrom(other.Ref);
       }
-      if (other.producer_ != null) {
-        if (producer_ == null) {
-          Producer = new global::Temporalio.Api.Stream.V1.Producer();
+      if (other.writer_ != null) {
+        if (writer_ == null) {
+          Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
         }
-        Producer.MergeFrom(other.Producer);
-      }
-      if (other.previousCompletedTask_ != null) {
-        if (previousCompletedTask_ == null) {
-          PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-        }
-        PreviousCompletedTask.MergeFrom(other.PreviousCompletedTask);
-      }
-      failedTasks_.Add(other.failedTasks_);
-      if (other.WithdrawRun.Length != 0) {
-        WithdrawRun = other.WithdrawRun;
+        Writer.MergeFrom(other.Writer);
       }
       if (other.TaskToken.Length != 0) {
         TaskToken = other.TaskToken;
@@ -2091,29 +1876,13 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 26: {
-            if (producer_ == null) {
-              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            if (writer_ == null) {
+              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
             }
-            input.ReadMessage(Producer);
+            input.ReadMessage(Writer);
             break;
           }
           case 34: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 42:
-          case 40: {
-            failedTasks_.AddEntriesFrom(input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 50: {
-            WithdrawRun = input.ReadString();
-            break;
-          }
-          case 58: {
             TaskToken = input.ReadBytes();
             break;
           }
@@ -2148,29 +1917,13 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 26: {
-            if (producer_ == null) {
-              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            if (writer_ == null) {
+              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
             }
-            input.ReadMessage(Producer);
+            input.ReadMessage(Writer);
             break;
           }
           case 34: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 42:
-          case 40: {
-            failedTasks_.AddEntriesFrom(ref input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 50: {
-            WithdrawRun = input.ReadString();
-            break;
-          }
-          case 58: {
             TaskToken = input.ReadBytes();
             break;
           }

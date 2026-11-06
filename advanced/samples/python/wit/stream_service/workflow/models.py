@@ -311,9 +311,8 @@ class AppendRecordsRequest(typing.Generic[BodyT]):
 
     ref: StreamRef
     records: list[AppendRecord[BodyT]]
-    producer: Producer | None = None
+    writer: StreamWriter | None = None
     sequence: int | None = None
-    withdraw_run: str | None = None
 
 
 class _AppendRecordsRequestTransferTypeConverter(
@@ -349,13 +348,12 @@ class _AppendRecordsRequestTransferTypeConverter(
         return AppendRecordsRequest(
             ref=ref,
             records=records,
-            producer=_ProducerTransferTypeConverter().from_transfer_type(
-                value.producer, Producer
+            writer=_StreamWriterTransferTypeConverter().from_transfer_type(
+                value.writer, StreamWriter
             )
-            if value.HasField("producer")
+            if value.HasField("writer")
             else None,
             sequence=value.sequence if value.sequence != 0 else None,
-            withdraw_run=value.withdraw_run if bool(value.withdraw_run) else None,
         )
 
     @typing_extensions.override
@@ -374,14 +372,12 @@ class _AppendRecordsRequestTransferTypeConverter(
             item.CopyFrom(
                 _AppendRecordTransferTypeConverter().to_transfer_type(element)
             )
-        if value.producer is not None:
-            message.producer.CopyFrom(
-                _ProducerTransferTypeConverter().to_transfer_type(value.producer)
+        if value.writer is not None:
+            message.writer.CopyFrom(
+                _StreamWriterTransferTypeConverter().to_transfer_type(value.writer)
             )
         if value.sequence is not None:
             message.sequence = value.sequence
-        if value.withdraw_run is not None:
-            message.withdraw_run = value.withdraw_run
         return message
 
 
@@ -433,6 +429,74 @@ class _AppendRecordTransferTypeConverter(
 temporalio.converter.transfer_type_convertible(
     _AppendRecordTransferTypeConverter[typing.Any]
 )(AppendRecord)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class StreamWriter:
+    """The Producer of a write, and which earlier Records the write withdraws."""
+
+    producer: Producer | None = None
+    previous_completed_task: WorkflowTaskEpoch | None = None
+    failed_tasks: list[int]
+    withdraw_run: str | None = None
+
+
+class _StreamWriterTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        StreamWriter, temporalio.api.stream.v1.message_pb2.StreamWriter
+    ]
+):
+    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamWriter] | None = (
+        temporalio.api.stream.v1.message_pb2.StreamWriter
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.stream.v1.message_pb2.StreamWriter,
+        type_hint: type[StreamWriter],
+    ) -> StreamWriter:
+        failed_tasks = list(value.failed_tasks)
+        return StreamWriter(
+            producer=_ProducerTransferTypeConverter().from_transfer_type(
+                value.producer, Producer
+            )
+            if value.HasField("producer")
+            else None,
+            previous_completed_task=_WorkflowTaskEpochTransferTypeConverter().from_transfer_type(
+                value.previous_completed_task, WorkflowTaskEpoch
+            )
+            if value.HasField("previous_completed_task")
+            else None,
+            failed_tasks=failed_tasks,
+            withdraw_run=value.withdraw_run if bool(value.withdraw_run) else None,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: StreamWriter,
+    ) -> temporalio.api.stream.v1.message_pb2.StreamWriter:
+        message = temporalio.api.stream.v1.message_pb2.StreamWriter()
+        if value.producer is not None:
+            message.producer.CopyFrom(
+                _ProducerTransferTypeConverter().to_transfer_type(value.producer)
+            )
+        if value.previous_completed_task is not None:
+            message.previous_completed_task.CopyFrom(
+                _WorkflowTaskEpochTransferTypeConverter().to_transfer_type(
+                    value.previous_completed_task
+                )
+            )
+        message.failed_tasks.extend(value.failed_tasks)
+        if value.withdraw_run is not None:
+            message.withdraw_run = value.withdraw_run
+        return message
+
+
+temporalio.converter.transfer_type_convertible(_StreamWriterTransferTypeConverter)(
+    StreamWriter
+)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -907,7 +971,7 @@ class CloseStreamRequest:
     """Close a Stream. Readers drain what is left, then end. Later appends are refused."""
 
     ref: StreamRef
-    producer: Producer | None = None
+    writer: StreamWriter | None = None
 
 
 class _CloseStreamRequestTransferTypeConverter(
@@ -932,10 +996,10 @@ class _CloseStreamRequestTransferTypeConverter(
         ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
         return CloseStreamRequest(
             ref=ref,
-            producer=_ProducerTransferTypeConverter().from_transfer_type(
-                value.producer, Producer
+            writer=_StreamWriterTransferTypeConverter().from_transfer_type(
+                value.writer, StreamWriter
             )
-            if value.HasField("producer")
+            if value.HasField("writer")
             else None,
         )
 
@@ -950,9 +1014,9 @@ class _CloseStreamRequestTransferTypeConverter(
         message.ref.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
         )
-        if value.producer is not None:
-            message.producer.CopyFrom(
-                _ProducerTransferTypeConverter().to_transfer_type(value.producer)
+        if value.writer is not None:
+            message.writer.CopyFrom(
+                _StreamWriterTransferTypeConverter().to_transfer_type(value.writer)
             )
         return message
 
@@ -1290,12 +1354,7 @@ temporalio.converter.transfer_type_convertible(
 class StreamSuperseded:
     """Which earlier Records a Superseded item withdraws."""
 
-    producer_id: str
-    failed_tasks: list[int]
-    epoch: ProducerEpoch | None = None
-    previous_completed_task: WorkflowTaskEpoch | None = None
-    withdraw_run: str | None = None
-    run_id: str | None = None
+    writer: StreamWriter | None = None
 
 
 class _StreamSupersededTransferTypeConverter(
@@ -1313,25 +1372,12 @@ class _StreamSupersededTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.StreamSuperseded,
         type_hint: type[StreamSuperseded],
     ) -> StreamSuperseded:
-        if not value.producer_id:
-            raise ValueError("missing required field StreamSuperseded.producer_id")
-        producer_id = value.producer_id
-        failed_tasks = list(value.failed_tasks)
         return StreamSuperseded(
-            producer_id=producer_id,
-            failed_tasks=failed_tasks,
-            epoch=_ProducerEpochTransferTypeConverter().from_transfer_type(
-                value.epoch, ProducerEpoch
+            writer=_StreamWriterTransferTypeConverter().from_transfer_type(
+                value.writer, StreamWriter
             )
-            if value.HasField("epoch")
+            if value.HasField("writer")
             else None,
-            previous_completed_task=_WorkflowTaskEpochTransferTypeConverter().from_transfer_type(
-                value.previous_completed_task, WorkflowTaskEpoch
-            )
-            if value.HasField("previous_completed_task")
-            else None,
-            withdraw_run=value.withdraw_run if bool(value.withdraw_run) else None,
-            run_id=value.run_id if bool(value.run_id) else None,
         )
 
     @typing_extensions.override
@@ -1340,22 +1386,10 @@ class _StreamSupersededTransferTypeConverter(
         value: StreamSuperseded,
     ) -> temporalio.api.stream.v1.message_pb2.StreamSuperseded:
         message = temporalio.api.stream.v1.message_pb2.StreamSuperseded()
-        message.producer_id = value.producer_id
-        message.failed_tasks.extend(value.failed_tasks)
-        if value.epoch is not None:
-            message.epoch.CopyFrom(
-                _ProducerEpochTransferTypeConverter().to_transfer_type(value.epoch)
+        if value.writer is not None:
+            message.writer.CopyFrom(
+                _StreamWriterTransferTypeConverter().to_transfer_type(value.writer)
             )
-        if value.previous_completed_task is not None:
-            message.previous_completed_task.CopyFrom(
-                _WorkflowTaskEpochTransferTypeConverter().to_transfer_type(
-                    value.previous_completed_task
-                )
-            )
-        if value.withdraw_run is not None:
-            message.withdraw_run = value.withdraw_run
-        if value.run_id is not None:
-            message.run_id = value.run_id
         return message
 
 

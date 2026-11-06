@@ -14,6 +14,7 @@ import typing
 import uuid
 
 import pytest
+import temporalio.activity
 import temporalio.client
 import temporalio.converter
 import temporalio.nexus.system
@@ -22,6 +23,7 @@ import temporalio.workflow
 from temporalio.api.common.v1 import Payload
 from typing_extensions import assert_type, override
 
+import wit.stream_service.both.models as both_models
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both._resource_call import ResourceCall
@@ -51,6 +53,7 @@ from wit.stream_service.both.models import (
     StreamReadStart,
     StreamRecord,
     StreamRef,
+    StreamWriter,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -215,7 +218,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, f"_stream_service_{name}")
 
     stream = await client.create_stream[str](id="s1")
-    last_offset = await stream.publish()
+    last_offset = await stream.append()
     await stream.close()
 
     assert stream.ref.id == "s1"
@@ -239,10 +242,9 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "__temporal_system",
         "AppendRecords",
     )
-    # A client call fills the producer from its source.
-    assert append.arg == AppendRecordsRequest(
-        ref=stream.ref, records=[], producer=Producer(id="client:sample")
-    )
+    # A client call fills the writer from its source.
+    writer = StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[])
+    assert append.arg == AppendRecordsRequest(ref=stream.ref, records=[], writer=writer)
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
     assert (close.service, close.endpoint, close.operation) == (
@@ -250,9 +252,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         SYSTEM_ENDPOINT,
         "CloseStream",
     )
-    assert close.arg == CloseStreamRequest(
-        ref=stream.ref, producer=Producer(id="client:sample")
-    )
+    assert close.arg == CloseStreamRequest(ref=stream.ref, writer=writer)
     assert close.result_type is CloseStreamResponse
 
 
@@ -283,7 +283,10 @@ async def test_a_clean_block_closes_its_stream() -> None:
         _ = assert_type(stream, Stream[Turn])
 
     assert closes(answers) == [
-        CloseStreamRequest(ref=stream.ref, producer=Producer(id="client:sample"))
+        CloseStreamRequest(
+            ref=stream.ref,
+            writer=StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[]),
+        )
     ]
 
 
@@ -307,7 +310,7 @@ async def test_a_canceled_block_closes_its_stream() -> None:
     assert len(closes(answers)) == 1
 
 
-async def test_a_publish_wraps_each_value_and_returns_the_last_offset() -> None:
+async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
     ref = StreamRef(id="s1")
     client, answers = connect(
         Client,
@@ -320,21 +323,21 @@ async def test_a_publish_wraps_each_value_and_returns_the_last_offset() -> None:
     )
     stream = client.get_stream[str](id=ref.id)
 
-    last_offset = await stream.publish("a", "b")
-    empty = await stream.publish()
+    last_offset = await stream.append("a", "b")
+    empty = await stream.append()
 
     _ = assert_type(last_offset, int)
     assert last_offset == 5
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
-        producer=Producer(id="client:sample"),
+        writer=StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[]),
     )
-    # `last_offset` has no presence on the wire, so an empty publish answers 0.
+    # `last_offset` has no presence on the wire, so an empty append answers 0.
     assert empty == 0
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
-        _ = stream.publish(1)  # pyright: ignore[reportArgumentType]
+        _ = stream.append(1)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize(
@@ -365,6 +368,43 @@ async def test_a_create_takes_the_fields_of_the_ref(
     assert wire.stream_ref.backend == fields.get("backend", "")
     assert wire.stream_ref.HasField("owner") == ("owner" in fields)
     assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
+
+
+@dataclasses.dataclass
+class FakeActivityInfo:
+    workflow_run_id: str
+    activity_id: str
+
+
+async def test_a_client_append_sends_the_writer_of_its_activity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(temporalio.activity, "in_activity", lambda: True)
+    monkeypatch.setattr(
+        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7")
+    )
+    client, answers = connect(
+        Client, {"AppendRecords": AppendRecordsResponse(last_offset=1)}
+    )
+    stream = client.get_stream[str](id="s1")
+
+    _ = await stream.append()
+
+    (append,) = answers.started
+    writer = StreamWriter(
+        producer=Producer(id="act:r1:7", run_id="r1"), failed_tasks=[]
+    )
+    assert append.arg == AppendRecordsRequest(
+        ref=StreamRef(id="s1"), records=[], writer=writer
+    )
+    # The writer's fields go in the request's one writer field.
+    converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
+    wire = converter.to_transfer_type(append.arg)
+    assert wire.writer.producer.id == "act:r1:7"
+    assert wire.writer.producer.run_id == "r1"
+    assert not wire.writer.HasField("previous_completed_task")
+    assert list(wire.writer.failed_tasks) == []
+    assert wire.writer.withdraw_run == ""
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:

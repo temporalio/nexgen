@@ -200,12 +200,11 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsRequest{TBody}"/> class.
         /// </summary>
-        public AppendRecordsRequest(StreamRef @ref, IReadOnlyList<AppendRecord<TBody>> records, Producer? producer, string? withdrawRun)
+        public AppendRecordsRequest(StreamRef @ref, IReadOnlyList<AppendRecord<TBody>> records, StreamWriter? writer)
         {
             Ref = @ref;
             Records = records;
-            Producer = producer;
-            WithdrawRun = withdrawRun;
+            Writer = writer;
         }
 
         public StreamRef Ref { get; init; }
@@ -217,15 +216,11 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Required outside a Workflow. In a Workflow the transport sets it.
         /// </summary>
-        public Producer? Producer { get; init; }
-        /// <summary>
-        /// Retry run only. The previous run, whose Records this withdraws.
-        /// </summary>
-        public string? WithdrawRun { get; init; }
+        public StreamWriter? Writer { get; init; }
 
         internal static AppendRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsRequest wire)
         {
-            return new AppendRecordsRequest<TBody>(StreamRef.FromTransferType(wire.Ref), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer), string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun)
+            return new AppendRecordsRequest<TBody>(StreamRef.FromTransferType(wire.Ref), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), wire.Writer == null ? null : StreamWriter.FromTransferType(wire.Writer))
             {
                 Sequence = wire.Sequence == 0 ? null : wire.Sequence,
             };
@@ -234,13 +229,9 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
-            if (Producer is { } producer)
+            if (Writer is { } writer)
             {
-                proto.Producer = (Temporalio.Api.Stream.V1.Producer)producer.ToTransferType();
-            }
-            if (WithdrawRun is { } withdrawRun)
-            {
-                proto.WithdrawRun = withdrawRun;
+                proto.Writer = (Temporalio.Api.Stream.V1.StreamWriter)writer.ToTransferType();
             }
             proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)Ref.ToTransferType();
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
@@ -369,26 +360,26 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="CloseStreamRequest"/> class.
         /// </summary>
-        public CloseStreamRequest(StreamRef @ref, Producer? producer)
+        public CloseStreamRequest(StreamRef @ref, StreamWriter? writer)
         {
             Ref = @ref;
-            Producer = producer;
+            Writer = writer;
         }
 
         public StreamRef Ref { get; init; }
-        public Producer? Producer { get; init; }
+        public StreamWriter? Writer { get; init; }
 
         internal static CloseStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.CloseStreamRequest wire)
         {
-            return new CloseStreamRequest(StreamRef.FromTransferType(wire.Ref), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer));
+            return new CloseStreamRequest(StreamRef.FromTransferType(wire.Ref), wire.Writer == null ? null : StreamWriter.FromTransferType(wire.Writer));
         }
 
         internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.CloseStreamRequest();
-            if (Producer is { } producer)
+            if (Writer is { } writer)
             {
-                proto.Producer = (Temporalio.Api.Stream.V1.Producer)producer.ToTransferType();
+                proto.Writer = (Temporalio.Api.Stream.V1.StreamWriter)writer.ToTransferType();
             }
             proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)Ref.ToTransferType();
             return proto;
@@ -1329,67 +1320,24 @@ namespace Temporalio.Workflows
     public record StreamSuperseded
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="StreamSuperseded"/> class.
+        /// The writer that withdraws. Its epoch is empty when only withdraw-run applies.
         /// </summary>
-        public StreamSuperseded(string producerId, IReadOnlyList<long> failedTasks)
-        {
-            ProducerId = producerId;
-            FailedTasks = failedTasks;
-        }
-
-        public string ProducerId { get; init; }
-        /// <summary>
-        /// Workflow only. Started event ids of failed or timed out Workflow Tasks.
-        /// </summary>
-        public IReadOnlyList<long> FailedTasks { get; init; }
-        /// <summary>
-        /// The withdrawing Producer's epoch, whose case picks the rule.
-        /// </summary>
-        public ProducerEpoch? Epoch { get; init; }
-        /// <summary>
-        /// Workflow only. The previous completed Workflow Task of the run.
-        /// </summary>
-        public WorkflowTaskEpoch? PreviousCompletedTask { get; init; }
-        /// <summary>
-        /// Workflow retry only. The previous run, all of whose Records are withdrawn.
-        /// </summary>
-        public string? WithdrawRun { get; init; }
-        /// <summary>
-        /// The withdrawing Producer's run, so no Reader parses ids. Empty for a client.
-        /// </summary>
-        public string? RunId { get; init; }
+        public StreamWriter? Writer { get; init; }
 
         internal static StreamSuperseded FromTransferType(Temporalio.Api.Stream.V1.StreamSuperseded wire)
         {
-            return new StreamSuperseded(wire.ProducerId, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.FailedTasks, item => item)))
+            return new StreamSuperseded()
             {
-                Epoch = wire.Epoch == null ? null : ProducerEpoch.FromTransferType(wire.Epoch),
-                PreviousCompletedTask = wire.PreviousCompletedTask == null ? null : WorkflowTaskEpoch.FromTransferType(wire.PreviousCompletedTask),
-                WithdrawRun = string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun,
-                RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
+                Writer = wire.Writer == null ? null : StreamWriter.FromTransferType(wire.Writer),
             };
         }
 
         internal Temporalio.Api.Stream.V1.StreamSuperseded ToTransferType()
         {
             var proto = new Temporalio.Api.Stream.V1.StreamSuperseded();
-            proto.ProducerId = ProducerId;
-            proto.FailedTasks.Add(System.Linq.Enumerable.Select(FailedTasks, item => item));
-            if (Epoch is { } epoch)
+            if (Writer is { } writer)
             {
-                proto.Epoch = (Temporalio.Api.Stream.V1.ProducerEpoch)epoch.ToTransferType();
-            }
-            if (PreviousCompletedTask is { } previousCompletedTask)
-            {
-                proto.PreviousCompletedTask = (Temporalio.Api.Stream.V1.WorkflowTaskEpoch)previousCompletedTask.ToTransferType();
-            }
-            if (WithdrawRun is { } withdrawRun)
-            {
-                proto.WithdrawRun = withdrawRun;
-            }
-            if (RunId is { } runId)
-            {
-                proto.RunId = runId;
+                proto.Writer = (Temporalio.Api.Stream.V1.StreamWriter)writer.ToTransferType();
             }
             return proto;
         }
@@ -1407,6 +1355,84 @@ namespace Temporalio.Workflows
 
             /// <summary>Converts a transfer-type value to this model.</summary>
             public object? FromTransferType(object? transferType) => transferType is null ? null : StreamSuperseded.FromTransferType((Temporalio.Api.Stream.V1.StreamSuperseded)transferType);
+        }
+
+    }
+
+    /// <summary>
+    /// The Producer of a write, and which earlier Records the write withdraws.
+    /// </summary>
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamWriter.TransferTypeConverter))]
+    [GeneratedCode("nexgen", null)]
+    public record StreamWriter
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamWriter"/> class.
+        /// </summary>
+        public StreamWriter(IReadOnlyList<long> failedTasks)
+        {
+            FailedTasks = failedTasks;
+        }
+
+        /// <summary>
+        /// Required on a write. Its epoch's case picks the withdrawal rule.
+        /// </summary>
+        public Producer? Producer { get; init; }
+        /// <summary>
+        /// Workflow and Local Activity only. The run's last completed Workflow Task.
+        /// </summary>
+        public WorkflowTaskEpoch? PreviousCompletedTask { get; init; }
+        /// <summary>
+        /// Workflow and Local Activity only. The run's failed or timed out Workflow Tasks.
+        /// </summary>
+        public IReadOnlyList<long> FailedTasks { get; init; }
+        /// <summary>
+        /// Retry run only. The previous run, all of whose Records are withdrawn.
+        /// </summary>
+        public string? WithdrawRun { get; init; }
+
+        internal static StreamWriter FromTransferType(Temporalio.Api.Stream.V1.StreamWriter wire)
+        {
+            return new StreamWriter(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.FailedTasks, item => item)))
+            {
+                Producer = wire.Producer == null ? null : Producer.FromTransferType(wire.Producer),
+                PreviousCompletedTask = wire.PreviousCompletedTask == null ? null : WorkflowTaskEpoch.FromTransferType(wire.PreviousCompletedTask),
+                WithdrawRun = string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun,
+            };
+        }
+
+        internal Temporalio.Api.Stream.V1.StreamWriter ToTransferType()
+        {
+            var proto = new Temporalio.Api.Stream.V1.StreamWriter();
+            if (Producer is { } producer)
+            {
+                proto.Producer = (Temporalio.Api.Stream.V1.Producer)producer.ToTransferType();
+            }
+            if (PreviousCompletedTask is { } previousCompletedTask)
+            {
+                proto.PreviousCompletedTask = (Temporalio.Api.Stream.V1.WorkflowTaskEpoch)previousCompletedTask.ToTransferType();
+            }
+            proto.FailedTasks.Add(System.Linq.Enumerable.Select(FailedTasks, item => item));
+            if (WithdrawRun is { } withdrawRun)
+            {
+                proto.WithdrawRun = withdrawRun;
+            }
+            return proto;
+        }
+
+        /// <summary>
+        /// Converts this model to and from its generated transfer type.
+        /// </summary>
+        public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
+        {
+            /// <summary>Gets the generated transfer type.</summary>
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.StreamWriter);
+
+            /// <summary>Converts a model value to its transfer type.</summary>
+            public object? ToTransferType(object? value) => value is null ? null : ((StreamWriter)value).ToTransferType();
+
+            /// <summary>Converts a transfer-type value to this model.</summary>
+            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamWriter.FromTransferType((Temporalio.Api.Stream.V1.StreamWriter)transferType);
         }
 
     }

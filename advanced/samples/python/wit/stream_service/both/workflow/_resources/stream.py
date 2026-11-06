@@ -69,16 +69,15 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
     ) -> int:
-        """Publish values, and return the offset of the last one."""
+        """Append values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.workflow_producer(),
-            withdraw_run=_support.withdraw_run(),
+            writer=_support.workflow_writer(),
         )
         return await _append_records(request)
 
@@ -88,7 +87,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.workflow_producer(),
+            writer=_support.workflow_writer(),
         )
         handle = await _close_stream(request)
         await handle
@@ -190,9 +189,8 @@ async def append_records(
     request = AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body=value) for value in records],
-        producer=_support.workflow_producer(),
+        writer=_support.workflow_writer(),
         sequence=sequence,
-        withdraw_run=_support.withdraw_run(),
     )
     return await _append_records(request)
 
@@ -217,7 +215,7 @@ async def close_stream(
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     request = CloseStreamRequest(
         ref=ref,
-        producer=_support.workflow_producer(),
+        writer=_support.workflow_writer(),
     )
     return await _close_stream(request)
 

@@ -10,25 +10,35 @@ import temporalio.activity
 import temporalio.workflow
 
 
-def _producer(producer_id: str, run_id: str | None = None) -> typing.Any:
+def _models() -> typing.Any:
     # The sample's models import the support package, so this finds them when it runs.
-    models = importlib.import_module("wit.stream_service.both.models")
-    return models.Producer(id=producer_id, run_id=run_id)
+    return importlib.import_module("wit.stream_service.both.models")
 
 
-def workflow_producer() -> typing.Any:
+def workflow_writer() -> typing.Any:
+    """The run's Workflow Producer, with the run that a retry run retries."""
+    models = _models()
     run_id = temporalio.workflow.info().run_id
-    return _producer(f"wf:{run_id}", run_id)
+    return models.StreamWriter(
+        producer=models.Producer(id=f"wf:{run_id}", run_id=run_id),
+        failed_tasks=[],
+        withdraw_run=withdraw_run(),
+    )
 
 
-def client_producer() -> typing.Any:
+def client_writer() -> typing.Any:
     """An Activity's attempt, or a client."""
+    models = _models()
     if temporalio.activity.in_activity():
         info = temporalio.activity.info()
-        return _producer(
-            f"act:{info.workflow_run_id}:{info.activity_id}", info.workflow_run_id
+        producer = models.Producer(
+            id=f"act:{info.workflow_run_id}:{info.activity_id}",
+            run_id=info.workflow_run_id,
         )
-    return _producer("client:sample")
+    else:
+        producer = models.Producer(id="client:sample")
+    # The sample has no Local Activity context, so a client writer withdraws nothing.
+    return models.StreamWriter(producer=producer, failed_tasks=[])
 
 
 def withdraw_run() -> str | None:

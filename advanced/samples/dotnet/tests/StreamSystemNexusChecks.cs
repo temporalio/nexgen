@@ -25,7 +25,7 @@ namespace Nexgen.DotNetExamples.Tests
                 StreamService,
                 "AppendRecords",
                 new StreamModels.AppendRecordsRequest<Turn>(
-                    streamRef, new StreamModels.AppendRecord<Turn>[0], null, null));
+                    streamRef, new StreamModels.AppendRecord<Turn>[0], null));
             await instance.StartAsync<StreamModels.ReadRecordsResponse<Turn>>(
                 StreamService, "ReadRecords", new StreamModels.ReadRecordsRequest(streamRef));
 

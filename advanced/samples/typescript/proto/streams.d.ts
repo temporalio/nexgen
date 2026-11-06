@@ -83,16 +83,17 @@ declare module "@temporalio/proto" {
       epoch?: temporal.api.stream.v1.IProducerEpoch | null;
       runId?: string | null;
     }
+    interface IStreamWriter {
+      producer?: temporal.api.stream.v1.IProducer | null;
+      previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
+      failedTasks?: Long[] | null;
+      withdrawRun?: string | null;
+    }
     interface IAppendRecord {
       body?: temporal.api.common.v1.IPayload | null;
     }
     interface IStreamSuperseded {
-      producerId?: string | null;
-      epoch?: temporal.api.stream.v1.IProducerEpoch | null;
-      previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
-      failedTasks?: Long[] | null;
-      withdrawRun?: string | null;
-      runId?: string | null;
+      writer?: temporal.api.stream.v1.IStreamWriter | null;
     }
     interface IStreamData {
       producer?: temporal.api.stream.v1.IProducer | null;
@@ -129,12 +130,9 @@ declare module "@temporalio/proto" {
     interface IAppendRecordsRequest {
       namespace?: string | null;
       ref?: temporal.api.stream.v1.IStreamRef | null;
-      producer?: temporal.api.stream.v1.IProducer | null;
+      writer?: temporal.api.stream.v1.IStreamWriter | null;
       sequence?: Long | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
-      previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
-      failedTasks?: Long[] | null;
-      withdrawRun?: string | null;
       deferWithdrawal?: boolean | null;
       taskToken?: Uint8Array | null;
     }
@@ -145,10 +143,7 @@ declare module "@temporalio/proto" {
     interface ICloseStreamRequest {
       namespace?: string | null;
       ref?: temporal.api.stream.v1.IStreamRef | null;
-      producer?: temporal.api.stream.v1.IProducer | null;
-      previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
-      failedTasks?: Long[] | null;
-      withdrawRun?: string | null;
+      writer?: temporal.api.stream.v1.IStreamWriter | null;
       taskToken?: Uint8Array | null;
     }
     interface ICloseStreamResponse {}
