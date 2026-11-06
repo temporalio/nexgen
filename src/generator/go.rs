@@ -2104,9 +2104,29 @@ impl<'a> ApiPlanner<'a> {
         self.external_models
             .record_model(&message.info.full_name, message);
 
+        let is_system_request = crate::nexgen_config::current().system_nexus
+            && self.api_plan.services.iter().any(|service| {
+                service.operations.iter().any(|operation| {
+                    operation
+                        .input
+                        .as_ref()
+                        .and_then(|input| planned_message_type(input, self.api_plan))
+                        .is_some_and(|input| input.info.full_name == message.info.full_name)
+                })
+            });
         let fields = planned_fields
             .iter()
-            .map(|(planned_field, sourced)| self.build_field(planned_field, *sourced))
+            .map(|(planned_field, sourced)| {
+                let mut field = self.build_field(planned_field, *sourced)?;
+                if is_system_request && !field.required {
+                    field.default_punning_zero =
+                        public_default_punning_zero_for_field(&planned_field.kind, &field.go_type);
+                    if field.default_punning_zero.is_some() {
+                        field.go_type = field.go_type.trim_start_matches('*').to_string();
+                    }
+                }
+                Ok(field)
+            })
             .collect::<Result<Vec<_>>>()?;
 
         self.models
@@ -2172,6 +2192,7 @@ impl<'a> ApiPlanner<'a> {
                 .and_then(|doc| doc.value())
                 .map(str::to_string),
             go_type,
+            default_punning_zero: None,
             required: field.required,
             sourced,
         })
@@ -2623,6 +2644,8 @@ pub(in crate::generator) struct RenderedField {
     pub(in crate::generator) doc: Option<String>,
     /// Go type expression (e.g. `"string"`, `"*PostalAddress"`, `"[]string"`).
     pub(in crate::generator) go_type: String,
+    /// Zero value representing absence on a System Nexus request field.
+    pub(in crate::generator) default_punning_zero: Option<String>,
     /// Whether the field is required in the WIT definition. Rendered as a
     /// leading `// Required.` godoc comment on the generated Go struct field.
     pub(in crate::generator) required: bool,
@@ -3374,6 +3397,7 @@ fn ensure_generic_tuple(
                 name: TUPLE_FIELD_NAMES[index].to_string(),
                 doc: None,
                 go_type: format!("T{}", index + 1),
+                default_punning_zero: None,
                 required: true,
                 sourced: false,
             })
@@ -3405,6 +3429,7 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                         name: "Result".to_string(),
                         doc: None,
                         go_type: "T".to_string(),
+                        default_punning_zero: None,
                         required: false,
                         sourced: false,
                     },
@@ -3412,6 +3437,7 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                         name: "Error".to_string(),
                         doc: None,
                         go_type: "E".to_string(),
+                        default_punning_zero: None,
                         required: false,
                         sourced: false,
                     },
@@ -6273,6 +6299,7 @@ mod tests {
                     name: name.to_string(),
                     doc: None,
                     go_type: "string".to_string(),
+                    default_punning_zero: None,
                     required: true,
                     sourced: name == "iD",
                 })
