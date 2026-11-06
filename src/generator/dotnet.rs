@@ -17,7 +17,7 @@ use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedProtoType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, operation_input_model,
+    PlannedSpec, PlannedType, flattened_list_field, operation_input_model,
 };
 use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
@@ -1619,6 +1619,14 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
+    fn flattened_list_type(&self, kind: &PlannedType) -> Option<String> {
+        let PlannedType::List(item) = kind else {
+            return None;
+        };
+        let (_, field) = flattened_list_field(self.api_plan, item)?;
+        Some(format!("IReadOnlyList<{}>", self.field_type(field)))
+    }
+
     fn field_type(&self, field: &RecordFieldSpec<PlannedFamily>) -> String {
         let base = self.high_level_field_kind_type(&field.field_type);
         if field.required {
@@ -1678,7 +1686,9 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn resource_field_type(&self, kind: &PlannedType, optional: bool) -> String {
-        let base = self.dotnet_field_kind_type(kind);
+        let base = self
+            .flattened_list_type(kind)
+            .unwrap_or_else(|| self.dotnet_field_kind_type(kind));
         if optional { nullable_type(&base) } else { base }
     }
 
@@ -1851,10 +1861,13 @@ impl<'a> ApiPlanner<'a> {
                 nullable_type(&base)
             };
         }
+        let field_type = self
+            .flattened_list_type(&field.field_type)
+            .unwrap_or_else(|| self.field_type(field));
         if field.api_required(GenerationTarget::Workflow) {
-            self.field_type(field)
+            field_type
         } else {
-            nullable_type(&self.field_type(field))
+            nullable_type(&field_type)
         }
     }
 
@@ -3579,10 +3592,44 @@ fn flattened_request_field_expr(
             csharp_parameter_name(&field.name)
         }
     } else if field.function.is_none() {
-        option_field_expr(field, options_required)
+        let value = option_field_expr(field, options_required);
+        flattened_list_expr(field, &value, api_plan).unwrap_or(value)
     } else {
         csharp_parameter_name(&field.name)
     }
+}
+
+fn flattened_list_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+    value: &str,
+    api_plan: &PlannedSpec,
+) -> Option<String> {
+    let PlannedType::List(item) = &field.field_type else {
+        return None;
+    };
+    let (_, nested) = flattened_list_field(api_plan, item)?;
+    let PlannedType::Record(record) = item.as_ref() else {
+        return None;
+    };
+    let type_parameters = api_plan
+        .record_type_parameters(&record.full_name)
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect::<Vec<_>>();
+    let model = csharp_generic_type(&api_plan.record(&record.full_name)?.name, &type_parameters);
+    let construct = if nested.required {
+        format!("new {model}(value)")
+    } else {
+        format!("new {model} {{ {} = value }}", field_property_name(nested))
+    };
+    let wrapped = format!(
+        "System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select({value}, value => {construct}))"
+    );
+    Some(if field.api_required(GenerationTarget::Workflow) {
+        wrapped
+    } else {
+        format!("{value} == null ? null : {wrapped}")
+    })
 }
 
 fn function_name_expression(

@@ -96,6 +96,24 @@ pub(crate) fn operation_input_model(
     }
 }
 
+pub(crate) fn flattened_list_field<'a>(
+    api_plan: &'a PlannedSpec,
+    item: &PlannedType,
+) -> Option<(&'a str, &'a crate::spec::RecordFieldSpec<PlannedFamily>)> {
+    let TypeSpec::Record(record) = item else {
+        return None;
+    };
+    let record = api_plan.record(&record.full_name)?;
+    let mut fields = record.fields.iter().filter(|(_, field)| {
+        !field
+            .origin
+            .as_ref()
+            .is_some_and(crate::spec::FieldOrigin::is_omitted)
+    });
+    let (key, field) = fields.next().filter(|_| record.flatten_in_api)?;
+    fields.next().is_none().then_some((key.as_str(), field))
+}
+
 pub(crate) fn planned_type_is_model_shaped(planned_type: &PlannedType) -> bool {
     matches!(
         planned_type,
@@ -173,6 +191,7 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) result: Option<PlannedResourceMethodResult>,
     /// Set by `@nexus.close`. The end of an `async with` block calls this method.
     pub(crate) close: bool,
+    pub(crate) varargs: Option<String>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
 }
 

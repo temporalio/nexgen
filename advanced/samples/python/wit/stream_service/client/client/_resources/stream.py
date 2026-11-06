@@ -14,7 +14,6 @@ from ...services import StreamService
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
-    AppendRecordsResponse,
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
@@ -76,12 +75,12 @@ class Stream(typing.Generic[BodyT]):
 
     async def publish(
         self,
-        records: list[AppendRecord[BodyT]],
-    ) -> AppendRecordsResponse:
+        *records: BodyT,
+    ) -> int:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            records=records,
+            records=[AppendRecord(body=value) for value in records],
             producer=_support.client_producer(),
             withdraw_run=_support.withdraw_run(),
         )
@@ -90,7 +89,8 @@ class Stream(typing.Generic[BodyT]):
             arg=request,
             id=f"{_uuid.uuid4()}",
         )
-        return await handle.result()
+        result = await handle.result()
+        return _support.last_offset(result)
 
     async def close(
         self,

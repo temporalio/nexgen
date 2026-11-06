@@ -23,6 +23,7 @@ of `@nexus` directives.
   - [Name-Binding: How Resource Methods Find Operations](#name-binding-how-resource-methods-find-operations)
   - [Resource Return Binding](#resource-return-binding)
   - [Closing a Resource](#closing-a-resource)
+  - [Variadic Items](#variadic-items)
   - [Edge Cases and Error Conditions](#edge-cases-and-error-conditions)
 - [Proto-Backed Models](#proto-backed-models)
   - [Transfer-Type Conversion](#transfer-type-conversion)
@@ -703,7 +704,9 @@ request = CancelWorkflowRequest(
 
 After field matching, the generator also filters candidates by return type. If
 the method returns `own<user>`, only operations that also return `own<user>` (or
-the equivalent proto type) are considered.
+the equivalent proto type) are considered. A method that returns a record binds
+to an operation that returns that record. An output transform on the operation
+changes the method's result too.
 
 **Disambiguation by name:**
 
@@ -789,6 +792,23 @@ async with client.create_stream[Turn](stream_ref=StreamRef(id="turns")) as strea
 A call that returns the resource returns a `ResourceCall`, such as
 `ResourceCall[Stream[Turn]]`. Await it for the resource, or enter it with
 `async with`. Only Python closes a resource this way.
+### Variadic Items
+
+`@nexus.varargs "<parameter>"` makes a resource method take the items of that
+list parameter as positional arguments. Only Python generates it, and Go refuses
+it.
+
+```wit
+resource %stream {
+  /// @nexus.operation "append-records"
+  /// @nexus.varargs "records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
+```
+
+```python
+async def publish(self, *records: BodyT) -> int: ...
+```
 
 ### Edge Cases and Error Conditions
 
@@ -1112,6 +1132,22 @@ all its constituent fields are `None`. Python, TypeScript, .NET, and Go all omit
 the optional nested record when none of its fields are supplied. Go uses nil
 pointers internally for wire presence, but its public options use
 default-punning: empty strings mean omitted.
+
+A list of a flattened record with one field takes that field's values, and the
+call wraps each value in the record. The record must be proto-backed. Go refuses
+such a list.
+
+```wit
+/// @nexus.flatten-in-api
+record append-record {
+  body: body-t,
+}
+```
+
+```python
+# Sends records=[AppendRecord(body="a"), AppendRecord(body="b")].
+await append_records(ref=ref, records=["a", "b"])
+```
 
 ### Output Transforms
 
@@ -1676,6 +1712,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.function-args`                  | freestanding function                                                                         |
 | `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
 | `@nexus.close`                          | resource method                                                                               |
+| `@nexus.varargs`                        | resource method                                                                               |
 
 <!-- annotation-placements:end -->
 
@@ -2326,6 +2363,15 @@ signal-with-start-workflow: func(...) -> ...;
 
 Marks the method that ends the resource. Its parameters must be optional. See
 [Closing a Resource](#closing-a-resource).
+
+---
+
+### @nexus.varargs
+
+**Placement:** Resource method **Syntax:** `@nexus.varargs "<parameter>"`
+
+The method takes the items of that list parameter as positional arguments. See
+[Variadic Items](#variadic-items).
 
 ---
 

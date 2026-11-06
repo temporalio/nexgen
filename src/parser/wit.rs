@@ -2928,6 +2928,7 @@ fn build_resource_method(
         .map(|ty| build_resource_result(resolve, ty, path, &context, language))
         .transpose()?;
     let close = build_resource_method_close(&params, &directives, path, &context)?;
+    let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
 
     Ok(ResourceMethodSpec {
         name: method_name,
@@ -2938,6 +2939,7 @@ fn build_resource_method(
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
         close,
+        varargs,
     })
 }
 
@@ -2963,6 +2965,48 @@ fn build_resource_method_close(
         });
     }
     Ok(true)
+}
+
+fn build_resource_method_varargs(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Option<String>> {
+    let Some(varargs) = directive(directives, "varargs", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.varargs".to_string(),
+        reason,
+    };
+    let Some(name) = varargs.value("value") else {
+        return Err(invalid(
+            "needs the name of a parameter, such as `\"values\"`".to_string(),
+        ));
+    };
+    let Some(param) = params.iter().find(|param| param.name == name) else {
+        return Err(invalid(format!("`{name}` isn't a parameter of the method")));
+    };
+    if param.optional || !matches!(param.field_type, TypeSpec::List(_)) {
+        return Err(invalid(format!(
+            "needs a list parameter, but `{name}` isn't a list or is an `option`"
+        )));
+    }
+    // A varargs function parameter also takes the trailing positional arguments.
+    if let Some(function) = params.iter().find(|param| {
+        param.function.as_ref().is_some_and(|function| {
+            function.primary && matches!(function.args, FunctionArgsSpec::Varargs { .. })
+        })
+    }) {
+        return Err(invalid(format!(
+            "can't go with parameter `{}`, a function that takes its arguments as varargs",
+            function.name
+        )));
+    }
+    Ok(Some(param.name.clone()))
 }
 
 fn build_resource_method_operation_name(
