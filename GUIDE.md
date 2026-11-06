@@ -1984,11 +1984,13 @@ resource to the operation that it binds. A record that holds a parameter, also
 through another record, is generic in it by the rules above, so a response that
 holds such a record is generic too.
 
-- Python. `Stream(typing.Generic[BodyT])` takes a `body_type`, so
-  `create_stream(Turn, ...)` returns a `Stream[Turn]`. The client factory takes
-  it too, as in `get_stream(ref=ref, created=None, body_type=Turn)`. The runtime
-  type isn't a dataclass field, so the data converter doesn't encode it, and a
-  decoded handle decodes its values as `typing.Any`.
+- Python. Construct a specialized handle with `Stream[Turn](...)`; its calls
+  recover the runtime decoding type from that specialization. Factories still
+  take a runtime type: `create_stream(Turn, ...)` returns a `Stream[Turn]`, and
+  `get_stream(ref=ref, created=None, body_type=Turn)` specializes the client
+  handle the same way. A type annotation alone does not specialize an instance:
+  `stream: Stream[Turn] = Stream(...)` still decodes its values as `typing.Any`,
+  as does any handle constructed without type arguments.
 - TypeScript. `Stream<BodyT>` takes `bodyType?: common.TypeInfo<BodyT>` after
   its fields.
 - .NET. A call of `Stream<TBody>` takes the type argument, as in

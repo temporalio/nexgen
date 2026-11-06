@@ -1263,8 +1263,19 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
+        for name in &type_variables {
+            let argument = python_runtime_type_argument_name(name);
+            output.push_str(&format!(
+                "        {argument} = {argument} or typing.cast(\"type[{name}]\", typing.Any)\n"
+            ));
+        }
         output.push_str("        return ");
         output.push_str(&resource.type_name);
+        let arguments = type_variables
+            .iter()
+            .map(|name| python_runtime_type_argument_name(name))
+            .collect::<Vec<_>>();
+        render_resource_type_specialization(output, &arguments);
         output.push_str("(\n");
         output.push_str(&format!("            {receiver}.create_nexus_client(\n"));
         output.push_str("                service=");
@@ -1281,11 +1292,6 @@ impl<'a> ApiPlanner<'a> {
             .fields
             .iter()
             .map(|field| python_field_name(&field.name))
-            .chain(
-                type_variables
-                    .iter()
-                    .map(|name| python_runtime_type_argument_name(name)),
-            )
         {
             output.push_str(&format!("            {name}={name},\n"));
         }
@@ -1497,7 +1503,7 @@ impl<'a> ApiPlanner<'a> {
         // data by accident. A resource with no methods is data, as its identity DTO is.
         let handle = target.is_some() && !resource.methods.is_empty();
         if !handle {
-            output.push_str(if client || !type_variables.is_empty() {
+            output.push_str(if client {
                 "@dataclasses.dataclass(init=False)\n"
             } else {
                 "@dataclasses.dataclass\n"
@@ -1540,9 +1546,10 @@ impl<'a> ApiPlanner<'a> {
         if client {
             self.render_resource_constructor(output, resource);
         } else if handle {
-            self.render_resource_init(output, resource, &type_variables);
-        } else if !type_variables.is_empty() {
-            render_generic_resource_init(output, &fields, &type_variables);
+            self.render_resource_init(output, resource);
+        }
+        if target.is_some() {
+            render_runtime_type_properties(output, resource, &type_variables);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -1589,8 +1596,7 @@ impl<'a> ApiPlanner<'a> {
         ));
         output.push_str(&parameter);
         output.push_str(": temporalio.client.NexusClient[typing.Any],\n        /,\n");
-        let type_variables = resource_type_variable_names(resource);
-        if !resource.fields.is_empty() || !type_variables.is_empty() {
+        if !resource.fields.is_empty() {
             output.push_str("        *,\n");
         }
         for field in &resource.fields {
@@ -1604,7 +1610,6 @@ impl<'a> ApiPlanner<'a> {
                 )
             ));
         }
-        render_runtime_type_keyword_parameters(output, &type_variables);
         output.push_str("    ) -> None:\n");
         output.push_str(&format!(
             "        {receiver}.{attribute}: temporalio.client.NexusClient[typing.Any] = {parameter}\n"
@@ -1613,17 +1618,10 @@ impl<'a> ApiPlanner<'a> {
             let name = python_field_name(&field.name);
             output.push_str(&format!("        {receiver}.{name} = {name}\n"));
         }
-        render_runtime_type_attributes(output, receiver.as_str(), &type_variables);
     }
 
-    /// The constructor of a Workflow handle, which takes its identity fields and the runtime type of
-    /// each type parameter.
-    fn render_resource_init(
-        &self,
-        output: &mut String,
-        resource: &PlannedResource,
-        type_variables: &[String],
-    ) {
+    /// The constructor of a Workflow handle, which takes its identity fields.
+    fn render_resource_init(&self, output: &mut String, resource: &PlannedResource) {
         let receiver = resource_client_identifier(resource, "self");
         output.push_str(&format!("\n    def __init__(\n        {receiver},\n"));
         for field in &resource.fields {
@@ -1637,17 +1635,12 @@ impl<'a> ApiPlanner<'a> {
                 )
             ));
         }
-        if !type_variables.is_empty() {
-            output.push_str("        *,\n");
-            render_runtime_type_keyword_parameters(output, type_variables);
-        }
         output.push_str("    ) -> None:\n");
         for field in &resource.fields {
             let name = python_field_name(&field.name);
             output.push_str(&format!("        {receiver}.{name} = {name}\n"));
         }
-        render_runtime_type_attributes(output, &receiver, type_variables);
-        if resource.fields.is_empty() && type_variables.is_empty() {
+        if resource.fields.is_empty() {
             output.push_str("        pass\n");
         }
     }
@@ -3573,18 +3566,14 @@ impl RenderedOperation<'_> {
         }
     }
 
-    /// The bindings of the runtime type arguments in a returned resource, which `receiver` holds
-    /// in a resource method.
-    fn render_runtime_type_bindings(&self, output: &mut String, indent: &str, receiver: &str) {
-        for name in &self.runtime_type_arguments {
-            let argument = python_runtime_type_argument_name(name);
-            output.push_str(indent);
-            output.push_str(&argument);
-            output.push('=');
-            output.push_str(receiver);
-            output.push_str(&argument);
-            output.push_str(",\n");
-        }
+    /// Specialize a returned resource with the runtime types from the call or enclosing resource.
+    fn render_resource_specialization(&self, output: &mut String, receiver: &str) {
+        let arguments = self
+            .runtime_type_arguments
+            .iter()
+            .map(|name| format!("{receiver}{}", python_runtime_type_argument_name(name)))
+            .collect::<Vec<_>>();
+        render_resource_type_specialization(output, &arguments);
     }
 
     /// The support helper that resumes after one item, when the poll has one.
@@ -6262,8 +6251,8 @@ fn render_endpoint_service_object_operation_body(
             render_resource_return_guards(output, "        ", operation, resource_return);
             output.push_str("        resource = ");
             output.push_str(&resource_return.resource_type_name);
+            operation.render_resource_specialization(output, "");
             output.push_str("(\n");
-            operation.render_runtime_type_bindings(output, "            ", "");
             for binding in &resource_return.bindings {
                 output.push_str("            ");
                 output.push_str(&python_field_name(&binding.field_name));
@@ -6870,35 +6859,16 @@ fn render_resource_client_binder(output: &mut String, resource: &PlannedResource
     output.push_str("    return resource\n");
 }
 
-/// The `__init__` of a generic resource, which takes its runtime types as keywords.
-fn render_generic_resource_init(
-    output: &mut String,
-    fields: &[(String, String)],
-    type_variables: &[String],
-) {
-    output.push_str("\n    def __init__(\n        self,\n");
-    for (name, annotation) in fields {
-        output.push_str("        ");
-        output.push_str(name);
-        output.push_str(": ");
-        output.push_str(annotation);
-        output.push_str(",\n");
+/// Runtime specialization uses the concrete type objects, not the static TypeVars.
+fn render_resource_type_specialization(output: &mut String, arguments: &[String]) {
+    if !arguments.is_empty() {
+        output.push('[');
+        output.push_str(&arguments.join(", "));
+        output.push(']');
     }
-    output.push_str("        *,\n");
-    render_runtime_type_keyword_parameters(output, type_variables);
-    output.push_str("    ) -> None:\n");
-    for (name, _) in fields {
-        output.push_str("        self.");
-        output.push_str(name);
-        output.push_str(" = ");
-        output.push_str(name);
-        output.push('\n');
-    }
-    render_runtime_type_attributes(output, "self", type_variables);
 }
 
-/// The keyword parameter of each runtime type of a generic resource. Python drops type arguments
-/// at runtime, so the handle keeps the class of each one to decode the generic values of a reply.
+/// Factory keywords supply runtime types when callers do not construct a specialized class directly.
 fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &[String]) {
     for name in type_variables {
         output.push_str("        ");
@@ -6909,17 +6879,25 @@ fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &
     }
 }
 
-/// The attribute of each runtime type of a generic resource, set from its parameter.
-fn render_runtime_type_attributes(output: &mut String, receiver: &str, type_variables: &[String]) {
-    if type_variables.is_empty() {
-        return;
-    }
-    output.push_str("        # Not a dataclass field, so the converter doesn't encode it. A\n");
-    output.push_str("        # decoded handle decodes its generic values as `typing.Any`.\n");
-    for name in type_variables {
+/// Python attaches __orig_class__ after construction, so resolve type arguments lazily.
+/// Unspecialized handles retain the existing untyped decoding behavior.
+fn render_runtime_type_properties(
+    output: &mut String,
+    resource: &PlannedResource,
+    type_variables: &[String],
+) {
+    let receiver = resource_client_identifier(resource, "self");
+    for (index, name) in type_variables.iter().enumerate() {
         let argument = python_runtime_type_argument_name(name);
         output.push_str(&format!(
-            "        {receiver}.{argument}: type[{name}] = {argument} or typing.cast(\"type[{name}]\", typing.Any)\n"
+            "\n    @property\n    def {argument}({receiver}) -> type[{name}]:\n"
+        ));
+        output.push_str("        # Generic aliases attach their concrete types after __init__.\n");
+        output.push_str(&format!(
+            "        arguments = typing.get_args(getattr({receiver}, \"__orig_class__\", None))\n"
+        ));
+        output.push_str(&format!(
+            "        return typing.cast(\"type[{name}]\", arguments[{index}] if arguments else typing.Any)\n"
         ));
     }
 }
@@ -7004,8 +6982,8 @@ fn render_resource_method_inline_operation_body(
             render_resource_return_guards(output, "        ", operation, resource_return);
             output.push_str("        resource = ");
             output.push_str(&resource_return.resource_type_name);
+            operation.render_resource_specialization(output, "self.");
             output.push_str("(\n");
-            operation.render_runtime_type_bindings(output, "            ", "self.");
             for binding in &resource_return.bindings {
                 output.push_str("            ");
                 output.push_str(&python_field_name(&binding.field_name));
@@ -8792,11 +8770,11 @@ fn render_client_operation_body(
         }
         start_line(output, target, "    resource = ");
         output.push_str(&resource_return.resource_type_name);
+        operation.render_resource_specialization(output, receiver);
         output.push_str("(\n");
         start_line(output, target, "        ");
         output.push_str(client);
         output.push_str(",\n");
-        operation.render_runtime_type_bindings(output, "            ", receiver);
         for binding in &resource_return.bindings {
             start_line(output, target, "        ");
             output.push_str(&python_field_name(&binding.field_name));
@@ -9108,8 +9086,8 @@ fn render_request_only_operation_function(
         }
         output.push_str("    return ");
         output.push_str(&resource_return.resource_type_name);
+        operation.render_resource_specialization(output, "");
         output.push_str("(\n");
-        operation.render_runtime_type_bindings(output, "        ", "");
         for binding in &resource_return.bindings {
             output.push_str("        ");
             output.push_str(&python_field_name(&binding.field_name));

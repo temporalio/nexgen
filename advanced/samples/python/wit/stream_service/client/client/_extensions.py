@@ -50,14 +50,14 @@ class StreamServiceClientExtension(abc.ABC):
         body_type: type[BodyT] | None = None,
     ) -> Stream[BodyT]:
         """Return the ``Stream`` handle that has these identity fields."""
-        return Stream(
+        body_type = body_type or typing.cast("type[BodyT]", typing.Any)
+        return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
                 endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
             ),
             ref=ref,
             created=created,
-            body_type=body_type,
         )
 
     async def _stream_service_create_stream(
@@ -77,9 +77,8 @@ class StreamServiceClientExtension(abc.ABC):
         result = await handle.result()
         if result.ref is None:
             raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream(
+        resource = Stream[body_type](
             nexus_client,
-            body_type=body_type,
             ref=result.ref,
             created=result.created or None,
         )

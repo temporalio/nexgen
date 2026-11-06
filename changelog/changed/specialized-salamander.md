@@ -1,0 +1,1 @@
+Python generic resource constructors use their type arguments for response decoding instead of separate runtime-type keyword arguments. Factories still accept runtime types and specialize the returned handles.
