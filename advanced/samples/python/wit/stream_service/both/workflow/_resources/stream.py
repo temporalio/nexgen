@@ -17,6 +17,7 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Execution,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamReadStart,
@@ -123,6 +124,39 @@ class Stream(typing.Generic[BodyT]):
         )
         handle = await _describe_stream(request)
         return await handle
+
+
+class _GetStream(typing.Generic[BodyT]):
+    """Subscript it with the type arguments that the call decodes with."""
+
+    def __init__(
+        self,
+        body_type: type[BodyT] | None = None,
+    ) -> None:
+        self.body_type: type[BodyT] = typing.cast(
+            "type[BodyT]", typing.Any if body_type is None else body_type
+        )
+
+    def __getitem__(self, body_type: type[_BodyT]) -> _GetStream[_BodyT]:
+        return _GetStream(body_type)
+
+    def __call__(
+        self,
+        *,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        created: bool | None = None,
+    ) -> Stream[BodyT]:
+        """A handle on an existing ``Stream``, with no call."""
+        ref = StreamRef(id=id, owner=owner, backend=backend)
+        return Stream[self.body_type](
+            ref=ref,
+            created=created,
+        )
+
+
+get_stream: _GetStream[typing.Any] = _GetStream()
 
 
 async def _append_records(

@@ -273,8 +273,8 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "flatten-in-api",
-            sites: &[Record],
-            keys: &[],
+            sites: &[Record, Resource],
+            keys: &["param"],
             language_keys: &[],
             repeatable: false,
             languages: None,
@@ -403,6 +403,10 @@ impl Annotation {
     }
 
     fn accepts_key(&self, key: &str, site: Site) -> bool {
+        // WIT can't annotate a constructor parameter, so a resource names the one to flatten.
+        if self.name == "flatten-in-api" {
+            return site == Site::Resource;
+        }
         if self.name == "type"
             && site == Site::Field
             && (key.ends_with("-from") || key.ends_with("-to"))

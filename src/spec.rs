@@ -736,6 +736,8 @@ pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     /// `ResourceTypeParameterPass` infers them, in the order of their declarations.
     pub type_parameters: Vec<TypeParameterSpec>,
     pub fields: Vec<ResourceFieldSpec<F>>,
+    /// The constructor parameter that `@nexus.flatten-in-api` names, by WIT name.
+    pub flatten: Option<String>,
     pub methods: Vec<ResourceMethodSpec<F>>,
     pub data: F::ResourceData,
 }
@@ -782,6 +784,7 @@ impl<F: TypeFamily> ResourceSpec<F> {
                 .into_iter()
                 .map(|field| field.map_names_with(map))
                 .collect(),
+            flatten: self.flatten,
             methods: self
                 .methods
                 .into_iter()
