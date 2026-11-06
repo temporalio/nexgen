@@ -20,28 +20,12 @@ namespace Temporalio.Worker.Interceptors
         public virtual Task<NexusWorkflowOperationHandle<CreateStreamResult>> CreateStreamAsync(CreateStreamRequest request) => Next.CreateStreamAsync(request);
 
         /// <summary>
-        /// Intercept the AppendRecords operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<AppendRecordsResponse>> AppendRecordsAsync(AppendRecordsRequest<object> request) => Next.AppendRecordsAsync(request);
-
-        /// <summary>
         /// Intercept the CloseStream operation.
         /// </summary>
         /// <param name="request">Request for the operation.</param>
         /// <returns>Operation handle.</returns>
         [GeneratedCode("nexgen", null)]
         public virtual Task<NexusWorkflowOperationHandle<CloseStreamResponse>> CloseStreamAsync(CloseStreamRequest request) => Next.CloseStreamAsync(request);
-
-        /// <summary>
-        /// Intercept the ReadRecords operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<ReadRecordsResponse<object>>> ReadRecordsAsync(ReadRecordsRequest request) => Next.ReadRecordsAsync(request);
 
         /// <summary>
         /// Intercept the DescribeStream operation.
@@ -83,16 +67,23 @@ namespace Temporalio.Worker
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "AppendRecords")
             {
-                if (arg is not AppendRecordsRequest<object> request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(AppendRecordsRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a AppendRecordsRequest<object> request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a AppendRecordsRequest<> request.", nameof(arg));
                 }
                 if (typeof(TResult) != typeof(AppendRecordsResponse))
                 {
                     throw new System.ArgumentException("System Nexus operation expects a AppendRecordsResponse result.");
                 }
-                var handle = outbound.Value.AppendRecordsAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
+                    Service: service,
+                    Operation: new(
+                        operationName,
+                        arg?.GetType() ?? typeof(object),
+                        typeof(TResult)),
+                    Arg: arg,
+                    Headers: null));
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "CloseStream")
@@ -111,16 +102,23 @@ namespace Temporalio.Worker
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "ReadRecords")
             {
-                if (arg is not ReadRecordsRequest request)
+                if (arg is not ReadRecordsRequest)
                 {
                     throw new System.ArgumentException("System Nexus operation expects a ReadRecordsRequest request.", nameof(arg));
                 }
-                if (typeof(TResult) != typeof(ReadRecordsResponse<object>))
+                if (!typeof(TResult).IsGenericType ||
+                    typeof(TResult).GetGenericTypeDefinition() != typeof(ReadRecordsResponse<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsResponse<object> result.");
+                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsResponse<> result.");
                 }
-                var handle = outbound.Value.ReadRecordsAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
+                    Service: service,
+                    Operation: new(
+                        operationName,
+                        arg?.GetType() ?? typeof(object),
+                        typeof(TResult)),
+                    Arg: arg,
+                    Headers: null));
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "DescribeStream")
@@ -159,32 +157,12 @@ namespace Temporalio.Worker
                 Headers: null));
 
             [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<AppendRecordsResponse>> AppendRecordsAsync(AppendRecordsRequest<object> request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<AppendRecordsResponse>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "AppendRecords",
-                    typeof(AppendRecordsRequest<object>),
-                    typeof(AppendRecordsResponse)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
             public override Task<NexusWorkflowOperationHandle<CloseStreamResponse>> CloseStreamAsync(CloseStreamRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<CloseStreamResponse>(new(
                 Service: "temporal.api.streamservice.v1.StreamService",
                 Operation: new(
                     "CloseStream",
                     typeof(CloseStreamRequest),
                     typeof(CloseStreamResponse)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<ReadRecordsResponse<object>>> ReadRecordsAsync(ReadRecordsRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<ReadRecordsResponse<object>>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "ReadRecords",
-                    typeof(ReadRecordsRequest),
-                    typeof(ReadRecordsResponse<object>)),
                 Arg: request,
                 Headers: null));
 

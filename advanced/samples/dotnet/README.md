@@ -15,6 +15,9 @@ snapshot-only Workflow API form of the JSON-Schema inputs.
 - `tests/` — endpoint runtime checks (`WorkflowService`, `UserService`), the
   generated-api compile check, and proto-wire compatibility checks against the
   fixtures in [`../wire/proto/`](../wire/proto/).
+  `Nexgen.DotNetStreamServiceSystemNexus.csproj` compiles the stream output with
+  its System Nexus interceptor. `tests/SystemNexusStandIn/` gives the SDK
+  members that the interceptor needs, so a test can run its dispatch.
 
 Regenerate WIT output with `cargo build-examples --format wit --lang dotnet`
 from the repo root.

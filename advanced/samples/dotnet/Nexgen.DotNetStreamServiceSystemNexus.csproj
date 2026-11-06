@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Nexgen.DotNetStreamServiceSystemNexus</AssemblyName>
+    <!-- The stand-in declares SDK types that Temporalio also has. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The stream output with its interceptor partial, on a stand-in for the SDK changes. -->
+    <Compile Include="wit/stream-service/**/*.cs" />
+    <Compile Include="proto/streams/**/*.cs" />
+    <Compile Include="TemporalSupport/TemporalSupport.cs" />
+    <Compile Include="TemporalSupport/StreamService/*.cs" />
+    <Compile Include="tests/SystemNexusStandIn/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.26.1" />
+    <PackageReference Include="NexusRpc" Version="0.4.0" />
+    <PackageReference Include="Temporalio" Version="1.20.0" />
+  </ItemGroup>
+</Project>
