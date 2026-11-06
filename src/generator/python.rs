@@ -1232,21 +1232,28 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(&receiver);
         output.push_str(",\n");
         let type_variables = resource_type_variable_names(resource);
-        if !resource.fields.is_empty() || !type_variables.is_empty() {
+        if !resource.fields.is_empty() {
             output.push_str("        *,\n");
         }
         for field in &resource.fields {
             output.push_str(&format!(
-                "        {}: {},\n",
+                "        {}: {}{},\n",
                 python_field_name(&field.name),
                 self.python_resource_field_annotation(
                     &field.kind,
                     field.optional,
                     field.function.as_ref()
-                )
+                ),
+                if field.optional { " = None" } else { "" }
             ));
         }
-        render_runtime_type_keyword_parameters(output, &type_variables);
+        render_runtime_type_keyword_parameters(
+            output,
+            "        ",
+            &type_variables,
+            !resource.fields.is_empty(),
+            "None",
+        );
         output.push_str("    ) -> ");
         output.push_str(&python_type_annotation_with_arguments(
             &resource.type_name,
@@ -1264,13 +1271,7 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
-        for name in &type_variables {
-            let argument = python_runtime_type_argument_name(name);
-            output.push_str(&format!(
-                "        if {argument} is None:\n            \
-                 {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
-            ));
-        }
+        render_runtime_type_fallbacks(output, "        ", &type_variables);
         output.push_str("        return ");
         output.push_str(&resource.type_name);
         let arguments = type_variables
@@ -3559,10 +3560,19 @@ impl RenderedOperation<'_> {
             .then(|| self.output_type_expr_for(receiver))
     }
 
-    fn runtime_type_args(&self, receiver: &str) -> String {
+    /// The runtime type arguments that a call passes after its request. A public function takes
+    /// them as keywords.
+    fn runtime_type_args(&self, receiver: &str, keywords: bool) -> String {
         self.runtime_type_arguments
             .iter()
-            .map(|name| format!(", {receiver}{}", python_runtime_type_argument_name(name)))
+            .map(|name| {
+                let argument = python_runtime_type_argument_name(name);
+                if keywords {
+                    format!(", {argument}={receiver}{argument}")
+                } else {
+                    format!(", {receiver}{argument}")
+                }
+            })
             .collect()
     }
 
@@ -6170,7 +6180,13 @@ fn render_endpoint_service_object_operation_method(
         output.push_str(&input.annotation);
         output.push_str(",\n");
     }
-    operation.render_runtime_type_parameters(output, "        ");
+    render_runtime_type_keyword_parameters(
+        output,
+        "        ",
+        &operation.runtime_type_arguments,
+        false,
+        "None",
+    );
     output.push_str("    ) -> ");
     output.push_str(&operation_public_return_annotation(service, operation));
     output.push_str(":\n");
@@ -6192,7 +6208,6 @@ fn render_endpoint_service_object_unpacked_method(
     output.push_str(&operation.attr_name);
     output.push_str("(\n");
     output.push_str("        self,\n");
-    operation.render_runtime_type_parameters(output, "        ");
     output.push_str("        *,\n");
     for field in &unpacked_input.parameters {
         output.push_str("        ");
@@ -6204,6 +6219,13 @@ fn render_endpoint_service_object_unpacked_method(
         }
         output.push_str(",\n");
     }
+    render_runtime_type_keyword_parameters(
+        output,
+        "        ",
+        &operation.runtime_type_arguments,
+        true,
+        "None",
+    );
     output.push_str("    ) -> ");
     output.push_str(&operation_public_return_annotation(service, operation));
     output.push_str(":\n");
@@ -6230,6 +6252,7 @@ fn render_endpoint_service_object_operation_body(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
+    render_runtime_type_fallbacks(output, "        ", &operation.runtime_type_arguments);
     if operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
         || operation.output_direct_result
@@ -7024,14 +7047,43 @@ fn render_resource_type_specialization(output: &mut String, arguments: &[String]
     }
 }
 
-/// A factory takes the runtime types as keywords, since its caller has no class to specialize.
-fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &[String]) {
+/// A public call takes the runtime types as optional keywords, one line each at `indent`, since
+/// Python can't specialize a function. `keyword_only` says whether a `*` or `*args` marker comes
+/// before them. Returns whether a marker comes before the parameters that follow.
+fn render_runtime_type_keyword_parameters(
+    output: &mut String,
+    indent: &str,
+    type_variables: &[String],
+    keyword_only: bool,
+    default: &str,
+) -> bool {
+    if type_variables.is_empty() {
+        return keyword_only;
+    }
+    if !keyword_only {
+        output.push_str(indent);
+        output.push_str("*,\n");
+    }
     for name in type_variables {
-        output.push_str("        ");
+        output.push_str(indent);
         output.push_str(&python_runtime_type_argument_name(name));
         output.push_str(": type[");
         output.push_str(name);
-        output.push_str("] | None = None,\n");
+        output.push_str("] | None = ");
+        output.push_str(default);
+        output.push_str(",\n");
+    }
+    true
+}
+
+/// A call with no runtime type decodes its generic values as `typing.Any`.
+fn render_runtime_type_fallbacks(output: &mut String, indent: &str, type_variables: &[String]) {
+    for name in type_variables {
+        let argument = python_runtime_type_argument_name(name);
+        output.push_str(&format!(
+            "{indent}if {argument} is None:\n{indent}    \
+             {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
+        ));
     }
 }
 
@@ -7282,7 +7334,7 @@ fn render_resource_method_operation_body(
     let call = format!(
         "{}(request{})\n",
         request_operation_function_name(operation),
-        operation.runtime_type_args("self.")
+        operation.runtime_type_args("self.", operation.unpacked_input.is_none())
     );
     render_resource_method_request(output, request_expr);
     if *direct_return {
@@ -8043,7 +8095,6 @@ fn render_function_unpacked_overload(
         );
     }
     render_operation_signature_start(output, target, &operation.attr_name);
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
 
     let primary_function = primary_function(&unpacked_input.functions);
     let primary_case = primary_function.and_then(|function| {
@@ -8158,6 +8209,13 @@ fn render_function_unpacked_overload(
         }
         output.push_str(",\n");
     }
+    let keyword_only = render_runtime_type_keyword_parameters(
+        output,
+        &format!("{}    ", target_indent(target)),
+        &operation.runtime_type_arguments,
+        keyword_only,
+        "...",
+    );
     if target == GenerationTarget::Client {
         render_rpc_option_parameters_with_default(output, "        ", keyword_only, "...");
     }
@@ -8600,7 +8658,6 @@ fn render_operation_poll_function(
     let target = GenerationTarget::Client;
     let body_indent = target_body_indent(target);
     render_operation_signature_start(output, target, &poll_function_name(&operation.attr_name));
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
     render_poll_function_params(output, operation);
     start_line(output, target, ") -> collections.abc.AsyncGenerator[");
     output.push_str(&operation.output_annotation);
@@ -8620,6 +8677,7 @@ fn render_operation_poll_function(
         None,
         operation.experimental,
     );
+    render_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
     render_poll_function_request(output, operation);
     // The iteration uses one Nexus client for every page.
     render_inline_nexus_client(output, target, service);
@@ -8640,7 +8698,6 @@ fn render_operation_poll_items_function(
     output.push_str(&poll_items_function_name(&operation.attr_name));
     output.push_str("(\n");
     start_line(output, target, "    self,\n");
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
     render_poll_function_params(output, operation);
     start_line(output, target, ") -> PollIterator[");
     output.push_str(operation_input_annotation(operation));
@@ -8748,7 +8805,13 @@ fn render_poll_function_params(output: &mut String, operation: &RenderedOperatio
         output.push_str(operation_input_annotation(operation));
         output.push_str(",\n");
     }
-    let keyword_only = unpacked_input.is_some_and(|input| !input.parameters.is_empty());
+    let keyword_only = render_runtime_type_keyword_parameters(
+        output,
+        "        ",
+        &operation.runtime_type_arguments,
+        unpacked_input.is_some_and(|input| !input.parameters.is_empty()),
+        "None",
+    );
     render_rpc_option_parameters(output, "        ", keyword_only);
 }
 
@@ -9020,18 +9083,29 @@ fn render_client_request_method(
         output.push_str(operation_input_annotation(operation));
         output.push_str(",\n");
     }
-    operation.render_runtime_type_parameters(output, "        ");
-    render_rpc_option_parameters(output, "        ", false);
+    let keyword_only = render_runtime_type_keyword_parameters(
+        output,
+        "        ",
+        &operation.runtime_type_arguments,
+        false,
+        "None",
+    );
+    render_rpc_option_parameters(output, "        ", keyword_only);
     start_line(output, target, ") -> ");
     output.push_str(&operation_result_annotation(operation));
     output.push_str(":\n");
     render_operation_docstring(output, target_body_indent(target), operation, &[], None);
+    render_runtime_type_fallbacks(
+        output,
+        target_body_indent(target),
+        &operation.runtime_type_arguments,
+    );
     start_line(output, target, "    return await self.");
     output.push_str(&client_operation_name(service, operation));
     output.push('(');
     if operation.input.is_some() {
         output.push_str("request");
-        output.push_str(&operation.runtime_type_args(""));
+        output.push_str(&operation.runtime_type_args("", false));
         output.push_str(", ");
     }
     output.push_str(PYTHON_RPC_OPTION_ARGS);
@@ -9120,7 +9194,17 @@ fn render_request_only_operation_function(
         output.push_str(&input.annotation);
         output.push_str(",\n");
     }
-    operation.render_runtime_type_parameters(output, "    ");
+    if render_request_doc {
+        render_runtime_type_keyword_parameters(
+            output,
+            "    ",
+            &operation.runtime_type_arguments,
+            false,
+            "None",
+        );
+    } else {
+        operation.render_runtime_type_parameters(output, "    ");
+    }
     if operation.output_transform_expr.is_some()
         || operation.output_resource_return.is_some()
         || operation.output_direct_result
@@ -9146,6 +9230,7 @@ fn render_request_only_operation_function(
         output.push_str("]:\n");
         if render_request_doc {
             render_operation_docstring(output, "    ", operation, &[], None);
+            render_runtime_type_fallbacks(output, "    ", &operation.runtime_type_arguments);
         }
         render_temporalio_workflow_runtime_imports(
             output,
@@ -9206,6 +9291,7 @@ fn render_request_only_operation_function(
 
     if render_request_doc {
         render_operation_docstring(output, "    ", operation, &[], None);
+        render_runtime_type_fallbacks(output, "    ", &operation.runtime_type_arguments);
     }
 
     render_temporalio_workflow_runtime_imports(
@@ -9656,7 +9742,6 @@ fn render_unpacked_operation_function(
         );
     }
     render_operation_signature_start(output, target, &operation.attr_name);
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
     if !unpacked_input.parameters.is_empty() {
         start_line(output, target, "    *,\n");
     }
@@ -9670,11 +9755,19 @@ fn render_unpacked_operation_function(
         }
         output.push_str(",\n");
     }
+    let keyword_only = render_runtime_type_keyword_parameters(
+        output,
+        &format!("{}    ", target_indent(target)),
+        &operation.runtime_type_arguments,
+        !unpacked_input.parameters.is_empty(),
+        "None",
+    );
     if target == GenerationTarget::Client {
-        render_rpc_option_parameters(output, "        ", !unpacked_input.parameters.is_empty());
+        render_rpc_option_parameters(output, "        ", keyword_only);
     }
     render_unpacked_return_annotation(output, target, service, operation);
     render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
+    render_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
     for flattened_message in &unpacked_input.flattened_messages {
         render_flattened_message_setup(output, body_indent, flattened_message);
     }
@@ -9691,7 +9784,7 @@ fn render_unpacked_operation_function(
     start_line(output, target, "    )\n");
     start_line(output, target, "    return await ");
     output.push_str(&operation_call_target(target, service, operation));
-    render_request_call_arguments(output, target, &operation.runtime_type_args(""));
+    render_request_call_arguments(output, target, &operation.runtime_type_args("", false));
 }
 
 /// The return annotation of an unpacked operation. A Workflow function returns the operation
@@ -9787,7 +9880,6 @@ fn render_function_unpacked_implementation(
         );
     }
     render_operation_signature_start(output, target, &operation.attr_name);
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
 
     let primary_function = primary_function(&unpacked_input.functions);
     if let Some(function) = primary_function {
@@ -9866,6 +9958,13 @@ fn render_function_unpacked_implementation(
         output.push_str(",\n");
     }
 
+    let keyword_only = render_runtime_type_keyword_parameters(
+        output,
+        &format!("{}    ", target_indent(target)),
+        &operation.runtime_type_arguments,
+        keyword_only,
+        "None",
+    );
     if target == GenerationTarget::Client {
         render_rpc_option_parameters(output, "        ", keyword_only);
     }
@@ -9877,6 +9976,11 @@ fn render_function_unpacked_implementation(
         operation,
         unpacked_input,
         primary_function,
+    );
+    render_runtime_type_fallbacks(
+        output,
+        target_body_indent(target),
+        &operation.runtime_type_arguments,
     );
 
     for function in &unpacked_input.functions {
@@ -9956,7 +10060,7 @@ fn render_function_unpacked_implementation(
     start_line(output, target, "    )\n");
     start_line(output, target, "    return await ");
     output.push_str(&operation_call_target(target, service, operation));
-    render_request_call_arguments(output, target, &operation.runtime_type_args(""));
+    render_request_call_arguments(output, target, &operation.runtime_type_args("", false));
 }
 
 fn rendered_function_implementation_renders_field(

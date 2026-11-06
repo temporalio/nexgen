@@ -213,7 +213,7 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
-    stream = await api.create_stream(str, stream_ref=ref)
+    stream = await api.create_stream(stream_ref=ref, body_type=str)
     response = await stream.publish(records=[])
     assert response.last_offset == 3
     # The Workflow API fills the request id and the producer from its sources.
@@ -274,7 +274,7 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
     if construction == "create":
-        stream = await workflow_only.create_stream(Turn, stream_ref=ref)
+        stream = await workflow_only.create_stream(stream_ref=ref, body_type=Turn)
     else:
         stream = WorkflowStream[Turn](ref=ref, created=None)
 

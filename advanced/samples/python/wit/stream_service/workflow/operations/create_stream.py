@@ -43,11 +43,11 @@ async def _create_stream(
 
 
 async def create_stream(
-    body_type: type[BodyT],
     *,
     stream_ref: StreamRef,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: type[BodyT] | None = None,
 ) -> Stream[BodyT]:
     """
     Args:
@@ -56,6 +56,8 @@ async def create_stream(
         id_conflict_policy: What the create does when the Stream exists. Unspecified is
             fail.
     """
+    if body_type is None:
+        body_type = typing.cast("type[BodyT]", typing.Any)
     request = CreateStreamRequest(
         stream_ref=stream_ref,
         retention=retention,

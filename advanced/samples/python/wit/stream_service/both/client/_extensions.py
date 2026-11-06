@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import collections.abc
 import typing
 import temporalio.client
 import temporalio.nexus.system
 import uuid as _uuid
-import datetime
 import abc
+import datetime
 
 from ..services import StreamService
 from ..models import (
@@ -46,7 +47,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         ref: StreamRef,
-        created: bool | None,
+        created: bool | None = None,
         body_type: type[BodyT] | None = None,
     ) -> Stream[BodyT]:
         """Return the ``Stream`` handle that has these identity fields."""
@@ -65,6 +66,9 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         request: CreateStreamRequest,
         body_type: type[BodyT],
+        *,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream[BodyT]:
         nexus_client = self.create_nexus_client(
             service=StreamService,
@@ -74,6 +78,8 @@ class StreamServiceClientExtension(abc.ABC):
             operation=StreamService.create_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
+            rpc_metadata=rpc_metadata or {},
+            rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
         if result.ref is None:
@@ -87,11 +93,13 @@ class StreamServiceClientExtension(abc.ABC):
 
     async def create_stream(
         self,
-        body_type: type[BodyT],
         *,
         stream_ref: StreamRef,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: type[BodyT] | None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream[BodyT]:
         """
         Args:
@@ -101,6 +109,8 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
+        if body_type is None:
+            body_type = typing.cast("type[BodyT]", typing.Any)
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             retention=retention,
@@ -108,4 +118,6 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )
-        return await self._stream_service_create_stream(request, body_type)
+        return await self._stream_service_create_stream(
+            request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )

@@ -2024,9 +2024,11 @@ resource %stream {
 ```
 
 The handle keeps a runtime type for each type parameter and decodes responses
-with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or
-`create_stream(Turn, ...)`. TypeScript takes `bodyType` after the fields, and
-.NET takes the type argument, as in `CreateStreamAsync<Turn>(options)`.
+with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or a
+keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
+`client.get_stream(ref=ref, body_type=Turn)`. A call with no `body_type` decodes
+as `typing.Any`. TypeScript takes `bodyType` after the fields, and .NET takes
+the type argument, as in `CreateStreamAsync<Turn>(options)`.
 
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
 operation with no `@nexus.proto` message can't return one yet.
