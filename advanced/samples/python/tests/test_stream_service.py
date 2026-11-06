@@ -17,7 +17,9 @@ from temporalio.api.stream.v1 import message_pb2
 from temporalio.api.streamservice.v1 import request_response_pb2
 from temporalio.converter import FailureConverter, PayloadConverter
 import temporalio.nexus.system
+from temporalio.worker import StartNexusOperationInput
 import temporalio.workflow
+from typing_extensions import override
 
 from wit.stream_service.models import models as models_only
 from wit.stream_service.workflow import models as workflow_models
@@ -25,6 +27,11 @@ from wit.stream_service.client import models as client_models
 from wit.stream_service.both import models as both_models
 from wit.stream_service import workflow as workflow_only
 from wit.stream_service.both import workflow as both_workflow
+from wit.stream_service.workflow._system_nexus_interceptor import (
+    _start_system_nexus_operation,
+    _SystemNexusWorkflowOutboundInterceptorBase,
+    _SystemNexusWorkflowOutboundInterceptorTerminal,
+)
 
 
 @dataclasses.dataclass
@@ -282,6 +289,94 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
     page = await stream.read()
 
     assert page.records == [record]
+
+
+async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:
+    record = workflow_models.StreamRecord(
+        item=workflow_models.StreamItemData(
+            workflow_models.StreamData(body=Turn(role="model"))
+        ),
+        offset=1,
+    )
+    converter = temporalio.nexus.system._SystemNexusPayloadConverter(
+        PayloadConverter.default,
+        FailureConverter.default,
+    )
+    payload = converter.to_payload(
+        workflow_models.ReadRecordsResponse[Turn](records=[record])
+    )
+    pages: list[workflow_models.ReadRecordsResponse[typing.Any]] = []
+
+    # Like the SDK's outbound root, the terminal is also the last interceptor.
+    class Root(
+        _SystemNexusWorkflowOutboundInterceptorTerminal,
+        _SystemNexusWorkflowOutboundInterceptorBase,
+    ):
+        @override
+        def _next_system_nexus_interceptor(
+            self,
+        ) -> _SystemNexusWorkflowOutboundInterceptorBase:
+            return self
+
+        @override
+        async def start_system_nexus_operation(
+            self,
+            input: StartNexusOperationInput[typing.Any, typing.Any],
+        ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
+            raise AssertionError("a read goes through its typed hook")
+
+        @override
+        async def _intercept_system_nexus_operation(
+            self,
+            input: StartNexusOperationInput[typing.Any, typing.Any],
+        ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
+            assert input.output_type is not None
+            pages.append(converter.from_payload(payload, input.output_type))
+            return typing.cast(
+                temporalio.workflow.NexusOperationHandle[typing.Any], object()
+            )
+
+    class PassThrough(_SystemNexusWorkflowOutboundInterceptorBase):
+        def __init__(self, next: _SystemNexusWorkflowOutboundInterceptorBase) -> None:
+            self.next: _SystemNexusWorkflowOutboundInterceptorBase = next
+
+        @override
+        def _next_system_nexus_interceptor(
+            self,
+        ) -> _SystemNexusWorkflowOutboundInterceptorBase:
+            return self.next
+
+        @override
+        async def start_system_nexus_operation(
+            self,
+            input: StartNexusOperationInput[typing.Any, typing.Any],
+        ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
+            return await self.next.start_system_nexus_operation(input)
+
+    _ = await _start_system_nexus_operation(
+        PassThrough(Root()),
+        StartNexusOperationInput(
+            endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+            service="temporal.api.streamservice.v1.StreamService",
+            operation="ReadRecords",
+            input=workflow_models.ReadRecordsRequest(
+                ref=workflow_models.StreamRef(id="typed-stream")
+            ),
+            output_type=workflow_models.ReadRecordsResponse[Turn],
+            schedule_to_close_timeout=None,
+            schedule_to_start_timeout=None,
+            start_to_close_timeout=None,
+            cancellation_type=temporalio.workflow.NexusOperationCancellationType.WAIT_COMPLETED,
+            headers=None,
+            summary=None,
+        ),
+    )
+
+    [page] = pages
+    assert page.records == [record]
+    item = page.records[0].item
+    assert isinstance(item, workflow_models.StreamItemData)
+    assert isinstance(item.value.body, Turn)
 
 
 @pytest.mark.parametrize(

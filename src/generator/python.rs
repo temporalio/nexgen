@@ -5809,7 +5809,11 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str(&output_type);
         output.push_str("]\",\n            input,\n        )\n        # The dispatch check above establishes that this operation's response type is _OutputT.\n        return typing.cast(\n            \"temporalio.workflow.NexusOperationHandle[_OutputT]\",\n            await interceptor.start_");
         output.push_str(&operation.attr_name);
-        output.push_str("(typed_input.input),\n        )\n");
+        output.push_str("(typed_input.input");
+        if system_nexus_generic_output(operation) {
+            output.push_str(", typed_input.output_type");
+        }
+        output.push_str("),\n        )\n");
     }
     // The generic hook gets each operation outside the generated set. Then a plugin
     // outside the SDK can serve its own System Nexus service.
@@ -5820,19 +5824,32 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
     output.push_str("\n    @abc.abstractmethod\n    async def start_system_nexus_operation(\n        self,\n        input: StartNexusOperationInput[_InputT, _OutputT],\n    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n        \"\"\"Intercept a System Nexus operation through the generic hook.\"\"\"\n        ...\n");
     for (_service, operation) in &operations {
         let output_type = system_nexus_type_expr(&operation.descriptor_output_ref);
+        let generic_output = system_nexus_generic_output(operation);
         output.push_str("\n    async def start_");
         output.push_str(&operation.attr_name);
         output.push_str("(\n        self, request: ");
         output.push_str(&system_nexus_input_type_expr(operation));
+        render_system_nexus_output_type_parameter(&mut output, operation, &output_type);
         output.push_str("\n    ) -> temporalio.workflow.NexusOperationHandle[");
         output.push_str(&output_type);
         output.push_str("]:\n");
         output.push_str("        \"\"\"Intercept the ");
         output.push_str(operation.name);
-        output.push_str(" operation.\"\"\"\n");
+        output.push_str(" operation.");
+        if generic_output {
+            output.push_str(
+                "\n\n        The response decodes with ``output_type``, which has the caller's type\n        \
+                 arguments. Without it, the generic values decode as ``typing.Any``.\n        ",
+            );
+        }
+        output.push_str("\"\"\"\n");
         output.push_str("        return await self._next_system_nexus_interceptor().start_");
         output.push_str(&operation.attr_name);
-        output.push_str("(request)\n");
+        output.push_str(if generic_output {
+            "(request, output_type)\n"
+        } else {
+            "(request)\n"
+        });
     }
 
     output.push_str("\n\nclass _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):\n");
@@ -5843,6 +5860,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str(&operation.attr_name);
         output.push_str("(\n        self, request: ");
         output.push_str(&system_nexus_input_type_expr(operation));
+        render_system_nexus_output_type_parameter(&mut output, operation, &output_type);
         output.push_str("\n    ) -> temporalio.workflow.NexusOperationHandle[");
         output.push_str(&output_type);
         output.push_str("]:\n");
@@ -5857,13 +5875,33 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str(&python_string_literal(service.wire_name));
         output.push_str(",\n                operation=");
         output.push_str(&python_string_literal(operation.wire_name));
-        // The SDK decodes the result with `output_type`, and its converter takes a class, not a
-        // parameterized alias.
+        // The SDK decodes the result with `output_type`. Without the caller's type arguments, the
+        // generic values of a response decode as `typing.Any`.
         output.push_str(",\n                input=request,\n                output_type=");
         output.push_str(&system_nexus_output_class_expr(operation, &output_type));
+        if system_nexus_generic_output(operation) {
+            output.push_str(" if output_type is None else output_type");
+        }
         output.push_str(",\n                schedule_to_close_timeout=None,\n                schedule_to_start_timeout=None,\n                start_to_close_timeout=None,\n                cancellation_type=NexusOperationCancellationType.WAIT_COMPLETED,\n                headers=None,\n                summary=None,\n            )\n        )\n");
     }
     output
+}
+
+/// Whether the response is a generic model, so its typed hooks take the caller's `output_type`.
+fn system_nexus_generic_output(operation: &RenderedOperation<'_>) -> bool {
+    !operation.output_record_type_parameters.is_empty()
+}
+
+fn render_system_nexus_output_type_parameter(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+    output_type: &str,
+) {
+    if system_nexus_generic_output(operation) {
+        output.push_str(", output_type: type[");
+        output.push_str(output_type);
+        output.push_str("] | None = None");
+    }
 }
 
 fn system_nexus_output_class_expr(operation: &RenderedOperation<'_>, output_type: &str) -> String {
