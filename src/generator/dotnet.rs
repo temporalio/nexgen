@@ -1471,8 +1471,8 @@ impl<'a> ApiPlanner<'a> {
         names
     }
 
-    /// Whether the operation starts by name, since the service interface erases its type
-    /// parameters.
+    /// Whether the operation starts by name. The service interface has `object` for each type
+    /// argument, and C# generics are invariant, so a call through it can't keep the caller's types.
     fn operation_starts_by_name(&self, operation: &PlannedOperation) -> bool {
         !self.operation_model_parameters(operation).is_empty()
             || operation.output_type().is_some_and(|output| {
@@ -2609,7 +2609,14 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(")\n            {\n");
                 let expected_request = match &generic_request {
                     Some(definition) => {
-                        output.push_str("                if (arg is null || !arg.GetType().IsGenericType ||\n                    arg.GetType().GetGenericTypeDefinition() != typeof(");
+                        output.push_str(
+                            "                \
+                             if (arg is null || !arg.GetType().IsGenericType ||\n",
+                        );
+                        output.push_str(
+                            "                    \
+                             arg.GetType().GetGenericTypeDefinition() != typeof(",
+                        );
                         output.push_str(definition);
                         output.push_str("))\n");
                         definition
@@ -2621,12 +2628,16 @@ impl<'a> ApiPlanner<'a> {
                         &request_type
                     }
                 };
-                output.push_str("                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
+                output.push_str(SYSTEM_NEXUS_ARGUMENT_EXCEPTION);
                 output.push_str(expected_request);
                 output.push_str(" request.\", nameof(arg));\n                }\n");
                 let expected_response = match &generic_response {
                     Some(definition) => {
-                        output.push_str("                if (!typeof(TResult).IsGenericType ||\n                    typeof(TResult).GetGenericTypeDefinition() != typeof(");
+                        output.push_str(
+                            "                \
+                             if (!typeof(TResult).IsGenericType ||\n                    \
+                             typeof(TResult).GetGenericTypeDefinition() != typeof(",
+                        );
                         output.push_str(definition);
                         output.push_str("))\n");
                         definition
@@ -2638,7 +2649,7 @@ impl<'a> ApiPlanner<'a> {
                         &response_type
                     }
                 };
-                output.push_str("                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
+                output.push_str(SYSTEM_NEXUS_ARGUMENT_EXCEPTION);
                 output.push_str(expected_response);
                 output.push_str(" result.\");\n                }\n");
                 if generic {
@@ -2646,7 +2657,10 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     output.push_str("                var handle = outbound.Value.");
                     output.push_str(&csharp_operation_ident(operation));
-                    output.push_str("Async(request);\n                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n");
+                    output.push_str(
+                        "Async(request);\n                \
+                         return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n",
+                    );
                 }
                 output.push_str("            }\n");
             }
@@ -2695,9 +2709,8 @@ impl<'a> ApiPlanner<'a> {
         output
     }
 
-    /// Whether the request or the response of an operation is a generic model. C# generics are
-    /// invariant, so a typed hook can't take every type argument. The generic hook gets such an
-    /// operation with the types of the call.
+    /// Whether the request or the response is a generic model. C# generics are invariant, so no
+    /// typed hook takes each type argument, and the generic hook gets the operation.
     fn system_nexus_has_generic_model(&self, operation: &PlannedOperation) -> bool {
         (self.operation_has_input(operation)
             && self
@@ -2723,6 +2736,9 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 }
+
+const SYSTEM_NEXUS_ARGUMENT_EXCEPTION: &str = "                {\n                    \
+    throw new System.ArgumentException(\"System Nexus operation expects a ";
 
 /// Starts the operation through the generic hook, with the types of the call.
 fn render_system_nexus_generic_hook_call(output: &mut String, indent: &str) {

@@ -152,7 +152,7 @@ pub(crate) struct PlannedResource {
     pub(crate) name: String,
     pub(crate) doc: Option<String>,
     pub(crate) type_name: String,
-    /// The type parameters that the resource declares, in order.
+    /// The type parameters of the resource, in the order of their declarations.
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
@@ -185,7 +185,7 @@ pub(crate) struct PlannedResourceMethodResult {
 pub(crate) enum PlannedResourceMethodResultKind {
     Resource {
         type_name: String,
-        /// The type parameters of the returned resource, which the method's resource declares.
+        /// The type parameters of the returned resource. The method's resource has them too.
         type_parameters: Vec<crate::spec::TypeParameterSpec>,
     },
     Value(PlannedType),

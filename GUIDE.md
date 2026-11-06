@@ -1956,11 +1956,12 @@ occur.
 
 #### Generic resources
 
-A resource that uses a type parameter is generic in it, as a record is, so it
-needs no annotation. Its fields, the parameters and results of its methods, and
-the operations that they bind count, also through records, protos and the
-resources that it returns. The resource takes its parameters in the order of
-their aliases in the interface, so a moved method doesn't reorder them.
+A resource that uses a type parameter is generic in it, as a record is. It needs
+no annotation. The types of its fields, of its method parameters and results,
+and of the operations that its methods bind count, also through records and
+protos. A method or an operation that returns a generic resource gives its type
+parameters too. The resource takes its type parameters in the order of their
+aliases in the interface, so a moved method doesn't reorder them.
 
 ```wit
 /// @nexus.type-parameter
@@ -1980,9 +1981,9 @@ resource %stream {
 The resource keeps a runtime type for each parameter, and its calls decode the
 generic values of a response with them. An operation that returns the resource
 takes a runtime type for each parameter. A method passes the types of its
-resource to the operation that it binds. A record that holds a parameter, also
-through another record, is generic in it by the rules above, so a response that
-holds such a record is generic too.
+resource to the operation that it binds. A record that holds a type parameter,
+also through another record, is generic in it. So a response that holds such a
+record is generic too.
 
 - Python. A handle that you build as `Stream[Turn](...)`, or from a subclass
   such as `class TurnStream(Stream[Turn])`, decodes its values as `Turn`. A

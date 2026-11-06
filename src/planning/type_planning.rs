@@ -1324,9 +1324,8 @@ fn plan_operation_resource_return(
     })
 }
 
-/// An operation that returns a generic resource takes each of the resource's type parameters. One
-/// that a method of a generic resource binds takes each parameter that its output uses, since a
-/// request value doesn't give its type at runtime and the handle has them all.
+/// An operation that returns a generic resource takes all its type parameters. A bound operation
+/// takes those of its output, since a request value doesn't give its type at runtime.
 fn operation_runtime_type_parameters(
     spec: &ApiSpec<OperationLoweredFamily>,
     service: &ServiceSpec<OperationLoweredFamily>,
@@ -1805,7 +1804,7 @@ interface alerts {
     }
 
     #[test]
-    fn a_method_result_names_the_type_parameters_of_its_generic_resource() {
+    fn a_method_result_has_the_type_parameters_of_its_generic_resource() {
         // The stream sample polls, and a poll needs System Nexus.
         let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
             system_nexus: true,

@@ -1266,7 +1266,8 @@ impl<'a> ApiPlanner<'a> {
         for name in &type_variables {
             let argument = python_runtime_type_argument_name(name);
             output.push_str(&format!(
-                "        if {argument} is None:\n            {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
+                "        if {argument} is None:\n            \
+                 {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
             ));
         }
         output.push_str("        return ");
@@ -2127,7 +2128,7 @@ impl<'a> ApiPlanner<'a> {
             .iter()
             .map(|parameter| parameter.name.clone())
             .collect::<Vec<_>>();
-        // The start call casts the handle when `output_type` names a generic model with no type
+        // The start call casts the handle when `output_type` is a generic model with no type
         // arguments.
         let generic_model_types = model_output_parameters
             .iter()
@@ -5777,8 +5778,8 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
     output.push_str(
         "async def _start_system_nexus_operation(\n    interceptor: _SystemNexusWorkflowOutboundInterceptorBase,\n    input: StartNexusOperationInput[_InputT, _OutputT],\n) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n",
     );
-    // An interceptor handles every type argument of a generic model, so the descriptor refs name
-    // the model with its type arguments erased to `typing.Any`.
+    // An interceptor gets each type argument of a generic model, so its type refs have
+    // `typing.Any` for each one.
     for (service, operation) in &operations {
         let output_type = system_nexus_type_expr(&operation.descriptor_output_ref);
         output.push_str("    if input.service == ");
@@ -5822,7 +5823,8 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str(" operation.");
         if generic_output {
             output.push_str(
-                "\n\n        The response decodes with ``output_type``, which has the caller's type\n        \
+                "\n\n        \
+                 The response decodes with ``output_type``, which has the caller's type\n        \
                  arguments. Without it, the generic values decode as ``typing.Any``.\n        ",
             );
         }
@@ -6912,7 +6914,7 @@ fn render_resource_type_specialization(output: &mut String, arguments: &[String]
     }
 }
 
-/// Factory keywords supply runtime types when callers do not construct a specialized class directly.
+/// A factory takes the runtime types as keywords, since its caller has no class to specialize.
 fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &[String]) {
     for name in type_variables {
         output.push_str("        ");
@@ -6938,18 +6940,26 @@ fn render_runtime_type_properties(
             "\n    @property\n    def {argument}({receiver}) -> type[{name}]:\n"
         ));
         output.push_str(
-            "        # A specialized alias sets __orig_class__ after __init__. A subclass of a\n        \
+            "        \
+             # A specialized alias sets __orig_class__ after __init__. A subclass of a\n        \
              # specialized class keeps its type arguments in __orig_bases__.\n",
         );
         output.push_str(&format!(
-            "        arguments = typing.get_args(getattr({receiver}, \"__orig_class__\", None)) or next(\n            \
-             (\n                typing.get_args(base)\n                \
-             for klass in type({receiver}).__mro__\n                \
-             for base in vars(klass).get(\"__orig_bases__\", ())\n                \
-             if typing.get_origin(base) is {class}\n            ),\n            (),\n        )\n"
+            "        \
+             arguments = typing.get_args(getattr({receiver}, \"__orig_class__\", None)) or next(\n\
+             \x20           (\n\
+             \x20               typing.get_args(base)\n\
+             \x20               for klass in type({receiver}).__mro__\n\
+             \x20               for base in vars(klass).get(\"__orig_bases__\", ())\n\
+             \x20               if typing.get_origin(base) is {class}\n\
+             \x20           ),\n\
+             \x20           (),\n\
+             \x20       )\n"
         ));
         output.push_str(&format!(
-            "        return typing.cast(\"type[{name}]\", arguments[{index}] if arguments else typing.Any)\n"
+            "        \
+             return typing.cast(\"type[{name}]\", arguments[{index}] if arguments else \
+             typing.Any)\n"
         ));
     }
 }
