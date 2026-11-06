@@ -64,7 +64,219 @@ pub struct GoOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GoFacadeOptions {
     pub(crate) package_name: String,
+    pub(crate) import_path: String,
     pub(crate) implementation_import_path: String,
+}
+
+const INTERNAL: &str = "go.temporal.io/sdk/internal";
+const WORKFLOW: &str = "go.temporal.io/sdk/workflow";
+const INTERNAL_BINDINGS: &str = "go.temporal.io/sdk/internalbindings";
+const COMMON_CONVERTER: &str = "go.temporal.io/sdk/internal/common/converter";
+const CONVERTER: &str = "go.temporal.io/sdk/converter";
+
+/// SDK-owned symbols used by advanced Go generation, not authored type mappings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SdkSymbol {
+    Context,
+    Future,
+    NewFuture,
+    Go,
+    NexusOperationOptions,
+    NexusOperationFuture,
+    ExecuteNexusOperationInput,
+    NewNexusClient,
+    NewSystemNexusClient,
+    GetDataConverterFromWorkflowContext,
+    SystemNexusRegistryKey,
+    SystemNexusRegistryEntry,
+    UpdateSystemNexusRegistry,
+    TransferTypeConverter,
+    NewTransferTypeConverter,
+    SerializationContext,
+    SystemNexusContext,
+    NewSystemNexusTransferTypeConverter,
+}
+
+struct SdkSymbolDefinition {
+    name: &'static str,
+    package: &'static str,
+    reexports: &'static [&'static str],
+}
+
+impl SdkSymbolDefinition {
+    fn is_available_in(&self, package: &str) -> bool {
+        package == self.package || self.reexports.contains(&package)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SdkReference {
+    expression: String,
+    import: Option<(&'static str, &'static str)>,
+}
+
+impl SdkSymbol {
+    const ALL: &[Self] = &[
+        Self::Context,
+        Self::Future,
+        Self::NewFuture,
+        Self::Go,
+        Self::NexusOperationOptions,
+        Self::NexusOperationFuture,
+        Self::ExecuteNexusOperationInput,
+        Self::NewNexusClient,
+        Self::NewSystemNexusClient,
+        Self::GetDataConverterFromWorkflowContext,
+        Self::SystemNexusRegistryKey,
+        Self::SystemNexusRegistryEntry,
+        Self::UpdateSystemNexusRegistry,
+        Self::TransferTypeConverter,
+        Self::NewTransferTypeConverter,
+        Self::SerializationContext,
+        Self::SystemNexusContext,
+        Self::NewSystemNexusTransferTypeConverter,
+    ];
+
+    fn definition(self) -> SdkSymbolDefinition {
+        match self {
+            Self::Context => SdkSymbolDefinition {
+                name: "Context",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::Future => SdkSymbolDefinition {
+                name: "Future",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::NewFuture => SdkSymbolDefinition {
+                name: "NewFuture",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::Go => SdkSymbolDefinition {
+                name: "Go",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::NexusOperationOptions => SdkSymbolDefinition {
+                name: "NexusOperationOptions",
+                package: INTERNAL,
+                reexports: &[WORKFLOW, INTERNAL_BINDINGS],
+            },
+            Self::NexusOperationFuture => SdkSymbolDefinition {
+                name: "NexusOperationFuture",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::ExecuteNexusOperationInput => SdkSymbolDefinition {
+                name: "ExecuteNexusOperationInput",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::NewNexusClient => SdkSymbolDefinition {
+                name: "NewNexusClient",
+                package: INTERNAL,
+                reexports: &[WORKFLOW, INTERNAL_BINDINGS],
+            },
+            Self::NewSystemNexusClient => SdkSymbolDefinition {
+                name: "NewSystemNexusClient",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::GetDataConverterFromWorkflowContext => SdkSymbolDefinition {
+                name: "GetDataConverterFromWorkflowContext",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::SystemNexusRegistryKey => SdkSymbolDefinition {
+                name: "SystemNexusRegistryKey",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::SystemNexusRegistryEntry => SdkSymbolDefinition {
+                name: "SystemNexusRegistryEntry",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::UpdateSystemNexusRegistry => SdkSymbolDefinition {
+                name: "UpdateSystemNexusRegistry",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::TransferTypeConverter => SdkSymbolDefinition {
+                name: "TransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::NewTransferTypeConverter => SdkSymbolDefinition {
+                name: "NewTransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::SerializationContext => SdkSymbolDefinition {
+                name: "SerializationContext",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::SystemNexusContext => SdkSymbolDefinition {
+                name: "SystemNexusContext",
+                package: COMMON_CONVERTER,
+                reexports: &[],
+            },
+            Self::NewSystemNexusTransferTypeConverter => SdkSymbolDefinition {
+                name: "NewSystemNexusTransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[],
+            },
+        }
+    }
+
+    fn find(package: &str, name: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|symbol| {
+            let definition = symbol.definition();
+            name == definition.name && definition.is_available_in(package)
+        })
+    }
+
+    fn resolve(self, output_package: Option<&str>, system_nexus: bool) -> SdkReference {
+        let definition = self.definition();
+        if output_package.is_some_and(|package| definition.is_available_in(package)) {
+            return SdkReference {
+                expression: definition.name.to_string(),
+                import: None,
+            };
+        }
+        // Both files share the generation mode. Only the output package above
+        // decides locality; mode selects a fallback import for non-local symbols.
+        let (path, qualifier) = match self {
+            Self::Context
+            | Self::Future
+            | Self::NewFuture
+            | Self::Go
+            | Self::NexusOperationFuture
+            | Self::NexusOperationOptions => {
+                if system_nexus {
+                    (INTERNAL, "internal")
+                } else {
+                    (WORKFLOW, "workflow")
+                }
+            }
+            // Ordinary endpoints use the public API when an import is needed.
+            Self::NewNexusClient => (WORKFLOW, "workflow"),
+            Self::TransferTypeConverter
+            | Self::NewTransferTypeConverter
+            | Self::SerializationContext => (CONVERTER, "converter"),
+            Self::SystemNexusContext | Self::NewSystemNexusTransferTypeConverter => {
+                (COMMON_CONVERTER, "commonconverter")
+            }
+            _ => (INTERNAL, "internal"),
+        };
+        SdkReference {
+            expression: format!("{qualifier}.{}", definition.name),
+            import: Some((path, qualifier)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -572,6 +784,7 @@ impl GoPackageContext {
                     package_name: Self::derive_package_name(
                         facade.rsplit('/').next().unwrap_or(facade),
                     )?,
+                    import_path: facade.to_string(),
                     implementation_import_path: import_path
                         .clone()
                         .expect("facade requires an implementation namespace"),
@@ -645,95 +858,67 @@ impl GoPackageContext {
         }
     }
 
-    fn workflow_import(&self) -> &'static str {
-        if crate::nexgen_config::current().system_nexus {
-            "go.temporal.io/sdk/internal"
-        } else {
-            "go.temporal.io/sdk/workflow"
-        }
-    }
-
-    fn workflow_reference(&self, name: &str) -> String {
-        let path = self.workflow_import();
-        let qualifier = path.rsplit('/').next().unwrap();
-        self.qualified_expr(path, &format!("{qualifier}.{name}"))
+    fn sdk_reference(&self, symbol: SdkSymbol) -> SdkReference {
+        symbol.resolve(
+            self.import_path.as_deref(),
+            crate::nexgen_config::current().system_nexus,
+        )
     }
 
     pub(in crate::generator) fn workflow_context_type(&self) -> String {
-        self.workflow_reference("Context")
+        self.sdk_reference(SdkSymbol::Context).expression
     }
 
     fn workflow_future_type(&self) -> String {
-        self.workflow_reference("Future")
+        self.sdk_reference(SdkSymbol::Future).expression
     }
 
     pub(in crate::generator) fn new_future(&self) -> String {
-        self.workflow_reference("NewFuture")
+        self.sdk_reference(SdkSymbol::NewFuture).expression
     }
 
     fn workflow_go(&self) -> String {
-        self.workflow_reference("Go")
+        self.sdk_reference(SdkSymbol::Go).expression
     }
 
     pub(in crate::generator) fn new_nexus_client(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.NewNexusClient")
+        self.sdk_reference(SdkSymbol::NewNexusClient).expression
     }
 
     pub(in crate::generator) fn nexus_operation_options(&self) -> String {
-        self.workflow_reference("NexusOperationOptions{}")
+        format!(
+            "{}{{}}",
+            self.sdk_reference(SdkSymbol::NexusOperationOptions)
+                .expression
+        )
     }
 
     pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            return "TransferTypeConverter".to_string();
-        }
-        self.qualified_expr(
-            "go.temporal.io/sdk/converter",
-            "converter.TransferTypeConverter",
-        )
+        self.sdk_reference(SdkSymbol::TransferTypeConverter)
+            .expression
     }
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
-        if !crate::nexgen_config::current().system_nexus {
-            self.qualified_expr(
-                "go.temporal.io/sdk/converter",
-                "converter.NewTransferTypeConverter",
-            )
-        } else if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "NewSystemNexusTransferTypeConverter".to_string()
+        let symbol = if crate::nexgen_config::current().system_nexus {
+            SdkSymbol::NewSystemNexusTransferTypeConverter
         } else {
-            "commonconverter.NewSystemNexusTransferTypeConverter".to_string()
-        }
+            SdkSymbol::NewTransferTypeConverter
+        };
+        self.sdk_reference(symbol).expression
     }
 
     pub(in crate::generator) fn system_nexus_context_type(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "SystemNexusContext".to_string()
-        } else {
-            "commonconverter.SystemNexusContext".to_string()
-        }
+        self.sdk_reference(SdkSymbol::SystemNexusContext).expression
     }
 
     pub(in crate::generator) fn workflow_data_converter(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.GetDataConverterFromWorkflowContext",
-        )
+        self.sdk_reference(SdkSymbol::GetDataConverterFromWorkflowContext)
+            .expression
     }
 
     pub(in crate::generator) fn serialization_context_type(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/converter",
-            "converter.SerializationContext",
-        )
-    }
-
-    fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
-        if self.is_self_import(import_path) {
-            self.unqualify_self_expr(code_expr)
-        } else {
-            code_expr.to_string()
-        }
+        self.sdk_reference(SdkSymbol::SerializationContext)
+            .expression
     }
 
     fn unqualify_self_expr(&self, code_expr: &str) -> String {
@@ -1305,9 +1490,10 @@ impl<'a> ApiPlanner<'a> {
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
-        if has_operations && !self.package.is_self_import(self.package.workflow_import()) {
-            self.imports
-                .insert(self.package.workflow_import().to_string());
+        if has_operations
+            && let Some((path, _)) = self.package.sdk_reference(SdkSymbol::Context).import
+        {
+            self.imports.insert(path.to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
         if self.package.workflow_interceptors && has_operations {
@@ -1354,16 +1540,13 @@ impl<'a> ApiPlanner<'a> {
         }
         // System transfer callbacks use the converter selected by the SDK;
         // ordinary callbacks are context-free.
-        if self.external_models.renders_transfer_type_converters() {
-            if !self.package.is_self_import("go.temporal.io/sdk/converter")
-                && (!crate::nexgen_config::current().system_nexus
-                    || !self
-                        .package
-                        .is_self_import("go.temporal.io/sdk/internal/common/converter"))
-            {
-                self.imports
-                    .insert("go.temporal.io/sdk/converter".to_string());
-            }
+        if self.external_models.renders_transfer_type_converters()
+            && let Some((path, _)) = self
+                .package
+                .sdk_reference(SdkSymbol::TransferTypeConverter)
+                .import
+        {
+            self.imports.insert(path.to_string());
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
@@ -1383,10 +1566,9 @@ impl<'a> ApiPlanner<'a> {
             .contains(&GenerationTarget::Workflow)
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
-            && !self.package.is_self_import(self.package.workflow_import())
+            && let Some((path, _)) = self.package.sdk_reference(SdkSymbol::Context).import
         {
-            self.imports
-                .insert(self.package.workflow_import().to_string());
+            self.imports.insert(path.to_string());
         }
         let mut external_imports = self.external_models.imports();
         for (path, alias) in &self.aliased_imports {
@@ -2305,11 +2487,12 @@ fn render_operation_registry(
         candidates.push((path.clone(), "support".to_string()));
     }
     let mut imports = BTreeMap::new();
-    if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
-        imports.insert(
-            "converter".to_string(),
-            "go.temporal.io/sdk/converter".to_string(),
-        );
+    if has_helpers
+        && let Some((path, alias)) = package
+            .sdk_reference(SdkSymbol::SerializationContext)
+            .import
+    {
+        imports.insert(alias.to_string(), path.to_string());
     }
     if !package.is_self_import("go.temporal.io/sdk/internal") {
         imports.insert(
@@ -2354,14 +2537,12 @@ fn render_operation_registry(
     }
     let mut output = String::from("\n// --- Registry ---\n");
     let sc = package.serialization_context_type();
-    let key = package.qualified_expr(
-        "go.temporal.io/sdk/internal",
-        "internal.SystemNexusRegistryKey",
-    );
-    let info = package.qualified_expr(
-        "go.temporal.io/sdk/internal",
-        "internal.SystemNexusRegistryEntry",
-    );
+    let key = package
+        .sdk_reference(SdkSymbol::SystemNexusRegistryKey)
+        .expression;
+    let info = package
+        .sdk_reference(SdkSymbol::SystemNexusRegistryEntry)
+        .expression;
     let registry_name = go_declaration_name("nexusOperationRegistry");
     output.push_str(&format!("\nvar {registry_name} = map[{key}]{info}{{\n"));
     let mut keys = BTreeSet::new();
@@ -2396,10 +2577,9 @@ fn render_operation_registry(
     }
     output.push_str("}\n");
     if !keys.is_empty() {
-        let register = package.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.UpdateSystemNexusRegistry",
-        );
+        let register = package
+            .sdk_reference(SdkSymbol::UpdateSystemNexusRegistry)
+            .expression;
         output.push_str(&format!(
             "\nfunc init() {{\n\t{register}({registry_name})\n}}\n"
         ));
@@ -5194,10 +5374,9 @@ pub(in crate::generator) fn new_nexus_client_expr(
     if crate::nexgen_config::current().system_nexus {
         return format!(
             "{}({})",
-            package.qualified_expr(
-                "go.temporal.io/sdk/internal",
-                "internal.NewSystemNexusClient"
-            ),
+            package
+                .sdk_reference(SdkSymbol::NewSystemNexusClient)
+                .expression,
             go_string_literal(service_name)
         );
     }
@@ -6164,7 +6343,103 @@ fn render_forwarding_wrapper(
 
 #[cfg(test)]
 mod tests {
+    use super::{COMMON_CONVERTER, CONVERTER, INTERNAL, SdkReference, SdkSymbol, WORKFLOW};
     use crate::error::Error;
+
+    #[test]
+    fn definitions_and_reexports_are_local_by_full_import_path() {
+        for symbol in SdkSymbol::ALL {
+            let definition = symbol.definition();
+            for package in
+                std::iter::once(definition.package).chain(definition.reexports.iter().copied())
+            {
+                for system_nexus in [false, true] {
+                    assert_eq!(
+                        symbol.resolve(Some(package), system_nexus),
+                        SdkReference {
+                            expression: definition.name.to_string(),
+                            import: None,
+                        },
+                        "{symbol:?} in {package}",
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            SdkSymbol::Future
+                .resolve(Some("example.org/workflow"), true)
+                .import,
+            Some((INTERNAL, "internal")),
+        );
+    }
+
+    #[test]
+    fn private_symbols_do_not_acquire_public_reexports() {
+        for (symbol, public, path, qualifier) in [
+            (
+                SdkSymbol::NewSystemNexusClient,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::GetDataConverterFromWorkflowContext,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusRegistryKey,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusRegistryEntry,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::UpdateSystemNexusRegistry,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusContext,
+                CONVERTER,
+                COMMON_CONVERTER,
+                "commonconverter",
+            ),
+            (
+                SdkSymbol::NewSystemNexusTransferTypeConverter,
+                CONVERTER,
+                COMMON_CONVERTER,
+                "commonconverter",
+            ),
+        ] {
+            assert_eq!(
+                symbol.resolve(Some(public), true).import,
+                Some((path, qualifier)),
+                "{symbol:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn external_workflow_references_preserve_generation_mode() {
+        assert_eq!(
+            SdkSymbol::Context.resolve(None, false).import,
+            Some((WORKFLOW, "workflow")),
+        );
+        assert_eq!(
+            SdkSymbol::Context.resolve(None, true).import,
+            Some((INTERNAL, "internal")),
+        );
+        assert_eq!(SdkSymbol::find(INTERNAL, "Custom"), None);
+        assert_eq!(SdkSymbol::find("example.org/internal", "Future"), None);
+    }
 
     #[test]
     fn system_nexus_declaration_names_preserve_visibility() {

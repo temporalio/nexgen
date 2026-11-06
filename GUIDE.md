@@ -1814,6 +1814,14 @@ Place them into their respective packages before compiling. Each import path's
 final segment determines its package name. Facade names omit the
 implementation's `SystemNexus_` prefix.
 
+Facades use the implementation package's name as its import qualifier, such as
+`internal`. Generator-provided SDK types use their local names when the facade
+is in a package that already re-exports them. For example, a facade targeting
+`go.temporal.io/sdk/workflow` uses `Context` and `Future` rather than
+`internal.Context` and `internal.Future`. This lookup uses the full import path;
+an unrelated package named `workflow` does not receive those substitutions. The
+built-in catalog does not infer re-exports for other authored type mappings.
+
 ---
 
 ### @nexus.operations-class
