@@ -24,6 +24,7 @@ import temporal_support as _support
 
 
 BodyT = typing.TypeVar("BodyT")
+_BodyT = typing.TypeVar("_BodyT")
 
 
 class Stream(typing.Generic[BodyT]):
@@ -188,45 +189,65 @@ async def _read_records(
     )
 
 
-async def read_records(
-    body_type: type[BodyT],
-    *,
-    ref: StreamRef,
-    from_offset: int | None = None,
-    start: StreamReadStart | None = None,
-    max_records: int | None = None,
-    wait: datetime.timedelta | None = None,
-    create_wait: datetime.timedelta | None = None,
-    last: int | None = None,
-    max_bytes: int | None = None,
-) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
-    """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
-    Activity.
+class _ReadRecords(typing.Generic[BodyT]):
+    """Subscript it with the type arguments that the call decodes with."""
 
-    Args:
-        from_offset: Start offset. Empty uses start. An offset past the newest one + 1
-            fails.
-        start: Where to start when from-offset is empty. Unspecified is the beginning.
-        max_records: About this many items per page, 1 to 1000. A Superseded item stays
-            with its Record.
-        wait: How long to wait for a new Record before an empty answer. At most 60 s.
-        create_wait: How long to wait for an uncreated Stream. Empty fails at once. At
-            most 60 s.
-        last: Read the newest this many Records, oldest first. No from-offset. No wait.
-        max_bytes: The maximum Record bytes in a page. A larger Record is still returned
-            alone.
-    """
-    request = ReadRecordsRequest(
-        ref=ref,
-        from_offset=from_offset,
-        start=start,
-        max_records=max_records,
-        wait=wait,
-        create_wait=create_wait,
-        last=last,
-        max_bytes=max_bytes,
-    )
-    return await _read_records(request, body_type)
+    def __init__(
+        self,
+        body_type: type[BodyT] | None = None,
+    ) -> None:
+        self.body_type: type[BodyT] = typing.cast(
+            "type[BodyT]", typing.Any if body_type is None else body_type
+        )
+
+    def __getitem__(self, body_type: type[_BodyT]) -> _ReadRecords[_BodyT]:
+        return _ReadRecords(body_type)
+
+    async def __call__(
+        self,
+        *,
+        ref: StreamRef,
+        from_offset: int | None = None,
+        start: StreamReadStart | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        create_wait: datetime.timedelta | None = None,
+        last: int | None = None,
+        max_bytes: int | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
+        """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
+        Activity.
+
+        Args:
+            from_offset: Start offset. Empty uses start. An offset past the newest one +
+                1 fails.
+            start: Where to start when from-offset is empty. Unspecified is the
+                beginning.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
+                At most 60 s.
+            last: Read the newest this many Records, oldest first. No from-offset. No
+                wait.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            ref=ref,
+            from_offset=from_offset,
+            start=start,
+            max_records=max_records,
+            wait=wait,
+            create_wait=create_wait,
+            last=last,
+            max_bytes=max_bytes,
+        )
+        return await _read_records(request, self.body_type)
+
+
+read_records: _ReadRecords[typing.Any] = _ReadRecords()
 
 
 async def _describe_stream(

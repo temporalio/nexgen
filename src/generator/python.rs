@@ -1120,7 +1120,18 @@ impl<'a> ApiPlanner<'a> {
             })
             .chain(&resource_type_variables)
             .collect::<BTreeSet<_>>();
-        for parameter in &type_parameters {
+        let subscript_variables = operations
+            .iter()
+            .filter(|operation| {
+                operation
+                    .target_unpacked_input(GenerationTarget::Client)
+                    .is_some_and(|unpacked_input| unpacked_input.functions.is_empty())
+            })
+            .flat_map(|operation| &operation.runtime_type_arguments)
+            .chain(&resource_type_variables)
+            .map(|name| runtime_type_subscript_variable(name))
+            .collect::<BTreeSet<_>>();
+        for parameter in type_parameters.iter().copied().chain(&subscript_variables) {
             body.push_str(parameter);
             body.push_str(" = typing.TypeVar(");
             body.push_str(&python_string_literal(parameter));
@@ -1146,10 +1157,33 @@ impl<'a> ApiPlanner<'a> {
         }
         for service in services {
             let mut factories = String::new();
+            let mut classes = String::new();
             for resource in &service.resources {
                 factories.push('\n');
-                self.render_client_resource_factory(&mut factories, service, resource);
+                self.render_client_resource_factory(
+                    &mut factories,
+                    &mut classes,
+                    service,
+                    resource,
+                );
             }
+            for operation in standalone_operations(service) {
+                if let Some(unpacked_input) =
+                    operation.target_unpacked_input(GenerationTarget::Client)
+                    && unpacked_input.functions.is_empty()
+                    && !operation.runtime_type_arguments.is_empty()
+                {
+                    classes.push_str("\n\n");
+                    render_unpacked_operation_call_class(
+                        &mut classes,
+                        GenerationTarget::Client,
+                        service,
+                        operation,
+                        unpacked_input,
+                    );
+                }
+            }
+            body.push_str(&classes);
             body.push_str("\n\n");
             render_client_extension(&mut body, service, &factories);
         }
@@ -1217,35 +1251,64 @@ impl<'a> ApiPlanner<'a> {
 
     /// A public method that builds a client handle from the identity fields of a resource, for
     /// example from fields that a caller stored. The handle gets a Nexus client for the
-    /// resource's own service.
+    /// resource's own service. A generic resource's factory is a call class in `classes`.
     fn render_client_resource_factory(
+        &self,
+        output: &mut String,
+        classes: &mut String,
+        service: &RenderedService<'_>,
+        resource: &PlannedResource,
+    ) {
+        let name = client_resource_factory_name(resource);
+        let receiver = resource_client_identifier(resource, "self");
+        let type_variables = resource_type_variable_names(resource);
+        if type_variables.is_empty() {
+            self.render_client_resource_factory_def(output, service, resource, &name, &receiver);
+            return;
+        }
+        let class_name = runtime_type_call_class_name(&name);
+        render_runtime_type_call_property(output, &name, &class_name, &type_variables);
+        classes.push_str("\n\n");
+        render_runtime_type_call_class_head(
+            classes,
+            &class_name,
+            &type_variables,
+            Some(&client_extension_class_name(service)),
+        );
+        classes.push('\n');
+        self.render_client_resource_factory_def(classes, service, resource, "__call__", &receiver);
+    }
+
+    fn render_client_resource_factory_def(
         &self,
         output: &mut String,
         service: &RenderedService<'_>,
         resource: &PlannedResource,
+        name: &str,
+        receiver: &str,
     ) {
-        let receiver = resource_client_identifier(resource, "self");
-        output.push_str("    def ");
-        output.push_str(&client_resource_factory_name(resource));
-        output.push_str("(\n        ");
-        output.push_str(&receiver);
-        output.push_str(",\n");
         let type_variables = resource_type_variable_names(resource);
-        if !resource.fields.is_empty() || !type_variables.is_empty() {
+        let call_class = !type_variables.is_empty();
+        output.push_str("    def ");
+        output.push_str(name);
+        output.push_str("(\n        ");
+        output.push_str(receiver);
+        output.push_str(",\n");
+        if !resource.fields.is_empty() {
             output.push_str("        *,\n");
         }
         for field in &resource.fields {
             output.push_str(&format!(
-                "        {}: {},\n",
+                "        {}: {}{},\n",
                 python_field_name(&field.name),
                 self.python_resource_field_annotation(
                     &field.kind,
                     field.optional,
                     field.function.as_ref()
-                )
+                ),
+                if field.optional { " = None" } else { "" }
             ));
         }
-        render_runtime_type_keyword_parameters(output, &type_variables);
         output.push_str("    ) -> ");
         output.push_str(&python_type_annotation_with_arguments(
             &resource.type_name,
@@ -1263,22 +1326,20 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
-        for name in &type_variables {
-            let argument = python_runtime_type_argument_name(name);
-            output.push_str(&format!(
-                "        if {argument} is None:\n            \
-                 {argument} = typing.cast(\"type[{name}]\", typing.Any)\n"
-            ));
-        }
         output.push_str("        return ");
         output.push_str(&resource.type_name);
         let arguments = type_variables
             .iter()
-            .map(|name| python_runtime_type_argument_name(name))
+            .map(|name| format!("{receiver}.{}", python_runtime_type_argument_name(name)))
             .collect::<Vec<_>>();
         render_resource_type_specialization(output, &arguments);
         output.push_str("(\n");
-        output.push_str(&format!("            {receiver}.create_nexus_client(\n"));
+        let extension = if call_class {
+            format!("{receiver}._extension")
+        } else {
+            receiver.to_string()
+        };
+        output.push_str(&format!("            {extension}.create_nexus_client(\n"));
         output.push_str("                service=");
         output.push_str(service.name);
         output.push_str(",\n                endpoint=");
@@ -1342,7 +1403,20 @@ impl<'a> ApiPlanner<'a> {
             body.push_str("\n\n");
         }
         let type_variables = resource_type_variable_names(resource);
-        for name in &type_variables {
+        let subscript_variables = bound_operations
+            .iter()
+            .map(|bound_operation| bound_operation.operation)
+            .filter(|operation| {
+                target == GenerationTarget::Workflow
+                    && operation
+                        .unpacked_input
+                        .as_ref()
+                        .is_some_and(|unpacked_input| unpacked_input.functions.is_empty())
+            })
+            .flat_map(|operation| &operation.runtime_type_arguments)
+            .map(|name| runtime_type_subscript_variable(name))
+            .collect::<BTreeSet<_>>();
+        for name in type_variables.iter().chain(&subscript_variables) {
             body.push_str(name);
             body.push_str(" = typing.TypeVar(");
             body.push_str(&python_string_literal(name));
@@ -5471,7 +5545,15 @@ fn render_operation_module(
         .iter()
         .chain(&operation.runtime_type_arguments)
         .collect::<BTreeSet<_>>();
-    for parameter in &type_parameters {
+    let subscript_variables = operation
+        .unpacked_input
+        .as_ref()
+        .filter(|unpacked_input| unpacked_input.functions.is_empty())
+        .into_iter()
+        .flat_map(|_| &operation.runtime_type_arguments)
+        .map(|name| runtime_type_subscript_variable(name))
+        .collect::<Vec<_>>();
+    for parameter in type_parameters.iter().copied().chain(&subscript_variables) {
         body.push_str(parameter);
         body.push_str(" = typing.TypeVar(");
         body.push_str(&python_string_literal(parameter));
@@ -6891,17 +6973,6 @@ fn render_resource_type_specialization(output: &mut String, arguments: &[String]
         output.push('[');
         output.push_str(&arguments.join(", "));
         output.push(']');
-    }
-}
-
-/// A factory takes the runtime types as keywords, since its caller has no class to specialize.
-fn render_runtime_type_keyword_parameters(output: &mut String, type_variables: &[String]) {
-    for name in type_variables {
-        output.push_str("        ");
-        output.push_str(&python_runtime_type_argument_name(name));
-        output.push_str(": type[");
-        output.push_str(name);
-        output.push_str("] | None = None,\n");
     }
 }
 
@@ -9499,51 +9570,239 @@ fn render_unpacked_operation_function(
         render_function_unpacked_implementation(output, target, service, operation, unpacked_input);
         return;
     }
-
-    let body_indent = target_body_indent(target);
-    if operation.deprecated {
-        start_line(
+    if operation.runtime_type_arguments.is_empty() {
+        render_unpacked_operation_def(output, target, service, operation, unpacked_input, false);
+        return;
+    }
+    let class_name = runtime_type_call_class_name(&operation.attr_name);
+    match target {
+        GenerationTarget::Workflow => {
+            render_unpacked_operation_call_class(
+                output,
+                target,
+                service,
+                operation,
+                unpacked_input,
+            );
+            output.push_str("\n\n");
+            output.push_str(&operation.attr_name);
+            output.push_str(": ");
+            output.push_str(&runtime_type_call_class_annotation(
+                &class_name,
+                &operation.runtime_type_arguments,
+            ));
+            output.push_str(" = ");
+            output.push_str(&class_name);
+            output.push_str("()\n");
+        }
+        // The class is at the top of the module, so the client has no attribute for it.
+        GenerationTarget::Client => render_runtime_type_call_property(
             output,
-            target,
+            &operation.attr_name,
+            &class_name,
+            &operation.runtime_type_arguments,
+        ),
+    }
+}
+
+fn render_unpacked_operation_def(
+    output: &mut String,
+    target: GenerationTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    unpacked_input: &RenderedUnpackedInput,
+    call_class: bool,
+) {
+    let indent = if call_class {
+        "    "
+    } else {
+        target_indent(target)
+    };
+    let body_indent = format!("{indent}    ");
+    let line = |output: &mut String, text: &str| {
+        output.push_str(indent);
+        output.push_str(text);
+    };
+    if operation.deprecated {
+        line(
+            output,
             "@typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_operation_signature_start(output, target, &operation.attr_name);
-    operation.render_runtime_type_parameters(output, &format!("{}    ", target_indent(target)));
+    if call_class {
+        line(output, "async def __call__(\n");
+        line(output, "    self,\n");
+    } else {
+        render_operation_signature_start(output, target, &operation.attr_name);
+        operation.render_runtime_type_parameters(output, &body_indent);
+    }
     if !unpacked_input.parameters.is_empty() {
-        start_line(output, target, "    *,\n");
+        line(output, "    *,\n");
     }
     for field in &unpacked_input.parameters {
-        start_line(output, target, "    ");
+        line(output, "    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
         output.push_str(&field.annotation);
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
-            render_python_default_expr(output, &default_expr, body_indent);
+            render_python_default_expr(output, &default_expr, &body_indent);
         }
         output.push_str(",\n");
     }
-    render_unpacked_return_annotation(output, target, service, operation);
-    render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
+    render_unpacked_return_annotation(output, target, indent, service, operation);
+    render_unpacked_operation_docstring(output, &body_indent, operation, unpacked_input, None);
     for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, body_indent, flattened_message);
+        render_flattened_message_setup(output, &body_indent, flattened_message);
     }
-    start_line(output, target, "    request = ");
+    line(output, "    request = ");
     output.push_str(&unpacked_input.model_name);
     output.push_str("(\n");
     for field in &unpacked_input.request_fields {
-        start_line(output, target, "        ");
+        line(output, "        ");
         output.push_str(&field.attr_name);
         output.push('=');
         output.push_str(&unpacked_request_field_value_expr(field));
         output.push_str(",\n");
     }
-    start_line(output, target, "    )\n");
-    start_line(output, target, "    return await ");
-    output.push_str(&operation_call_target(target, service, operation));
+    line(output, "    )\n");
+    line(output, "    return await ");
+    if call_class && target == GenerationTarget::Client {
+        output.push_str("self._extension.");
+        output.push_str(&client_operation_name(service, operation));
+    } else {
+        output.push_str(&operation_call_target(target, service, operation));
+    }
     output.push_str("(request");
-    output.push_str(&operation.runtime_type_args(""));
+    output.push_str(&operation.runtime_type_args(if call_class { "self." } else { "" }));
     output.push_str(")\n");
+}
+
+fn render_unpacked_operation_call_class(
+    output: &mut String,
+    target: GenerationTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    unpacked_input: &RenderedUnpackedInput,
+) {
+    let extension =
+        (target == GenerationTarget::Client).then(|| client_extension_class_name(service));
+    render_runtime_type_call_class_head(
+        output,
+        &runtime_type_call_class_name(&operation.attr_name),
+        &operation.runtime_type_arguments,
+        extension.as_deref(),
+    );
+    output.push('\n');
+    render_unpacked_operation_def(output, target, service, operation, unpacked_input, true);
+}
+
+fn runtime_type_call_class_name(call_name: &str) -> String {
+    format!("_{}", call_name.to_upper_camel_case())
+}
+
+fn runtime_type_subscript_variable(type_variable: &str) -> String {
+    format!("_{type_variable}")
+}
+
+/// A call class with `typing.Any` for each type argument, as a call with no subscript has.
+fn runtime_type_call_class_annotation(class_name: &str, type_variables: &[String]) -> String {
+    let arguments = vec!["typing.Any".to_string(); type_variables.len()];
+    python_type_annotation_with_arguments(class_name, &arguments)
+}
+
+/// Python can't subscript a function, so a generic call is an object whose subscript binds the
+/// runtime types, as in `create_stream[Turn](...)`. `extension` is the client's extension class.
+fn render_runtime_type_call_class_head(
+    output: &mut String,
+    class_name: &str,
+    type_variables: &[String],
+    extension: Option<&str>,
+) {
+    output.push_str("class ");
+    output.push_str(class_name);
+    output.push_str("(typing.Generic[");
+    output.push_str(&type_variables.join(", "));
+    output.push_str("]):\n");
+    output.push_str(
+        "    \"\"\"Subscript it with the type arguments that the call decodes with.\"\"\"\n",
+    );
+    output.push_str("\n    def __init__(\n        self,\n");
+    if let Some(extension) = extension {
+        output.push_str("        extension: ");
+        output.push_str(extension);
+        output.push_str(",\n");
+    }
+    for name in type_variables {
+        output.push_str("        ");
+        output.push_str(&python_runtime_type_argument_name(name));
+        output.push_str(": type[");
+        output.push_str(name);
+        output.push_str("] | None = None,\n");
+    }
+    output.push_str("    ) -> None:\n");
+    if let Some(extension) = extension {
+        output.push_str("        self._extension: ");
+        output.push_str(extension);
+        output.push_str(" = extension\n");
+    }
+    for name in type_variables {
+        let argument = python_runtime_type_argument_name(name);
+        output.push_str(&format!(
+            "        self.{argument}: type[{name}] = typing.cast(\n            \
+             \"type[{name}]\", typing.Any if {argument} is None else {argument}\n        )\n"
+        ));
+    }
+    let subscripts = type_variables
+        .iter()
+        .map(|name| runtime_type_subscript_variable(name))
+        .collect::<Vec<_>>();
+    let extension_arg = if extension.is_some() {
+        "self._extension, "
+    } else {
+        ""
+    };
+    output.push_str("\n    def __getitem__(\n        self, ");
+    if let [subscript] = subscripts.as_slice() {
+        let argument = python_runtime_type_argument_name(&type_variables[0]);
+        output.push_str(&format!(
+            "{argument}: type[{subscript}]\n    ) -> {}:\n        \
+             return {class_name}({extension_arg}{argument})\n",
+            python_type_annotation_with_arguments(class_name, &subscripts)
+        ));
+    } else {
+        let types = subscripts
+            .iter()
+            .map(|subscript| format!("type[{subscript}]"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        output.push_str(&format!(
+            "types: tuple[{types}]\n    ) -> {}:\n        \
+             return {class_name}({extension_arg}*types)\n",
+            python_type_annotation_with_arguments(class_name, &subscripts)
+        ));
+    }
+}
+
+/// The extension property of a generic call. A call with no subscript decodes with `typing.Any`.
+fn render_runtime_type_call_property(
+    output: &mut String,
+    call_name: &str,
+    class_name: &str,
+    type_variables: &[String],
+) {
+    output.push_str("    @property\n    def ");
+    output.push_str(call_name);
+    output.push_str("(self) -> ");
+    output.push_str(&runtime_type_call_class_annotation(
+        class_name,
+        type_variables,
+    ));
+    output.push_str(
+        ":\n        \"\"\"Subscript it with the type arguments that the call decodes with.\"\"\"\n",
+    );
+    output.push_str("        return ");
+    output.push_str(class_name);
+    output.push_str("(self)\n");
 }
 
 /// The return annotation of an unpacked operation. A Workflow function returns the operation
@@ -9551,10 +9810,12 @@ fn render_unpacked_operation_function(
 fn render_unpacked_return_annotation(
     output: &mut String,
     target: GenerationTarget,
+    indent: &str,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    start_line(output, target, ") -> ");
+    output.push_str(indent);
+    output.push_str(") -> ");
     if target == GenerationTarget::Client {
         output.push_str(&erase_python_type_parameters_with_replacement(
             &operation.overload_output_annotation,
@@ -9573,12 +9834,14 @@ fn render_unpacked_return_annotation(
             "NexusOperationHandle",
         ));
         output.push_str("[\n");
-        start_line(output, target, "    ");
+        output.push_str(indent);
+        output.push_str("    ");
         output.push_str(&function_unpacked_implementation_return_annotation(
             service, operation,
         ));
         output.push_str(",\n");
-        start_line(output, target, "]:\n");
+        output.push_str(indent);
+        output.push_str("]:\n");
     }
 }
 
@@ -9714,7 +9977,7 @@ fn render_function_unpacked_implementation(
         output.push_str(",\n");
     }
 
-    render_unpacked_return_annotation(output, target, service, operation);
+    render_unpacked_return_annotation(output, target, target_indent(target), service, operation);
     render_unpacked_operation_docstring(
         output,
         target_body_indent(target),

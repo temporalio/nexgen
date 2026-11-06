@@ -185,9 +185,9 @@ async def test_sdk_factory_needs_no_adapter() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=5),
         },
     )
-    stream = await client.create_stream(str, stream_ref=ref)
+    stream = await client.create_stream[str](stream_ref=ref)
     assert stream.ref == ref
-    stored = client.get_stream(ref=ref, created=None, body_type=str)
+    stored = client.get_stream[str](ref=ref)
     assert (await stored.describe()).last_offset == 5
     assert [call.operation for call in answers.started] == [
         "CreateStream",
@@ -209,7 +209,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, name)
         assert not hasattr(client, f"_stream_service_{name}")
 
-    stream = await client.create_stream(str, stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream[str](stream_ref=StreamRef(id="s1"))
     response = await stream.publish(records=[])
     await stream.close()
 
@@ -256,7 +256,7 @@ async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
         Client, {"DescribeStream": DescribeStreamResponse(last_offset=7)}
     )
     ref = StreamRef(id="stored-stream")
-    response = await client.get_stream(ref=ref, created=None, body_type=str).describe()
+    response = await client.get_stream[str](ref=ref).describe()
     assert response.last_offset == 7
     assert len(client.created_clients) == 1
     assert answers.started[0].arg == DescribeStreamRequest(ref=ref)
@@ -294,7 +294,7 @@ async def test_client_only_calls_need_no_workflow_context(
             "DescribeStream": client_models.DescribeStreamResponse(last_offset=8),
         },
     )
-    stream = await client.create_stream(str, stream_ref=ref)
+    stream = await client.create_stream[str](stream_ref=ref)
     response = await stream.describe()
     assert response.last_offset == 8
     assert len(client.created_clients) == 1
@@ -314,7 +314,7 @@ async def test_each_call_gets_a_new_operation_id() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=7),
         },
     )
-    stream = await client.create_stream(str, stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream[str](stream_ref=StreamRef(id="s1"))
     _ = await stream.describe()
     _ = await stream.describe()
     ids = [started.id for started in answers.started]
@@ -331,7 +331,7 @@ def test_a_resource_requires_a_nexus_client() -> None:
 def test_a_resource_is_not_data_but_its_identity_field_is() -> None:
     client, _ = connect(Client, {})
     ref = StreamRef(id="stored-stream")
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
     converter = temporalio.converter.PayloadConverter.default
 
     # A handle has calls, so it never crosses the converter in either direction.
@@ -345,7 +345,7 @@ def test_a_resource_is_not_data_but_its_identity_field_is() -> None:
     # Code passes the identity field and builds the handle explicitly.
     decoded = converter.from_payload(payload, StreamRef)
     assert decoded == ref
-    assert client.get_stream(ref=decoded, created=None, body_type=str).ref == stream.ref
+    assert client.get_stream[str](ref=decoded).ref == stream.ref
 
 
 async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_move() -> (
@@ -360,7 +360,7 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
         ReadRecordsResponse[str](records=[], next_offset=3),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = [page async for page in stream.iter_read(from_offset=1)]
 
@@ -383,7 +383,7 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
         ReadRecordsResponse[str](records=[], done=True),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = [page async for page in stream.iter_read(from_offset=1, wait=wait)]
 
@@ -407,7 +407,7 @@ async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> No
         Client,
         {"CreateStream": CreateStreamResult(ref=ref), "ReadRecords": list(pages)},
     )
-    stream = await client.create_stream(str, stream_ref=StreamRef(id="s1"))
+    stream = await client.create_stream[str](stream_ref=StreamRef(id="s1"))
 
     read = [
         page
@@ -436,7 +436,7 @@ async def test_a_done_first_page_ends_the_read() -> None:
         )
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = [page async for page in stream.iter_read()]
 
@@ -458,7 +458,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
             ]
         },
     )
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     async for page in stream.iter_read(from_offset=1, wait=wait):
         page.next_offset = 9
@@ -490,7 +490,7 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
             ]
         },
     )
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = stream.iter_read_items(from_offset=10, wait=wait)
     seen: list[tuple[int | None, int | None]] = []
@@ -526,7 +526,7 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
             ]
         },
     )
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = stream.iter_read_items(from_offset=1)
     first = await anext(read)
@@ -558,7 +558,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
             ]
         },
     )
-    stream = client.get_stream(ref=ref, created=None, body_type=str)
+    stream = client.get_stream[str](ref=ref)
 
     read = stream.iter_read_items(from_offset=1, wait=wait)
     next_offsets: list[int | None] = []
@@ -620,9 +620,9 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     )
 
     if construction == "create":
-        stream = await client.create_stream(Turn, stream_ref=ref)
+        stream = await client.create_stream[Turn](stream_ref=ref)
     elif construction == "get":
-        stream = client.get_stream(ref=ref, created=None, body_type=Turn)
+        stream = client.get_stream[Turn](ref=ref)
     else:
         stream = Stream[Turn](
             client.create_nexus_client(
