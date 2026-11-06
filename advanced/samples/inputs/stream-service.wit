@@ -331,6 +331,7 @@ interface stream-service {
     create-wait: option<duration>,
     // Replay needs a fixed range, so the Workflow API omits `last`.
     /// @nexus.doc "Read the newest this many Records, oldest first. No from-offset. No wait."
+    /// @nexus.api-omit targets="workflow"
     last: option<s32>,
     /// @nexus.doc "The maximum Record bytes in a page. A larger Record is still returned alone."
     max-bytes: option<s64>,

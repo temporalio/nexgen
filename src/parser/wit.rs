@@ -1207,9 +1207,12 @@ fn build_fields_from_record(
             resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
+        let api_omit_targets = api_omit_directive
+            .map(|directive| build_origin_targets(directive, path, &field_context, "api-omit"))
+            .transpose()?;
         let origin = build_field_origins(
             &directives,
-            api_omit_directive.is_some(),
+            api_omit_targets.as_deref(),
             path,
             &field_context,
         )?;
@@ -1231,6 +1234,16 @@ fn build_fields_from_record(
             .is_some_and(FieldOrigin::is_sourced);
         let flatten_in_api =
             build_field_flatten(resolve, &field.ty, &directives, path, &field_context)?;
+        if api_omit_targets.is_some() && required && !is_list_type(resolve, &field.ty) {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: field_context,
+                directive: "@nexus.api-omit".to_string(),
+                reason: "needs an `option<T>` or `list<T>` field, since the call leaves the field \
+                         unset"
+                    .to_string(),
+            });
+        }
         let annotation =
             directive(&directives, "type", path, &field_context)?.map(directive_language_string);
         let flattened_annotation = directive(&directives, "flattened-type", path, &field_context)?
@@ -1719,11 +1732,16 @@ pub(crate) fn find_proto_name_for_type_def(
 
 fn build_field_origins(
     directives: &[Directive],
-    api_omitted: bool,
+    api_omit_targets: Option<&[GenerationTarget]>,
     path: &Path,
     context: &str,
 ) -> Result<LanguageFieldOrigins> {
     let mut origins = LanguageFieldOrigins::default();
+    let api_omitted = api_omit_targets.is_some();
+    // An api-omit of some targets lets the others take a source or a parameter.
+    let api_omitted_targets = api_omit_targets
+        .filter(|targets| *targets != [GenerationTarget::Workflow, GenerationTarget::Client])
+        .map(|targets| targets.iter().copied().collect::<BTreeSet<_>>());
     let sources = origin_directives(directives, "source", path, context)?;
     let defaults = origin_directives(directives, "default", path, context)?
         .into_iter()
@@ -1732,7 +1750,13 @@ fn build_field_origins(
         })
         .collect::<Result<Vec<_>>>()?;
     if api_omitted {
-        origins.default = Some(FieldOrigin::ApiOmitted);
+        origins.default = Some(match &api_omitted_targets {
+            Some(api_omitted) => FieldOrigin::ByTarget {
+                sources: BTreeMap::new(),
+                api_omitted: api_omitted.clone(),
+            },
+            None => FieldOrigin::ApiOmitted,
+        });
         if !defaults.is_empty() {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(), context: context.to_string(),
@@ -1779,17 +1803,38 @@ fn build_field_origins(
             });
         }
         let origin = if !source_expressions.is_empty() {
-            if api_omitted {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: context.to_string(),
-                    directive: "@nexus.api-omit".to_string(),
-                    reason: "cannot be combined with `@nexus.source`".to_string(),
-                });
+            match &api_omitted_targets {
+                Some(api_omitted)
+                    if !api_omitted
+                        .iter()
+                        .any(|target| source_expressions.contains_key(target)) =>
+                {
+                    Some(FieldOrigin::ByTarget {
+                        sources: source_expressions,
+                        api_omitted: api_omitted.clone(),
+                    })
+                }
+                Some(_) => {
+                    return Err(Error::InvalidWitDirective {
+                        path: path.to_path_buf(),
+                        context: context.to_string(),
+                        directive: "@nexus.api-omit".to_string(),
+                        reason: "cannot be combined with `@nexus.source` for the same target"
+                            .to_string(),
+                    });
+                }
+                None if api_omitted => {
+                    return Err(Error::InvalidWitDirective {
+                        path: path.to_path_buf(),
+                        context: context.to_string(),
+                        directive: "@nexus.api-omit".to_string(),
+                        reason: "cannot be combined with `@nexus.source`".to_string(),
+                    });
+                }
+                None => Some(FieldOrigin::Source {
+                    expressions: source_expressions,
+                }),
             }
-            Some(FieldOrigin::Source {
-                expressions: source_expressions,
-            })
         } else if !default_expressions.is_empty() {
             Some(FieldOrigin::Default {
                 expressions: default_expressions,
@@ -3519,6 +3564,20 @@ fn interface_export_name(key: &WorldKey, interface: &Interface) -> String {
             .name
             .clone()
             .unwrap_or_else(|| "unnamed-interface".to_string()),
+    }
+}
+
+fn is_list_type(resolve: &Resolve, ty: &Type) -> bool {
+    let mut current = ty;
+    loop {
+        match current {
+            Type::Id(id) => match &resolve.types[*id].kind {
+                TypeDefKind::List(_) => return true,
+                TypeDefKind::Type(next) => current = next,
+                _ => return false,
+            },
+            _ => return false,
+        }
     }
 }
 

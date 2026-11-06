@@ -208,11 +208,11 @@ export interface CreateStreamRequest {
   /**
    * Retry run only. The previous run, whose Records this withdraws.
    */
-  withdrawRun: string;
+  withdrawRun?: string;
   /**
    * Unique for each create call, and the same on its retries.
    */
-  requestId: string;
+  requestId?: string;
 }
 
 function createStreamRequestFromProto(
@@ -228,16 +228,8 @@ function createStreamRequestFromProto(
       proto.idConflictPolicy == null
         ? undefined
         : (proto.idConflictPolicy as number as StreamIdConflictPolicy),
-    withdrawRun: requiredField(
-      proto.withdrawRun === "" ? undefined : proto.withdrawRun,
-      "sourced field",
-      "withdrawRun",
-    ),
-    requestId: requiredField(
-      proto.requestId === "" ? undefined : proto.requestId,
-      "sourced field",
-      "requestId",
-    ),
+    withdrawRun: proto.withdrawRun ?? undefined,
+    requestId: proto.requestId ?? undefined,
   };
 }
 
@@ -319,11 +311,11 @@ export interface AppendRecordsRequest<BodyT> {
   /**
    * Required outside a Workflow. In a Workflow the transport sets it.
    */
-  producer: Producer;
+  producer?: Producer;
   /**
    * Retry run only. The previous run, whose Records this withdraws.
    */
-  withdrawRun: string;
+  withdrawRun?: string;
 }
 
 function appendRecordsRequestFromProto<BodyT>(
@@ -342,14 +334,8 @@ function appendRecordsRequestFromProto<BodyT>(
       "records",
     ),
     sequence: proto.sequence ?? undefined,
-    producer: producerFromProto(
-      requiredField(proto.producer, "sourced field", "producer"),
-    ),
-    withdrawRun: requiredField(
-      proto.withdrawRun === "" ? undefined : proto.withdrawRun,
-      "sourced field",
-      "withdrawRun",
-    ),
+    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
+    withdrawRun: proto.withdrawRun ?? undefined,
   };
 }
 
@@ -824,7 +810,7 @@ export const closeStreamResponseTransferTypeConverter = {
 };
 export interface CloseStreamRequest {
   ref: StreamRef;
-  producer: Producer;
+  producer?: Producer;
 }
 
 function closeStreamRequestFromProto(
@@ -832,9 +818,7 @@ function closeStreamRequestFromProto(
 ): CloseStreamRequest {
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "CloseStreamRequest", "ref")),
-    producer: producerFromProto(
-      requiredField(proto.producer, "sourced field", "producer"),
-    ),
+    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
   };
 }
 
