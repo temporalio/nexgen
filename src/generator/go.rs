@@ -6355,9 +6355,6 @@ fn render_operation_request(
         output.push_str(expression);
         output.push_str(",\n");
     }
-    if let Some(field) = &operation.context_propagation_header {
-        output.push_str(&format!("\t\t{field}: _nexgenHeader.Fields,\n"));
-    }
     output.push_str("\t}");
 }
 

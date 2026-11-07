@@ -282,16 +282,6 @@ pub(super) fn render(
             ));
             "executeNexusOperation"
         };
-        if operation.context_propagation_header.is_some() {
-            output.push_str(
-                "\t_nexgenHeader, err := workflowHeaderPropagated(ctx, getWorkflowEnvOptions(ctx).ContextPropagators)\n\
-                 \tif err != nil {\n\
-                 \t\tresult, resultSettable := NewFuture(ctx)\n\
-                 \t\tresultSettable.SetError(err)\n\
-                 \t\treturn result\n\
-                 \t}\n",
-            );
-        }
         if let Some(params) = &operation.unpacked_input {
             render_public_input_locals(&mut output, params, false);
             output.push_str("\trequest := ");
@@ -301,6 +291,21 @@ pub(super) fn render(
             for (field, expression) in &operation.sourced_fields {
                 output.push_str(&format!("\trequest.{field} = {expression}\n"));
             }
+        }
+        if let Some(field) = &operation.context_propagation_header {
+            let context = operation
+                .serialization_context_expr
+                .map(|helper| format!("{helper}(request)"))
+                .unwrap_or_else(|| "nil".to_string());
+            output.push_str(&format!(
+                "\t_nexgenHeader, err := workflowHeaderPropagated(ctx, getWorkflowEnvOptions(ctx).ContextPropagators, {context})\n\
+                 \tif err != nil {{\n\
+                 \t\tresult, resultSettable := NewFuture(ctx)\n\
+                 \t\tresultSettable.SetError(err)\n\
+                 \t\treturn result\n\
+                 \t}}\n\
+                 \trequest.{field} = _nexgenHeader.Fields\n",
+            ));
         }
         render_operation_body(
             &mut output,
