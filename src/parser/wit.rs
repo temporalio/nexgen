@@ -2874,6 +2874,9 @@ fn build_resource(
         None => Vec::new(),
     };
 
+    let flatten =
+        build_resource_flatten(resolve, constructor, &resource_directives, path, &context)?;
+
     let methods = interface
         .functions
         .values()
@@ -2905,9 +2908,47 @@ fn build_resource(
         name: resource_name,
         doc,
         fields,
+        flatten,
         methods,
         data: (),
     })
+}
+
+fn build_resource_flatten(
+    resolve: &Resolve,
+    constructor: Option<&Function>,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Option<String>> {
+    let Some(flatten) = directive(directives, "flatten-in-api", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.flatten-in-api".to_string(),
+        reason,
+    };
+    let Some(param) = flatten.value("param") else {
+        return Err(invalid(
+            "on a resource, needs a constructor parameter, such as `param=\"ref\"`".to_string(),
+        ));
+    };
+    let mut ty = constructor
+        .and_then(|constructor| constructor.params.iter().find(|item| item.name == param))
+        .map(|item| item.ty)
+        .ok_or_else(|| invalid(format!("`{param}` isn't a parameter of the constructor")))?;
+    loop {
+        let Type::Id(id) = ty else {
+            return Err(invalid(format!("the type of `{param}` isn't a record")));
+        };
+        match &resolve.types[id].kind {
+            TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => ty = *inner,
+            TypeDefKind::Record(_) => return Ok(Some(param.to_string())),
+            _ => return Err(invalid(format!("the type of `{param}` isn't a record"))),
+        }
+    }
 }
 
 fn build_resource_method(

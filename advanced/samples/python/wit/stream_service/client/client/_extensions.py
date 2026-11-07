@@ -62,14 +62,42 @@ class StreamServiceClientExtension(abc.ABC):
         body_type: None = None,
     ) -> Stream[object]: ...
 
+    @typing.overload
     def get_stream(
         self,
         *,
-        ref: StreamRef,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        created: bool | None = None,
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    def get_stream(
+        self,
+        *,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        created: bool | None = None,
+        body_type: None = None,
+    ) -> Stream[object]: ...
+
+    def get_stream(
+        self,
+        *,
+        ref: StreamRef | None = None,
+        id: str | None = None,
+        owner: Execution | None = None,
+        backend: str | None = None,
         created: bool | None = None,
         body_type: typing.Any = None,
     ) -> Stream[typing.Any]:
         """Return the ``Stream`` handle that has these identity fields."""
+        if ref is None:
+            assert id is not None
+            ref = StreamRef(id=id, owner=owner, backend=backend)
         if body_type is None:
             body_type = typing.Any
         return Stream[body_type](

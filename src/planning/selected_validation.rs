@@ -9,7 +9,8 @@ use crate::error::{Error, Result};
 use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     ApiSpec, ApiSpecLeaf, CompilerPass, ExternalTypeSpec, FieldOrigin, FunctionArgsSpec,
-    FunctionResultSpec, OperationSpec, RecordFieldSpec, RecordSpec, SelectedFamily, TypeSpec,
+    FunctionResultSpec, OperationSpec, RecordFieldSpec, RecordSpec, ResourceSpec, SelectedFamily,
+    TypeSpec,
 };
 
 pub(crate) struct SelectedValidationPass;
@@ -107,6 +108,11 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
                 }
             }
         }
+        for resource in &service.resources {
+            if let Some(flatten) = &resource.flatten {
+                validate_resource_flatten(spec, resource, flatten, &invalid)?;
+            }
+        }
     }
 
     for (_, record) in spec.records() {
@@ -161,7 +167,66 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
             }
         }
     }
+    Ok(())
+}
 
+fn validate_resource_flatten(
+    spec: &ApiSpec<SelectedFamily>,
+    resource: &ResourceSpec<SelectedFamily>,
+    flatten: &str,
+    invalid: &dyn Fn(String) -> Error,
+) -> Result<()> {
+    let context = format!("resource `{}` parameter `{flatten}`", resource.name);
+    let Some(param) = resource.fields.iter().find(|field| field.name == flatten) else {
+        return Err(invalid(format!(
+            "{context} isn't a parameter of the constructor"
+        )));
+    };
+    let nested = match param.field_type.without_option() {
+        TypeSpec::Record(record) => spec.record(record.as_str()),
+        TypeSpec::External(ExternalTypeSpec::Proto(proto)) => spec.record_for_proto(proto.as_str()),
+        _ => None,
+    };
+    let Some(nested) = nested else {
+        return Err(invalid(format!(
+            "{context} flattens fields, but its type isn't a record"
+        )));
+    };
+    if nested.flatten_in_api {
+        return Err(invalid(format!(
+            "{context} flattens fields of `{}`, which flattens all of its fields already",
+            nested.full_name
+        )));
+    }
+    // Each language changes the case and the separators of a name.
+    let normalized = |name: &str| {
+        name.chars()
+            .filter(|character| !matches!(character, '-' | '_'))
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+    };
+    let parameters = resource
+        .fields
+        .iter()
+        .filter(|field| field.name != flatten)
+        .map(|field| {
+            (
+                normalized(&field.name),
+                format!("parameter `{}`", field.name),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let omitted = |field: &RecordFieldSpec<SelectedFamily>| {
+        matches!(field.origin, Some(FieldOrigin::Omitted))
+    };
+    for (key, promoted) in nested.fields.iter().filter(|(_, field)| !omitted(field)) {
+        if let Some(other) = parameters.get(&normalized(&promoted.name)) {
+            return Err(invalid(format!(
+                "{context} promotes `{key}`, whose name `{}` is also the name of {other}",
+                promoted.name
+            )));
+        }
+    }
     Ok(())
 }
 

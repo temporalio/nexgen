@@ -15,6 +15,7 @@ from ..models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Execution,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamReadStart,
@@ -110,6 +111,67 @@ class Stream(typing.Generic[BodyT]):
         )
         handle = await _describe_stream(request)
         return await handle
+
+
+@typing.overload
+def get_stream(
+    *,
+    ref: StreamRef,
+    created: bool | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
+
+
+@typing.overload
+def get_stream(
+    *,
+    ref: StreamRef,
+    created: bool | None = None,
+    body_type: None = None,
+) -> Stream[object]: ...
+
+
+@typing.overload
+def get_stream(
+    *,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    created: bool | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
+
+
+@typing.overload
+def get_stream(
+    *,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    created: bool | None = None,
+    body_type: None = None,
+) -> Stream[object]: ...
+
+
+def get_stream(
+    *,
+    ref: StreamRef | None = None,
+    id: str | None = None,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    created: bool | None = None,
+    body_type: typing.Any = None,
+) -> Stream[typing.Any]:
+    """A handle on an existing ``Stream``, with no call."""
+    if ref is None:
+        assert id is not None
+        ref = StreamRef(id=id, owner=owner, backend=backend)
+    if body_type is None:
+        body_type = typing.Any
+    return Stream[body_type](
+        ref=ref,
+        created=created,
+    )
 
 
 async def _append_records(
