@@ -2422,10 +2422,10 @@ signal-with-start-workflow: func(...) -> ...;
 
 Enables outbound workflow context propagation for a Go System Nexus operation
 generated into `go.temporal.io/sdk/internal`. It requires `--targets workflow`
-and a protobuf-backed request record. Standalone packages are not supported: the
-generated code calls the SDK's private header helpers. Operations bound to
-resource methods are not supported because those methods bypass the typed
-interceptor chain.
+and a protobuf-backed request record. The Go backend ignores this directive when
+generating into any other package because header injection calls the SDK's
+private helpers. Operations bound to resource methods are not supported because
+those methods bypass the typed interceptor chain.
 
 The value is a checked WIT field path, not a Go expression. Its root must be the
 operation's input parameter name, and it must select a direct field of that

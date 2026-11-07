@@ -14,8 +14,8 @@ pub(super) fn validate_context_propagation_mode(
     package: &GoPackageContext,
 ) -> Result<()> {
     if operation.context_propagation_header.value().is_some()
-        && (!package.workflow_interceptors
-            || !package.is_self_import("go.temporal.io/sdk/internal"))
+        && package.is_self_import("go.temporal.io/sdk/internal")
+        && !package.workflow_interceptors
     {
         return Err(context_propagation_error(
             &operation.name,
@@ -28,7 +28,11 @@ pub(super) fn validate_context_propagation_mode(
 pub(super) fn context_propagation_header(
     operation: &PlannedOperation,
     spec: &PlannedSpec,
+    package: &GoPackageContext,
 ) -> Result<Option<String>> {
+    if !package.is_self_import("go.temporal.io/sdk/internal") {
+        return Ok(None);
+    }
     let Some(key) = operation.context_propagation_header.value() else {
         return Ok(None);
     };

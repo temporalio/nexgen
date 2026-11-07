@@ -1483,7 +1483,8 @@ impl<'a> ApiPlanner<'a> {
         for service in &self.api_plan.services {
             for operation in &service.operations {
                 interceptor::validate_context_propagation_mode(operation, &self.package)?;
-                if operation.context_propagation_header.value().is_some()
+                if self.package.is_self_import("go.temporal.io/sdk/internal")
+                    && operation.context_propagation_header.value().is_some()
                     && service.resources.iter().any(|resource| {
                         resource.data.methods.iter().any(|method| {
                             matches!(
@@ -2084,7 +2085,7 @@ impl<'a> ApiPlanner<'a> {
             })
             .unwrap_or_default();
         let context_propagation_header =
-            interceptor::context_propagation_header(operation, self.api_plan)?;
+            interceptor::context_propagation_header(operation, self.api_plan, &self.package)?;
         if context_propagation_header.is_some() && unpacked_input.is_none() {
             return Err(interceptor::context_propagation_error(
                 &operation.name,

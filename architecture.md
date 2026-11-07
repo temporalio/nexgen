@@ -203,13 +203,6 @@ expression when building a request. Model constructors and converters only
 handle data. This lets workflow and client APIs share models without sharing
 runtime behavior.
 
-Outbound context propagation is operation metadata, not model conversion
-behavior. The WIT frontend resolves a direct authored field path to its input
-record's field key. Language selection and planning preserve that neutral field
-identity. The Go backend resolves its emitted name, validates SDK generation
-requirements, and owns header initialization and injection around the typed
-interceptor chain. This uses the existing passes; it adds no pipeline stage.
-
 Client resources keep their service-bound Nexus client. API code decodes
 returned resource data and constructs handles with that client. Python client
 APIs use the SDK's `NexusClient` and the shared typed operation descriptors.
