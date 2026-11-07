@@ -66,12 +66,11 @@ class StreamServiceClientExtension(abc.ABC):
         *,
         ref: StreamRef,
         created: bool | None = None,
-        body_type: type[BodyT] | None = None,
-    ) -> Stream[BodyT]:
+        body_type: typing.Any = None,
+    ) -> Stream[typing.Any]:
         """Return the ``Stream`` handle that has these identity fields."""
-        # None here means the caller gave no runtime type, so reads decode as Any.
         if body_type is None:
-            body_type = typing.cast("type[BodyT]", typing.Any)
+            body_type = typing.Any
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
@@ -140,10 +139,10 @@ class StreamServiceClientExtension(abc.ABC):
         stream_ref: StreamRef,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
-        body_type: type[BodyT] | None = None,
+        body_type: typing.Any = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream[BodyT]:
+    ) -> Stream[typing.Any]:
         """
         Args:
             stream_ref: The ref of the Stream to create. Its id is the Stream id.
@@ -152,9 +151,8 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
-        # None here means the caller gave no runtime type, so reads decode as Any.
         if body_type is None:
-            body_type = typing.cast("type[BodyT]", typing.Any)
+            body_type = typing.Any
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             retention=retention,

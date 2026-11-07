@@ -1255,7 +1255,7 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
-        render_runtime_type_fallbacks(output, "        ", &type_variables);
+        render_untyped_runtime_type_fallbacks(output, "        ", &type_variables);
         output.push_str("        return ");
         output.push_str(&resource.type_name);
         let arguments = type_variables
@@ -7086,7 +7086,7 @@ impl RuntimeTypeSignature<'_> {
                 let replacement = match self {
                     Self::Overload(supplied) if supplied[index] => return annotation,
                     Self::Overload(_) => "object",
-                    Self::Implementation => return annotation,
+                    Self::Implementation => "typing.Any",
                 };
                 replace_python_identifier(&annotation, name, replacement)
             },
@@ -7111,7 +7111,7 @@ impl RuntimeTypeSignature<'_> {
             let annotation = match self {
                 Self::Overload(supplied) if supplied[index] => format!("type[{name}]"),
                 Self::Overload(_) => "None = None".to_string(),
-                Self::Implementation => format!("type[{name}] | None = None"),
+                Self::Implementation => "typing.Any = None".to_string(),
             };
             output.push_str(&format!("{indent}{argument}: {annotation},\n"));
         }
@@ -7167,6 +7167,20 @@ fn render_runtime_type_keyword_parameters(
         output.push_str(",\n");
     }
     true
+}
+
+/// Overload implementations use Any internally; the overloads enforce the public contract.
+fn render_untyped_runtime_type_fallbacks(
+    output: &mut String,
+    indent: &str,
+    type_variables: &[String],
+) {
+    for name in type_variables {
+        let argument = python_runtime_type_argument_name(name);
+        output.push_str(&format!(
+            "{indent}if {argument} is None:\n{indent}    {argument} = typing.Any\n"
+        ));
+    }
 }
 
 /// A call with no runtime type decodes its generic values as `typing.Any`.
@@ -9850,7 +9864,7 @@ fn render_unpacked_operation_function(
     output.push('\n');
     let body_indent = target_body_indent(target);
     render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
-    render_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
+    render_untyped_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
     for flattened_message in &unpacked_input.flattened_messages {
         render_flattened_message_setup(output, body_indent, flattened_message);
     }

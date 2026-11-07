@@ -67,8 +67,8 @@ async def create_stream(
     stream_ref: StreamRef,
     retention: datetime.timedelta | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
-    body_type: type[BodyT] | None = None,
-) -> Stream[BodyT]:
+    body_type: typing.Any = None,
+) -> Stream[typing.Any]:
     """
     Args:
         stream_ref: The ref of the Stream to create. Its id is the Stream id.
@@ -76,9 +76,8 @@ async def create_stream(
         id_conflict_policy: What the create does when the Stream exists. Unspecified is
             fail.
     """
-    # None here means the caller gave no runtime type, so reads decode as Any.
     if body_type is None:
-        body_type = typing.cast("type[BodyT]", typing.Any)
+        body_type = typing.Any
     request = CreateStreamRequest(
         stream_ref=stream_ref,
         retention=retention,

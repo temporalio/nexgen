@@ -228,8 +228,8 @@ async def read_records(
     create_wait: datetime.timedelta | None = None,
     last: int | None = None,
     max_bytes: int | None = None,
-    body_type: type[BodyT] | None = None,
-) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
+    body_type: typing.Any = None,
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[typing.Any],]:
     """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
     Activity.
 
@@ -246,9 +246,8 @@ async def read_records(
         max_bytes: The maximum Record bytes in a page. A larger Record is still returned
             alone.
     """
-    # None here means the caller gave no runtime type, so reads decode as Any.
     if body_type is None:
-        body_type = typing.cast("type[BodyT]", typing.Any)
+        body_type = typing.Any
     request = ReadRecordsRequest(
         ref=ref,
         from_offset=from_offset,
