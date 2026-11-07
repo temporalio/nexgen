@@ -29,15 +29,14 @@ BodyT = typing.TypeVar("BodyT")
 class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
-    ref: StreamRef
     created: bool | None
 
     def __init__(
         self,
-        ref: StreamRef,
+        ref: StreamRef[BodyT],
         created: bool | None,
     ) -> None:
-        self.ref = ref
+        self._ref: StreamRef[BodyT] = ref
         self.created = created
 
     @property
@@ -53,6 +52,17 @@ class Stream(typing.Generic[BodyT]):
             (),
         )
         return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+
+    @property
+    def ref(self) -> StreamRef[BodyT]:
+        # The ref carries the handle's payload type, so a reader of it keeps the type.
+        if not typing.get_args(getattr(self._ref, "__orig_class__", None)):
+            self._ref = StreamRef[self.body_type](
+                id=self._ref.id,
+                owner=self._ref.owner,
+                backend=self._ref.backend,
+            )
+        return self._ref
 
     async def publish(
         self,
