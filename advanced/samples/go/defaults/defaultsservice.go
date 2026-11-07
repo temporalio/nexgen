@@ -255,13 +255,11 @@ func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 }
 
 type GetSenderOptions struct {
-	// Token - Required.
-	Token string
 }
 
-func GetSender(ctx workflow.Context, opts GetSenderOptions) workflow.Future {
+func GetSender(ctx workflow.Context, opts GetSenderOptions, token string) workflow.Future {
 	return getSender(ctx, getSenderRequest{
-		Token: opts.Token,
+		Token: token,
 	})
 }
 

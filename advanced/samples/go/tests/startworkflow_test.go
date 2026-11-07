@@ -58,21 +58,21 @@ func (s *StartWorkflowIntegrationSuite) TestPublicOperationsAndResourceMethods()
 		// Get resolves to a StartedWorkflow resource rather than a client.WorkflowRun.
 		future := sw.StartWorkflow(
 			ctx,
-			sw.StartWorkflowOptions{Workflow: "typed-workflow", WorkflowID: "start-id", TaskQueue: "start-queue", WorkflowStartDelay: time.Second},
+			sw.StartWorkflowOptions{WorkflowStartDelay: time.Second}, "typed-workflow", "start-id", "start-queue",
 		)
 		if err := future.Get(ctx, &start); err != nil {
 			return err
 		}
 		var restart sw.StartedWorkflow
 		if err := sw.RestartWorkflow(
-			ctx, sw.RestartWorkflowOptions{Workflow: "typed-restart", WorkflowID: "restart-id", TaskQueue: "restart-queue"},
+			ctx, sw.RestartWorkflowOptions{}, "typed-restart", "restart-id", "restart-queue",
 		).Get(ctx, &restart); err != nil {
 			return err
 		}
 		var cancelResult sw.CancelWorkflowResponse
 		if err := sw.CancelWorkflow(ctx, sw.CancelWorkflowOptions{
-			WorkflowExecution: sw.WorkflowExecution{WorkflowID: "cancel-id"}, Reason: "because",
-		}).Get(ctx, &cancelResult); err != nil {
+			Reason: "because",
+		}, sw.WorkflowExecution{WorkflowID: "cancel-id"}).Get(ctx, &cancelResult); err != nil {
 			return err
 		}
 		var resourceRestart sw.StartedWorkflow

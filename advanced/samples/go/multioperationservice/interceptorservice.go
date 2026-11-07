@@ -44,24 +44,20 @@ func (m SystemNexus_Response) GetValue() string {
 }
 
 type SystemNexus_FirstOperationOptions struct {
-	// ID - Required.
-	ID string
 }
 
-func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions) internal.Future {
+func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
 	return systemnexus_firstOperation(ctx, SystemNexus_Request{
-		ID: opts.ID,
+		ID: id,
 	})
 }
 
 type SystemNexus_SecondOperationOptions struct {
-	// ID - Required.
-	ID string
 }
 
-func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions) internal.Future {
+func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
 	return systemnexus_secondOperation(ctx, SystemNexus_Request{
-		ID: opts.ID,
+		ID: id,
 	})
 }
 

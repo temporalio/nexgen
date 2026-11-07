@@ -118,8 +118,8 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
 		var response ws.SignalWithStartWorkflowResponse
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal")},
-			"wake-up", "signal-value", emptyArgsWorkflow,
+			ws.SignalWithStartWorkflowOptions{},
+			s.targetID("minimal"), "wake-up", "signal-value", emptyArgsWorkflow,
 		).Get(ctx, &response)
 		return response.RunID, err
 	}, &runID)
@@ -136,14 +136,14 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 	s.runWorkflow(func(ctx workflow.Context) ([]*string, error) {
 		var byFunction, byName ws.SignalWithStartWorkflowResponse
 		if err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("function"), TaskQueue: s.taskQueue},
-			"wake-up", "wake-up", exampleWorkflow, 7, "nexus",
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("function"), "wake-up", "wake-up", exampleWorkflow, 7, "nexus",
 		).Get(ctx, &byFunction); err != nil {
 			return nil, err
 		}
 		if err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("name"), TaskQueue: s.taskQueue},
-			"wake-up", nil, "singleArgWorkflow", "positional",
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("name"), "wake-up", nil, "singleArgWorkflow", "positional",
 		).Get(ctx, &byName); err != nil {
 			return nil, err
 		}
@@ -167,8 +167,8 @@ func (s *WorkflowServiceIntegrationSuite) TestListSignalArgument() {
 	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
 		var response ws.SignalWithStartWorkflowResponse
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("list"), TaskQueue: s.taskQueue},
-			"wake-up", []string{"one", "two"}, listSignalWorkflow,
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("list"), "wake-up", []string{"one", "two"}, listSignalWorkflow,
 		).Get(ctx, &response)
 		return response.RunID, err
 	}, &runID)
@@ -184,11 +184,10 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID:        s.targetID("invalid"),
 				TaskQueue: s.taskQueue,
 				Memo:      map[string]any{"invalid": func() {}},
 			},
-			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
+			s.targetID("invalid"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		if err == nil {
 			return "", errors.New("expected a payload conversion error")
@@ -360,11 +359,10 @@ func (s *WorkflowServiceIntegrationSuite) TestFlattenedMetadataPresence() {
 			var result string
 			s.runWorkflow(func(ctx workflow.Context) (string, error) {
 				err := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{
-					ID:            s.targetID("target"),
 					TaskQueue:     s.taskQueue,
 					StaticSummary: tc.summary,
 					StaticDetails: tc.details,
-				}, "wake-up", "signal", singleArgWorkflow, "input").Get(ctx, nil)
+				}, s.targetID("target"), "wake-up", "signal", singleArgWorkflow, "input").Get(ctx, nil)
 				return "caller-result", err
 			}, &result)
 			s.Require().Equal("caller-result", result)
@@ -434,7 +432,6 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID:        s.targetID("target"),
 				TaskQueue: s.taskQueue,
 				Memo: map[string]any{
 					"memo-key": "target-memo",
@@ -442,7 +439,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 				StaticSummary: "target-summary",
 				StaticDetails: "target-details",
 			},
-			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
+			s.targetID("target"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		return "caller-result", err
 	}, &callerResult)

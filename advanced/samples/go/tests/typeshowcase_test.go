@@ -65,9 +65,14 @@ func (s *TypeShowcaseIntegrationSuite) SetupTest() {
 			s.calls = append(s.calls, nexusCall{"Deactivate", input})
 			return nil, nil
 		})
+	updateLabels := nexus.NewSyncOperation("UpdateLabels",
+		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (nexus.NoValue, error) {
+			s.calls = append(s.calls, nexusCall{"UpdateLabels", input})
+			return nil, nil
+		})
 
 	service := nexus.NewService(typeShowcaseServiceName)
-	s.NoError(service.Register(getUser, updateEmail, rename, setProfile, recordSync, deactivate))
+	s.NoError(service.Register(getUser, updateEmail, rename, setProfile, recordSync, deactivate, updateLabels))
 	s.env.RegisterNexusService(service)
 }
 
@@ -112,22 +117,22 @@ func sampleSyncReport() typeshowcase.SyncReport {
 func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		var user typeshowcase.User
-		if err := typeshowcase.GetUser(ctx, typeshowcase.GetUserOptions{UserID: "user-123", ConsistencyToken: "read-123"}).Get(ctx, &user); err != nil {
+		if err := typeshowcase.GetUser(ctx, typeshowcase.GetUserOptions{ConsistencyToken: "read-123"}, "user-123").Get(ctx, &user); err != nil {
 			return err
 		}
 		var updatedUser typeshowcase.User
-		if err := typeshowcase.UpdateEmail(ctx, typeshowcase.UpdateEmailOptions{UserID: "user-123", Email: "new@example.com"}).Get(ctx, &updatedUser); err != nil {
+		if err := typeshowcase.UpdateEmail(ctx, typeshowcase.UpdateEmailOptions{}, "user-123", "new@example.com").Get(ctx, &updatedUser); err != nil {
 			return err
 		}
 		var renamedUser typeshowcase.User
-		if err := typeshowcase.Rename(ctx, typeshowcase.RenameOptions{UserID: "user-123", DisplayName: "New Name"}).Get(ctx, &renamedUser); err != nil {
+		if err := typeshowcase.Rename(ctx, typeshowcase.RenameOptions{}, "user-123", "New Name").Get(ctx, &renamedUser); err != nil {
 			return err
 		}
 		var profileUser typeshowcase.User
-		if err := typeshowcase.SetProfile(ctx, typeshowcase.SetProfileOptions{UserID: "user-123", Profile: sampleProfile()}).Get(ctx, &profileUser); err != nil {
+		if err := typeshowcase.SetProfile(ctx, typeshowcase.SetProfileOptions{}, "user-123", sampleProfile()).Get(ctx, &profileUser); err != nil {
 			return err
 		}
-		if err := typeshowcase.Deactivate(ctx, typeshowcase.DeactivateOptions{UserID: "user-123", Reason: "requested"}).Get(ctx, nil); err != nil {
+		if err := typeshowcase.Deactivate(ctx, typeshowcase.DeactivateOptions{Reason: "requested"}, "user-123").Get(ctx, nil); err != nil {
 			return err
 		}
 		var resourceUpdatedUser typeshowcase.User
@@ -143,10 +148,7 @@ func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 		}
 		// Container fields exercise the generated generic Tuple2 and Result
 		// types as nested list and map values.
-		return typeshowcase.RecordSync(ctx, typeshowcase.RecordSyncOptions{
-			UserID: "user-123",
-			Report: sampleSyncReport(),
-		}).Get(ctx, nil)
+		return typeshowcase.RecordSync(ctx, typeshowcase.RecordSyncOptions{}, "user-123", sampleSyncReport()).Get(ctx, nil)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
@@ -175,4 +177,33 @@ func (s *TypeShowcaseIntegrationSuite) TestOperationsAndResourceMethods() {
 	s.Contains(report, "Route")
 	s.Contains(report, "Attempts")
 	s.Contains(report, "RegionStatus")
+}
+
+func (s *TypeShowcaseIntegrationSuite) TestRequiredAndOptionalCollections() {
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		if err := typeshowcase.UpdateLabels(ctx, typeshowcase.UpdateLabelsOptions{
+			ExtraTags:     []string{"optional"},
+			ExtraMetadata: map[string]string{"optional": "value"},
+		}, "user-123", []string{"required"}, map[string]string{"required": "value"}).Get(ctx, nil); err != nil {
+			return err
+		}
+		// Required means caller-supplied, not nonzero. Nil containers and empty
+		// strings must pass through without being interpreted as absent options.
+		return typeshowcase.UpdateLabels(ctx, typeshowcase.UpdateLabelsOptions{}, "", nil, nil).Get(ctx, nil)
+	})
+
+	s.NoError(s.env.GetWorkflowError())
+	s.Require().Len(s.calls, 2)
+	input := s.calls[0].Input
+	s.Equal("user-123", stringField(input, "UserID"))
+	s.Equal([]string{"required"}, stringSliceField(input, "Tags"))
+	s.Equal(map[string]any{"required": "value"}, mapValue(field(input, "Metadata")))
+	s.Equal([]string{"optional"}, stringSliceField(input, "ExtraTags"))
+	s.Equal(map[string]any{"optional": "value"}, mapValue(field(input, "ExtraMetadata")))
+	zero := s.calls[1].Input
+	s.Empty(stringField(zero, "UserID"))
+	s.Nil(field(zero, "Tags"))
+	s.Nil(field(zero, "Metadata"))
+	s.Nil(field(zero, "ExtraTags"))
+	s.Nil(field(zero, "ExtraMetadata"))
 }

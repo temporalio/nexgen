@@ -103,50 +103,49 @@ func notify(ctx workflow.Context, request notifyRequest) workflow.Future {
 // --- Operations (public API) ---
 
 type GetUserOptions struct {
-	// UserID - Required.
-	UserID string
 }
 
-func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
+func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
 	return getUser(ctx, getUserRequest{
-		UserID: opts.UserID,
+		UserID: userID,
 	})
 }
 
 type UpdateEmailOptions struct {
-	// UserID - Required.
-	UserID string
-	// Email - Required.
-	Email string
 }
 
-func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions) workflow.Future {
+func UpdateEmail(
+	ctx workflow.Context,
+	opts UpdateEmailOptions,
+	userID string,
+	email string,
+) workflow.Future {
 	return updateEmail(ctx, updateEmailRequest{
-		UserID: opts.UserID,
-		Email:  opts.Email,
+		UserID: userID,
+		Email:  email,
 	})
 }
 
 type NotifyOptions struct {
-	// UserID - Required.
-	UserID string
 	// Reason - Optional.
 	Reason string
-	// Channels - Required.
-	Channels []string
-	// Sender - Required.
-	Sender string
 }
 
-func Notify(ctx workflow.Context, opts NotifyOptions) workflow.Future {
+func Notify(
+	ctx workflow.Context,
+	opts NotifyOptions,
+	userID string,
+	channels []string,
+	sender string,
+) workflow.Future {
 	var reason *string
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
 	return notify(ctx, notifyRequest{
-		UserID:   opts.UserID,
+		UserID:   userID,
 		Reason:   reason,
-		Channels: opts.Channels,
-		Sender:   opts.Sender,
+		Channels: channels,
+		Sender:   sender,
 	})
 }

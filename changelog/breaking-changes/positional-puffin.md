@@ -1,0 +1,1 @@
+Go operation convenience wrappers now take required input fields as positional arguments after the options struct, rather than as options fields. Optional and defaulted fields remain in options structs.

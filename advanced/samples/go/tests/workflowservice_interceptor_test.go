@@ -43,9 +43,9 @@ func (s *WorkflowServiceIntegrationSuite) TestTypedInterceptors() {
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID: s.targetID("original"), WorkflowTaskTimeout: 5 * time.Second, StartDelay: time.Hour,
+				WorkflowTaskTimeout: 5 * time.Second, StartDelay: time.Hour,
 			},
-			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
+			s.targetID("original"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		return "caller-result", err
 	}, &result)
