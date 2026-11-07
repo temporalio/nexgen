@@ -61,6 +61,7 @@ def _stream_status_from_proto(value: int) -> StreamStatus:
 
 
 BodyT = typing.TypeVar("BodyT")
+_BodyT = typing_extensions.TypeVar("_BodyT", default=typing.Any)
 
 
 @dataclasses.dataclass(slots=True)
@@ -139,8 +140,8 @@ temporalio.converter.transfer_type_convertible(
 )(CreateStreamRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True)
-class StreamRef:
+@dataclasses.dataclass
+class StreamRef(typing.Generic[_BodyT]):
     """Identifies one Stream. The id is opaque to callers."""
 
     id: str
@@ -166,7 +167,7 @@ class _StreamRefTransferTypeConverter(
         if not value.id:
             raise ValueError("missing required field StreamRef.id")
         id = value.id
-        return StreamRef(
+        return type_hint(
             id=id,
             owner=_ExecutionTransferTypeConverter().from_transfer_type(
                 value.owner, Execution

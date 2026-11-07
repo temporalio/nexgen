@@ -16,11 +16,12 @@ import pytest
 from temporalio.api.enums.v1 import stream_pb2
 from temporalio.api.stream.v1 import message_pb2
 from temporalio.api.streamservice.v1 import request_response_pb2
+import temporalio.converter
 from temporalio.converter import FailureConverter, PayloadConverter
 import temporalio.nexus.system
 from temporalio.worker import StartNexusOperationInput
 import temporalio.workflow
-from typing_extensions import override
+from typing_extensions import assert_type, override
 
 from wit.stream_service.models import models as models_only
 from wit.stream_service.workflow import models as workflow_models
@@ -324,6 +325,73 @@ def test_a_subclass_of_a_specialized_handle_takes_its_type_argument() -> None:
 
     assert TurnStream(ref=ref, created=None).body_type is Turn
     assert WorkflowStream(ref=ref, created=None).body_type is typing.Any
+
+
+async def test_a_decoded_ref_builds_a_typed_workflow_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = workflow_models.StreamRecord(
+        item=workflow_models.StreamItemData(
+            workflow_models.StreamData(body=Turn(role="model"))
+        ),
+        offset=1,
+    )
+    payload = SYSTEM_CONVERTER.to_payload(
+        workflow_models.ReadRecordsResponse[Turn](records=[record])
+    )
+
+    # A Workflow input crosses the data converter, which sends a ref as its wire message. The
+    # parameter's annotation is the type that it decodes with.
+    data_converter = temporalio.converter.DataConverter.default
+    plain = workflow_models.StreamRef(id="typed-stream")
+    payloads = await data_converter.encode([plain])
+    assert payloads == await data_converter.encode(
+        [message_pb2.StreamRef(id="typed-stream")]
+    )
+    [decoded] = await data_converter.decode(payloads, [workflow_models.StreamRef[Turn]])
+    ref: workflow_models.StreamRef[Turn] = decoded
+
+    class NexusClient:
+        async def start_operation(
+            self, operation: str, input: typing.Any, *, output_type: type[typing.Any]
+        ) -> collections.abc.Awaitable[typing.Any]:
+            del operation, input
+            future: asyncio.Future[typing.Any] = (
+                asyncio.get_running_loop().create_future()
+            )
+            future.set_result(SYSTEM_CONVERTER.from_payload(payload, output_type))
+            return future
+
+    def create_client(*, service: str, endpoint: str) -> NexusClient:
+        del service, endpoint
+        return NexusClient()
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+
+    stream = WorkflowStream[Turn](ref=ref, created=None)
+    page = await stream.read()
+
+    _ = assert_type(stream.ref, workflow_models.StreamRef[Turn])
+    assert page.records == [record]
+    # The type argument rides in memory, so the ref still equals the plain one.
+    assert stream.ref == plain
+    assert repr(stream.ref) == repr(plain)
+
+
+def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
+    plain = workflow_models.StreamRef(id="typed-stream")
+
+    typed_ref = WorkflowStream[Turn](ref=plain, created=None).ref
+    any_ref = WorkflowStream(ref=plain, created=None).ref
+
+    _ = assert_type(typed_ref, workflow_models.StreamRef[Turn])
+    assert typing.get_args(getattr(typed_ref, "__orig_class__", None)) == (Turn,)
+    assert typing.get_args(getattr(any_ref, "__orig_class__", None)) == (typing.Any,)
+    # A hand-built typed ref keeps its own type argument.
+    assert typing.get_args(
+        getattr(workflow_models.StreamRef[Turn](id="s1"), "__orig_class__", None)
+    ) == (Turn,)
 
 
 async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:

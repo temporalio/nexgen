@@ -7,6 +7,9 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
 use crate::generator::proto::python as python_proto;
+use crate::generator::resource_plan::{
+    ref_type_parameters, resource_ref_field, resource_ref_record,
+};
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
@@ -27,7 +30,7 @@ use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldPolicy, FlagsSpec,
     FunctionArgsSpec, FunctionFieldSpec, FunctionResultSpec, LanguageImportSpec,
     LanguageImportStyle, ModulePath, OperationPollSpec, OperationSpec, RecordFieldSpec, RecordSpec,
-    SelectedTextSpec, TypeDeclSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
+    SelectedTextSpec, TypeDeclSpec, TypeParameterSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
 };
 use crate::spec::{ApiSpecBranch, ApiSpecNode};
 
@@ -1229,6 +1232,10 @@ impl<'a> ApiPlanner<'a> {
         service: &RenderedService<'_>,
         resource: &PlannedResource,
     ) {
+        if let Some(ref_field) = self.typed_ref_field(resource) {
+            self.render_client_resource_ref_factory(output, service, resource, ref_field);
+            return;
+        }
         let type_variables = resource_type_variable_names(resource);
         for supplied in runtime_type_overload_cases(&type_variables) {
             output.push_str("    @typing.overload\n");
@@ -1262,9 +1269,129 @@ impl<'a> ApiPlanner<'a> {
         );
         render_resource_factory_impl_body(output, "        ", &type_variables);
         let receiver = resource_client_identifier(resource, "self");
+        self.render_client_resource_factory_return(output, service, resource, &receiver);
+    }
+
+    /// A generic resource's `get_<resource>` also infers the payload type from its ref, so it takes
+    /// either a generic ref, which gives the type, or the fields with an explicit `body_type`. They
+    /// are `@typing.overload`s, since one path has no `body_type`.
+    fn render_client_resource_ref_factory(
+        &self,
+        output: &mut String,
+        service: &RenderedService<'_>,
+        resource: &PlannedResource,
+        ref_field: &PlannedResourceField,
+    ) {
+        let receiver = resource_client_identifier(resource, "self");
+        let name = client_resource_factory_name(resource);
+        let ref_name = python_field_name(&ref_field.name);
+        let type_variables = resource_type_variable_names(resource);
+        let result = python_type_annotation_with_arguments(&resource.type_name, &type_variables);
+        let ref_generic = self.python_resource_constructor_field_annotation(resource, ref_field);
+        let ref_bare = self.python_resource_field_annotation(
+            &ref_field.kind,
+            ref_field.optional,
+            ref_field.function.as_ref(),
+        );
+        let other_fields = resource
+            .fields
+            .iter()
+            .filter(|field| field.name != ref_field.name)
+            .collect::<Vec<_>>();
+        let render_other_fields = |output: &mut String| {
+            for field in &other_fields {
+                output.push_str(&format!(
+                    "        {}: {}{},\n",
+                    python_field_name(&field.name),
+                    self.python_resource_field_annotation(
+                        &field.kind,
+                        field.optional,
+                        field.function.as_ref()
+                    ),
+                    if field.optional { " = None" } else { "" }
+                ));
+            }
+        };
+
+        // A positional generic ref gives the payload type.
+        output.push_str(&format!(
+            "    @typing.overload\n    def {name}(\n        {receiver},\n"
+        ));
+        output.push_str(&format!("        {ref_name}: {ref_generic},\n        /,\n"));
+        if !other_fields.is_empty() {
+            output.push_str("        *,\n");
+            render_other_fields(output);
+        }
+        output.push_str(&format!("    ) -> {result}: ...\n"));
+
+        // An explicit runtime type overrides a ref, positionally or by keyword.
+        output.push_str(&format!(
+            "    @typing.overload\n    def {name}(\n        {receiver},\n"
+        ));
+        output.push_str(&format!("        {ref_name}: {ref_bare},\n        *,\n"));
+        render_other_fields(output);
+        for variable in &type_variables {
+            output.push_str(&format!(
+                "        {}: type[{variable}],\n",
+                python_runtime_type_argument_name(variable)
+            ));
+        }
+        output.push_str(&format!("    ) -> {result}: ...\n"));
+
+        // A keyword ref with no runtime type decodes as `object`, like the other factories.
+        let object_result = python_type_annotation_with_arguments(
+            &resource.type_name,
+            &vec!["object".to_string(); type_variables.len()],
+        );
+        output.push_str(&format!(
+            "    @typing.overload\n    def {name}(\n        {receiver},\n        *,\n"
+        ));
+        output.push_str(&format!("        {ref_name}: {ref_bare},\n"));
+        render_other_fields(output);
+        for variable in &type_variables {
+            output.push_str(&format!(
+                "        {}: None = None,\n",
+                python_runtime_type_argument_name(variable)
+            ));
+        }
+        output.push_str(&format!("    ) -> {object_result}: ...\n"));
+
+        // The implementation takes the ref either way.
+        output.push_str(&format!("    def {name}(\n        {receiver},\n"));
+        output.push_str(&format!("        {ref_name}: {ref_generic},\n        *,\n"));
+        render_other_fields(output);
+        render_runtime_type_keyword_parameters(output, "        ", &type_variables, true, "None");
+        output.push_str(&format!("    ) -> {result}:\n"));
+        render_python_docstring(
+            output,
+            "        ",
+            Some(&format!(
+                "Return the ``{}`` handle for this ref.",
+                resource.type_name
+            )),
+            &[],
+            None,
+            false,
+        );
+        self.render_ref_runtime_type_fallbacks(output, resource, &ref_name);
+        self.render_client_resource_factory_return(output, service, resource, &receiver);
+    }
+
+    /// The `return Stream[...](...)` tail of a client factory, with the runtime types resolved.
+    fn render_client_resource_factory_return(
+        &self,
+        output: &mut String,
+        service: &RenderedService<'_>,
+        resource: &PlannedResource,
+        receiver: &str,
+    ) {
+        let arguments = resource_type_variable_names(resource)
+            .iter()
+            .map(|name| python_runtime_type_argument_name(name))
+            .collect::<Vec<_>>();
         output.push_str("        return ");
         output.push_str(&resource.type_name);
-        render_resource_type_specialization(output, &runtime_type_argument_names(&type_variables));
+        render_resource_type_specialization(output, &arguments);
         output.push_str("(\n");
         output.push_str(&format!("            {receiver}.create_nexus_client(\n"));
         output.push_str("                service=");
@@ -1390,6 +1517,37 @@ impl<'a> ApiPlanner<'a> {
             );
             let default = if field.optional { " = None" } else { "" };
             output.push_str(&format!("{indent}{name}: {annotation}{default},\n"));
+        }
+    }
+
+    /// When a runtime type keyword is `None`, the ref's own type argument decides it, else `Any`.
+    fn render_ref_runtime_type_fallbacks(
+        &self,
+        output: &mut String,
+        resource: &PlannedResource,
+        ref_name: &str,
+    ) {
+        let parameters = self.ref_type_parameters(resource);
+        output.push_str(&format!(
+            "        arguments = typing.get_args(getattr({ref_name}, \"__orig_class__\", None))\n"
+        ));
+        for (name, parameter) in resource_type_variable_names(resource)
+            .iter()
+            .zip(&resource.type_parameters)
+        {
+            let argument = python_runtime_type_argument_name(name);
+            let position = parameters
+                .iter()
+                .position(|candidate| candidate == parameter)
+                .expect("a resource type parameter rides on its ref");
+            output.push_str(&format!(
+                "        # None means no explicit type, so the ref's type argument decides, else Any.\n\
+                 \x20       if {argument} is None:\n\
+                 \x20           {argument} = typing.cast(\n\
+                 \x20               \"type[{name}]\",\n\
+                 \x20               arguments[{position}] if arguments else typing.Any,\n\
+                 \x20           )\n"
+            ));
         }
     }
 
@@ -1633,15 +1791,16 @@ impl<'a> ApiPlanner<'a> {
             .map(|field| {
                 (
                     python_field_name(&field.name),
-                    self.python_resource_field_annotation(
-                        &field.kind,
-                        field.optional,
-                        field.function.as_ref(),
-                    ),
+                    self.python_resource_constructor_field_annotation(resource, field),
                 )
             })
             .collect::<Vec<_>>();
+        let typed_ref = target.and_then(|_| self.typed_ref_field(resource));
         for (name, annotation) in &fields {
+            // A typed ref is a property, not a plain attribute, so it keeps the handle's type.
+            if typed_ref.is_some_and(|field| python_field_name(&field.name) == *name) {
+                continue;
+            }
             output.push_str("    ");
             output.push_str(name);
             output.push_str(": ");
@@ -1655,6 +1814,9 @@ impl<'a> ApiPlanner<'a> {
         }
         if target.is_some() {
             render_runtime_type_properties(output, resource, &type_variables);
+            if let Some(field) = typed_ref {
+                self.render_resource_ref_property(output, resource, field);
+            }
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -1708,20 +1870,31 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "        {}: {},\n",
                 python_field_name(&field.name),
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref()
-                )
+                self.python_resource_constructor_field_annotation(resource, field)
             ));
         }
         output.push_str("    ) -> None:\n");
         output.push_str(&format!(
             "        {receiver}.{attribute}: temporalio.client.NexusClient[typing.Any] = {parameter}\n"
         ));
+        self.render_resource_field_assignments(output, resource);
+    }
+
+    /// A typed ref is stored under `_ref`, so the `ref` property can stamp the handle's type onto
+    /// it, while every other field is a plain attribute.
+    fn render_resource_field_assignments(&self, output: &mut String, resource: &PlannedResource) {
+        let receiver = resource_client_identifier(resource, "self");
+        let typed_ref = self.typed_ref_field(resource);
         for field in &resource.fields {
             let name = python_field_name(&field.name);
-            output.push_str(&format!("        {receiver}.{name} = {name}\n"));
+            if typed_ref.is_some_and(|typed_ref| typed_ref.name == field.name) {
+                let annotation = self.python_resource_constructor_field_annotation(resource, field);
+                output.push_str(&format!(
+                    "        {receiver}._{name}: {annotation} = {name}\n"
+                ));
+            } else {
+                output.push_str(&format!("        {receiver}.{name} = {name}\n"));
+            }
         }
     }
 
@@ -1733,18 +1906,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "        {}: {},\n",
                 python_field_name(&field.name),
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref()
-                )
+                self.python_resource_constructor_field_annotation(resource, field)
             ));
         }
         output.push_str("    ) -> None:\n");
-        for field in &resource.fields {
-            let name = python_field_name(&field.name);
-            output.push_str(&format!("        {receiver}.{name} = {name}\n"));
-        }
+        self.render_resource_field_assignments(output, resource);
         if resource.fields.is_empty() {
             output.push_str("        pass\n");
         }
@@ -2146,6 +2312,130 @@ impl<'a> ApiPlanner<'a> {
         } else {
             base
         }
+    }
+
+    /// The annotation of a resource constructor field. A generic resource's ref takes its payload
+    /// type, so `stream.ref` is a `StreamRef[Turn]`, not a bare `StreamRef`.
+    fn python_resource_constructor_field_annotation(
+        &self,
+        resource: &PlannedResource,
+        field: &PlannedResourceField,
+    ) -> String {
+        resource_ref_field(resource)
+            .filter(|ref_field| ref_field.name == field.name)
+            .and_then(|_| self.python_ref_annotation(resource, |parameter| parameter.name.clone()))
+            .unwrap_or_else(|| {
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref(),
+                )
+            })
+    }
+
+    /// A generic resource's ref takes the resource's type parameters, so it keeps the resource's
+    /// type where code passes it as data. `argument` gives each. `None` for a ref with none.
+    fn python_ref_annotation(
+        &self,
+        resource: &PlannedResource,
+        argument: impl Fn(&TypeParameterSpec) -> String,
+    ) -> Option<String> {
+        let record = resource_ref_record(resource)?;
+        let arguments = self.ref_type_arguments(resource, argument);
+        (!arguments.is_empty())
+            .then(|| python_type_annotation_with_arguments(&record.model_name, &arguments))
+    }
+
+    /// The type arguments of a resource's ref, in the order of the ref's own type parameters and
+    /// then the resource's. The ref of another resource can add more, which take `typing.Any`.
+    fn ref_type_arguments(
+        &self,
+        resource: &PlannedResource,
+        argument: impl Fn(&TypeParameterSpec) -> String,
+    ) -> Vec<String> {
+        self.ref_type_parameters(resource)
+            .iter()
+            .map(|parameter| {
+                if resource.type_parameters.contains(parameter) {
+                    argument(parameter)
+                } else {
+                    "typing.Any".to_string()
+                }
+            })
+            .collect()
+    }
+
+    fn ref_type_parameters(&self, resource: &PlannedResource) -> Vec<TypeParameterSpec> {
+        let Some(record) = resource_ref_record(resource) else {
+            return Vec::new();
+        };
+        self.api_plan
+            .record_type_parameters(&record.full_name)
+            .into_iter()
+            .map(|usage| usage.parameter)
+            .chain(ref_type_parameters(self.api_plan, &record.full_name))
+            .collect()
+    }
+
+    /// A generic handle's ref keeps the handle's type arguments in memory, so the handle's `ref` is
+    /// a property. Only a ref with phantom type parameters can keep them.
+    fn typed_ref_field<'r>(
+        &self,
+        resource: &'r PlannedResource,
+    ) -> Option<&'r PlannedResourceField> {
+        let record = resource_ref_record(resource)?;
+        if resource.methods.is_empty()
+            || resource.type_parameters.is_empty()
+            || ref_type_parameters(self.api_plan, &record.full_name).is_empty()
+        {
+            return None;
+        }
+        resource_ref_field(resource)
+    }
+
+    /// Python sets `__orig_class__` after `__init__`, so the ref takes the handle's type arguments
+    /// when code first reads it.
+    fn render_resource_ref_property(
+        &self,
+        output: &mut String,
+        resource: &PlannedResource,
+        field: &PlannedResourceField,
+    ) {
+        let receiver = resource_client_identifier(resource, "self");
+        let name = python_field_name(&field.name);
+        let record = resource_ref_record(resource).expect("a typed ref is a record");
+        let arguments = self.ref_type_arguments(resource, |parameter| {
+            format!(
+                "{receiver}.{}",
+                python_runtime_type_argument_name(&parameter.name)
+            )
+        });
+        output.push_str(&format!(
+            "\n    @property\n    def {name}({receiver}) -> {}:\n",
+            self.python_resource_constructor_field_annotation(resource, field)
+        ));
+        output.push_str(
+            "        # The ref carries the handle's payload type, so a reader of it keeps the type.\n",
+        );
+        output.push_str(&format!(
+            "        if not typing.get_args(\n\
+             \x20           getattr({receiver}._{name}, \"__orig_class__\", None)\n\
+             \x20       ):\n"
+        ));
+        output.push_str(&format!(
+            "            {receiver}._{name} = {}[{}](\n",
+            record.model_name,
+            arguments.join(", ")
+        ));
+        for model_field in &self.models[&record.full_name].fields {
+            let attr = &model_field.attr_name;
+            output.push_str(&format!(
+                "                {attr}={receiver}._{name}.{attr},\n"
+            ));
+        }
+        output.push_str(&format!(
+            "            )\n        return {receiver}._{name}\n"
+        ));
     }
 
     fn python_resource_value_annotation(&self, value: &PlannedType) -> String {
@@ -2807,6 +3097,10 @@ impl<'a> ApiPlanner<'a> {
                     .into_iter()
                     .map(|usage| usage.parameter.name)
                     .collect(),
+                phantom_type_parameters: ref_type_parameters(api_plan, full_name)
+                    .into_iter()
+                    .map(|parameter| phantom_type_variable(&parameter.name))
+                    .collect(),
                 experimental: planned_model.experimental,
                 fields: Vec::new(),
             },
@@ -3316,6 +3610,23 @@ fn render_record_models(
         body.push_str(&python_string_literal(parameter));
         body.push_str(")\n");
     }
+    let phantom_type_parameters = models
+        .iter()
+        .flat_map(|model| model.phantom_type_parameters.iter())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for parameter in &phantom_type_parameters {
+        // No field gives a phantom parameter a value, so a bare annotation or a plain constructor
+        // call takes `typing.Any` for it. Its own `TypeVar` keeps the default off the other models.
+        body.push_str(parameter);
+        body.push_str(" = typing_extensions.TypeVar(");
+        body.push_str(&python_string_literal(parameter));
+        body.push_str(", default=typing.Any)\n");
+    }
+    let type_parameters = type_parameters
+        .into_iter()
+        .chain(phantom_type_parameters)
+        .collect::<BTreeSet<_>>();
     if !type_parameters.is_empty() && !models.is_empty() {
         body.push_str("\n\n");
     }
@@ -3371,16 +3682,31 @@ fn render_record_model(
     model: &RenderedModel,
     wire_block: Option<&RenderedRecordWireBlock>,
 ) {
-    if model_needs_keyword_only_dataclass(model) {
-        output.push_str("@dataclasses.dataclass(slots=True, kw_only=True)\n");
-    } else {
-        output.push_str("@dataclasses.dataclass(slots=True)\n");
+    // A ref keeps its type arguments in `__orig_class__`, which needs an instance `__dict__`, so a
+    // record with phantom type parameters drops `slots`.
+    let mut options = Vec::new();
+    if model.phantom_type_parameters.is_empty() {
+        options.push("slots=True");
     }
+    if model_needs_keyword_only_dataclass(model) {
+        options.push("kw_only=True");
+    }
+    output.push_str("@dataclasses.dataclass");
+    if !options.is_empty() {
+        output.push_str(&format!("({})", options.join(", ")));
+    }
+    output.push('\n');
     output.push_str("class ");
     output.push_str(&model.name);
-    if !model.type_parameters.is_empty() {
+    let type_parameters = model
+        .type_parameters
+        .iter()
+        .chain(&model.phantom_type_parameters)
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    if !type_parameters.is_empty() {
         output.push_str("(typing.Generic[");
-        output.push_str(&model.type_parameters.join(", "));
+        output.push_str(&type_parameters.join(", "));
         output.push_str("])");
     }
     output.push_str(":\n");
@@ -3947,6 +4273,9 @@ pub(in crate::generator) struct RenderedModel {
     pub(in crate::generator) name: String,
     pub(in crate::generator) doc: Option<String>,
     pub(in crate::generator) type_parameters: Vec<String>,
+    /// The `TypeVar`s of each generic resource whose ref this record is. No field uses them, so
+    /// only the class takes them, and the converter doesn't.
+    pub(in crate::generator) phantom_type_parameters: Vec<String>,
     pub(in crate::generator) experimental: bool,
     pub(in crate::generator) fields: Vec<RenderedField>,
 }
@@ -4409,6 +4738,11 @@ fn python_type_annotation_with_arguments(name: &str, arguments: &[String]) -> St
     } else {
         format!("{name}[{}]", arguments.join(", "))
     }
+}
+
+/// A phantom type variable can't collide with a model's own, since a model name can't start `_`.
+fn phantom_type_variable(type_var: &str) -> String {
+    format!("_{type_var}")
 }
 
 fn python_runtime_type_argument_name(type_var: &str) -> String {

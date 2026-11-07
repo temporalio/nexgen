@@ -47,12 +47,19 @@ class StreamServiceClientExtension(abc.ABC):
     @typing.overload
     def get_stream(
         self,
+        ref: StreamRef[BodyT],
+        /,
         *,
+        created: bool | None = None,
+    ) -> Stream[BodyT]: ...
+    @typing.overload
+    def get_stream(
+        self,
         ref: StreamRef,
+        *,
         created: bool | None = None,
         body_type: type[BodyT],
     ) -> Stream[BodyT]: ...
-
     @typing.overload
     def get_stream(
         self,
@@ -61,17 +68,21 @@ class StreamServiceClientExtension(abc.ABC):
         created: bool | None = None,
         body_type: None = None,
     ) -> Stream[object]: ...
-
     def get_stream(
         self,
+        ref: StreamRef[BodyT],
         *,
-        ref: StreamRef,
         created: bool | None = None,
-        body_type: typing.Any = None,
-    ) -> Stream[typing.Any]:
-        """Return the ``Stream`` handle that has these identity fields."""
+        body_type: type[BodyT] | None = None,
+    ) -> Stream[BodyT]:
+        """Return the ``Stream`` handle for this ref."""
+        arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+        # None means no explicit type, so the ref's type argument decides, else Any.
         if body_type is None:
-            body_type = typing.Any
+            body_type = typing.cast(
+                "type[BodyT]",
+                arguments[0] if arguments else typing.Any,
+            )
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
