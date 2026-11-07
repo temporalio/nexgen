@@ -4361,11 +4361,6 @@ fn render_file(
         }
         for (key, model) in public_models {
             output.push('\n');
-            if let Some(doc) =
-                record_for_model_key(api_plan, key).and_then(|record| record.doc.value())
-            {
-                render_go_doc_comment(&mut output, "", doc);
-            }
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
