@@ -128,8 +128,6 @@ Selects the target-language values from authored language maps.
 ### SelectedValidationPass
 
 Validates the selected generic model and operation surface after selection.
-Checks that depend on inferred resource type parameters belong to resource
-resolution.
 
 ### ResourceResolutionPass
 
