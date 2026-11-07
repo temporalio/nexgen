@@ -13,13 +13,17 @@ namespace Nexgen.DotNetExamples.Tests
 {
     public class StreamServiceChecks
     {
+        public sealed record Turn(string Role);
+
         [Fact]
         public void StreamWithItsHandleRoundTrips()
         {
             var converter = DataConverter.Default.PayloadConverter;
-            var stream = new StreamServiceExample.Stream(new StreamServiceExample.StreamRef("stream-1"), null);
+            var stream = new StreamServiceExample.Stream<Turn>(
+                new StreamServiceExample.StreamRef("stream-1"), null);
 
-            var decoded = converter.ToValue<StreamServiceExample.Stream>(converter.ToPayload(stream));
+            var decoded = converter.ToValue<StreamServiceExample.Stream<Turn>>(
+                converter.ToPayload(stream));
 
             Assert.Equal("stream-1", decoded.Ref.Id);
         }
@@ -29,25 +33,26 @@ namespace Nexgen.DotNetExamples.Tests
         [Fact]
         public void ReadItemsRoundTripAsTheirRecords()
         {
-            var model = new StreamServiceExample.ReadRecordsResponse(new[]
+            var model = new StreamServiceExample.ReadRecordsResponse<Turn>(new[]
             {
-                new StreamServiceExample.StreamRecord
+                new StreamServiceExample.StreamRecord<Turn>
                 {
-                    Item = new StreamServiceExample.StreamItem.Superseded(
+                    Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
                         new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
                     Offset = 2,
                 },
             });
 
             var wire = Assert.IsType<WireReadRecordsResponse>(
-                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsResponse))
+                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsResponse<Turn>))
                     .ToTransferType(model));
             Assert.Equal(
                 new[] { WireStreamRecord.ItemOneofCase.Superseded },
                 wire.Records.Select(record => record.ItemCase));
 
-            var decoded = FromPayload<StreamServiceExample.ReadRecordsResponse>(ToPayload(model));
-            var superseded = Assert.IsType<StreamServiceExample.StreamItem.Superseded>(
+            var decoded = FromPayload<StreamServiceExample.ReadRecordsResponse<Turn>>(
+                ToPayload(model));
+            var superseded = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Superseded>(
                 decoded.Records[0].Item);
             Assert.Equal("workflow-1", superseded.Value.ProducerId);
             Assert.Equal(new long[] { 7 }, superseded.Value.FailedTasks);

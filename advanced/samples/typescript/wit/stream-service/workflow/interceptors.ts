@@ -23,9 +23,9 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
     ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>,
   ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>;
   appendRecords?: (
-    input: AppendRecordsRequest,
+    input: AppendRecordsRequest<unknown>,
     next: (
-      input: AppendRecordsRequest,
+      input: AppendRecordsRequest<unknown>,
     ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>,
   ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>;
   closeStream?: (
@@ -38,8 +38,8 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
     input: ReadRecordsRequest,
     next: (
       input: ReadRecordsRequest,
-    ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse>>,
-  ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse>>;
+    ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse<unknown>>>,
+  ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse<unknown>>>;
   describeStream?: (
     input: DescribeStreamRequest,
     next: (
@@ -67,8 +67,8 @@ export function dispatchSystemNexusSpecificInterceptors(
           >;
         case "AppendRecords":
           return composeInterceptors(interceptors, "appendRecords", (request) =>
-            next<AppendRecordsRequest, AppendRecordsResponse>(request),
-          )(input as AppendRecordsRequest) as Promise<
+            next<AppendRecordsRequest<unknown>, AppendRecordsResponse>(request),
+          )(input as AppendRecordsRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         case "CloseStream":
@@ -79,7 +79,7 @@ export function dispatchSystemNexusSpecificInterceptors(
           >;
         case "ReadRecords":
           return composeInterceptors(interceptors, "readRecords", (request) =>
-            next<ReadRecordsRequest, ReadRecordsResponse>(request),
+            next<ReadRecordsRequest, ReadRecordsResponse<unknown>>(request),
           )(input as ReadRecordsRequest) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;

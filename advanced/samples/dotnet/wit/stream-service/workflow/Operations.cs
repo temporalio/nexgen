@@ -44,19 +44,19 @@ namespace Temporalio.Workflows
     /// Append one batch. Workflow code makes the call from a Local Activity.
     /// </summary>
     [GeneratedCode("nexgen", null)]
-    public class AppendRecordsOptions
+    public class AppendRecordsOptions<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AppendRecordsOptions"/> class.
+        /// Initializes a new instance of the <see cref="AppendRecordsOptions{TBody}"/> class.
         /// </summary>
-        public AppendRecordsOptions(StreamRef @ref, IReadOnlyList<AppendRecord> records)
+        public AppendRecordsOptions(StreamRef @ref, IReadOnlyList<AppendRecord<TBody>> records)
         {
             Ref = @ref;
             Records = records;
         }
 
         public StreamRef Ref { get; set; }
-        public IReadOnlyList<AppendRecord> Records { get; set; }
+        public IReadOnlyList<AppendRecord<TBody>> Records { get; set; }
         /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
@@ -148,23 +148,23 @@ namespace Temporalio.Workflows
 
         /// <param name="request">Create a Stream. If it exists, fail, or with use-existing get the open one.</param>
         [GeneratedCode("nexgen", null)]
-        private static async Task<Stream> CreateStreamAsync(CreateStreamRequest request)
+        private static async Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<CreateStreamResult>(svc => svc.CreateStream(request)).ConfigureAwait(true);
-            return new Stream((result.Ref ?? throw new System.InvalidOperationException("CreateStream answered without `ref`")), result.Created);
+            return new Stream<TBody>((result.Ref ?? throw new System.InvalidOperationException("CreateStream answered without `ref`")), result.Created);
         }
 
         /// <param name="options">Create a Stream. If it exists, fail, or with use-existing get the open one.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<Stream> CreateStreamAsync(CreateStreamOptions options)
+        public static Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamOptions options)
         {
             var request = new CreateStreamRequest(options.StreamRef, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.RequestId())
             {
                 Retention = options.Retention,
                 IdConflictPolicy = options.IdConflictPolicy,
             };
-            return CreateStreamAsync(request);
+            return CreateStreamAsync<TBody>(request);
         }
 
         /// <summary>
@@ -172,10 +172,10 @@ namespace Temporalio.Workflows
         /// </summary>
         /// <param name="request">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
         [GeneratedCode("nexgen", null)]
-        private static async Task<AppendRecordsResponse> AppendRecordsAsync(AppendRecordsRequest request)
+        private static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<AppendRecordsResponse>(svc => svc.AppendRecords(request)).ConfigureAwait(true);
+            var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<AppendRecordsResponse>("AppendRecords", request).ConfigureAwait(true);
             return result;
         }
 
@@ -184,9 +184,9 @@ namespace Temporalio.Workflows
         /// </summary>
         /// <param name="options">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<AppendRecordsResponse> AppendRecordsAsync(AppendRecordsOptions options)
+        public static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest(options.Ref, options.Records, Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
+            var request = new AppendRecordsRequest<TBody>(options.Ref, options.Records, Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
             {
                 Sequence = options.Sequence,
             };
@@ -215,10 +215,10 @@ namespace Temporalio.Workflows
         /// </summary>
         /// <param name="request">Read Records from an offset.</param>
         [GeneratedCode("nexgen", null)]
-        private static async Task<ReadRecordsResponse> ReadRecordsAsync(ReadRecordsRequest request)
+        private static async Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsRequest request)
         {
-            var client = Workflow.CreateNexusWorkflowClient<IStreamService>(StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<ReadRecordsResponse>(svc => svc.ReadRecords(request)).ConfigureAwait(true);
+            var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ReadRecordsResponse<TBody>>("ReadRecords", request).ConfigureAwait(true);
             return result;
         }
 
@@ -227,7 +227,7 @@ namespace Temporalio.Workflows
         /// </summary>
         /// <param name="options">Read Records from an offset.</param>
         [GeneratedCode("nexgen", null)]
-        public static Task<ReadRecordsResponse> ReadRecordsAsync(ReadRecordsOptions options)
+        public static Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsOptions options)
         {
             var request = new ReadRecordsRequest(options.Ref)
             {
@@ -239,7 +239,7 @@ namespace Temporalio.Workflows
                 Last = options.Last,
                 MaxBytes = options.MaxBytes,
             };
-            return ReadRecordsAsync(request);
+            return ReadRecordsAsync<TBody>(request);
         }
 
         [GeneratedCode("nexgen", null)]

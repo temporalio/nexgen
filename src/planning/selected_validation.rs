@@ -105,47 +105,6 @@ fn validate_generic_model_semantics(spec: &ApiSpec<SelectedFamily>, path: &Path)
                 }
             }
         }
-        for resource in &service.resources {
-            let resource_is_generic = resource
-                .fields
-                .iter()
-                .any(|field| !spec.type_parameters(&field.field_type).is_empty())
-                || resource.methods.iter().any(|method| {
-                    method
-                        .params
-                        .iter()
-                        .any(|param| !spec.type_parameters(&param.field_type).is_empty())
-                        || method.result.as_ref().is_some_and(|result| {
-                            !spec.type_parameters(&result.result_type).is_empty()
-                        })
-                });
-            if resource_is_generic {
-                return Err(invalid(format!(
-                    "resource `{}` cannot contain generic type parameters",
-                    resource.name
-                )));
-            }
-
-            for method in &resource.methods {
-                let Some(operation_name) = &method.operation_name else {
-                    continue;
-                };
-                let Some(operation) = service.operation(operation_name) else {
-                    continue;
-                };
-                let operation_is_generic = operation
-                    .input_type()
-                    .is_some_and(|input| !spec.type_parameters(input).is_empty())
-                    || operation
-                        .output_type()
-                        .is_some_and(|output| !spec.type_parameters(output).is_empty());
-                if operation_is_generic {
-                    return Err(invalid(format!(
-                        "resource-bound operation `{operation_name}` cannot use generic type parameters"
-                    )));
-                }
-            }
-        }
     }
     Ok(())
 }
@@ -160,7 +119,7 @@ mod tests {
     use crate::planning::{AuthoredValidationPass, LanguageSelectionPass};
     use crate::spec::ApiSpecTree;
 
-    fn validate(language: Language, wit: &str) -> Result<()> {
+    fn selected(language: Language, wit: &str) -> Result<ApiSpecTree<SelectedFamily>> {
         let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
             language,
             wit,
@@ -173,7 +132,13 @@ mod tests {
         let selected = LanguageSelectionPass::new(language)
             .apply(authored)
             .expect("language selection is infallible");
-        SelectedValidationPass.apply(selected).map(|_| ())
+        Ok(selected)
+    }
+
+    fn validate(language: Language, wit: &str) -> Result<()> {
+        SelectedValidationPass
+            .apply(selected(language, wit)?)
+            .map(|_| ())
     }
 
     const GENERIC_WIT: &str = r#"

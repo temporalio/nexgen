@@ -26,7 +26,10 @@ import temporal_support as _support
 from .._poll import PollIterator
 
 
-class Stream:
+BodyT = typing.TypeVar("BodyT")
+
+
+class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
     ref: StreamRef
@@ -44,9 +47,23 @@ class Stream:
         self.ref = ref
         self.created = created
 
+    @property
+    def body_type(self) -> type[BodyT]:
+        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
+        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
+            (
+                typing.get_args(base)
+                for klass in type(self).__mro__
+                for base in vars(klass).get("__orig_bases__", ())
+                if typing.get_origin(base) is Stream
+            ),
+            (),
+        )
+        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+
     async def publish(
         self,
-        records: list[AppendRecord],
+        records: list[AppendRecord[BodyT]],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
@@ -98,7 +115,7 @@ class Stream:
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> ReadRecordsResponse:
+    ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
@@ -110,9 +127,10 @@ class Stream:
             max_bytes=max_bytes,
         )
         handle = await self._nexus_client.start_operation(
-            operation=StreamService.read_records,
+            operation="ReadRecords",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=ReadRecordsResponse[self.body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
@@ -129,7 +147,7 @@ class Stream:
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse, None]:
+    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
         """Yield each response of ``read`` until the poll helper stops.
 
         Read one page of Records. The poll iterator reads them all.
@@ -160,9 +178,10 @@ class Stream:
         nexus_client = self._nexus_client
         while True:
             operation_handle = await nexus_client.start_operation(
-                operation=StreamService.read_records,
+                operation="ReadRecords",
                 arg=request,
                 id=f"{_uuid.uuid4()}",
+                result_type=ReadRecordsResponse[self.body_type],
                 rpc_metadata=rpc_metadata or {},
                 rpc_timeout=rpc_timeout,
             )
@@ -184,7 +203,7 @@ class Stream:
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> PollIterator[ReadRecordsRequest, StreamRecord]:
+    ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
         """Yield each item of ``iter_read``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is

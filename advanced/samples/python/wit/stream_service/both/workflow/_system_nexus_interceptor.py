@@ -46,7 +46,7 @@ async def _start_system_nexus_operation(
         and input.operation_name == "AppendRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.AppendRecordsRequest, models.AppendRecordsResponse]",
+            "StartNexusOperationInput[models.AppendRecordsRequest[typing.Any], models.AppendRecordsResponse]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -72,13 +72,15 @@ async def _start_system_nexus_operation(
         and input.operation_name == "ReadRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.ReadRecordsRequest, models.ReadRecordsResponse]",
+            "StartNexusOperationInput[models.ReadRecordsRequest, models.ReadRecordsResponse[typing.Any]]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
         return typing.cast(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
-            await interceptor.start_read_records(typed_input.input),
+            await interceptor.start_read_records(
+                typed_input.input, typed_input.output_type
+            ),
         )
     if (
         input.service == "temporal.api.streamservice.v1.StreamService"
@@ -117,7 +119,7 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
         return await self._next_system_nexus_interceptor().start_create_stream(request)
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         """Intercept the AppendRecords operation."""
         return await self._next_system_nexus_interceptor().start_append_records(request)
@@ -129,10 +131,16 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
         return await self._next_system_nexus_interceptor().start_close_stream(request)
 
     async def start_read_records(
-        self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+        self,
+        request: models.ReadRecordsRequest,
+        output_type: type[models.ReadRecordsResponse[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         """Intercept the ReadRecords operation."""
-        return await self._next_system_nexus_interceptor().start_read_records(request)
+        return await self._next_system_nexus_interceptor().start_read_records(
+            request, output_type
+        )
 
     async def start_describe_stream(
         self, request: models.DescribeStreamRequest
@@ -174,7 +182,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
@@ -220,8 +228,12 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_read_records(
-        self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+        self,
+        request: models.ReadRecordsRequest,
+        output_type: type[models.ReadRecordsResponse[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
@@ -232,7 +244,12 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
                 service="temporal.api.streamservice.v1.StreamService",
                 operation="ReadRecords",
                 input=request,
-                output_type=models.ReadRecordsResponse,
+                output_type=typing.cast(
+                    "type[models.ReadRecordsResponse[typing.Any]]",
+                    models.ReadRecordsResponse,
+                )
+                if output_type is None
+                else output_type,
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,

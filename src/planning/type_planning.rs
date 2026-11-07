@@ -459,6 +459,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
                 name: name.to_string(),
                 doc: None,
                 type_name: name.to_upper_camel_case(),
+                type_parameters: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
             })
@@ -667,6 +668,9 @@ impl<'a> TypePlanningContext<'a> {
                     &self.spec,
                     operation.data.output_resource_return.as_ref(),
                 ),
+                runtime_type_parameters: operation_runtime_type_parameters(
+                    &self.spec, service, operation,
+                ),
             },
         })
     }
@@ -852,7 +856,7 @@ impl<'a> TypePlanningContext<'a> {
                     result: method
                         .result
                         .as_ref()
-                        .map(|result| self.planned_resource_method_result(result)),
+                        .map(|result| self.planned_resource_method_result(service, result)),
                     binding,
                 })
             })
@@ -862,6 +866,7 @@ impl<'a> TypePlanningContext<'a> {
             name: resource.name.clone(),
             doc: resource.doc.value().map(str::to_string),
             type_name: resource.name.to_upper_camel_case(),
+            type_parameters: resource.type_parameters.clone(),
             fields: resource
                 .fields
                 .iter()
@@ -873,12 +878,17 @@ impl<'a> TypePlanningContext<'a> {
 
     fn planned_resource_method_result(
         &mut self,
+        service: &ServiceSpec<OperationLoweredFamily>,
         result: &ResourceResultSpec<SelectedFamily>,
     ) -> PlannedResourceMethodResult {
         let optional = matches!(result.result_type, TypeSpec::Option(_));
         let kind = match result.result_type.without_option() {
             TypeSpec::Resource(resource) => PlannedResourceMethodResultKind::Resource {
                 type_name: resource.as_str().to_upper_camel_case(),
+                type_parameters: service
+                    .resource(resource.as_str())
+                    .map(|resource| resource.data.type_parameters().to_vec())
+                    .unwrap_or_default(),
             },
             _ => PlannedResourceMethodResultKind::Value(
                 self.planned_selected_type_from_authored(&result.result_type),
@@ -1312,6 +1322,42 @@ fn plan_operation_resource_return(
             })
             .collect(),
     })
+}
+
+/// A request encodes from its value, so a bound operation takes only its output's type parameters.
+fn operation_runtime_type_parameters(
+    spec: &ApiSpec<OperationLoweredFamily>,
+    service: &ServiceSpec<OperationLoweredFamily>,
+    operation: &OperationSpec<OperationLoweredFamily>,
+) -> Vec<crate::spec::TypeParameterSpec> {
+    if let Some(resource_return) = &operation.data.output_resource_return {
+        return service
+            .resource(&resource_return.resource_name)
+            .map(|resource| resource.data.type_parameters().to_vec())
+            .unwrap_or_default();
+    }
+    let bound = service.resources.iter().any(|resource| {
+        !resource.data.type_parameters().is_empty()
+            && resource.data.resolved.as_ref().is_some_and(|resolved| {
+                resolved.methods.iter().any(|method| {
+                    matches!(
+                        &method.binding,
+                        ResolvedResourceMethodBinding::Operation { operation_name, .. }
+                            if *operation_name == operation.name
+                    )
+                })
+            })
+    });
+    if !bound {
+        return Vec::new();
+    }
+    operation
+        .output_type()
+        .map(|output| spec.type_parameters_through_protos(output))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect()
 }
 
 pub(crate) struct TypePlanningPass<'a> {

@@ -14,13 +14,12 @@ world system {
 interface stream-service {
   use nexus:temporal-types/model@1.0.0.{
     duration,
-    payload,
     placeholder,
   };
 
   /// The value type of a Stream's Records. A call's type argument sets it.
-  // TODO: implement @nexus.type-parameter, and make this alias a placeholder.
-  type body-t = payload;
+  /// @nexus.type-parameter
+  type body-t = placeholder;
 
   /// @nexus.proto "google.protobuf.Timestamp"
   record timestamp {
@@ -376,7 +375,6 @@ interface stream-service {
   // A stream never changes, since offsets are values that its methods return. Only a create's
   // response sets created, so a stream built from a ref has none.
   /// @nexus.doc "One Stream. Build it from a stream-ref, or get it from a create."
-  // TODO: implement @nexus.type-parameter "body-t".
   // TODO: implement @nexus.flatten-in-api param="ref" fields="id backend" keep=true
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);

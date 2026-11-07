@@ -21,6 +21,7 @@ import temporal_support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
+BodyT = typing.TypeVar("BodyT")
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -42,14 +43,35 @@ class StreamServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
+    @typing.overload
     def get_stream(
         self,
         *,
         ref: StreamRef,
-        created: bool | None,
-    ) -> Stream:
+        created: bool | None = None,
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    def get_stream(
+        self,
+        *,
+        ref: StreamRef,
+        created: bool | None = None,
+        body_type: None = None,
+    ) -> Stream[object]: ...
+
+    def get_stream(
+        self,
+        *,
+        ref: StreamRef,
+        created: bool | None = None,
+        body_type: typing.Any = None,
+    ) -> Stream[typing.Any]:
         """Return the ``Stream`` handle that has these identity fields."""
-        return Stream(
+        if body_type is None:
+            body_type = typing.Any
+        return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
                 endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -61,10 +83,11 @@ class StreamServiceClientExtension(abc.ABC):
     async def _stream_service_create_stream(
         self,
         request: CreateStreamRequest,
+        body_type: type[BodyT],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+    ) -> Stream[BodyT]:
         nexus_client = self.create_nexus_client(
             service=StreamService,
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -79,12 +102,36 @@ class StreamServiceClientExtension(abc.ABC):
         result = await handle.result()
         if result.ref is None:
             raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream(
+        resource = Stream[body_type](
             nexus_client,
             ref=result.ref,
             created=result.created or None,
         )
         return resource
+
+    @typing.overload
+    async def create_stream(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: type[BodyT],
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    async def create_stream(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[object]: ...
 
     async def create_stream(
         self,
@@ -92,9 +139,10 @@ class StreamServiceClientExtension(abc.ABC):
         stream_ref: StreamRef,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: typing.Any = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+    ) -> Stream[typing.Any]:
         """
         Args:
             stream_ref: The ref of the Stream to create. Its id is the Stream id.
@@ -103,6 +151,8 @@ class StreamServiceClientExtension(abc.ABC):
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
+        if body_type is None:
+            body_type = typing.Any
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             retention=retention,
@@ -111,5 +161,5 @@ class StreamServiceClientExtension(abc.ABC):
             request_id=_support.request_id(),
         )
         return await self._stream_service_create_stream(
-            request, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
         )

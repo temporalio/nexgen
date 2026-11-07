@@ -572,6 +572,9 @@ Resources are the most complex feature of the code generator. They produce
 classes whose constructor fields represent the resource's identity, and whose
 methods delegate to Nexus operations.
 
+A resource that uses a type parameter is generic. See
+[Generic resources](#generic-resources).
+
 ### Resource Declaration
 
 ```wit
@@ -1998,14 +2001,48 @@ const inputType = {
 };
 ```
 
-Type parameters are also unsupported in resources, map keys, function-signature
-metadata, or resource-bound generic operations.
+Type parameters are also unsupported in map keys and in function-signature
+metadata.
 
 Python represents generic variants as tagged tuples and protobuf oneof-backed
 generic variants as unions of generic case dataclasses. TypeScript uses tagged
 object unions, Go uses sealed interfaces and case structs, and .NET uses nested
 records. References to generic variants are closed automatically wherever they
 occur.
+
+#### Generic resources
+
+A resource that uses a type parameter in its fields, its methods or the
+operations that they bind is generic in it. Records, protos and a returned
+generic resource count too, so the resource needs no annotation. It takes its
+type parameters in the order of their aliases.
+
+```wit
+/// @nexus.type-parameter
+type body-t = placeholder;
+
+/// @nexus.proto "temporal.api.stream.v1.AppendRecord"
+record append-record {
+  body: body-t,
+}
+
+resource %stream {
+  /// @nexus.operation "append-records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
+```
+
+The handle keeps a runtime type for each type parameter and decodes responses
+with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or a
+keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
+`client.get_stream(ref=ref, body_type=Turn)`. A call with no `body_type` decodes
+as `typing.Any`, but its static return type is `Stream[object]`; a concrete
+`Stream[Turn]` requires `body_type=Turn`. TypeScript takes `bodyType` after the
+fields, and .NET takes the type argument, as in
+`CreateStreamAsync<Turn>(options)`.
+
+Go and Java refuse a generic resource. A record field can't hold one yet, and an
+operation with no `@nexus.proto` message can't return one yet.
 
 ---
 

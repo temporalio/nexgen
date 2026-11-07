@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit"
+contains = ["operation `Open` returns the generic resource `holder` with no `@nexus.proto` message, which isn't supported yet"]

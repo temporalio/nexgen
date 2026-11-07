@@ -150,6 +150,7 @@ pub(crate) struct PlannedResource {
     pub(crate) name: String,
     pub(crate) doc: Option<String>,
     pub(crate) type_name: String,
+    pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
 }
@@ -179,7 +180,10 @@ pub(crate) struct PlannedResourceMethodResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PlannedResourceMethodResultKind {
-    Resource { type_name: String },
+    Resource {
+        type_name: String,
+        type_parameters: Vec<crate::spec::TypeParameterSpec>,
+    },
     Value(PlannedType),
 }
 
@@ -235,6 +239,8 @@ pub(crate) struct PlannedWireVariantMember {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct PlannedOperationData {
     pub(crate) output_resource_return: Option<PlannedOperationResourceReturn>,
+    /// A request value can't give its type at runtime, so the call passes these types.
+    pub(crate) runtime_type_parameters: Vec<crate::spec::TypeParameterSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

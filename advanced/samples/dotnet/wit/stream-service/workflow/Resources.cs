@@ -13,7 +13,7 @@ namespace Temporalio.Workflows
 {
 
     [GeneratedCode("nexgen", null)]
-    public class Stream
+    public class Stream<TBody>
     {
         public Stream(StreamRef @ref, bool? created)
         {
@@ -25,9 +25,9 @@ namespace Temporalio.Workflows
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> PublishAsync(IReadOnlyList<AppendRecord> records)
+        public Task<AppendRecordsResponse> PublishAsync(IReadOnlyList<AppendRecord<TBody>> records)
         {
-            var request = new AppendRecordsOptions(Ref, records);
+            var request = new AppendRecordsOptions<TBody>(Ref, records);
             return Operations.AppendRecordsAsync(request);
         }
 
@@ -39,10 +39,10 @@ namespace Temporalio.Workflows
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task<ReadRecordsResponse> ReadAsync(long? fromOffset, StreamReadStart? start, int? maxRecords, System.TimeSpan? wait, System.TimeSpan? createWait, long? maxBytes)
+        public Task<ReadRecordsResponse<TBody>> ReadAsync(long? fromOffset, StreamReadStart? start, int? maxRecords, System.TimeSpan? wait, System.TimeSpan? createWait, long? maxBytes)
         {
             var request = new ReadRecordsOptions(Ref) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait, MaxBytes = maxBytes };
-            return Operations.ReadRecordsAsync(request);
+            return Operations.ReadRecordsAsync<TBody>(request);
         }
 
         [GeneratedCode("nexgen", null)]
