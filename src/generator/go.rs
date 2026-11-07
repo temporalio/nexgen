@@ -1555,7 +1555,6 @@ impl<'a> ApiPlanner<'a> {
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
         if self.package.workflow_interceptors && has_operations {
-            self.imports.insert("fmt".to_string());
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
         }
@@ -1718,7 +1717,7 @@ impl<'a> ApiPlanner<'a> {
             validate_model_getter_names(model)?;
         }
         let interceptors = if self.package.workflow_interceptors && has_operations {
-            interceptor::render(&services, &self.package)?
+            interceptor::render(&services, &self.package, &visibility)?
         } else {
             String::new()
         };
@@ -2015,7 +2014,6 @@ impl<'a> ApiPlanner<'a> {
             wire_name: operation.wire_name.as_str(),
             doc: operation.doc.value(),
             return_doc: operation.return_doc.value(),
-            func_name: go_declaration_name(&go_unexported_name(&operation.name)),
             input_type,
             model_type_parameters,
             output_type,
@@ -2681,7 +2679,7 @@ pub(in crate::generator) struct RenderedService<'a> {
 }
 
 /// A resolved Nexus operation with enough information to render the operation
-/// constant and an unexported caller function.
+/// constant and a public operation wrapper.
 #[derive(Debug)]
 pub(in crate::generator) struct RenderedOperation<'a> {
     /// UpperCamelCase operation name (e.g. `"GetUser"`).
@@ -2694,8 +2692,6 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Return-value doc text (from `@nexus.doc returns=`), rendered as a
     /// `Returns:` paragraph in the wrapper's godoc comment.
     return_doc: Option<&'a str>,
-    /// Unexported Go function name (e.g. `"getUser"`).
-    pub(in crate::generator) func_name: String,
     /// Go type for the request parameter (e.g. `"GetUserRequest"`).
     pub(in crate::generator) input_type: String,
     /// Model-derived parameters inferred from the request.
@@ -4239,11 +4235,6 @@ fn render_file(
         return output;
     }
 
-    let has_operations = crate::nexgen_config::current()
-        .targets
-        .contains(&GenerationTarget::Workflow)
-        && services.iter().any(|s| !s.operations.is_empty());
-
     // --- Datatypes ---
     let private_enums = enums
         .iter()
@@ -4329,17 +4320,6 @@ fn render_file(
         }
     }
 
-    // --- Operations (internal) ---
-    if has_operations {
-        output.push_str("\n// --- Operations (internal) ---\n");
-        for service in services {
-            for operation in &service.operations {
-                output.push('\n');
-                render_operation_function(&mut output, service, operation, package);
-            }
-        }
-    }
-
     // --- Operations (public API) ---
     let public_enums = enums
         .iter()
@@ -4415,11 +4395,11 @@ fn render_file(
                         visibility,
                     );
                 } else {
-                    // External input type — generate a simple forwarding wrapper
+                    // External input type — keep the request parameter intact.
                     output.push('\n');
                     render_empty_options_struct(&mut output, operation);
                     output.push('\n');
-                    render_forwarding_wrapper(&mut output, service, operation, package);
+                    render_external_input_wrapper(&mut output, service, operation, package);
                 }
             }
         }
@@ -5116,15 +5096,9 @@ fn resolve_resource_value_type_with_struct_flag(
     }
 }
 
-/// Renders methods on a resource struct. Each method that is bound to an
-/// operation delegates to the corresponding unexported operation function,
-/// constructing the request from the receiver's fields and the method params.
-///
-/// ```go
-/// func (u *User) UpdateEmail(ctx workflow.Context, email string) (*User, error) {
-///     return updateEmail(ctx, UpdateEmailRequest{UserId: u.UserId, Email: email})
-/// }
-/// ```
+/// Renders resource methods that construct their bound request and inline
+/// operation execution and result adaptation. The Nexus client path preserves
+/// resource-owned values instead of reapplying convenience-wrapper sources.
 ///
 /// Methods bound to `Stub` emit a panic placeholder.
 fn render_resource_methods(
@@ -5239,7 +5213,7 @@ fn render_resource_methods(
                     }
                 }
 
-                // Body: construct request and delegate
+                // Body: construct the bound request and execute it directly.
                 let method_param_sources = method
                     .params
                     .iter()
@@ -5386,11 +5360,16 @@ fn render_resource_methods(
                 }
 
                 output.push_str(&request_locals.into_inner());
-                output.push_str("\treturn ");
-                output.push_str(&operation.func_name);
-                output.push_str("(ctx, ");
+                output.push_str("\trequest := ");
                 output.push_str(&request_expr);
-                output.push_str(")\n");
+                output.push('\n');
+                render_operation_body(
+                    output,
+                    service,
+                    operation,
+                    package,
+                    OperationExecution::NexusClient,
+                );
                 output.push_str("}\n");
             }
             PlannedResourceMethodBinding::Stub => {
@@ -5492,53 +5471,39 @@ pub(in crate::generator) fn new_nexus_client_expr(
     )
 }
 
-/// Renders an unexported operation wrapper function that creates a Nexus
-/// client and executes the operation.
-///
-/// For operations returning a value:
-/// ```go
-/// func getUser(ctx workflow.Context, request GetUserRequest) (*User, error) {
-///     c := workflow.NewNexusClient(Endpoint, ServiceName)
-///     fut := c.ExecuteOperation(ctx, GetUserOp, request, workflow.NexusOperationOptions{})
-///     var result User
-///     if err := fut.Get(ctx, &result); err != nil {
-///         return nil, err
-///     }
-///     return &result, nil
-/// }
-/// ```
-///
-/// For void operations:
-/// ```go
-/// func deactivate(ctx workflow.Context, request DeactivateRequest) error {
-///     c := workflow.NewNexusClient(Endpoint, ServiceName)
-///     fut := c.ExecuteOperation(ctx, DeactivateOp, request, workflow.NexusOperationOptions{})
-///     return fut.Get(ctx, nil)
-/// }
-/// ```
-fn render_operation_function(
+#[derive(Clone, Copy)]
+pub(in crate::generator) enum OperationExecution {
+    NexusClient,
+    ExecuteNexusOperation(&'static str),
+}
+
+pub(in crate::generator) fn render_operation_execution(
     output: &mut String,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
+    input: &str,
     package: &GoPackageContext,
+    execution: OperationExecution,
 ) {
-    if let Some(binding) = &operation.wire_binding {
-        proto::render_operation_function_proto(output, service, operation, binding, package);
+    if let OperationExecution::ExecuteNexusOperation(execute) = execution {
+        output.push_str(&format!(
+            "\tfut := {execute}(ctx, {}{{\n\
+             \t\tClient: {}({}),\n\
+             \t\tOperation: {},\n\
+             \t\tInput: {input},\n\
+             \t\tNexusHeader: nexus.Header{{}},\n\
+             \t}})\n",
+            package
+                .sdk_reference(SdkSymbol::ExecuteNexusOperationInput)
+                .expression,
+            package
+                .sdk_reference(SdkSymbol::NewSystemNexusClient)
+                .expression,
+            go_string_literal(service.wire_name),
+            go_string_literal(operation.wire_name),
+        ));
         return;
     }
-
-    let operation_name = go_string_literal(operation.wire_name);
-
-    output.push_str("func ");
-    output.push_str(&operation.func_name);
-    render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
-    output.push_str("(ctx ");
-    output.push_str(&package.workflow_context_type());
-    output.push_str(", request ");
-    output.push_str(&operation.input_type);
-    output.push_str(") ");
-    render_operation_future_return_type(output, package);
-    output.push_str(" {\n");
     let endpoint = service
         .endpoint
         .as_deref()
@@ -5546,10 +5511,26 @@ fn render_operation_function(
     output.push_str("\tc := ");
     output.push_str(&new_nexus_client_expr(endpoint, service.wire_name, package));
     output.push_str("\n\tfut := c.ExecuteOperation(ctx, ");
-    output.push_str(&operation_name);
-    output.push_str(", request, ");
+    output.push_str(&go_string_literal(operation.wire_name));
+    output.push_str(", ");
+    output.push_str(input);
+    output.push_str(", ");
     output.push_str(&package.nexus_operation_options());
     output.push_str(")\n");
+}
+
+fn render_operation_body(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    package: &GoPackageContext,
+    execution: OperationExecution,
+) {
+    if let Some(binding) = &operation.wire_binding {
+        proto::render_operation_body_proto(output, service, operation, binding, package, execution);
+        return;
+    }
+    render_operation_execution(output, service, operation, "request", package, execution);
     if let (Some(transform_expr), Some(transform_type)) = (
         operation.output_transform_expr,
         operation.output_transform_type.as_ref(),
@@ -5577,7 +5558,6 @@ fn render_operation_function(
     } else {
         output.push_str("\treturn fut\n");
     }
-    output.push_str("}\n");
 }
 
 /// Renders an options struct for omittable parameters of a convenience wrapper.
@@ -6076,40 +6056,16 @@ fn wrapper_input_docs<'a>(
 /// Renders an exported convenience wrapper that unpacks required fields as
 /// positional arguments and optional fields into a required options struct.
 ///
-/// The request struct is always constructed across multiple lines. The function
-/// signature is also split across multiple lines when it has more than three
-/// parameters (counting `ctx`).
+/// Request structs are constructed across multiple lines. The function signature
+/// is also split across multiple lines when it has more than three parameters
+/// (counting `ctx`).
 ///
-/// ```go
-/// func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions, userId string, email string) workflow.Future {
-///     return updateEmail(ctx, UpdateEmailRequest{
-///         UserId: userId,
-///         Email:  email,
-///     })
-/// }
-/// ```
-///
-/// With more than three parameters:
-/// ```go
-/// func StartWorkflow(
-///     ctx workflow.Context,
-///     opts StartWorkflowOptions,
-///     workflow string,
-///     workflowId string,
-///     taskQueue string,
-/// ) workflow.Future {
-///     return startWorkflow(ctx, StartWorkflowRequest{
-///         Workflow:           workflow,
-///         Args:               opts.Args,
-///         WorkflowId:         workflowId,
-///         TaskQueue:          taskQueue,
-///         WorkflowStartDelay: opts.WorkflowStartDelay,
-///     })
-/// }
-/// ```
+/// Ordinary wrappers construct the request and execute it inline. System Nexus
+/// wrappers pass defaulted arguments to the SDK's typed interceptor chain or the
+/// generated terminal function.
 fn render_convenience_wrapper(
     output: &mut String,
-    _service: &RenderedService<'_>,
+    service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     params: &[RenderedUnpackedParam],
     package: &GoPackageContext,
@@ -6188,14 +6144,34 @@ fn render_convenience_wrapper(
     render_operation_wrapper_return_type(output, package);
     output.push_str(" {\n");
 
-    // Function body -- build the request as a multi-line struct literal,
-    // sourcing required fields from positional args and optional fields from
-    // opts.
-    render_public_input_locals(output, params);
+    if package.workflow_interceptors {
+        interceptor::render_defaults(output, params);
+        render_function_name_inlining(output, params, package);
+        interceptor::render_call(output, operation, package);
+        output.push_str("}\n");
+        return;
+    }
+    render_public_input_locals(output, params, true);
     render_function_name_inlining(output, params, package);
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
+    output.push_str("\trequest := ");
+    render_operation_request(output, operation, params, false);
+    output.push('\n');
+    render_operation_body(
+        output,
+        service,
+        operation,
+        package,
+        OperationExecution::NexusClient,
+    );
+    output.push_str("}\n");
+}
+
+fn render_operation_request(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    resolved_functions: bool,
+) {
     output.push_str(&operation.input_type);
     output.push_str("{\n");
     for param in params {
@@ -6206,6 +6182,7 @@ fn render_convenience_wrapper(
             .function
             .as_ref()
             .is_some_and(function_value_is_string)
+            || (resolved_functions && param.function.is_some())
         {
             output.push_str(&param.param_name);
         } else if has_explicit_args(param) {
@@ -6218,6 +6195,12 @@ fn render_convenience_wrapper(
             output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.is_some() {
             output.push_str(&param.param_name);
+        } else if resolved_functions && param.default_expression.is_some() {
+            if param.default_input.is_some() {
+                output.push('*');
+            }
+            output.push_str("opts.");
+            output.push_str(&param.field_name);
         } else if param_is_positional(param)
             || param.default_punning_zero.is_some()
             || param.flattened_fields.is_some()
@@ -6237,9 +6220,7 @@ fn render_convenience_wrapper(
         output.push_str(expression);
         output.push_str(",\n");
     }
-    output.push_str("\t})\n");
-
-    output.push_str("}\n");
+    output.push_str("\t}");
 }
 
 fn singular_args_public_param_name(param: &RenderedUnpackedParam) -> String {
@@ -6298,12 +6279,19 @@ fn wrapper_param_signature(
     }
 }
 
-fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
+fn render_public_input_locals(
+    output: &mut String,
+    params: &[RenderedUnpackedParam],
+    apply_defaults: bool,
+) {
     for param in params
         .iter()
         .filter(|param| param_belongs_in_options(param))
     {
         if let Some(default) = &param.default_expression {
+            if !apply_defaults {
+                continue;
+            }
             let source = format!("opts.{}", param.field_name);
             let supplied = if param.default_input.is_some() {
                 format!("*{source}")
@@ -6339,7 +6327,9 @@ fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedPar
             for flattened in fields {
                 let field = &flattened.field;
                 let name = go_unexported_name(&field.name);
-                if let Some(default) = &flattened.default_expression {
+                if let Some(default) = &flattened.default_expression
+                    && apply_defaults
+                {
                     let mut local = String::new();
                     render_go_default_local(
                         &mut local,
@@ -6402,18 +6392,11 @@ fn render_public_input_locals(output: &mut String, params: &[RenderedUnpackedPar
     }
 }
 
-/// Renders an exported forwarding wrapper for operations whose input type is
-/// an external/replacement type (no model to unpack). The wrapper simply
-/// forwards to the unexported operation function.
-///
-/// ```go
-/// func ExampleOperation(ctx workflow.Context, request SomeExternalType) (*SomeExternalType, error) {
-///     return exampleOperation(ctx, request)
-/// }
-/// ```
-fn render_forwarding_wrapper(
+/// Renders an exported wrapper for operations whose input type is an
+/// external/replacement type, keeping the request parameter intact.
+fn render_external_input_wrapper(
     output: &mut String,
-    _service: &RenderedService<'_>,
+    service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     package: &GoPackageContext,
 ) {
@@ -6424,7 +6407,11 @@ fn render_forwarding_wrapper(
     output.push_str(&exported_name);
     output.push_str("(ctx ");
     output.push_str(&package.workflow_context_type());
-    output.push_str(", _ ");
+    output.push_str(if package.workflow_interceptors {
+        ", opts "
+    } else {
+        ", _ "
+    });
     output.push_str(&exported_name);
     output.push_str("Options, request ");
     output.push_str(&operation.input_type);
@@ -6433,6 +6420,11 @@ fn render_forwarding_wrapper(
     render_operation_wrapper_return_type(output, package);
 
     output.push_str(" {\n");
+    if package.workflow_interceptors {
+        interceptor::render_call(output, operation, package);
+        output.push_str("}\n");
+        return;
+    }
     for (field_name, expression) in &operation.sourced_fields {
         output.push_str("\trequest.");
         output.push_str(field_name);
@@ -6440,9 +6432,13 @@ fn render_forwarding_wrapper(
         output.push_str(expression);
         output.push('\n');
     }
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, request)\n");
+    render_operation_body(
+        output,
+        service,
+        operation,
+        package,
+        OperationExecution::NexusClient,
+    );
     output.push_str("}\n");
 }
 

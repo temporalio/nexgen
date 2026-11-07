@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	common "go.temporal.io/api/common/v1"
+	enums "go.temporal.io/api/enums/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
@@ -114,6 +115,8 @@ func (s *WorkflowServiceIntegrationSuite) runWorkflow(caller any, result any) {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
+	capture := &captureNexusInputInterceptor{}
+	s.interceptors = []interceptor.WorkerInterceptor{capture}
 	var runID *string
 	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
 		var response ws.SignalWithStartWorkflowResponse
@@ -129,6 +132,16 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	var result string
 	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("minimal"), *runID).Get(s.ctx, &result))
 	s.Equal("signal-value", result)
+
+	capture.mu.Lock()
+	calls := append([]interceptor.ExecuteNexusOperationInput(nil), capture.calls...)
+	capture.mu.Unlock()
+	s.Require().Len(calls, 1)
+	request := calls[0].Input.(ws.SignalWithStartWorkflowRequest)
+	s.Equal("emptyArgsWorkflow", request.Workflow)
+	s.Empty(request.Args)
+	s.Equal(s.taskQueue, request.TaskQueue)
+	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, request.WorkflowIDReusePolicy)
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
@@ -230,15 +243,10 @@ func (c recordingDataConverter) ToPayloads(values ...any) (*common.Payloads, err
 	return c.DataConverter.ToPayloads(values...)
 }
 
-// The sample uses the SDK's generic Nexus hook to enter its generated typed
-// chain. SDK-internal generation instead attaches methods to SDK-owned receivers.
 type captureNexusInputInterceptor struct {
 	interceptor.WorkerInterceptorBase
-	mu            sync.Mutex
-	calls         []interceptor.ExecuteNexusOperationInput
-	dispatchCalls int
-	typedCalls    int
-	onTyped       func(workflow.Context, *ws.SignalWithStartWorkflowRequest)
+	mu    sync.Mutex
+	calls []interceptor.ExecuteNexusOperationInput
 }
 
 func (i *captureNexusInputInterceptor) InterceptWorkflow(ctx workflow.Context, next interceptor.WorkflowInboundInterceptor) interceptor.WorkflowInboundInterceptor {
@@ -271,75 +279,10 @@ func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, 
 	}
 	if !workflow.IsReplaying(ctx) {
 		i.capture.mu.Lock()
-		i.capture.dispatchCalls++
+		i.capture.calls = append(i.capture.calls, input)
 		i.capture.mu.Unlock()
 	}
-	terminal := &ws.WorkflowOutboundInterceptorTerminal{
-		SystemNexus_WorkflowOutboundRuntime: &workflowServiceRuntime{next: i.Next, capture: i.capture},
-	}
-	outbound := &captureWorkflowServiceOutbound{
-		WorkflowOutboundInterceptorBase: ws.WorkflowOutboundInterceptorBase{
-			Next: &ws.WorkflowOutboundInterceptorBase{Next: terminal},
-		},
-		capture: i.capture,
-	}
-	operation, ok := input.Operation.(string)
-	if !ok {
-		return terminal.FailedFuture(ctx, fmt.Errorf("sample runtime expects a string operation name, got %T", input.Operation))
-	}
-	return terminal.SystemNexus_ExecuteOperation(ctx, outbound, ws.ExecuteOperationInput{
-		Service:   input.Client.Service(),
-		Operation: operation,
-		Input:     input.Input,
-	})
-}
-
-type captureWorkflowServiceOutbound struct {
-	ws.WorkflowOutboundInterceptorBase
-	capture *captureNexusInputInterceptor
-}
-
-func (i *captureWorkflowServiceOutbound) SignalWithStartWorkflow(ctx workflow.Context, request *ws.SignalWithStartWorkflowRequest) workflow.NexusOperationFuture {
-	if !workflow.IsReplaying(ctx) {
-		i.capture.mu.Lock()
-		i.capture.typedCalls++
-		i.capture.mu.Unlock()
-	}
-	if i.capture.onTyped != nil {
-		i.capture.onTyped(ctx, request)
-	}
-	return i.WorkflowOutboundInterceptorBase.SignalWithStartWorkflow(ctx, request)
-}
-
-type workflowServiceRuntime struct {
-	next    interceptor.WorkflowOutboundInterceptor
-	capture *captureNexusInputInterceptor
-}
-
-func (r *workflowServiceRuntime) ExecuteNexusOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
-	if !workflow.IsReplaying(ctx) {
-		r.capture.mu.Lock()
-		r.capture.calls = append(r.capture.calls, input)
-		r.capture.mu.Unlock()
-	}
-	return r.next.ExecuteNexusOperation(ctx, input)
-}
-
-type failedWorkflowServiceFuture struct {
-	workflow.Future
-	execution workflow.Future
-}
-
-func (f *failedWorkflowServiceFuture) GetNexusOperationExecution() workflow.Future {
-	return f.execution
-}
-
-func (*workflowServiceRuntime) FailedFuture(ctx workflow.Context, err error) workflow.NexusOperationFuture {
-	result, resultSettable := workflow.NewFuture(ctx)
-	execution, executionSettable := workflow.NewFuture(ctx)
-	resultSettable.SetError(err)
-	executionSettable.SetError(err)
-	return &failedWorkflowServiceFuture{Future: result, execution: execution}
+	return i.Next.ExecuteNexusOperation(ctx, input)
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestFlattenedMetadataPresence() {

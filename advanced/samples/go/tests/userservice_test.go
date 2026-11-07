@@ -38,6 +38,9 @@ func (s *UserServiceIntegrationSuite) SetupTest() {
 	updateEmail := nexus.NewSyncOperation("UpdateEmail",
 		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (userservice.User, error) {
 			s.calls = append(s.calls, nexusCall{"UpdateEmail", input})
+			if stringField(input, "Email") == "invalid" {
+				return userservice.User{}, nexus.NewOperationFailedError("email rejected")
+			}
 			return *userservice.NewUser(stringField(input, "UserID"), stringField(input, "Email")), nil
 		})
 
@@ -91,4 +94,17 @@ func (s *UserServiceIntegrationSuite) TestOperationFailure() {
 	s.Error(s.env.GetWorkflowError())
 	s.Require().Len(s.calls, 1)
 	s.Equal("GetUser", s.calls[0].Operation)
+}
+
+func (s *UserServiceIntegrationSuite) TestResourceMethodFailure() {
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		user := userservice.NewUser("user-123", "alice@example.com")
+		var result userservice.User
+		return user.UpdateEmail(ctx, "invalid").Get(ctx, &result)
+	})
+
+	s.ErrorContains(s.env.GetWorkflowError(), "email rejected")
+	s.Require().Len(s.calls, 1)
+	s.Equal("UpdateEmail", s.calls[0].Operation)
+	s.Equal("user-123", stringField(s.calls[0].Input, "UserID"))
 }

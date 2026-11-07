@@ -51,14 +51,6 @@ func (m result[T, E]) GetError() E {
 	return m.Error
 }
 
-// --- Operations (internal) ---
-
-func complete[ContextT any](ctx workflow.Context, request genericRequest[ContextT]) workflow.Future {
-	c := workflow.NewNexusClient("generic-models", "GenericModelService")
-	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
 // --- Operations (public API) ---
 
 type OperationCompletionResult[OutputT any] interface {
@@ -247,11 +239,14 @@ func Complete[ContextT any](
 	byName map[string]ContextT,
 	nested Inner[ContextT],
 ) workflow.Future {
-	return complete(ctx, genericRequest[ContextT]{
+	request := genericRequest[ContextT]{
 		Context:  context,
 		Contexts: contexts,
 		ByName:   byName,
 		Nested:   nested,
 		Probe:    opts.Probe,
-	})
+	}
+	c := workflow.NewNexusClient("generic-models", "GenericModelService")
+	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
+	return fut
 }

@@ -426,16 +426,6 @@ pub(super) fn render(
             record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
         );
     }
-    if package.workflow_interceptors
-        && !package.is_self_import("go.temporal.io/sdk/internal")
-        && services
-            .iter()
-            .any(|service| !service.operations.is_empty())
-    {
-        for name in interceptor::STANDALONE_TYPES {
-            plan.add_alias(&mut scope, name, Vec::new(), None);
-        }
-    }
     for service in services {
         for resource in &service.resources {
             plan.add_alias(
