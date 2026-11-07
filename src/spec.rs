@@ -853,6 +853,8 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub field_type: TypeSpec<F>,
     pub required: bool,
     pub origin: F::Origin,
+    /// Set by `@nexus.flatten-in-api` on the field.
+    pub flatten_in_api: bool,
     pub function: Option<FunctionFieldSpec<F>>,
     pub data: F::FieldData,
 }
@@ -1252,6 +1254,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             field_type: self.field_type.map_names_with(map),
             required: self.required,
             origin: map.map_origin(self.origin),
+            flatten_in_api: self.flatten_in_api,
             function: self.function.map(|function| function.map_names_with(map)),
             data,
         }
@@ -1267,6 +1270,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             && self.flattened_annotation.is_none()
             && !self.required
             && self.origin.is_none()
+            && !self.flatten_in_api
             && self.function.is_none()
     }
 }

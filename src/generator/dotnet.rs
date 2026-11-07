@@ -3618,7 +3618,7 @@ fn flattened_nested_model<'a>(
         return None;
     };
     let nested_model = api_plan.record(&record.full_name)?;
-    nested_model.flatten_in_api.then_some(nested_model)
+    (nested_model.flatten_in_api || field.flatten_in_api).then_some(nested_model)
 }
 
 fn render_operation_options_constructor(

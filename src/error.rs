@@ -99,6 +99,9 @@ pub enum Error {
         conflicting_declaration: String,
     },
 
+    #[error("can't flatten a request field of operation `{operation}`: {reason}")]
+    UnsupportedFlatten { operation: String, reason: String },
+
     #[error(
         ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
     )]

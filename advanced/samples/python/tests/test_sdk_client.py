@@ -39,6 +39,7 @@ from wit.stream_service.both.models import (
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Execution,
     Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
@@ -47,6 +48,7 @@ from wit.stream_service.both.models import (
     StreamReadStart,
     StreamRecord,
     StreamRef,
+    _CreateStreamRequestTransferTypeConverter,
 )
 
 
@@ -185,7 +187,7 @@ async def test_sdk_factory_needs_no_adapter() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=5),
         },
     )
-    stream = await client.create_stream(stream_ref=ref, body_type=str)
+    stream = await client.create_stream(id=ref.id, body_type=str)
     assert stream.ref == ref
     stored = client.get_stream(ref=ref, body_type=str)
     assert (await stored.describe()).last_offset == 5
@@ -200,29 +202,29 @@ def test_factory_types_require_an_explicit_runtime_type() -> None:
         _ = assert_type(client.get_stream(ref=ref), Stream[object])
         _ = assert_type(client.get_stream(ref=ref, body_type=None), Stream[object])
         _ = assert_type(client.get_stream(ref=ref, body_type=Turn), Stream[Turn])
-        _ = assert_type(await client.create_stream(stream_ref=ref), Stream[object])
+        _ = assert_type(await client.create_stream(id=ref.id), Stream[object])
         _ = assert_type(
-            await client.create_stream(stream_ref=ref, body_type=None),
+            await client.create_stream(id=ref.id, body_type=None),
             Stream[object],
         )
         _ = assert_type(
-            await client.create_stream(stream_ref=ref, body_type=Turn), Stream[Turn]
+            await client.create_stream(id=ref.id, body_type=Turn), Stream[Turn]
         )
         stored: Stream[Turn] = client.get_stream(ref=ref)  # pyright: ignore[reportAssignmentType]
-        created: Stream[Turn] = await client.create_stream(stream_ref=ref)  # pyright: ignore[reportAssignmentType]
+        created: Stream[Turn] = await client.create_stream(id=ref.id)  # pyright: ignore[reportAssignmentType]
         _ = stored, created
 
         _ = assert_type(
-            await workflow_package.create_stream(stream_ref=ref),
+            await workflow_package.create_stream(id=ref.id),
             workflow_stream_module.Stream[object],
         )
         _ = assert_type(
-            await workflow_package.create_stream(stream_ref=ref, body_type=Turn),
+            await workflow_package.create_stream(id=ref.id, body_type=Turn),
             workflow_stream_module.Stream[Turn],
         )
         workflow: workflow_stream_module.Stream[
             Turn
-        ] = await workflow_package.create_stream(stream_ref=ref)  # pyright: ignore[reportAssignmentType]
+        ] = await workflow_package.create_stream(id=ref.id)  # pyright: ignore[reportAssignmentType]
         _ = workflow
 
     # basedpyright checks the assertions and requires each ignored diagnostic to exist.
@@ -249,7 +251,7 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
         },
     )
     if construction == "create":
-        stream = await client.create_stream(stream_ref=ref)
+        stream = await client.create_stream(id=ref.id)
     else:
         stream = client.get_stream(ref=ref)
     _ = assert_type(stream, Stream[object])
@@ -275,7 +277,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, name)
         assert not hasattr(client, f"_stream_service_{name}")
 
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"), body_type=str)
+    stream = await client.create_stream(id="s1", body_type=str)
     response = await stream.publish(records=[])
     await stream.close()
 
@@ -315,6 +317,36 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         ref=stream.ref, producer=Producer(id="client:sample")
     )
     assert close.result_type is CloseStreamResponse
+
+
+@pytest.mark.parametrize(
+    ("fields", "ref"),
+    [
+        ({}, StreamRef(id="s1")),
+        (
+            {"backend": "redis", "owner": Execution(business_id="wf-1", run_id="r1")},
+            StreamRef(
+                id="s1",
+                backend="redis",
+                owner=Execution(business_id="wf-1", run_id="r1"),
+            ),
+        ),
+    ],
+)
+async def test_a_create_takes_the_fields_of_the_ref(
+    fields: dict[str, typing.Any], ref: StreamRef
+) -> None:
+    client, answers = connect(Client, {"CreateStream": CreateStreamResult(ref=ref)})
+
+    _ = await client.create_stream(id="s1", **fields)
+
+    request = answers.started[0].arg
+    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
+    wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
+    assert wire.stream_ref.id == "s1"
+    assert wire.stream_ref.backend == fields.get("backend", "")
+    assert wire.stream_ref.HasField("owner") == ("owner" in fields)
+    assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
@@ -360,7 +392,7 @@ async def test_client_only_calls_need_no_workflow_context(
             "DescribeStream": client_models.DescribeStreamResponse(last_offset=8),
         },
     )
-    stream = await client.create_stream(stream_ref=ref, body_type=str)
+    stream = await client.create_stream(id=ref.id, body_type=str)
     response = await stream.describe()
     assert response.last_offset == 8
     assert len(client.created_clients) == 1
@@ -380,7 +412,7 @@ async def test_each_call_gets_a_new_operation_id() -> None:
             "DescribeStream": DescribeStreamResponse(last_offset=7),
         },
     )
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"), body_type=str)
+    stream = await client.create_stream(id="s1", body_type=str)
     _ = await stream.describe()
     _ = await stream.describe()
     ids = [started.id for started in answers.started]
@@ -473,7 +505,7 @@ async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> No
         Client,
         {"CreateStream": CreateStreamResult(ref=ref), "ReadRecords": list(pages)},
     )
-    stream = await client.create_stream(stream_ref=StreamRef(id="s1"), body_type=str)
+    stream = await client.create_stream(id="s1", body_type=str)
 
     read = [
         page
@@ -677,9 +709,7 @@ async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
     )
     timeout = datetime.timedelta(seconds=3)
 
-    stream = await client.create_stream(
-        stream_ref=StreamRef(id="s1"), body_type=str, rpc_timeout=timeout
-    )
+    stream = await client.create_stream(id="s1", body_type=str, rpc_timeout=timeout)
     _ = await stream.describe(rpc_metadata={"authorization": "token"})
 
     assert [
@@ -709,7 +739,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     )
 
     if construction == "create":
-        stream = await client.create_stream(stream_ref=ref, body_type=Turn)
+        stream = await client.create_stream(id=ref.id, body_type=Turn)
     elif construction == "get":
         stream = client.get_stream(ref=ref, body_type=Turn)
     else:

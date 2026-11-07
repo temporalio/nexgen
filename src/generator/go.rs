@@ -962,6 +962,18 @@ fn generate_in_tree(
             resource: resource.name.clone(),
         });
     }
+    if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
+        record
+            .fields
+            .iter()
+            .find(|(_, field)| field.flatten_in_api)
+            .map(|(field_name, _)| (record, field_name))
+    }) {
+        return Err(Error::UnsupportedGoType {
+            context: format!("record `{}` field `{field_name}`", record.full_name),
+            reason: "Go doesn't flatten the record of one field".to_string(),
+        });
+    }
     ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
 }
 
