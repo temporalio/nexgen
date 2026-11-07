@@ -1141,7 +1141,7 @@ pub(in crate::generator) fn render_operation_body_proto(
     render_operation_execution(output, service, operation, input_arg, package, execution);
 
     if let (Some(transform_expr), Some(transform_type)) = (
-        operation.output_transform_expr,
+        operation.output_transform_expr.as_deref(),
         operation.output_transform_type.as_ref(),
     ) {
         render_operation_future_adapter(output, package, transform_type, false, |output| {

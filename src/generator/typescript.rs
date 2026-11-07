@@ -1839,6 +1839,15 @@ pub(in crate::generator) fn required_from_wire_expr(
 ) -> String {
     let wire_value_expr = if field_has_presence(field) {
         wire_value_expr.to_string()
+    } else if matches!(&field.field_type, PlannedType::Bool) {
+        format!("{wire_value_expr} ?? false")
+    } else if matches!(&field.field_type, PlannedType::Int(_) | PlannedType::Float) {
+        let zero = match field.field_type {
+            PlannedType::Int(IntSpec::I64) => "Long.ZERO",
+            PlannedType::Int(IntSpec::U64) => "Long.UZERO",
+            _ => "0",
+        };
+        format!("{wire_value_expr} ?? {zero}")
     } else if matches!(&field.field_type, PlannedType::String) {
         format!("{wire_value_expr} === '' ? undefined : {wire_value_expr}")
     } else if matches!(&field.field_type, PlannedType::Bytes) {

@@ -351,13 +351,6 @@ pub enum Error {
         reason: String,
     },
 
-    #[error("type override for `{message}.{field}` cannot be marked required: {reason}")]
-    UnsupportedRequiredTypeField {
-        message: String,
-        field: String,
-        reason: String,
-    },
-
     #[error("type override for `{message}.{field}` cannot use field `source`: {reason}")]
     UnsupportedSourcedTypeField {
         message: String,

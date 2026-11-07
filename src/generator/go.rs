@@ -2068,7 +2068,8 @@ impl<'a> ApiPlanner<'a> {
             raw_output_type,
             serialization_context_expr,
             sourced_fields,
-            output_transform_expr: go_output_transform.map(|(_, expr)| expr),
+            output_transform_expr: go_output_transform
+                .map(|(_, expr)| self.package.alias_workflow_expr(expr)),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
             unpacked_input,
@@ -2755,7 +2756,7 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Go expression for an `@nexus.output-transform`, if one is configured.
     /// The expression is rendered with `request` and raw `result` in scope and
     /// must evaluate to `(output_transform_type, error)`.
-    pub(in crate::generator) output_transform_expr: Option<&'a str>,
+    pub(in crate::generator) output_transform_expr: Option<String>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
     /// The Go name and source expression of each sourced field of the request for the Workflow
@@ -5628,7 +5629,7 @@ fn render_operation_body(
     }
     render_operation_execution(output, service, operation, "request", package, execution);
     if let (Some(transform_expr), Some(transform_type)) = (
-        operation.output_transform_expr,
+        operation.output_transform_expr.as_deref(),
         operation.output_transform_type.as_ref(),
     ) {
         render_operation_future_adapter(output, package, transform_type, false, |output| {
