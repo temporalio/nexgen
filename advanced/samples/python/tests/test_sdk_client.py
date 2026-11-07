@@ -195,6 +195,72 @@ async def test_sdk_factory_needs_no_adapter() -> None:
     ]
 
 
+def test_factory_types_require_an_explicit_runtime_type() -> None:
+    async def check(client: Client, ref: StreamRef) -> None:
+        _ = assert_type(client.get_stream(ref=ref), Stream[object])
+        _ = assert_type(client.get_stream(ref=ref, body_type=None), Stream[object])
+        _ = assert_type(client.get_stream(ref=ref, body_type=Turn), Stream[Turn])
+        _ = assert_type(await client.create_stream(stream_ref=ref), Stream[object])
+        _ = assert_type(
+            await client.create_stream(stream_ref=ref, body_type=None),
+            Stream[object],
+        )
+        _ = assert_type(
+            await client.create_stream(stream_ref=ref, body_type=Turn), Stream[Turn]
+        )
+        stored: Stream[Turn] = client.get_stream(ref=ref)  # pyright: ignore[reportAssignmentType]
+        created: Stream[Turn] = await client.create_stream(stream_ref=ref)  # pyright: ignore[reportAssignmentType]
+        _ = stored, created
+
+        _ = assert_type(
+            await workflow_package.create_stream(stream_ref=ref),
+            workflow_stream_module.Stream[object],
+        )
+        _ = assert_type(
+            await workflow_package.create_stream(stream_ref=ref, body_type=Turn),
+            workflow_stream_module.Stream[Turn],
+        )
+        workflow: workflow_stream_module.Stream[
+            Turn
+        ] = await workflow_package.create_stream(stream_ref=ref)  # pyright: ignore[reportAssignmentType]
+        _ = workflow
+
+    # basedpyright checks the assertions and requires each ignored diagnostic to exist.
+    _ = check
+
+
+@pytest.mark.parametrize("construction", ["create", "get"])
+async def test_an_untyped_factory_retains_untyped_decoding(construction: str) -> None:
+    ref = StreamRef(id="untyped-stream")
+    client, _ = connect(
+        Client,
+        {
+            "CreateStream": CreateStreamResult(ref=ref),
+            "ReadRecords": SYSTEM_CONVERTER.to_payload(
+                ReadRecordsResponse[Turn](
+                    records=[
+                        StreamRecord(
+                            item=StreamItemData(StreamData(body=Turn(role="model"))),
+                            offset=1,
+                        )
+                    ]
+                )
+            ),
+        },
+    )
+    if construction == "create":
+        stream = await client.create_stream(stream_ref=ref)
+    else:
+        stream = client.get_stream(ref=ref)
+    _ = assert_type(stream, Stream[object])
+
+    page = await stream.read()
+
+    item = page.records[0].item
+    assert isinstance(item, StreamItemData)
+    assert item.value.body == {"role": "model"}
+
+
 async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     client, answers = connect(
         Client,

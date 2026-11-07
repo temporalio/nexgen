@@ -42,6 +42,26 @@ async def _create_stream(
     )
 
 
+@typing.overload
+async def create_stream(
+    *,
+    stream_ref: StreamRef,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
+
+
+@typing.overload
+async def create_stream(
+    *,
+    stream_ref: StreamRef,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: None = None,
+) -> Stream[object]: ...
+
+
 async def create_stream(
     *,
     stream_ref: StreamRef,

@@ -1225,41 +1225,25 @@ impl<'a> ApiPlanner<'a> {
         service: &RenderedService<'_>,
         resource: &PlannedResource,
     ) {
-        let receiver = resource_client_identifier(resource, "self");
-        output.push_str("    def ");
-        output.push_str(&client_resource_factory_name(resource));
-        output.push_str("(\n        ");
-        output.push_str(&receiver);
-        output.push_str(",\n");
         let type_variables = resource_type_variable_names(resource);
-        if !resource.fields.is_empty() {
-            output.push_str("        *,\n");
+        for supplied in runtime_type_overload_cases(&type_variables) {
+            output.push_str("    @typing.overload\n");
+            self.render_client_resource_factory_signature(
+                output,
+                resource,
+                &type_variables,
+                RuntimeTypeSignature::Overload(&supplied),
+            );
+            output.push_str(" ...\n\n");
         }
-        for field in &resource.fields {
-            output.push_str(&format!(
-                "        {}: {}{},\n",
-                python_field_name(&field.name),
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref()
-                ),
-                if field.optional { " = None" } else { "" }
-            ));
-        }
-        render_runtime_type_keyword_parameters(
+        self.render_client_resource_factory_signature(
             output,
-            "        ",
+            resource,
             &type_variables,
-            !resource.fields.is_empty(),
-            "None",
+            RuntimeTypeSignature::Implementation,
         );
-        output.push_str("    ) -> ");
-        output.push_str(&python_type_annotation_with_arguments(
-            &resource.type_name,
-            &type_variables,
-        ));
-        output.push_str(":\n");
+        output.push('\n');
+        let receiver = resource_client_identifier(resource, "self");
         render_python_docstring(
             output,
             "        ",
@@ -1291,14 +1275,53 @@ impl<'a> ApiPlanner<'a> {
                 .expect("the client target refuses a service with no endpoint"),
         ));
         output.push_str(",\n            ),\n");
-        for name in resource
-            .fields
-            .iter()
-            .map(|field| python_field_name(&field.name))
-        {
+        for field in &resource.fields {
+            let name = python_field_name(&field.name);
             output.push_str(&format!("            {name}={name},\n"));
         }
         output.push_str("        )\n");
+    }
+
+    fn render_client_resource_factory_signature(
+        &self,
+        output: &mut String,
+        resource: &PlannedResource,
+        type_variables: &[String],
+        signature: RuntimeTypeSignature<'_>,
+    ) {
+        let receiver = resource_client_identifier(resource, "self");
+        output.push_str("    def ");
+        output.push_str(&client_resource_factory_name(resource));
+        output.push_str("(\n        ");
+        output.push_str(&receiver);
+        output.push_str(",\n");
+        if !resource.fields.is_empty() {
+            output.push_str("        *,\n");
+        }
+        for field in &resource.fields {
+            output.push_str(&format!(
+                "        {}: {}{},\n",
+                python_field_name(&field.name),
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref()
+                ),
+                if field.optional { " = None" } else { "" }
+            ));
+        }
+        signature.render_parameters(
+            output,
+            "        ",
+            type_variables,
+            !resource.fields.is_empty(),
+        );
+        output.push_str("    ) -> ");
+        output.push_str(&signature.annotation(
+            &python_type_annotation_with_arguments(&resource.type_name, type_variables),
+            type_variables,
+        ));
+        output.push(':');
     }
 
     fn render_resource_module_file(
@@ -7047,6 +7070,76 @@ fn render_resource_type_specialization(output: &mut String, arguments: &[String]
     }
 }
 
+/// An omitted runtime type must not be inferred from the expected return type.
+/// Each overload fixes omitted type arguments to object; the implementation decodes with Any.
+#[derive(Clone, Copy)]
+enum RuntimeTypeSignature<'a> {
+    Overload(&'a [bool]),
+    Implementation,
+}
+
+impl RuntimeTypeSignature<'_> {
+    fn annotation(self, annotation: &str, type_variables: &[String]) -> String {
+        type_variables.iter().enumerate().fold(
+            annotation.to_string(),
+            |annotation, (index, name)| {
+                let replacement = match self {
+                    Self::Overload(supplied) if supplied[index] => return annotation,
+                    Self::Overload(_) => "object",
+                    Self::Implementation => return annotation,
+                };
+                replace_python_identifier(&annotation, name, replacement)
+            },
+        )
+    }
+
+    fn render_parameters(
+        self,
+        output: &mut String,
+        indent: &str,
+        type_variables: &[String],
+        keyword_only: bool,
+    ) -> bool {
+        if type_variables.is_empty() {
+            return keyword_only;
+        }
+        if !keyword_only {
+            output.push_str(&format!("{indent}*,\n"));
+        }
+        for (index, name) in type_variables.iter().enumerate() {
+            let argument = python_runtime_type_argument_name(name);
+            let annotation = match self {
+                Self::Overload(supplied) if supplied[index] => format!("type[{name}]"),
+                Self::Overload(_) => "None = None".to_string(),
+                Self::Implementation => format!("type[{name}] | None = None"),
+            };
+            output.push_str(&format!("{indent}{argument}: {annotation},\n"));
+        }
+        true
+    }
+}
+
+/// Preserve independently supplied types on resources with multiple type parameters.
+fn runtime_type_overload_cases(type_variables: &[String]) -> Vec<Vec<bool>> {
+    if type_variables.is_empty() {
+        return Vec::new();
+    }
+    let mut cases = vec![Vec::new()];
+    for _ in type_variables {
+        cases = cases
+            .into_iter()
+            .flat_map(|case| {
+                [true, false].map(|supplied| {
+                    let mut case = case.clone();
+                    case.push(supplied);
+                    case
+                })
+            })
+            .collect();
+    }
+    cases
+}
+
 /// A public call takes the runtime types as optional keywords, one line each at `indent`, since
 /// Python can't specialize a function. `keyword_only` says whether a `*` or `*args` marker comes
 /// before them. Returns whether a marker comes before the parameters that follow.
@@ -9734,6 +9827,57 @@ fn render_unpacked_operation_function(
         return;
     }
 
+    for supplied in runtime_type_overload_cases(&operation.runtime_type_arguments) {
+        start_line(output, target, "@typing.overload\n");
+        render_unpacked_operation_signature(
+            output,
+            target,
+            service,
+            operation,
+            unpacked_input,
+            RuntimeTypeSignature::Overload(&supplied),
+        );
+        output.push_str(" ...\n\n");
+    }
+    render_unpacked_operation_signature(
+        output,
+        target,
+        service,
+        operation,
+        unpacked_input,
+        RuntimeTypeSignature::Implementation,
+    );
+    output.push('\n');
+    let body_indent = target_body_indent(target);
+    render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
+    render_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
+    for flattened_message in &unpacked_input.flattened_messages {
+        render_flattened_message_setup(output, body_indent, flattened_message);
+    }
+    start_line(output, target, "    request = ");
+    output.push_str(&unpacked_input.model_name);
+    output.push_str("(\n");
+    for field in &unpacked_input.request_fields {
+        start_line(output, target, "        ");
+        output.push_str(&field.attr_name);
+        output.push('=');
+        output.push_str(&unpacked_request_field_value_expr(field));
+        output.push_str(",\n");
+    }
+    start_line(output, target, "    )\n");
+    start_line(output, target, "    return await ");
+    output.push_str(&operation_call_target(target, service, operation));
+    render_request_call_arguments(output, target, &operation.runtime_type_args("", false));
+}
+
+fn render_unpacked_operation_signature(
+    output: &mut String,
+    target: GenerationTarget,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    unpacked_input: &RenderedUnpackedInput,
+    signature: RuntimeTypeSignature<'_>,
+) {
     let body_indent = target_body_indent(target);
     if operation.deprecated {
         start_line(
@@ -9756,36 +9900,22 @@ fn render_unpacked_operation_function(
         }
         output.push_str(",\n");
     }
-    let keyword_only = render_runtime_type_keyword_parameters(
+    let keyword_only = signature.render_parameters(
         output,
         &format!("{}    ", target_indent(target)),
         &operation.runtime_type_arguments,
         !unpacked_input.parameters.is_empty(),
-        "None",
     );
     if target == GenerationTarget::Client {
         render_rpc_option_parameters(output, "        ", keyword_only);
     }
-    render_unpacked_return_annotation(output, target, service, operation);
-    render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
-    render_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
-    for flattened_message in &unpacked_input.flattened_messages {
-        render_flattened_message_setup(output, body_indent, flattened_message);
-    }
-    start_line(output, target, "    request = ");
-    output.push_str(&unpacked_input.model_name);
-    output.push_str("(\n");
-    for field in &unpacked_input.request_fields {
-        start_line(output, target, "        ");
-        output.push_str(&field.attr_name);
-        output.push('=');
-        output.push_str(&unpacked_request_field_value_expr(field));
-        output.push_str(",\n");
-    }
-    start_line(output, target, "    )\n");
-    start_line(output, target, "    return await ");
-    output.push_str(&operation_call_target(target, service, operation));
-    render_request_call_arguments(output, target, &operation.runtime_type_args("", false));
+    let mut annotation = String::new();
+    render_unpacked_return_annotation(&mut annotation, target, service, operation);
+    output.push_str(
+        signature
+            .annotation(&annotation, &operation.runtime_type_arguments)
+            .trim_end_matches('\n'),
+    );
 }
 
 /// The return annotation of an unpacked operation. A Workflow function returns the operation
@@ -10348,6 +10478,24 @@ fn is_python_keyword(name: &str) -> bool {
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
+
+    #[test]
+    fn runtime_type_overloads_cover_each_independently_optional_argument() {
+        assert!(super::runtime_type_overload_cases(&[]).is_empty());
+        assert_eq!(
+            super::runtime_type_overload_cases(&["BodyT".to_string()]),
+            [vec![true], vec![false]]
+        );
+        assert_eq!(
+            super::runtime_type_overload_cases(&["KeyT".to_string(), "BodyT".to_string()]),
+            [
+                vec![true, true],
+                vec![true, false],
+                vec![false, true],
+                vec![false, false],
+            ]
+        );
+    }
 
     #[test]
     fn qualifies_source_calls_without_changing_arguments() {

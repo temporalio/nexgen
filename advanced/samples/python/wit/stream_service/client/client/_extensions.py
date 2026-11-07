@@ -43,6 +43,24 @@ class StreamServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
+    @typing.overload
+    def get_stream(
+        self,
+        *,
+        ref: StreamRef,
+        created: bool | None = None,
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    def get_stream(
+        self,
+        *,
+        ref: StreamRef,
+        created: bool | None = None,
+        body_type: None = None,
+    ) -> Stream[object]: ...
+
     def get_stream(
         self,
         *,
@@ -91,6 +109,30 @@ class StreamServiceClientExtension(abc.ABC):
             created=result.created or None,
         )
         return resource
+
+    @typing.overload
+    async def create_stream(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: type[BodyT],
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    async def create_stream(
+        self,
+        *,
+        stream_ref: StreamRef,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[object]: ...
 
     async def create_stream(
         self,

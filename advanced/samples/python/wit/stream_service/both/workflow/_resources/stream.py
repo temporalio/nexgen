@@ -188,6 +188,36 @@ async def _read_records(
     )
 
 
+@typing.overload
+async def read_records(
+    *,
+    ref: StreamRef,
+    from_offset: int | None = None,
+    start: StreamReadStart | None = None,
+    max_records: int | None = None,
+    wait: datetime.timedelta | None = None,
+    create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
+    max_bytes: int | None = None,
+    body_type: type[BodyT],
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]: ...
+
+
+@typing.overload
+async def read_records(
+    *,
+    ref: StreamRef,
+    from_offset: int | None = None,
+    start: StreamReadStart | None = None,
+    max_records: int | None = None,
+    wait: datetime.timedelta | None = None,
+    create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
+    max_bytes: int | None = None,
+    body_type: None = None,
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[object],]: ...
+
+
 async def read_records(
     *,
     ref: StreamRef,
