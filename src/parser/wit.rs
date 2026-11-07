@@ -2863,8 +2863,6 @@ fn build_resource(
     Ok(ResourceSpec {
         name: resource_name,
         doc,
-        // `ResourceTypeParameterPass` infers them from what the resource uses.
-        type_parameters: Vec::new(),
         fields,
         methods,
         data: (),

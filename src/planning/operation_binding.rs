@@ -1,5 +1,5 @@
-//! `OperationBindingPass` attaches resolved operation/resource relationships
-//! to their owning nodes.
+//! `OperationBindingPass` attaches resolved return relationships to operations
+//! and preserves the resource data populated by resource resolution.
 //!
 //! It consumes resource-bound IR and produces `OperationBoundFamily`. This is
 //! deliberately semantic only: type materialization belongs to a later pass.
@@ -16,6 +16,14 @@ pub(crate) struct OperationBoundOperation {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct OperationBoundResource {
     pub(crate) resolved: Option<ResolvedResourceSpec>,
+}
+
+impl OperationBoundResource {
+    pub(crate) fn type_parameters(&self) -> &[crate::spec::TypeParameterSpec] {
+        self.resolved
+            .as_ref()
+            .map_or(&[], |resource| &resource.type_parameters)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,14 +63,14 @@ impl CompilerPass<ResourceBoundFamily, OperationBoundFamily> for OperationBindin
         &mut self,
         leaf: ApiSpecLeaf<ResourceBoundFamily>,
     ) -> Result<ApiSpecLeaf<OperationBoundFamily>> {
-        let bindings = leaf.spec.data.bindings.clone();
+        let bindings = leaf.spec.data.operation_returns.clone();
         let mut spec = leaf.spec.map_names(OperationBindingMapper);
 
         for service in &mut spec.services {
             let resolved = bindings.get(&service.name);
             for operation in &mut service.operations {
                 let output_resource_return = resolved
-                    .and_then(|resources| resources.operation_returns.get(&operation.name))
+                    .and_then(|returns| returns.get(&operation.name))
                     .cloned();
                 operation.data = OperationBoundOperation {
                     direct_return: operation.output_transform().is_some()
@@ -72,17 +80,6 @@ impl CompilerPass<ResourceBoundFamily, OperationBoundFamily> for OperationBindin
                             Some(TypeSpec::Resource(resource)) if resource.wire_type.is_none()
                         ),
                     output_resource_return,
-                };
-            }
-            for resource in &mut service.resources {
-                resource.data = OperationBoundResource {
-                    resolved: resolved.and_then(|resources| {
-                        resources
-                            .resources
-                            .iter()
-                            .find(|candidate| candidate.name == resource.name)
-                            .cloned()
-                    }),
                 };
             }
         }
@@ -132,8 +129,14 @@ impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBi
     }
     fn map_service_data(&mut self, _: &str, _: ()) {}
     fn map_record_data(&mut self, _: &str, _: ()) {}
-    fn map_resource_data(&mut self, _: &str, _: ()) -> OperationBoundResource {
-        OperationBoundResource { resolved: None }
+    fn map_resource_data(
+        &mut self,
+        _: &str,
+        resolved: ResolvedResourceSpec,
+    ) -> OperationBoundResource {
+        OperationBoundResource {
+            resolved: Some(resolved),
+        }
     }
     fn map_operation_data(&mut self, _: &str, _: ()) -> OperationBoundOperation {
         OperationBoundOperation {

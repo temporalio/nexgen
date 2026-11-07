@@ -887,7 +887,7 @@ impl<'a> TypePlanningContext<'a> {
                 type_name: resource.as_str().to_upper_camel_case(),
                 type_parameters: service
                     .resource(resource.as_str())
-                    .map(|resource| resource.type_parameters.clone())
+                    .map(|resource| resource.data.type_parameters().to_vec())
                     .unwrap_or_default(),
             },
             _ => PlannedResourceMethodResultKind::Value(
@@ -1333,11 +1333,11 @@ fn operation_runtime_type_parameters(
     if let Some(resource_return) = &operation.data.output_resource_return {
         return service
             .resource(&resource_return.resource_name)
-            .map(|resource| resource.type_parameters.clone())
+            .map(|resource| resource.data.type_parameters().to_vec())
             .unwrap_or_default();
     }
     let bound = service.resources.iter().any(|resource| {
-        !resource.type_parameters.is_empty()
+        !resource.data.type_parameters().is_empty()
             && resource.data.resolved.as_ref().is_some_and(|resolved| {
                 resolved.methods.iter().any(|method| {
                     matches!(

@@ -33,7 +33,7 @@ pub(crate) fn generate(
             .services
             .iter()
             .flat_map(|service| &service.resources)
-            .find(|resource| !resource.type_parameters.is_empty())
+            .find(|resource| !resource.data.type_parameters.is_empty())
         {
             return Err(Error::UnsupportedGenericResource {
                 language: crate::language::Language::Java,

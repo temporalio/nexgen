@@ -127,19 +127,32 @@ Selects the target-language values from authored language maps.
 
 ### SelectedValidationPass
 
-Validates the selected generic surface after selection.
+Validates the selected generic model and operation surface after selection.
+Checks that depend on inferred resource type parameters belong to resource
+resolution.
 
 ### ResourceResolutionPass
 
 Resolves resource-method and resource-return facts from the API spec and
-descriptors. Operations must return resources owned by their service, including
-those held in result records. Return bindings determine shared wire models
-regardless of API targets; resource methods are bound only when an API target is
+descriptors. After resolving method bindings, it infers each resource's type
+parameters, including propagation through returned resources to a fixed point.
+It validates generic-resource restrictions within this pass, before resolving
+return-field bindings. Inferred parameters first appear in
+`ResourceBoundFamily::ResourceData`, alongside the resolved resource facts;
+authored and selected `ResourceSpec` nodes have no type-parameter field.
+Inference also runs for models-only generation.
+
+Operations must return resources owned by their service, including those held in
+result records. Return bindings determine shared wire models regardless of API
+targets. Method relationships are resolved for inference even in models-only
+generation; callable method metadata is retained only when an API target is
 selected.
 
 ### OperationBindingPass
 
-Attaches resolved resource facts to their owning operations and resources.
+Attaches resolved return facts to their owning operations and preserves each
+resource's resolved data, including its inferred type parameters, through
+operation lowering.
 
 ### OperationLoweringPass
 
