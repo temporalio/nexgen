@@ -180,6 +180,7 @@ pub(super) fn render(
             .expression,
     );
     let mut output = String::from("\n// --- Workflow outbound interceptors ---\n\n");
+    package.render_declaration_doc(&mut output, "", &interface, None);
     output.push_str(&format!("type {interface} interface {{\n"));
     for (_, operation) in &operations {
         let method = go_field_name(operation.name);

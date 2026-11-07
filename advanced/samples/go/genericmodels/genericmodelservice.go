@@ -226,11 +226,13 @@ func (m GetterPair[ContextT, OutputT]) GetResultValue() result[ContextT, OutputT
 	return m.ResultValue
 }
 
+// CompleteOptions - Options for Complete.
 type CompleteOptions[ContextT any] struct {
 	// Probe - Optional.
 	Probe *GetterProbe[ContextT]
 }
 
+// Complete.
 func Complete[ContextT any](
 	ctx workflow.Context,
 	opts CompleteOptions[ContextT],

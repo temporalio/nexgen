@@ -19,7 +19,10 @@ import (
 
 // --- Operations (public API) ---
 
-// Request fields for signaling a workflow, starting it first if needed.
+// SignalWithStartWorkflowRequest - Request fields for signaling a workflow, starting it
+// first if needed.
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflowRequest]
 type SystemNexus_SignalWithStartWorkflowRequest struct {
 	// Workflow - Workflow function identifying the workflow to start.
 	//
@@ -462,7 +465,9 @@ func (SystemNexus_SignalWithStartWorkflowRequest) TransferTypeConverter() (conve
 	)
 }
 
-// Static metadata for a workflow execution.
+// UserMetadata - Static metadata for a workflow execution.
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.UserMetadata]
 type SystemNexus_UserMetadata struct {
 	// StaticSummary - Single-line fixed summary for the workflow execution that may appear
 	// in UI and CLI. This can be in single-line Temporal Markdown format.
@@ -535,7 +540,10 @@ func systemnexus_userMetadataFromProto(cfg *commonconverter.SystemNexusContext, 
 	return nil
 }
 
-// Result of signaling a workflow and starting it if needed.
+// SignalWithStartWorkflowResponse - Result of signaling a workflow and starting it if
+// needed.
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflowResponse]
 type SystemNexus_SignalWithStartWorkflowResponse struct {
 	// RunID - Run ID of the started workflow.
 	//
@@ -586,6 +594,9 @@ func (SystemNexus_SignalWithStartWorkflowResponse) TransferTypeConverter() (conv
 	)
 }
 
+// SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflowOptions]
 type SystemNexus_SignalWithStartWorkflowOptions struct {
 	// TaskQueue - Task queue to run the workflow on. Defaults to the calling workflow's
 	// task queue.
@@ -660,8 +671,8 @@ type SystemNexus_SignalWithStartWorkflowOptions struct {
 	StaticDetails string
 }
 
-// Signal a workflow, starting it first if needed. Encode payloads with the configured
-// data converter.
+// SignalWithStartWorkflow - Signal a workflow, starting it first if needed. Encode
+// payloads with the configured data converter.
 //
 // Input id: Unique identifier for the workflow execution. Must be nonempty.
 // Input signal: Signal name to send with the start request.
@@ -670,6 +681,8 @@ type SystemNexus_SignalWithStartWorkflowOptions struct {
 // Input args: Arguments for the workflow.
 //
 // Returns: A workflow handle to the started workflow.
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflow]
 func SystemNexus_SignalWithStartWorkflow(
 	ctx internal.Context,
 	opts SystemNexus_SignalWithStartWorkflowOptions,

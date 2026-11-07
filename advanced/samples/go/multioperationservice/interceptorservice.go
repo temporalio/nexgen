@@ -27,18 +27,22 @@ func (m SystemNexus_Response) GetValue() string {
 	return m.Value
 }
 
+// SystemNexus_FirstOperationOptions - Options for SystemNexus_FirstOperation.
 type SystemNexus_FirstOperationOptions struct {
 }
 
+// SystemNexus_FirstOperation.
 func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
 	return SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation(func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
 		return input.Client.ExecuteOperation(ctx, input.Operation, input.Input, input.Options)
 	}, ctx, opts, id)
 }
 
+// SystemNexus_SecondOperationOptions - Options for SystemNexus_SecondOperation.
 type SystemNexus_SecondOperationOptions struct {
 }
 
+// SystemNexus_SecondOperation.
 func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
 	return SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation(func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
 		return input.Client.ExecuteOperation(ctx, input.Operation, input.Input, input.Options)

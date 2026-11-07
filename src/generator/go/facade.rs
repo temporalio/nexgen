@@ -290,7 +290,7 @@ struct FunctionPlan {
     documentation: String,
 }
 
-struct FacadePlan {
+pub(super) struct FacadePlan {
     package_name: String,
     imports: BTreeMap<String, String>,
     aliases: Vec<AliasPlan>,
@@ -299,6 +299,33 @@ struct FacadePlan {
 }
 
 impl FacadePlan {
+    pub(super) fn exposed_names(&self, import_path: &str) -> BTreeMap<String, String> {
+        self.aliases
+            .iter()
+            .map(|alias| (&alias.target, &alias.name))
+            .chain(
+                self.constants
+                    .iter()
+                    .map(|constant| (&constant.target, &constant.name)),
+            )
+            .chain(
+                self.functions
+                    .iter()
+                    .map(|function| (&function.target, &function.name)),
+            )
+            .map(|(target, name)| {
+                (
+                    target.expression.rsplit('.').next().unwrap().to_string(),
+                    format!("{import_path}.{name}"),
+                )
+            })
+            .collect()
+    }
+
+    pub(super) fn render(&self) -> String {
+        render_plan(self)
+    }
+
     fn record_reference(&mut self, reference: &TypeReference) {
         if let Some((path, alias)) = &reference.import {
             self.imports.insert(path.clone(), alias.clone());
@@ -357,7 +384,7 @@ impl FacadePlan {
     }
 }
 
-pub(super) fn render(
+pub(super) fn plan(
     options: &GoFacadeOptions,
     package: &GoPackageContext,
     imports: &BTreeSet<String>,
@@ -369,7 +396,7 @@ pub(super) fn render(
     services: &[RenderedService<'_>],
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
-) -> String {
+) -> FacadePlan {
     let mut scope = TypeScope::new(options, package, imports, external_imports);
     let mut plan = FacadePlan {
         package_name: go_package_name(&options.package_name),
@@ -437,6 +464,8 @@ pub(super) fn render(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
+                let name =
+                    public_name(&go_declaration_name(&go_field_name(operation.name))).to_string();
                 plan.add_alias(
                     &mut scope,
                     &format!(
@@ -448,7 +477,7 @@ pub(super) fn render(
                         .iter()
                         .map(|usage| usage.parameter.name.clone())
                         .collect(),
-                    None,
+                    Some(&format!("Options for {name}.")),
                 );
             }
         }
@@ -552,7 +581,12 @@ pub(super) fn render(
                 });
                 let positional = ordered_positional_params(unpacked);
                 let docs = wrapper_input_docs(positional.iter().copied());
-                render_operation_doc_comment(&mut documentation, operation, &docs);
+                render_operation_doc_comment(
+                    &mut documentation,
+                    public_name(&name),
+                    operation,
+                    &docs,
+                );
                 for (index, param) in positional.iter().enumerate() {
                     let (name, kind) = wrapper_param_signature(
                         param,
@@ -580,7 +614,12 @@ pub(super) fn render(
                     });
                 }
             } else {
-                render_operation_doc_comment(&mut documentation, operation, &[]);
+                render_operation_doc_comment(
+                    &mut documentation,
+                    public_name(&name),
+                    operation,
+                    &[],
+                );
                 for (name, kind) in [
                     ("opts", format!("{}Options", go_declaration_name(&name))),
                     ("request", operation.input_type.clone()),
@@ -605,7 +644,7 @@ pub(super) fn render(
             });
         }
     }
-    render_plan(&plan)
+    plan
 }
 
 fn public_name(name: &str) -> &str {
@@ -628,9 +667,7 @@ fn render_plan(plan: &FacadePlan) -> String {
     }
     output.push('\n');
     for alias in &plan.aliases {
-        if let Some(doc) = &alias.documentation {
-            render_go_doc_comment(&mut output, "", doc);
-        }
+        render_go_declaration_doc(&mut output, "", &alias.name, alias.documentation.as_deref());
         output.push_str(&format!("type {}", alias.name));
         if !alias.parameters.is_empty() {
             output.push('[');
@@ -651,13 +688,18 @@ fn render_plan(plan: &FacadePlan) -> String {
         output.push_str("\n\n");
     }
     for constant in &plan.constants {
+        render_go_declaration_doc(&mut output, "", &constant.name, None);
         output.push_str(&format!(
             "const {} = {}\n\n",
             constant.name, constant.target.expression,
         ));
     }
     for function in &plan.functions {
-        output.push_str(&function.documentation);
+        if function.documentation.is_empty() {
+            render_go_declaration_doc(&mut output, "", &function.name, None);
+        } else {
+            output.push_str(&function.documentation);
+        }
         output.push_str(&format!("func {}", function.name));
         if !function.type_parameters.is_empty() {
             output.push('[');
@@ -737,6 +779,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            facade_exports: BTreeMap::new(),
             workflow_interceptors: false,
         }
     }
@@ -777,6 +820,60 @@ mod tests {
                 ("time".to_string(), "time".to_string()),
             ]),
         );
+    }
+
+    #[test]
+    fn exposed_names_follow_facade_aliases_constants_and_functions() {
+        let options = options();
+        let mut scope = TypeScope::new(&options, &package(), &BTreeSet::new(), &[]);
+        let mut plan = FacadePlan {
+            package_name: options.package_name.clone(),
+            imports: BTreeMap::new(),
+            aliases: Vec::new(),
+            constants: Vec::new(),
+            functions: Vec::new(),
+        };
+        assert!(plan.exposed_names(&options.import_path).is_empty());
+        plan.add_alias(
+            &mut scope,
+            "SystemNexus_Result[T]",
+            vec!["T".to_string()],
+            None,
+        );
+        plan.add_constant("SystemNexus_StatusActive".to_string(), &options);
+        plan.add_function(FunctionPlan {
+            name: "Call".to_string(),
+            target: TypeReference::implementation("SystemNexus_Call", &options),
+            parameters: Vec::new(),
+            type_parameters: Vec::new(),
+            result: scope.resolve("any", &BTreeSet::new()),
+            documentation: String::new(),
+        });
+        assert_eq!(
+            plan.exposed_names(&options.import_path),
+            BTreeMap::from([
+                (
+                    "SystemNexus_Result".to_string(),
+                    "example.org/sdk/workflow.Result".to_string()
+                ),
+                (
+                    "SystemNexus_StatusActive".to_string(),
+                    "example.org/sdk/workflow.StatusActive".to_string()
+                ),
+                (
+                    "SystemNexus_Call".to_string(),
+                    "example.org/sdk/workflow.Call".to_string()
+                ),
+            ]),
+        );
+        let mut package = package();
+        package.facade_exports = plan.exposed_names(&options.import_path);
+        assert_eq!(
+            package.documentation_name("SystemNexus_Result[T]"),
+            "Result"
+        );
+        assert_eq!(package.documentation_name("SystemNexus_Call"), "Call");
+        assert_eq!(package.documentation_name("Unrelated[T]"), "Unrelated");
     }
 
     #[test]
