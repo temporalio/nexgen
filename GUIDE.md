@@ -220,8 +220,10 @@ fallback, and facades do not re-export interceptor helpers. The Go
 forwarding, short-circuiting, and terminal scheduling. SDK tests cover
 public-function entry into the SDK's interceptor chain.
 
-The terminal uses default Nexus settings. Generated code does not initialize
-workflow headers or invoke configured context propagators. SDK interceptor
+The terminal uses default Nexus settings. With
+[`@nexus.context-propagation`](#nexuscontext-propagation), SDK generation
+initializes workflow headers before interception and injects configured context
+propagators afterward. Without that directive, it does neither. SDK interceptor
 generation requires concrete types because Go methods cannot declare type
 parameters.
 
@@ -1750,6 +1752,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.operation`                      | resource method, freestanding function                                                        |
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
+| `@nexus.context-propagation`            | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
 | `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
@@ -1807,6 +1810,7 @@ The catalog currently declares these restrictions:
 | `@nexus.operations-class`               | dotnet               | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
+| `@nexus.context-propagation`            | go                   | required                |
 
 <!-- annotation-availability:end -->
 
@@ -2408,6 +2412,57 @@ converted to UpperCamelCase is used (e.g., `signal-with-start-workflow` becomes
 /// @nexus.operation name="SignalWithStartWorkflowExecution"
 signal-with-start-workflow: func(...) -> ...;
 ```
+
+---
+
+### @nexus.context-propagation
+
+**Placement:** Operation (function) **Syntax:**
+`@nexus.context-propagation go="request.headers"`
+
+Enables outbound workflow context propagation for a Go System Nexus operation
+generated into `go.temporal.io/sdk/internal`. It requires `--targets workflow`
+and a protobuf-backed request record. The Go backend ignores this directive when
+generating into any other package because header injection calls the SDK's
+private helpers. Operations bound to resource methods are not supported because
+those methods bypass the typed interceptor chain.
+
+The value is a checked WIT field path, not a Go expression. Its root must be the
+operation's input parameter name, and it must select a direct field of that
+record. Input record aliases are supported; nested paths are not. Nexgen
+resolves the WIT field identity before applying `@nexus.proto-field` and
+`@nexus.name` mappings, so the path uses authored WIT names.
+
+The selected field must use `@nexus.api-omit`. Its Go binding must accept
+`map[string]*commonpb.Payload`; the Go compiler checks that binding. For
+example, using the Temporal `header` binding:
+
+```wit
+/// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+record signal-with-start-workflow-request {
+  /// @nexus.api-omit
+  /// @nexus.proto-field "header"
+  headers: option<header>,
+}
+
+/// @nexus.context-propagation go="request.headers"
+signal-with-start-workflow: func(
+  request: signal-with-start-workflow-request,
+) -> signal-with-start-workflow-response;
+```
+
+The public function creates a fresh header map before the typed interceptor
+chain. Interceptors read and modify it with `interceptor.WorkflowHeader(ctx)`.
+The terminal calls the configured propagators' `InjectFromWorkflow` methods with
+the forwarded context, then assigns the map to the selected request field before
+encoding or scheduling. Injection errors resolve the returned workflow `Future`
+with an error and do not schedule an operation. Interceptor-supplied headers are
+preserved unless a propagator overwrites the same key.
+
+These are Temporal payload headers inside the operation request, not Nexus
+transport headers. The directive does not enable inbound extraction or response
+propagation. Use `go=` in multi-language inputs to keep it inactive for other
+backends.
 
 ---
 

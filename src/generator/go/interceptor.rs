@@ -1,5 +1,64 @@
 use super::*;
 
+pub(super) fn context_propagation_error(operation: &str, reason: &str) -> Error {
+    Error::InvalidWitDirective {
+        path: PathBuf::from("<go-plan>"),
+        context: format!("operation `{operation}`"),
+        directive: "@nexus.context-propagation".to_string(),
+        reason: reason.to_string(),
+    }
+}
+
+pub(super) fn validate_context_propagation_mode(
+    operation: &PlannedOperation,
+    package: &GoPackageContext,
+) -> Result<()> {
+    if operation.context_propagation_header.value().is_some()
+        && package.is_self_import("go.temporal.io/sdk/internal")
+        && !package.workflow_interceptors
+    {
+        return Err(context_propagation_error(
+            &operation.name,
+            "requires Go workflow System Nexus generation into go.temporal.io/sdk/internal",
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn context_propagation_header(
+    operation: &PlannedOperation,
+    spec: &PlannedSpec,
+    package: &GoPackageContext,
+) -> Result<Option<String>> {
+    if !package.is_self_import("go.temporal.io/sdk/internal") {
+        return Ok(None);
+    }
+    let Some(key) = operation.context_propagation_header.value() else {
+        return Ok(None);
+    };
+    let record = operation
+        .input
+        .as_ref()
+        .and_then(|input| planned_message_type(input, spec))
+        .and_then(|input| record_for_message(spec, &input))
+        .ok_or_else(|| {
+            context_propagation_error(&operation.name, "requires a generated request record")
+        })?;
+    let field = record.fields.get(key).ok_or_else(|| {
+        context_propagation_error(
+            &operation.name,
+            "header field is not present in the request",
+        )
+    })?;
+    if !matches!(field.origin, Some(crate::spec::FieldOrigin::ApiOmitted)) {
+        return Err(context_propagation_error(
+            &operation.name,
+            "header field must use @nexus.api-omit so context propagation owns its value",
+        ));
+    }
+    Ok(Some(go_field_name(&field.name)))
+}
+
 pub(super) fn render_defaults(output: &mut String, params: &[RenderedUnpackedParam]) {
     for param in params
         .iter()
@@ -81,6 +140,9 @@ pub(super) fn render_call(
     let method = go_field_name(operation.name);
     let arguments = call_arguments(operation, false).join(", ");
     if package.is_self_import("go.temporal.io/sdk/internal") {
+        if operation.context_propagation_header.is_some() {
+            output.push_str("\tctx = workflowContextWithNewHeader(ctx)\n");
+        }
         output.push_str(&format!(
             "\treturn getWorkflowOutboundInterceptor(ctx).{method}({arguments})\n",
         ));
@@ -184,8 +246,12 @@ pub(super) fn render(
     output.push_str(&format!("type {interface} interface {{\n"));
     for (_, operation) in &operations {
         let method = go_field_name(operation.name);
+        output.push_str(&format!("\t// {method} intercepts workflow.{method}.\n"));
+        if operation.context_propagation_header.is_some() {
+            output.push_str("\t// WorkflowHeader returns a non-nil map for this context.\n");
+        }
         output.push_str(&format!(
-            "\t// {method} intercepts workflow.{method}.\n\t{method}{}\n",
+            "\t{method}{}\n",
             signature(operation, package, visibility, None),
         ));
     }
@@ -225,6 +291,21 @@ pub(super) fn render(
             for (field, expression) in &operation.sourced_fields {
                 output.push_str(&format!("\trequest.{field} = {expression}\n"));
             }
+        }
+        if let Some(field) = &operation.context_propagation_header {
+            let context = operation
+                .serialization_context_expr
+                .map(|helper| format!("{helper}(request)"))
+                .unwrap_or_else(|| "nil".to_string());
+            output.push_str(&format!(
+                "\t_nexgenHeader, err := workflowHeaderPropagated(ctx, getWorkflowEnvOptions(ctx).ContextPropagators, {context})\n\
+                 \tif err != nil {{\n\
+                 \t\tresult, resultSettable := NewFuture(ctx)\n\
+                 \t\tresultSettable.SetError(err)\n\
+                 \t\treturn result\n\
+                 \t}}\n\
+                 \trequest.{field} = _nexgenHeader.Fields\n",
+            ));
         }
         render_operation_body(
             &mut output,

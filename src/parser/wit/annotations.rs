@@ -263,6 +263,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "context-propagation",
+            sites: &[Function],
+            keys: &["value"],
+            language_keys: &[""],
+            repeatable: false,
+            languages: Some(&[Language::Go]),
+            system_nexus: true,
+        },
+        Annotation {
             name: "output-transform",
             sites: &[Function],
             keys: &["value", "import"],

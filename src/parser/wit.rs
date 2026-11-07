@@ -3064,6 +3064,8 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
+    let context_propagation_header =
+        build_operation_context_propagation(resolve, function, &directives, path, &context)?;
     let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
@@ -3104,6 +3106,7 @@ fn build_operation(
         output,
         output_transform,
         serialization_context,
+        context_propagation_header,
         poll,
         data: (),
     })
@@ -3355,6 +3358,63 @@ fn build_operation_serialization_context(
                 reason: format!("invalid `{language}` support helper `{helper}`"),
             });
         }
+    }
+    Ok(spec)
+}
+
+fn build_operation_context_propagation(
+    resolve: &Resolve,
+    function: &Function,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<LanguageStringSpec> {
+    let Some(directive) = directive(directives, "context-propagation", path, context)? else {
+        return Ok(LanguageStringSpec::default());
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.context-propagation".to_string(),
+        reason,
+    };
+    let mut spec = directive_language_string(directive);
+    if spec.is_empty() {
+        return Err(invalid("requires a request field path".to_string()));
+    }
+    let parameter = &function.params[0];
+    let mut input = parameter.ty;
+    let record = loop {
+        let Type::Id(id) = input else { break None };
+        match &resolve.types[id].kind {
+            TypeDefKind::Record(record) => break Some(record),
+            TypeDefKind::Type(next) => input = *next,
+            _ => break None,
+        }
+    }
+    .ok_or_else(|| invalid("requires an operation whose input is a record".to_string()))?;
+    for value in spec.default.iter_mut().chain(spec.by_language.values_mut()) {
+        let (root, field_name) = value.split_once('.').ok_or_else(|| {
+            invalid(format!(
+                "`{value}` must select a direct input field as `{}.<field>`",
+                parameter.name
+            ))
+        })?;
+        if root != parameter.name || field_name.is_empty() || field_name.contains('.') {
+            return Err(invalid(format!(
+                "`{value}` must select a direct input field as `{}.<field>`",
+                parameter.name
+            )));
+        }
+        let field = record
+            .fields
+            .iter()
+            .find(|field| field.name == field_name)
+            .ok_or_else(|| invalid(format!("`{field_name}` isn't a field of the request")))?;
+        let field_context = format!("{context} field `{field_name}`");
+        let field_directives =
+            parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
+        *value = record_field_key(field, &field_directives, path, &field_context)?;
     }
     Ok(spec)
 }
@@ -3822,6 +3882,64 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("nexgen-{label}-{unique}"))
+    }
+
+    #[test]
+    fn context_propagation_lowers_authored_paths_to_field_keys() {
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![GenerationTarget::Workflow],
+        });
+        let input = r#"
+package test:context-identity;
+world system { export api; }
+interface api {
+  record request {
+    /// @nexus.proto-field "header"
+    /// @nexus.name go="TransportHeaders"
+    /// @nexus.api-omit
+    context-headers: string,
+  }
+  type request-alias = request;
+  /// @nexus.context-propagation go="input.context-headers"
+  send: func(input: request-alias);
+  plain: func(input: request);
+}
+"#;
+        for language in [
+            Language::Go,
+            Language::Python,
+            Language::TypeScript,
+            Language::Dotnet,
+        ] {
+            let spec = parse(language, input);
+            let operations = &spec.services[0].operations;
+            assert_eq!(
+                operations[0]
+                    .context_propagation_header
+                    .for_language(Language::Go),
+                Some("header"),
+            );
+            assert_eq!(
+                operations[0]
+                    .context_propagation_header
+                    .for_language(Language::Python),
+                None,
+            );
+            assert!(operations[1].context_propagation_header.is_empty());
+            let selected = crate::planning::LanguageSelectionPass::new(language)
+                .apply(crate::spec::ApiSpecTree::single(spec))
+                .unwrap();
+            let crate::spec::ApiSpecNode::Leaf(leaf) = selected.root else {
+                panic!("expected a single module");
+            };
+            assert_eq!(
+                leaf.spec.services[0].operations[0]
+                    .context_propagation_header
+                    .value(),
+                (language == Language::Go).then_some("header"),
+            );
+        }
     }
 
     #[test]
