@@ -1208,9 +1208,16 @@ fn render_record_wire_block(
         output.push_str("    ) -> ");
         output.push_str(&converter_model_annotation);
         output.push_str(":\n");
+        // A parameterized hint, such as a Workflow input's `StreamRef[Turn]`, builds a ref that
+        // keeps its type arguments in `__orig_class__`.
+        let constructor = if model.phantom_type_parameters.is_empty() {
+            model.name.as_str()
+        } else {
+            "type_hint"
+        };
         if model.fields.is_empty() {
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("()\n");
         } else {
             if !type_arguments.is_empty() {
@@ -1278,7 +1285,7 @@ fn render_record_wire_block(
             }
 
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("(\n");
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields

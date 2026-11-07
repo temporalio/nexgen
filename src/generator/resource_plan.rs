@@ -1,11 +1,51 @@
-//! Shared rendering of resolved resource-method request plans.
+//! Shared rendering of resolved resource-method request plans, and the refs of resources.
 
 use crate::error::{Error, Result};
 use crate::planning::{
-    PlannedFamily, PlannedProtoType, PlannedResourceMethodBindingSpec, PlannedSpec, RequestPlan,
-    RequestPlanField, RequestPlanSource,
+    PlannedFamily, PlannedProtoType, PlannedRecordType, PlannedResource, PlannedResourceField,
+    PlannedResourceMethodBindingSpec, PlannedSpec, PlannedType, RequestPlan, RequestPlanField,
+    RequestPlanSource,
 };
-use crate::spec::{ExternalTypeSourceSpec, FieldOrigin, RecordSpec};
+use crate::spec::{ExternalTypeSourceSpec, FieldOrigin, RecordSpec, TypeParameterSpec};
+
+/// A resource's ref is the constructor parameter whose type is a record, such as `stream-ref`.
+/// Code passes it as data, so a generic resource's ref carries the resource's payload type.
+pub(crate) fn resource_ref_field(resource: &PlannedResource) -> Option<&PlannedResourceField> {
+    resource
+        .fields
+        .iter()
+        .find(|field| matches!(field.kind.without_option(), PlannedType::Record(_)))
+}
+
+pub(crate) fn resource_ref_record(resource: &PlannedResource) -> Option<&PlannedRecordType> {
+    match resource_ref_field(resource)?.kind.without_option() {
+        PlannedType::Record(record) => Some(record),
+        _ => None,
+    }
+}
+
+/// The type parameters of each generic resource whose ref is the record, minus those the record's
+/// own fields use. A phantom parameter rides along on the ref so a reader keeps the payload type.
+pub(crate) fn ref_type_parameters(
+    api_plan: &PlannedSpec,
+    record_full_name: &str,
+) -> Vec<TypeParameterSpec> {
+    let own = api_plan.record_type_parameters(record_full_name);
+    let mut parameters = api_plan
+        .services
+        .iter()
+        .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
+        .filter(|resource| {
+            resource_ref_record(resource).is_some_and(|record| record.full_name == record_full_name)
+        })
+        .flat_map(|resource| resource.type_parameters.iter().cloned())
+        .filter(|parameter| !own.iter().any(|usage| usage.parameter == *parameter))
+        .collect::<Vec<_>>();
+    // `full_name` is a type parameter's identity, so this order stays stable when a method moves.
+    parameters.sort_by(|left, right| left.full_name.cmp(&right.full_name));
+    parameters.dedup();
+    parameters
+}
 
 pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>(
     plan: &RequestPlan,

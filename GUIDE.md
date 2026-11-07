@@ -2101,6 +2101,20 @@ as `typing.Any`, but its static return type is `Stream[object]`; a concrete
 fields, and .NET takes the type argument, as in
 `CreateStreamAsync<Turn>(options)`.
 
+In Python, a generic resource's ref takes the resource's type parameters too, so
+the `ref` of a `Stream[Turn]` is a `StreamRef[Turn]`. No field uses them, so
+they default to `typing.Any`, and the ref keeps the same wire message, equality
+and repr. The type argument rides in memory, in `__orig_class__`.
+`StreamRef[Turn]`, the `ref` of a `Stream[Turn]`, and a decode with the type
+hint `StreamRef[Turn]`, such as a Workflow input's, each set it.
+`get_stream(ref)` infers the handle's type from the ref, so a reader that gets a
+ref keeps its payload type.
+
+```python
+stream = client.get_stream(ref)  # Stream[Turn] for a StreamRef[Turn]
+stream = client.get_stream(ref=ref, body_type=str)  # body_type wins over the ref
+```
+
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
 operation with no `@nexus.proto` message can't return one yet.
 
