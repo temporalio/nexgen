@@ -1,0 +1,1 @@
+In Python, a generic resource's ref takes the resource's type parameters, so `get_stream(ref)` infers the handle's type from a `StreamRef[Turn]` and reads `Turn` bodies. The ref carries its type argument in memory only, so its wire message, equality and repr do not change.
