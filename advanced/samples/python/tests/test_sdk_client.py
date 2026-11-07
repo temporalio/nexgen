@@ -31,6 +31,7 @@ from wit.stream_service.client.client import (
 )
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
+    AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
     CloseStreamRequest,
@@ -278,11 +279,11 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, f"_stream_service_{name}")
 
     stream = await client.create_stream(id="s1", body_type=str)
-    response = await stream.publish(records=[])
+    last_offset = await stream.publish()
     await stream.close()
 
     assert stream.ref.id == "s1"
-    assert response.last_offset == 7
+    assert last_offset == 7
     assert len(client.created_clients) == 1
     create, append, close = answers.started
     assert (create.service, create.endpoint, create.operation) == (
@@ -347,6 +348,36 @@ async def test_a_create_takes_the_fields_of_the_ref(
     assert wire.stream_ref.backend == fields.get("backend", "")
     assert wire.stream_ref.HasField("owner") == ("owner" in fields)
     assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
+
+
+async def test_a_publish_wraps_each_value_and_returns_the_last_offset() -> None:
+    ref = StreamRef(id="s1")
+    client, answers = connect(
+        Client,
+        {
+            "AppendRecords": [
+                AppendRecordsResponse(first_offset=4, last_offset=5),
+                AppendRecordsResponse(),
+            ]
+        },
+    )
+    stream = client.get_stream(ref=ref, body_type=str)
+
+    last_offset = await stream.publish("a", "b")
+    empty = await stream.publish()
+
+    _ = assert_type(last_offset, int)
+    assert last_offset == 5
+    assert answers.started[0].arg == AppendRecordsRequest(
+        ref=ref,
+        records=[AppendRecord(body="a"), AppendRecord(body="b")],
+        producer=Producer(id="client:sample"),
+    )
+    # `last_offset` has no presence on the wire, so an empty publish answers 0.
+    assert empty == 0
+    if typing.TYPE_CHECKING:
+        # The items take the type argument, so a `Stream[str]` refuses an `int`.
+        _ = stream.publish(1)  # pyright: ignore[reportArgumentType]
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:

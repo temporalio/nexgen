@@ -56,17 +56,16 @@ class Stream(typing.Generic[BodyT]):
 
     async def publish(
         self,
-        records: list[AppendRecord[BodyT]],
-    ) -> AppendRecordsResponse:
+        *records: BodyT,
+    ) -> int:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            records=records,
+            records=[AppendRecord(body=value) for value in records],
             producer=_support.workflow_producer(),
             withdraw_run=_support.withdraw_run(),
         )
-        handle = await _append_records(request)
-        return await handle
+        return await _append_records(request)
 
     async def close(
         self,
@@ -114,24 +113,26 @@ class Stream(typing.Generic[BodyT]):
 
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
-) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
+) -> int:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
-    return await nexus_client.start_operation(
+    handle = await nexus_client.start_operation(
         operation="AppendRecords",
         input=request,
         output_type=AppendRecordsResponse,
     )
+    result = await handle
+    return _support.last_offset(result)
 
 
 async def append_records(
     *,
     ref: StreamRef,
-    records: list[AppendRecord[BodyT]],
+    records: list[BodyT],
     sequence: int | None = None,
-) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
+) -> int:
     """Append one batch. Workflow code makes the call from a Local Activity.
 
     Args:
@@ -140,7 +141,7 @@ async def append_records(
     """
     request = AppendRecordsRequest(
         ref=ref,
-        records=records,
+        records=[AppendRecord(body=value) for value in records],
         producer=_support.workflow_producer(),
         sequence=sequence,
         withdraw_run=_support.withdraw_run(),
