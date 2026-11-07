@@ -7,19 +7,22 @@ import (
 	"go.temporal.io/sdk/internal"
 )
 
-// Request fields for signaling a workflow, starting it first if needed.
+// SignalWithStartWorkflowRequest - Request fields for signaling a workflow, starting it
+// first if needed.
 type SignalWithStartWorkflowRequest = workflowservice.SystemNexus_SignalWithStartWorkflowRequest
 
-// Static metadata for a workflow execution.
+// UserMetadata - Static metadata for a workflow execution.
 type UserMetadata = workflowservice.SystemNexus_UserMetadata
 
-// Result of signaling a workflow and starting it if needed.
+// SignalWithStartWorkflowResponse - Result of signaling a workflow and starting it if
+// needed.
 type SignalWithStartWorkflowResponse = workflowservice.SystemNexus_SignalWithStartWorkflowResponse
 
+// SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
 type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
-// Signal a workflow, starting it first if needed. Encode payloads with the configured
-// data converter.
+// SignalWithStartWorkflow - Signal a workflow, starting it first if needed. Encode
+// payloads with the configured data converter.
 //
 // Input id: Unique identifier for the workflow execution. Must be nonempty.
 // Input signal: Signal name to send with the start request.

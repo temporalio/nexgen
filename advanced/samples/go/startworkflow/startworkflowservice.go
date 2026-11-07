@@ -351,11 +351,13 @@ func (CancelWorkflowResponse) TransferTypeConverter() (converter.TransferTypeCon
 	)
 }
 
+// StartWorkflowOptions - Options for StartWorkflow.
 type StartWorkflowOptions struct {
 	// WorkflowStartDelay - Optional.
 	WorkflowStartDelay time.Duration
 }
 
+// StartWorkflow.
 func StartWorkflow(
 	ctx temporalworkflow.Context,
 	opts StartWorkflowOptions,
@@ -389,11 +391,13 @@ func StartWorkflow(
 	return result
 }
 
+// RestartWorkflowOptions - Options for RestartWorkflow.
 type RestartWorkflowOptions struct {
 	// WorkflowStartDelay - Optional.
 	WorkflowStartDelay time.Duration
 }
 
+// RestartWorkflow.
 func RestartWorkflow(
 	ctx temporalworkflow.Context,
 	opts RestartWorkflowOptions,
@@ -427,11 +431,13 @@ func RestartWorkflow(
 	return result
 }
 
+// CancelWorkflowOptions - Options for CancelWorkflow.
 type CancelWorkflowOptions struct {
 	// Reason - Optional.
 	Reason string
 }
 
+// CancelWorkflow.
 func CancelWorkflow(ctx temporalworkflow.Context, opts CancelWorkflowOptions, workflowExecution WorkflowExecution) temporalworkflow.Future {
 	var reason *string
 	if opts.Reason != "" {
@@ -456,11 +462,13 @@ func CancelWorkflow(ctx temporalworkflow.Context, opts CancelWorkflowOptions, wo
 	return result
 }
 
+// SignalWithStartOptions - Options for SignalWithStart.
 type SignalWithStartOptions struct {
 	// Reason - Optional.
 	Reason string
 }
 
+// SignalWithStart.
 func SignalWithStart(ctx temporalworkflow.Context, opts SignalWithStartOptions, workflowExecution WorkflowExecution) temporalworkflow.Future {
 	var reason *string
 	if opts.Reason != "" {

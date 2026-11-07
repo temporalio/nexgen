@@ -203,9 +203,12 @@ func (m ExecuteNamedVarargsFunctionResult) GetValue() string {
 	return m.Value
 }
 
+// ExecuteFunctionOptions - Options for ExecuteFunction.
 type ExecuteFunctionOptions struct {
 }
 
+// ExecuteFunction.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteFunction(
@@ -233,9 +236,12 @@ func ExecuteFunction(
 	return fut
 }
 
+// ExecuteCallbackOptions - Options for ExecuteCallback.
 type ExecuteCallbackOptions struct {
 }
 
+// ExecuteCallback.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteCallback(
@@ -263,9 +269,12 @@ func ExecuteCallback(
 	return fut
 }
 
+// ExecuteCountedFunctionOptions - Options for ExecuteCountedFunction.
 type ExecuteCountedFunctionOptions struct {
 }
 
+// ExecuteCountedFunction.
+//
 // Input name: The name argument for the function.
 // Input count: The count argument for the function.
 func ExecuteCountedFunction(
@@ -293,9 +302,12 @@ func ExecuteCountedFunction(
 	return fut
 }
 
+// ExecuteNamedFunctionOptions - Options for ExecuteNamedFunction.
 type ExecuteNamedFunctionOptions struct {
 }
 
+// ExecuteNamedFunction.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteNamedFunction[FunctionF interface {
@@ -331,9 +343,12 @@ func ExecuteNamedFunction[FunctionF interface {
 	return fut
 }
 
+// ExecuteVarargsFunctionOptions - Options for ExecuteVarargsFunction.
 type ExecuteVarargsFunctionOptions struct {
 }
 
+// ExecuteVarargsFunction.
+//
 // Input args: Arguments for the function.
 func ExecuteVarargsFunction(
 	ctx workflow.Context,
@@ -358,9 +373,12 @@ func ExecuteVarargsFunction(
 	return fut
 }
 
+// ExecuteNamedVarargsFunctionOptions - Options for ExecuteNamedVarargsFunction.
 type ExecuteNamedVarargsFunctionOptions struct {
 }
 
+// ExecuteNamedVarargsFunction.
+//
 // Input args: Arguments for the function.
 func ExecuteNamedVarargsFunction[FunctionF interface {
 	~string | func(...string) string
@@ -393,9 +411,12 @@ func ExecuteNamedVarargsFunction[FunctionF interface {
 	return fut
 }
 
+// ExecuteDescriptorsOptions - Options for ExecuteDescriptors.
 type ExecuteDescriptorsOptions struct {
 }
 
+// ExecuteDescriptors.
+//
 // Input durationValues: Arguments for the durations.
 // Input callbackValues: Arguments for the callback.
 // Input callableValues: Arguments for the callable.

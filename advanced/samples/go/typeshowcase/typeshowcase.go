@@ -215,28 +215,29 @@ const (
 	UserCapabilityDeactivate  UserCapability = 1 << 2
 )
 
-// Go notification target.
+// NotificationTarget - Go notification target.
 //
 // WARNING: This API is experimental and may change in the future.
 type NotificationTarget interface {
 	isNotificationTarget()
 }
 
-// Go payload.
+// NotificationTargetEmail - Go payload.
 type NotificationTargetEmail struct {
 	Value string
 }
 
 func (NotificationTargetEmail) isNotificationTarget() {}
 
-// XML characters remain valid in docs: <tag attr="value"> & 'quoted'.
+// NotificationTargetSms - XML characters remain valid in docs: <tag attr="value"> &
+// 'quoted'.
 type NotificationTargetSms struct {
 	Value string
 }
 
 func (NotificationTargetSms) isNotificationTarget() {}
 
-// Default empty case.
+// NotificationTargetNone - Default empty case.
 type NotificationTargetNone struct{}
 
 func (NotificationTargetNone) isNotificationTarget() {}
@@ -245,12 +246,12 @@ type NotificationTargetUndocumented struct{}
 
 func (NotificationTargetUndocumented) isNotificationTarget() {}
 
-// Default-only documentation on a single-case variant.
+// SingleTarget - Default-only documentation on a single-case variant.
 type SingleTarget interface {
 	isSingleTarget()
 }
 
-// Only case.
+// SingleTargetOnly - Only case.
 type SingleTargetOnly struct{}
 
 func (SingleTargetOnly) isSingleTarget() {}
@@ -448,12 +449,13 @@ func (m SyncSettings) GetCheckpoint() *string {
 	return m.Checkpoint
 }
 
+// GetUserOptions - Options for GetUser.
 type GetUserOptions struct {
 	// ConsistencyToken - Optional.
 	ConsistencyToken string
 }
 
-// Get a user.
+// GetUser - Get a user.
 //
 // Returns: The matching user.
 func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
@@ -470,9 +472,11 @@ func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.
 	return fut
 }
 
+// UpdateEmailOptions - Options for UpdateEmail.
 type UpdateEmailOptions struct {
 }
 
+// UpdateEmail.
 func UpdateEmail(
 	ctx workflow.Context,
 	opts UpdateEmailOptions,
@@ -488,9 +492,11 @@ func UpdateEmail(
 	return fut
 }
 
+// RenameOptions - Options for Rename.
 type RenameOptions struct {
 }
 
+// Rename.
 func Rename(
 	ctx workflow.Context,
 	opts RenameOptions,
@@ -506,9 +512,11 @@ func Rename(
 	return fut
 }
 
+// SetProfileOptions - Options for SetProfile.
 type SetProfileOptions struct {
 }
 
+// SetProfile.
 func SetProfile(
 	ctx workflow.Context,
 	opts SetProfileOptions,
@@ -524,9 +532,11 @@ func SetProfile(
 	return fut
 }
 
+// RecordSyncOptions - Options for RecordSync.
 type RecordSyncOptions struct {
 }
 
+// RecordSync.
 func RecordSync(
 	ctx workflow.Context,
 	opts RecordSyncOptions,
@@ -542,11 +552,13 @@ func RecordSync(
 	return fut
 }
 
+// DeactivateOptions - Options for Deactivate.
 type DeactivateOptions struct {
 	// Reason - Optional.
 	Reason string
 }
 
+// Deactivate.
 func Deactivate(ctx workflow.Context, opts DeactivateOptions, userID string) workflow.Future {
 	var reason *string
 	if opts.Reason != "" {
@@ -561,6 +573,7 @@ func Deactivate(ctx workflow.Context, opts DeactivateOptions, userID string) wor
 	return fut
 }
 
+// UpdateLabelsOptions - Options for UpdateLabels.
 type UpdateLabelsOptions struct {
 	// ExtraTags - Optional.
 	ExtraTags []string
@@ -568,6 +581,7 @@ type UpdateLabelsOptions struct {
 	ExtraMetadata map[string]string
 }
 
+// UpdateLabels.
 func UpdateLabels(
 	ctx workflow.Context,
 	opts UpdateLabelsOptions,
@@ -587,9 +601,11 @@ func UpdateLabels(
 	return fut
 }
 
+// UpdateNotificationSettingsOptions - Options for UpdateNotificationSettings.
 type UpdateNotificationSettingsOptions struct {
 }
 
+// UpdateNotificationSettings.
 func UpdateNotificationSettings(
 	ctx workflow.Context,
 	opts UpdateNotificationSettingsOptions,
@@ -605,6 +621,7 @@ func UpdateNotificationSettings(
 	return fut
 }
 
+// GetSyncSettingsOptions - Options for GetSyncSettings.
 type GetSyncSettingsOptions struct {
 	// Region - Optional.
 	Region string
@@ -612,6 +629,7 @@ type GetSyncSettingsOptions struct {
 	Checkpoint string
 }
 
+// GetSyncSettings.
 func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions, userID string) workflow.Future {
 	var settingsValue *SyncSettings
 	if opts.Region != "" || opts.Checkpoint != "" {
