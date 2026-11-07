@@ -14,10 +14,6 @@ type SignalWithStartWorkflowRequest = workflowservice.SystemNexus_SignalWithStar
 // UserMetadata - Static metadata for a workflow execution.
 type UserMetadata = workflowservice.SystemNexus_UserMetadata
 
-// SignalWithStartWorkflowResponse - Result of signaling a workflow and starting it if
-// needed.
-type SignalWithStartWorkflowResponse = workflowservice.SystemNexus_SignalWithStartWorkflowResponse
-
 // SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
 type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
@@ -30,7 +26,7 @@ type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStar
 // Input workflow: Workflow function identifying the workflow to start.
 // Input args: Arguments for the workflow.
 //
-// Returns: A workflow handle to the started workflow.
+// Returns: A workflow.Execution with details about the signaled workflow.
 func SignalWithStartWorkflow(
 	ctx internal.Context,
 	opts SignalWithStartWorkflowOptions,

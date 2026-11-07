@@ -525,6 +525,10 @@ coordinates?: [number, number];
 
 `option<T>` fields become optional with a `None`/`undefined` default.
 
+In proto-backed records, API optionality is independent of protobuf presence.
+Non-optional booleans and numbers accept implicit protobuf defaults, including
+`false` and zero, even when the field is omitted from the wire.
+
 **Python:**
 
 ```python
@@ -1199,6 +1203,10 @@ signal-with-start-workflow: func(
 The generated wrapper returns the transformed type. The transform expression has
 access to `request` (the input) and `result` (the raw response). Go transform
 expressions must evaluate to `(T, error)`, where `T` is the `go-type` value:
+
+Go transforms run inside the terminal workflow interceptor, so `request`
+contains any changes made by outbound interceptors. References to the `workflow`
+package in the transform use the same import alias as generated SDK references.
 
 For TypeScript, `typescript-type-import` adds a type-only import for the type
 named by `typescript-type`; `typescript-import` adds the value import used by

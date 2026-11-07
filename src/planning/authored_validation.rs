@@ -506,18 +506,6 @@ fn validate_message_model_config(
         .record
         .fields
         .iter()
-        .filter(|(_, field)| field.required && !is_resource_field(field))
-        .map(|(field_name, _)| field_name)
-    {
-        if oneof_by_name(&oneofs, field_name).is_some() {
-            continue;
-        }
-        validate_model_required_field(message_name, field_name, message)?;
-    }
-    for field_name in model_config
-        .record
-        .fields
-        .iter()
         .filter(|(_, field)| field.origin.is_omitted())
         .map(|(field_name, _)| field_name)
     {
@@ -1195,32 +1183,6 @@ fn is_resource_field(field: &RecordFieldSpec) -> bool {
     matches!(field.field_type.without_option(), TypeSpec::Resource(_))
 }
 
-fn validate_model_required_field(
-    message_name: &str,
-    field_name: &str,
-    message: &MessageMetadata,
-) -> Result<()> {
-    let field = validate_model_override_field(message_name, field_name, message)?;
-    let field_type = field_type(field);
-
-    // An empty repeated or map field is the unset value. The field has no presence,
-    // so a bare `list<T>` or `map<K, V>` is not a required field.
-    if field_label(field) == Some(Label::Repeated) {
-        return Ok(());
-    }
-
-    if field_has_presence(field, field_type) || field_supports_required_without_presence(field_type)
-    {
-        return Ok(());
-    }
-
-    Err(Error::UnsupportedRequiredTypeField {
-        message: message_name.to_string(),
-        field: field_name.to_string(),
-        reason: "field must support presence or be a string/bytes scalar or enum".to_string(),
-    })
-}
-
 fn field_is_map(field: &FieldDescriptorProto, descriptors: &DescriptorIndex) -> bool {
     if field_label(field) != Some(Label::Repeated) || field_type(field) != Some(Type::Message) {
         return false;
@@ -1245,12 +1207,6 @@ fn field_has_presence(field: &FieldDescriptorProto, field_type: Option<Type>) ->
     matches!(field_type, Some(Type::Message))
         || field.proto3_optional.unwrap_or(false)
         || field.oneof_index.is_some()
-}
-
-fn field_supports_required_without_presence(field_type: Option<Type>) -> bool {
-    // A proto3 enum always has a declared zero member. Preserve that wire value
-    // on required API enums instead of manufacturing an operation default.
-    matches!(field_type, Some(Type::String | Type::Bytes | Type::Enum))
 }
 
 fn field_label(field: &FieldDescriptorProto) -> Option<Label> {
