@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import collections.abc
 import typing
+import typing_extensions
 import temporalio.client
 import uuid as _uuid
 import datetime
+import types
 
 from ...services import StreamService
 from ...models import (
@@ -60,6 +62,17 @@ class Stream(typing.Generic[BodyT]):
             (),
         )
         return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+
+    async def __aenter__(self) -> typing_extensions.Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: types.TracebackType | None,
+    ) -> None:
+        await self.close()
 
     async def publish(
         self,

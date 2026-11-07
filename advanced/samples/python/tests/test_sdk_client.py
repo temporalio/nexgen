@@ -6,6 +6,7 @@ interceptor answers each Nexus call in the process, so the test needs no server.
 
 from __future__ import annotations
 
+import asyncio
 import collections.abc
 import dataclasses
 import datetime
@@ -23,6 +24,7 @@ from typing_extensions import assert_type, override
 
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
+from wit.stream_service.both._resource_call import ResourceCall
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
 from wit.stream_service.both.client._poll import PollIterator
 from wit.stream_service.both.workflow import _resources as workflow_resources
@@ -347,6 +349,57 @@ async def test_a_create_takes_the_fields_of_the_ref(
     assert wire.stream_ref.backend == fields.get("backend", "")
     assert wire.stream_ref.HasField("owner") == ("owner" in fields)
     assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
+
+
+def closing_client() -> tuple[Client, Answers]:
+    return connect(
+        Client,
+        {
+            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "CloseStream": CloseStreamResponse(),
+        },
+    )
+
+
+def closes(answers: Answers) -> list[CloseStreamRequest]:
+    return [
+        typing.cast(CloseStreamRequest, started.arg)
+        for started in answers.started
+        if started.operation == "CloseStream"
+    ]
+
+
+async def test_a_clean_block_closes_its_stream() -> None:
+    client, answers = closing_client()
+    call = client.create_stream(id="s1", body_type=Turn)
+
+    _ = assert_type(call, ResourceCall[Stream[Turn]])
+    async with call as stream:
+        _ = assert_type(stream, Stream[Turn])
+
+    assert closes(answers) == [
+        CloseStreamRequest(ref=stream.ref, producer=Producer(id="client:sample"))
+    ]
+
+
+async def test_a_failed_block_closes_its_stream() -> None:
+    client, answers = closing_client()
+
+    with pytest.raises(ValueError, match="boom"):
+        async with client.create_stream(id="s1", body_type=Turn):
+            raise ValueError("boom")
+
+    assert len(closes(answers)) == 1
+
+
+async def test_a_canceled_block_closes_its_stream() -> None:
+    client, answers = closing_client()
+
+    with pytest.raises(asyncio.CancelledError):
+        async with client.create_stream(id="s1", body_type=Turn):
+            raise asyncio.CancelledError("stop")
+
+    assert len(closes(answers)) == 1
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
