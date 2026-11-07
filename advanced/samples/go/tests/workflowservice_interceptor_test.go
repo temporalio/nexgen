@@ -2,6 +2,7 @@ package tests
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -94,9 +95,6 @@ func TestWorkflowServiceTypedInterceptors(t *testing.T) {
 	require.Equal(t, "SignalWithStartWorkflowExecution", input.Operation)
 	require.Equal(t, workflow.NexusOperationOptions{}, input.Options)
 	require.Empty(t, input.NexusHeader)
-	request := input.Input.(implementation.SystemNexus_SignalWithStartWorkflowRequest)
-	require.Equal(t, "intercepted", request.ID)
-	require.Equal(t, []any{"intercepted-signal"}, request.SignalArgs)
 
 	dc := commonconverter.WithDataConverterSystemNexusContext(
 		commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
@@ -107,6 +105,9 @@ func TestWorkflowServiceTypedInterceptors(t *testing.T) {
 	var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
 	require.NoError(t, converter.GetDefaultDataConverter().FromPayload(payload, &wire))
 	require.Equal(t, "intercepted", wire.WorkflowId)
+	var signalArg string
+	require.NoError(t, converter.GetDefaultDataConverter().FromPayloads(wire.SignalInput, &signalArg))
+	require.Equal(t, "intercepted-signal", signalArg)
 	require.Equal(t, 10*time.Second, wire.WorkflowTaskTimeout.AsDuration())
 	require.Nil(t, wire.WorkflowStartDelay)
 	require.Nil(t, wire.Header)
@@ -116,20 +117,37 @@ func TestWorkflowServiceTypedInterceptors(t *testing.T) {
 	require.Equal(t, "from interceptor", summary)
 }
 
+func workflowServiceRequest(t *testing.T, opts ws.SignalWithStartWorkflowOptions) any {
+	t.Helper()
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	runtime := &recordingWorkflowServiceRuntime{}
+	env.ExecuteWorkflow(func(ctx workflow.Context) error {
+		future, settable := workflow.NewFuture(ctx)
+		settable.Set(workflowservicepb.SignalWithStartWorkflowExecutionResponse{}, nil)
+		runtime.future = &sampleNexusFuture{Future: future}
+		return implementation.SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow(
+			runtime.ExecuteNexusOperation, ctx, opts, "target", "wake-up", nil, "singleArgWorkflow",
+		).Get(ctx, nil)
+	})
+	require.NoError(t, env.GetWorkflowError())
+	require.Len(t, runtime.inputs, 1)
+	return runtime.inputs[0].Input
+}
+
 func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 	dc := commonconverter.WithDataConverterSystemNexusContext(
 		commonconverter.MakeTransferAware(converter.GetDefaultDataConverter()),
 		converter.GetDefaultDataConverter(),
 	)
-	empty := ""
 	for _, tc := range []struct {
 		name    string
-		request ws.SignalWithStartWorkflowRequest
+		options ws.SignalWithStartWorkflowOptions
 	}{
 		{name: "omitted"},
 		{
 			name: "nonzero",
-			request: ws.SignalWithStartWorkflowRequest{
+			options: ws.SignalWithStartWorkflowOptions{
 				WorkflowExecutionTimeout: time.Hour,
 				WorkflowRunTimeout:       time.Minute,
 				WorkflowTaskTimeout:      10 * time.Second,
@@ -140,15 +158,16 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 		},
 		{
 			name: "nested presence",
-			request: ws.SignalWithStartWorkflowRequest{
-				RetryPolicy:  &temporal.RetryPolicy{},
-				Priority:     &temporal.Priority{PriorityKey: 1},
-				UserMetadata: &ws.UserMetadata{StaticSummary: &empty},
+			options: ws.SignalWithStartWorkflowOptions{
+				RetryPolicy:   &temporal.RetryPolicy{},
+				Priority:      &temporal.Priority{PriorityKey: 1},
+				StaticSummary: "summary",
 			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			payload, err := dc.ToPayload(tc.request)
+			request := workflowServiceRequest(t, tc.options)
+			payload, err := dc.ToPayload(request)
 			require.NoError(t, err)
 			var wire workflowservicepb.SignalWithStartWorkflowExecutionRequest
 			require.NoError(t, converter.GetDefaultDataConverter().FromPayload(payload, &wire))
@@ -156,10 +175,10 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 				value time.Duration
 				wire  *durationpb.Duration
 			}{
-				{tc.request.WorkflowExecutionTimeout, wire.WorkflowExecutionTimeout},
-				{tc.request.WorkflowRunTimeout, wire.WorkflowRunTimeout},
-				{tc.request.WorkflowTaskTimeout, wire.WorkflowTaskTimeout},
-				{tc.request.StartDelay, wire.WorkflowStartDelay},
+				{tc.options.WorkflowExecutionTimeout, wire.WorkflowExecutionTimeout},
+				{tc.options.WorkflowRunTimeout, wire.WorkflowRunTimeout},
+				{tc.options.WorkflowTaskTimeout, wire.WorkflowTaskTimeout},
+				{tc.options.StartDelay, wire.WorkflowStartDelay},
 			} {
 				if duration.value == 0 {
 					require.Nil(t, duration.wire)
@@ -168,18 +187,19 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 					require.Equal(t, duration.value, duration.wire.AsDuration())
 				}
 			}
-			require.Equal(t, tc.request.WorkflowIDConflictPolicy, wire.WorkflowIdConflictPolicy)
-			require.Equal(t, tc.request.CronSchedule, wire.CronSchedule)
-			require.Equal(t, tc.request.RetryPolicy == nil, wire.RetryPolicy == nil)
-			require.Equal(t, tc.request.Priority == nil, wire.Priority == nil)
-			require.Equal(t, tc.request.UserMetadata == nil, wire.UserMetadata == nil)
-			if tc.request.UserMetadata != nil {
+			require.Equal(t, tc.options.WorkflowIDConflictPolicy, wire.WorkflowIdConflictPolicy)
+			require.Equal(t, tc.options.CronSchedule, wire.CronSchedule)
+			require.Equal(t, tc.options.RetryPolicy == nil, wire.RetryPolicy == nil)
+			require.Equal(t, tc.options.Priority == nil, wire.Priority == nil)
+			require.Equal(t, tc.options.StaticSummary == "", wire.UserMetadata == nil)
+			if tc.options.StaticSummary != "" {
 				require.NotNil(t, wire.UserMetadata.Summary)
 			}
 
-			var roundTrip ws.SignalWithStartWorkflowRequest
-			require.NoError(t, dc.FromPayload(payload, &roundTrip))
-			require.Equal(t, tc.request, roundTrip)
+			// Decode into the private envelope type captured from the terminal.
+			roundTrip := reflect.New(reflect.TypeOf(request))
+			require.NoError(t, dc.FromPayload(payload, roundTrip.Interface()))
+			require.Equal(t, request, roundTrip.Elem().Interface())
 		})
 	}
 
@@ -192,14 +212,8 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 		}
 		payload, err := converter.GetDefaultDataConverter().ToPayload(wire)
 		require.NoError(t, err)
-		var request ws.SignalWithStartWorkflowRequest
-		require.NoError(t, dc.FromPayload(payload, &request))
-		require.Zero(t, request.WorkflowExecutionTimeout)
-		require.Zero(t, request.WorkflowRunTimeout)
-		require.Zero(t, request.WorkflowTaskTimeout)
-		require.Zero(t, request.StartDelay)
-		require.Zero(t, request.WorkflowIDReusePolicy, "decoding must not evaluate wrapper defaults")
-		require.Empty(t, request.TaskQueue, "decoding must not evaluate wrapper defaults")
+		request := reflect.New(reflect.TypeOf(workflowServiceRequest(t, ws.SignalWithStartWorkflowOptions{}))).Interface()
+		require.NoError(t, dc.FromPayload(payload, request))
 
 		payload, err = dc.ToPayload(request)
 		require.NoError(t, err)
@@ -208,6 +222,8 @@ func TestWorkflowServiceRequestDefaultPunning(t *testing.T) {
 		require.Nil(t, wire.WorkflowRunTimeout)
 		require.Nil(t, wire.WorkflowTaskTimeout)
 		require.Nil(t, wire.WorkflowStartDelay)
+		require.Zero(t, wire.WorkflowIdReusePolicy, "decoding must not evaluate wrapper defaults")
+		require.Empty(t, wire.GetTaskQueue().GetName(), "decoding must not evaluate wrapper defaults")
 	})
 }
 

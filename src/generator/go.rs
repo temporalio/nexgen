@@ -1527,7 +1527,6 @@ impl<'a> ApiPlanner<'a> {
             &self.flags,
             &self.variants,
             &self.models,
-            self.package.workflow_interceptors,
         );
         apply_go_visibility(
             &visibility,
@@ -3033,7 +3032,6 @@ fn compute_go_visibility(
     flags: &IndexMap<String, RenderedFlags>,
     variants: &IndexMap<String, RenderedVariant>,
     models: &IndexMap<String, RenderedModel>,
-    interceptor_inputs: bool,
 ) -> GoVisibility {
     let mut marker = GoVisibilityMarker {
         api_plan,
@@ -3052,14 +3050,6 @@ fn compute_go_visibility(
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);
-            if interceptor_inputs
-                && let Some(input) = operation
-                    .input
-                    .as_ref()
-                    .and_then(|input| planned_message_type(input, api_plan))
-            {
-                marker.mark_message_type(&input);
-            }
         }
         for resource in &service.resources {
             marker.mark_resource_public_surface(&resource.data);
@@ -6721,75 +6711,6 @@ mod tests {
         assert_eq!(
             super::go_unexported_name("SystemNexus_Request"),
             "systemnexus_request"
-        );
-    }
-
-    #[test]
-    fn system_nexus_visibility_keeps_unpacked_requests_private() {
-        use crate::spec::CompilerPass;
-
-        let input = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("advanced/samples/inputs/multi-operation-service.wit");
-        let tree = crate::parser::load_api_spec_tree_for_language_with_inputs(
-            crate::language::Language::Go,
-            &[input],
-        )
-        .unwrap();
-        let selected = crate::planning::LanguageSelectionPass::new(crate::language::Language::Go)
-            .apply(tree)
-            .unwrap();
-        let descriptors = crate::descriptors::DescriptorIndex::load_many(&[]).unwrap();
-        let bound = crate::planning::ResourceResolutionPass::new(
-            &descriptors,
-            vec![crate::nexgen_config::GenerationTarget::Workflow],
-        )
-        .apply(selected)
-        .unwrap();
-        let bound = crate::planning::OperationBindingPass::new()
-            .apply(bound)
-            .unwrap();
-        let lowered = crate::planning::OperationLoweringPass::new()
-            .apply(bound)
-            .unwrap();
-        let planned = crate::planning::TypePlanningPass::new(&lowered, &descriptors)
-            .apply(lowered)
-            .unwrap();
-        let crate::spec::ApiSpecNode::Leaf(leaf) = planned.root else {
-            panic!("expected a single sample module");
-        };
-        let models = leaf
-            .spec
-            .records()
-            .map(|(key, record)| {
-                (
-                    key.to_string(),
-                    super::RenderedModel {
-                        name: record.name.clone(),
-                        type_parameters: Vec::new(),
-                        fields: Vec::new(),
-                    },
-                )
-            })
-            .collect();
-        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
-            system_nexus: true,
-            ..Default::default()
-        });
-        let visibility = super::compute_go_visibility(
-            &leaf.spec,
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            &models,
-            false,
-        );
-        for (key, record) in leaf.spec.records() {
-            assert_eq!(visibility.is_public(key), record.name == "Response");
-        }
-        assert_eq!(visibility.rewrite_go_expr("Request"), "systemnexus_request");
-        assert_eq!(
-            visibility.rewrite_go_expr("Response"),
-            "SystemNexus_Response"
         );
     }
 

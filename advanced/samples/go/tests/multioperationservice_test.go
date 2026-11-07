@@ -29,7 +29,8 @@ type multiOperationRuntime struct {
 func (r *multiOperationRuntime) ExecuteNexusOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
 	r.inputs = append(r.inputs, input)
 	future, settable := workflow.NewFuture(ctx)
-	settable.Set(service.SystemNexus_Response{Value: input.Input.(service.SystemNexus_Request).ID}, nil)
+	request := input.Input.(interface{ GetID() string })
+	settable.Set(service.SystemNexus_Response{Value: request.GetID()}, nil)
 	return &sampleNexusFuture{Future: future}
 }
 
