@@ -7,16 +7,17 @@ import (
 	"go.temporal.io/sdk/internal"
 )
 
-// --- Operations (public API) ---
+// --- Datatypes ---
 
-type SystemNexus_Request struct {
-	// ID - Required.
+type systemnexus_request struct {
 	ID string
 }
 
-func (m SystemNexus_Request) GetID() string {
+func (m systemnexus_request) GetID() string {
 	return m.ID
 }
+
+// --- Operations (public API) ---
 
 type SystemNexus_Response struct {
 	// Value - Required.
@@ -65,7 +66,7 @@ func SystemNexus_WorkflowOutboundInterceptorBase_FirstOperation(next systemnexus
 
 // SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation constructs and schedules the intercepted request.
 func SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation(executeNexusOperation func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture, ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
-	request := SystemNexus_Request{
+	request := systemnexus_request{
 		ID: id,
 	}
 	fut := executeNexusOperation(ctx, internal.ExecuteNexusOperationInput{
@@ -84,7 +85,7 @@ func SystemNexus_WorkflowOutboundInterceptorBase_SecondOperation(next systemnexu
 
 // SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation constructs and schedules the intercepted request.
 func SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation(executeNexusOperation func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture, ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
-	request := SystemNexus_Request{
+	request := systemnexus_request{
 		ID: id,
 	}
 	fut := executeNexusOperation(ctx, internal.ExecuteNexusOperationInput{
