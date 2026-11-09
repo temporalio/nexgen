@@ -239,7 +239,7 @@ async def test_workflow_apis_call_the_stream_service(
 async def test_workflow_handle_decodes_with_its_type_parameter(
     monkeypatch: pytest.MonkeyPatch, construction: str
 ) -> None:
-    ref = workflow_models.StreamRef(id="typed-stream")
+    ref = workflow_models.StreamRef[Turn](id="typed-stream")
     record = workflow_models.StreamRecord(
         item=workflow_models.StreamItemData(
             workflow_models.StreamData(body=Turn(role="model"))
@@ -284,14 +284,18 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
     assert page.records == [record]
 
 
-def test_a_subclass_of_a_specialized_handle_takes_its_type_argument() -> None:
+def test_a_subclass_of_a_specialized_handle_is_rejected() -> None:
     class TurnStream(WorkflowStream[Turn]):
         pass
 
-    ref = workflow_models.StreamRef(id="typed-stream")
+    ref = workflow_models.StreamRef[Turn](id="typed-stream")
 
-    assert TurnStream(ref=ref, created=None).body_type is Turn
-    assert WorkflowStream(ref=ref, created=None).body_type is typing.Any
+    with pytest.raises(TypeError, match="Generic resource subclasses"):
+        _ = TurnStream(ref=ref, created=None)
+    assert (
+        WorkflowStream(ref=workflow_models.StreamRef(id="s1"), created=None).body_type
+        is object
+    )
 
 
 async def test_a_decoded_ref_builds_a_typed_workflow_handle(
@@ -348,17 +352,30 @@ async def test_a_decoded_ref_builds_a_typed_workflow_handle(
 
 def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
     plain = workflow_models.StreamRef(id="typed-stream")
+    typed = workflow_models.StreamRef[Turn](id="typed-stream")
 
-    typed_ref = WorkflowStream[Turn](ref=plain, created=None).ref
-    any_ref = WorkflowStream(ref=plain, created=None).ref
+    typed_ref = WorkflowStream[Turn](ref=typed, created=None).ref
+    unknown_ref = WorkflowStream(ref=plain, created=None).ref
+    inferred = WorkflowStream(ref=typed, created=None)
 
     _ = assert_type(typed_ref, workflow_models.StreamRef[Turn])
+    _ = assert_type(inferred, WorkflowStream[Turn])
+    assert inferred.body_type is Turn
+    _ = assert_type(plain, workflow_models.StreamRef[object])
+    _ = assert_type(unknown_ref, workflow_models.StreamRef[object])
+    assert typed_ref is typed
+    assert unknown_ref is plain
     assert typing.get_args(getattr(typed_ref, "__orig_class__", None)) == (Turn,)
-    assert typing.get_args(getattr(any_ref, "__orig_class__", None)) == (typing.Any,)
     # A hand-built typed ref keeps its own type argument.
     assert typing.get_args(
         getattr(workflow_models.StreamRef[Turn](id="s1"), "__orig_class__", None)
     ) == (Turn,)
+
+    if typing.TYPE_CHECKING:
+        _ = WorkflowStream[Turn](
+            ref=plain,  # pyright: ignore[reportArgumentType]
+            created=None,
+        )
 
 
 async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:

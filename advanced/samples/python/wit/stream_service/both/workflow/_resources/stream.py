@@ -29,6 +29,7 @@ BodyT = typing.TypeVar("BodyT")
 class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
+    ref: StreamRef[BodyT]
     created: bool | None
 
     def __init__(
@@ -36,33 +37,15 @@ class Stream(typing.Generic[BodyT]):
         ref: StreamRef[BodyT],
         created: bool | None,
     ) -> None:
-        self._ref: StreamRef[BodyT] = ref
+        if type(self) is not Stream:
+            raise TypeError("Generic resource subclasses are not supported")
+        self.ref = ref
         self.created = created
 
     @property
     def body_type(self) -> type[BodyT]:
-        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
-        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
-            (
-                typing.get_args(base)
-                for klass in type(self).__mro__
-                for base in vars(klass).get("__orig_bases__", ())
-                if typing.get_origin(base) is Stream
-            ),
-            (),
-        )
-        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
-
-    @property
-    def ref(self) -> StreamRef[BodyT]:
-        # The ref carries the handle's payload type, so a reader of it keeps the type.
-        if not typing.get_args(getattr(self._ref, "__orig_class__", None)):
-            self._ref = StreamRef[self.body_type](
-                id=self._ref.id,
-                owner=self._ref.owner,
-                backend=self._ref.backend,
-            )
-        return self._ref
+        arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
+        return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
     async def publish(
         self,
@@ -138,7 +121,7 @@ async def _append_records(
 
 async def append_records(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
     records: list[AppendRecord[BodyT]],
     sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
@@ -174,7 +157,7 @@ async def _close_stream(
 
 async def close_stream(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     request = CloseStreamRequest(
         ref=ref,
@@ -201,7 +184,7 @@ async def _read_records(
 @typing.overload
 async def read_records(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -216,7 +199,7 @@ async def read_records(
 @typing.overload
 async def read_records(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -230,7 +213,7 @@ async def read_records(
 
 async def read_records(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -287,7 +270,7 @@ async def _describe_stream(
 
 async def describe_stream(
     *,
-    ref: StreamRef,
+    ref: StreamRef[typing.Any],
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     request = DescribeStreamRequest(
         ref=ref,

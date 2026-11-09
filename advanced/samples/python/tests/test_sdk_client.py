@@ -725,7 +725,7 @@ async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
 async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     construction: str,
 ) -> None:
-    ref = StreamRef(id="s1")
+    ref = StreamRef[Turn](id="s1")
     record = StreamRecord(
         item=StreamItemData(StreamData(body=Turn(role="model"))), offset=1
     )
@@ -808,17 +808,31 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     plain_stream = client.get_stream(plain)
 
     _ = assert_type(typed_stream, Stream[Turn])
-    _ = assert_type(plain_stream, Stream[typing.Any])
+    _ = assert_type(plain, StreamRef[object])
+    _ = assert_type(plain_stream, Stream[object])
+    _ = assert_type(client.get_stream(ref=typed), Stream[Turn])
+    assert plain_stream.body_type is object
     [typed_record] = (await typed_stream.read()).records
     [plain_record] = (await plain_stream.read()).records
     assert typed_record.item == StreamItemData(StreamData(body=Turn(role="model")))
-    # A plain ref reads as Any, so the body stays a decoded dict.
+    # An unknown payload stays a decoded dict.
     assert plain_record.item == StreamItemData(StreamData(body={"role": "model"}))
     # An explicit body_type overrides a ref with no type argument, positionally or by keyword.
     override = client.get_stream(plain, body_type=Turn)
     _ = assert_type(override, Stream[Turn])
     assert override.body_type is Turn
     assert client.get_stream(ref=plain, body_type=Turn).body_type is Turn
+    explicit_unknown = client.get_stream(StreamRef[object](id="s1"))
+    assert explicit_unknown.body_type is object
+    assert (await explicit_unknown.read()).records == (
+        await plain_stream.read()
+    ).records
+    assert (
+        client.get_stream(StreamRef[object](id="s1"), body_type=Turn).body_type is Turn
+    )
+    # A mismatch is rejected at runtime too, even when the caller bypasses static checking.
+    with pytest.raises(TypeError, match="decoding type must match"):
+        _ = client.get_stream(typing.cast(typing.Any, typed), body_type=str)
     # The ref of a typed handle keeps its type argument, which is not part of its data.
     ref = client.get_stream(ref=plain, body_type=Turn).ref
     assert client.get_stream(ref).body_type is Turn
@@ -826,11 +840,34 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     assert repr(ref) == repr(plain)
 
     if typing.TYPE_CHECKING:
+        _ = client.get_stream(typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
+        _ = Stream[Turn](
+            client.create_nexus_client(
+                service=STREAM_SERVICE, endpoint=SYSTEM_ENDPOINT
+            ),
+            ref=plain,  # pyright: ignore[reportArgumentType]
+            created=None,
+        )
         # A ref of another type is an error where the handle fixes its own type.
         _ = Stream[str](
             client.create_nexus_client(
                 service=STREAM_SERVICE, endpoint=SYSTEM_ENDPOINT
             ),
             ref=StreamRef[Turn](id="s1"),  # pyright: ignore[reportArgumentType]
+            created=None,
+        )
+
+
+def test_a_client_stream_subclass_is_rejected() -> None:
+    class TurnStream(Stream[Turn]):
+        pass
+
+    client, _ = connect(Client, {})
+    with pytest.raises(TypeError, match="Generic resource subclasses"):
+        _ = TurnStream(
+            client.create_nexus_client(
+                service=STREAM_SERVICE, endpoint=SYSTEM_ENDPOINT
+            ),
+            ref=StreamRef[Turn](id="s1"),
             created=None,
         )
