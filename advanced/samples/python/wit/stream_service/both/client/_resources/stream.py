@@ -12,6 +12,7 @@ from ...services import StreamService
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
+    AppendRecordsResponse,
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
@@ -65,8 +66,8 @@ class Stream(typing.Generic[BodyT]):
         *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> int | None:
-        """Publish values, and return the offset of the last one."""
+    ) -> AppendRecordsResponse:
+        """Publish values, and return the first and the last offset of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
@@ -80,8 +81,7 @@ class Stream(typing.Generic[BodyT]):
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
-        result = await handle.result()
-        return result.last_offset
+        return await handle.result()
 
     async def close(
         self,

@@ -269,7 +269,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         Client,
         {
             "CreateStream": CreateStreamResult(ref=StreamRef(id="s1"), created=True),
-            "AppendRecords": AppendRecordsResponse(last_offset=7),
+            "AppendRecords": AppendRecordsResponse(first_offset=7, last_offset=7),
             "CloseStream": CloseStreamResponse(),
         },
     )
@@ -279,11 +279,11 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, f"_stream_service_{name}")
 
     stream = await client.create_stream(id="s1", body_type=str)
-    last_offset = await stream.publish()
+    response = await stream.publish("a")
     await stream.close()
 
     assert stream.ref.id == "s1"
-    assert last_offset == 7
+    assert response.last_offset == 7
     assert len(client.created_clients) == 1
     create, append, close = answers.started
     assert (create.service, create.endpoint, create.operation) == (
@@ -305,7 +305,9 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     )
     # A client call fills the producer from its source.
     assert append.arg == AppendRecordsRequest(
-        ref=stream.ref, records=[], producer=Producer(id="client:sample")
+        ref=stream.ref,
+        records=[AppendRecord(body="a")],
+        producer=Producer(id="client:sample"),
     )
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
@@ -350,31 +352,24 @@ async def test_a_create_takes_the_fields_of_the_ref(
     assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
 
 
-async def test_a_publish_wraps_each_value_and_returns_the_last_offset() -> None:
+async def test_a_publish_wraps_each_value_and_returns_the_response() -> None:
     ref = StreamRef(id="s1")
     client, answers = connect(
         Client,
-        {
-            "AppendRecords": [
-                AppendRecordsResponse(first_offset=4, last_offset=5),
-                AppendRecordsResponse(),
-            ]
-        },
+        {"AppendRecords": AppendRecordsResponse(first_offset=4, last_offset=5)},
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    last_offset = await stream.publish("a", "b")
-    empty = await stream.publish()
+    response = await stream.publish("a", "b")
 
-    _ = assert_type(last_offset, int | None)
-    assert last_offset == 5
+    _ = assert_type(response, AppendRecordsResponse)
+    assert response.first_offset == 4
+    assert response.last_offset == 5
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
         producer=Producer(id="client:sample"),
     )
-    # An empty publish writes no Record, so it has no last offset and answers none.
-    assert empty is None
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.publish(1)  # pyright: ignore[reportArgumentType]

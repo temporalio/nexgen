@@ -856,8 +856,8 @@ temporalio.converter.transfer_type_convertible(_ClientEpochTransferTypeConverter
 
 @dataclasses.dataclass(slots=True)
 class AppendRecordsResponse:
-    first_offset: int | None = None
-    last_offset: int | None = None
+    first_offset: int
+    last_offset: int
 
 
 class _AppendRecordsResponseTransferTypeConverter(
@@ -877,9 +877,11 @@ class _AppendRecordsResponseTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
         type_hint: type[AppendRecordsResponse],
     ) -> AppendRecordsResponse:
+        first_offset = value.first_offset
+        last_offset = value.last_offset
         return AppendRecordsResponse(
-            first_offset=value.first_offset if value.first_offset != 0 else None,
-            last_offset=value.last_offset if value.last_offset != 0 else None,
+            first_offset=first_offset,
+            last_offset=last_offset,
         )
 
     @typing_extensions.override
@@ -890,10 +892,8 @@ class _AppendRecordsResponseTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse()
         )
-        if value.first_offset is not None:
-            message.first_offset = value.first_offset
-        if value.last_offset is not None:
-            message.last_offset = value.last_offset
+        message.first_offset = value.first_offset
+        message.last_offset = value.last_offset
         return message
 
 
