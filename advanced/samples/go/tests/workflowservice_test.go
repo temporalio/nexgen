@@ -117,20 +117,20 @@ func (s *WorkflowServiceIntegrationSuite) runWorkflow(caller any, result any) {
 func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	capture := &captureNexusInputInterceptor{}
 	s.interceptors = []interceptor.WorkerInterceptor{capture}
-	var runID *string
-	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
-		var response ws.SignalWithStartWorkflowResponse
+	var execution workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) (workflow.Execution, error) {
+		var execution workflow.Execution
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{},
 			s.targetID("minimal"), "wake-up", "signal-value", emptyArgsWorkflow,
-		).Get(ctx, &response)
-		return response.RunID, err
-	}, &runID)
+		).Get(ctx, &execution)
+		return execution, err
+	}, &execution)
 
-	s.Require().NotNil(runID)
-	s.NotEmpty(*runID)
+	s.Equal(s.targetID("minimal"), execution.ID)
+	s.NotEmpty(execution.RunID)
 	var result string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("minimal"), *runID).Get(s.ctx, &result))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, execution.ID, execution.RunID).Get(s.ctx, &result))
 	s.Equal("signal-value", result)
 
 	capture.mu.Lock()
@@ -145,9 +145,9 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
-	var runIDs []*string
-	s.runWorkflow(func(ctx workflow.Context) ([]*string, error) {
-		var byFunction, byName ws.SignalWithStartWorkflowResponse
+	var executions []workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) ([]workflow.Execution, error) {
+		var byFunction, byName workflow.Execution
 		if err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
 			s.targetID("function"), "wake-up", "wake-up", exampleWorkflow, 7, "nexus",
@@ -160,35 +160,37 @@ func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms()
 		).Get(ctx, &byName); err != nil {
 			return nil, err
 		}
-		return []*string{byFunction.RunID, byName.RunID}, nil
-	}, &runIDs)
+		return []workflow.Execution{byFunction, byName}, nil
+	}, &executions)
 
-	s.Require().Len(runIDs, 2)
-	for _, runID := range runIDs {
-		s.Require().NotNil(runID)
-		s.NotEmpty(*runID)
+	s.Require().Len(executions, 2)
+	for _, execution := range executions {
+		s.NotEmpty(execution.RunID)
 	}
+	s.Equal(s.targetID("function"), executions[0].ID)
+	s.Equal(s.targetID("name"), executions[1].ID)
 	var functionResult, nameResult string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("function"), *runIDs[0]).Get(s.ctx, &functionResult))
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("name"), *runIDs[1]).Get(s.ctx, &nameResult))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, executions[0].ID, executions[0].RunID).Get(s.ctx, &functionResult))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, executions[1].ID, executions[1].RunID).Get(s.ctx, &nameResult))
 	s.Equal("example:7:nexus:wake-up", functionResult)
 	s.Equal("single:positional:nil", nameResult)
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestListSignalArgument() {
-	var runID *string
-	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
-		var response ws.SignalWithStartWorkflowResponse
+	var execution workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) (workflow.Execution, error) {
+		var execution workflow.Execution
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
 			s.targetID("list"), "wake-up", []string{"one", "two"}, listSignalWorkflow,
-		).Get(ctx, &response)
-		return response.RunID, err
-	}, &runID)
+		).Get(ctx, &execution)
+		return execution, err
+	}, &execution)
 
-	s.Require().NotNil(runID)
+	s.Equal(s.targetID("list"), execution.ID)
+	s.NotEmpty(execution.RunID)
 	var result []string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("list"), *runID).Get(s.ctx, &result))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, execution.ID, execution.RunID).Get(s.ctx, &result))
 	s.Equal([]string{"one", "two"}, result)
 }
 

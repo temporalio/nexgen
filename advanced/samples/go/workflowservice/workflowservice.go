@@ -15,7 +15,37 @@ import (
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	commonconverter "go.temporal.io/sdk/internal/common/converter"
+	temporalworkflow "go.temporal.io/sdk/workflow"
 )
+
+// --- Datatypes ---
+
+type systemnexus_signalWithStartWorkflowResponse struct {
+	RunID   string
+	Started bool
+}
+
+func (m systemnexus_signalWithStartWorkflowResponse) GetRunID() string {
+	return m.RunID
+}
+
+func (m systemnexus_signalWithStartWorkflowResponse) GetStarted() bool {
+	return m.Started
+}
+
+func systemnexus_signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusContext, m *systemnexus_signalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
+	message := &workflowservice.SignalWithStartWorkflowExecutionResponse{}
+	message.RunId = m.RunID
+	message.Started = m.Started
+	return message, nil
+}
+
+func systemnexus_signalWithStartWorkflowResponseFromProto(cfg *commonconverter.SystemNexusContext, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *systemnexus_signalWithStartWorkflowResponse) error {
+	*out = systemnexus_signalWithStartWorkflowResponse{}
+	out.RunID = proto.GetRunId()
+	out.Started = proto.GetStarted()
+	return nil
+}
 
 // --- Operations (public API) ---
 
@@ -540,60 +570,6 @@ func systemnexus_userMetadataFromProto(cfg *commonconverter.SystemNexusContext, 
 	return nil
 }
 
-// SignalWithStartWorkflowResponse - Result of signaling a workflow and starting it if
-// needed.
-//
-// Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflowResponse]
-type SystemNexus_SignalWithStartWorkflowResponse struct {
-	// RunID - Run ID of the started workflow.
-	//
-	// Optional.
-	RunID *string
-	// Started - Whether the workflow was started.
-	//
-	// Optional.
-	Started *bool
-}
-
-func (m SystemNexus_SignalWithStartWorkflowResponse) GetRunID() *string {
-	return m.RunID
-}
-
-func (m SystemNexus_SignalWithStartWorkflowResponse) GetStarted() *bool {
-	return m.Started
-}
-
-func systemnexus_signalWithStartWorkflowResponseToProto(cfg *commonconverter.SystemNexusContext, m *SystemNexus_SignalWithStartWorkflowResponse) (*workflowservice.SignalWithStartWorkflowExecutionResponse, error) {
-	message := &workflowservice.SignalWithStartWorkflowExecutionResponse{}
-	if m.RunID != nil {
-		message.RunId = (*m.RunID)
-	}
-	if m.Started != nil {
-		message.Started = (*m.Started)
-	}
-	return message, nil
-}
-
-func systemnexus_signalWithStartWorkflowResponseFromProto(cfg *commonconverter.SystemNexusContext, proto *workflowservice.SignalWithStartWorkflowExecutionResponse, out *SystemNexus_SignalWithStartWorkflowResponse) error {
-	*out = SystemNexus_SignalWithStartWorkflowResponse{}
-	{
-		converted := proto.GetRunId()
-		out.RunID = &converted
-	}
-	{
-		converted := proto.GetStarted()
-		out.Started = &converted
-	}
-	return nil
-}
-
-func (SystemNexus_SignalWithStartWorkflowResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return commonconverter.NewSystemNexusTransferTypeConverter(
-		systemnexus_signalWithStartWorkflowResponseToProto,
-		systemnexus_signalWithStartWorkflowResponseFromProto,
-	)
-}
-
 // SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
 //
 // Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflowOptions]
@@ -680,7 +656,7 @@ type SystemNexus_SignalWithStartWorkflowOptions struct {
 // Input workflow: Workflow function identifying the workflow to start.
 // Input args: Arguments for the workflow.
 //
-// Returns: A workflow handle to the started workflow.
+// Returns: A workflow.Execution with details about the signaled workflow.
 //
 // Exposed as: [go.temporal.io/sdk/advanced/samples/go/workflowservice_facade.SignalWithStartWorkflow]
 func SystemNexus_SignalWithStartWorkflow(
@@ -780,8 +756,15 @@ func SystemNexus_WorkflowEnvironmentInterceptor_SignalWithStartWorkflow(executeN
 	})
 	result, resultSettable := internal.NewFuture(ctx)
 	internal.Go(ctx, func(ctx internal.Context) {
-		var value SystemNexus_SignalWithStartWorkflowResponse
-		if err := fut.Get(ctx, &value); err != nil {
+		var result workflowservice.SignalWithStartWorkflowExecutionResponse
+		if err := fut.Get(ctx, &result); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		value, err := func() (temporalworkflow.Execution, error) {
+			return temporalworkflow.Execution{ID: request.ID, RunID: result.GetRunId()}, nil
+		}()
+		if err != nil {
 			resultSettable.SetError(err)
 			return
 		}

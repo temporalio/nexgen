@@ -295,34 +295,33 @@ namespace Temporalio.Workflows
     public record SignalWithStartWorkflowResponse
     {
         /// <summary>
-        /// Run ID of the started workflow.
+        /// Initializes a new instance of the <see cref="SignalWithStartWorkflowResponse"/> class.
         /// </summary>
-        public string? RunId { get; init; }
+        public SignalWithStartWorkflowResponse(string runId, bool started)
+        {
+            RunId = runId;
+            Started = started;
+        }
+
+        /// <summary>
+        /// Run ID of the signaled workflow.
+        /// </summary>
+        public string RunId { get; init; }
         /// <summary>
         /// Whether the workflow was started.
         /// </summary>
-        public bool? Started { get; init; }
+        public bool Started { get; init; }
 
         internal static SignalWithStartWorkflowResponse FromTransferType(Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse wire)
         {
-            return new SignalWithStartWorkflowResponse()
-            {
-                RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
-                Started = wire.Started == false ? null : wire.Started,
-            };
+            return new SignalWithStartWorkflowResponse(wire.RunId, wire.Started);
         }
 
         internal Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse ToTransferType()
         {
             var proto = new Temporalio.Api.WorkflowService.V1.SignalWithStartWorkflowExecutionResponse();
-            if (RunId is { } runId)
-            {
-                proto.RunId = runId;
-            }
-            if (Started is { } started)
-            {
-                proto.Started = started;
-            }
+            proto.RunId = RunId;
+            proto.Started = Started;
             return proto;
         }
 

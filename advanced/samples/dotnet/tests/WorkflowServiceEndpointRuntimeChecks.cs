@@ -135,11 +135,7 @@ namespace Nexgen.DotNetExamples.Tests
                         (_ctx, input) =>
                         {
                             calls.Add(input);
-                            return new SignalWithStartWorkflowResponse
-                            {
-                                RunId = "run-123",
-                                Started = true,
-                            };
+                            return new SignalWithStartWorkflowResponse("run-123", true);
                         })),
             };
             return new ServiceHandlerInstance(definition, handlers);

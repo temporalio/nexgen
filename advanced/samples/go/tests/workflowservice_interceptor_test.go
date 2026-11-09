@@ -70,10 +70,10 @@ func TestWorkflowServiceTypedInterceptors(t *testing.T) {
 		return implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(terminal, ctx, opts, "intercepted", signal, "intercepted-signal", workflowType, args...)
 	})
 	runID := "target-run"
-	var response ws.SignalWithStartWorkflowResponse
+	var execution workflow.Execution
 	env.ExecuteWorkflow(func(ctx workflow.Context) error {
 		future, settable := workflow.NewFuture(ctx)
-		settable.Set(ws.SignalWithStartWorkflowResponse{RunID: &runID}, nil)
+		settable.Set(workflowservicepb.SignalWithStartWorkflowExecutionResponse{RunId: runID}, nil)
 		runtime.future = &sampleNexusFuture{Future: future}
 		return implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(outbound, ctx,
 			ws.SignalWithStartWorkflowOptions{
@@ -83,10 +83,10 @@ func TestWorkflowServiceTypedInterceptors(t *testing.T) {
 				StartDelay:            time.Hour,
 			},
 			"original", "wake-up", "signal-value", "singleArgWorkflow", "workflow-input",
-		).Get(ctx, &response)
+		).Get(ctx, &execution)
 	})
 	require.NoError(t, env.GetWorkflowError())
-	require.Equal(t, &runID, response.RunID)
+	require.Equal(t, workflow.Execution{ID: "intercepted", RunID: runID}, execution)
 	require.Equal(t, 1, calls)
 	require.Len(t, runtime.inputs, 1)
 	input := runtime.inputs[0]
@@ -249,22 +249,17 @@ func TestWorkflowServiceInterceptorShortCircuit(t *testing.T) {
 				if tc.fail {
 					settable.SetError(errors.New("interceptor rejected the call"))
 				} else {
-					runID := "intercepted-run"
-					settable.Set(ws.SignalWithStartWorkflowResponse{RunID: &runID}, nil)
+					settable.Set(workflow.Execution{ID: "intercepted", RunID: "intercepted-run"}, nil)
 				}
 				interceptedFuture = future
 				return future
 			})
-			env.ExecuteWorkflow(func(ctx workflow.Context) (string, error) {
-				var response ws.SignalWithStartWorkflowResponse
+			env.ExecuteWorkflow(func(ctx workflow.Context) (workflow.Execution, error) {
+				var execution workflow.Execution
 				future := implementation.SystemNexus_WorkflowOutboundInterceptorBase_SignalWithStartWorkflow(outbound, ctx, tc.options, "original", "wake-up", "signal", "registered-target", "input", 42)
 				require.Same(t, interceptedFuture, future)
-				err := future.Get(ctx, &response)
-				if err != nil {
-					return "", err
-				}
-				require.NotNil(t, response.RunID)
-				return *response.RunID, nil
+				err := future.Get(ctx, &execution)
+				return execution, err
 			})
 			require.Equal(t, 1, calls)
 			if tc.fail {
@@ -272,9 +267,9 @@ func TestWorkflowServiceInterceptorShortCircuit(t *testing.T) {
 				return
 			}
 			require.NoError(t, env.GetWorkflowError())
-			var runID string
-			require.NoError(t, env.GetWorkflowResult(&runID))
-			require.Equal(t, "intercepted-run", runID)
+			var execution workflow.Execution
+			require.NoError(t, env.GetWorkflowResult(&execution))
+			require.Equal(t, workflow.Execution{ID: "intercepted", RunID: "intercepted-run"}, execution)
 		})
 	}
 }
