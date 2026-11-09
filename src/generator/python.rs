@@ -2460,8 +2460,21 @@ impl<'a> ApiPlanner<'a> {
             }
             _ => None,
         };
+        let operation_parameters = model_input_parameters
+            .iter()
+            .map(|usage| usage.parameter.full_name.clone())
+            .chain(
+                operation
+                    .data
+                    .runtime_type_parameters
+                    .iter()
+                    .map(|parameter| parameter.full_name.clone()),
+            )
+            .collect::<BTreeSet<_>>();
         let unpacked_input = unpacked_input_name
-            .map(|name| self.build_unpacked_input(name, GenerationTarget::Workflow))
+            .map(|name| {
+                self.build_unpacked_input(name, GenerationTarget::Workflow, &operation_parameters)
+            })
             .transpose()?;
         let client_unpacked_input = unpacked_input_name
             .filter(|_| {
@@ -2469,7 +2482,9 @@ impl<'a> ApiPlanner<'a> {
                     .targets
                     .contains(&GenerationTarget::Client)
             })
-            .map(|name| self.build_unpacked_input(name, GenerationTarget::Client))
+            .map(|name| {
+                self.build_unpacked_input(name, GenerationTarget::Client, &operation_parameters)
+            })
             .transpose()?;
         let output_type_parameters = unpacked_input
             .iter()
@@ -2631,6 +2646,7 @@ impl<'a> ApiPlanner<'a> {
         &self,
         input_full_name: &str,
         target: GenerationTarget,
+        operation_parameters: &BTreeSet<String>,
     ) -> Result<RenderedUnpackedInput> {
         let model = self
             .models
@@ -2676,6 +2692,7 @@ impl<'a> ApiPlanner<'a> {
                     parameters.push(RenderedUnpackedInputField {
                         attr_name: child.value_expr.clone(),
                         annotation: child.annotation.clone(),
+                        reference: None,
                         default_kind: child.default_kind.clone(),
                         doc: child.doc.clone(),
                     });
@@ -2692,6 +2709,11 @@ impl<'a> ApiPlanner<'a> {
             )?;
             parameters.push(RenderedUnpackedInputField {
                 attr_name: rendered_field.attr_name.clone(),
+                reference: self.operation_ref_parameter(
+                    &planned_field.field_type,
+                    operation_parameters,
+                    !planned_field.api_required(target),
+                ),
                 annotation: if !planned_field.api_required(target) && planned_field.required {
                     format!("{} | None", rendered_field.annotation)
                 } else {
@@ -2762,6 +2784,43 @@ impl<'a> ApiPlanner<'a> {
                     }
                 })
                 .collect(),
+        })
+    }
+
+    /// Public operations bind a ref's phantom parameters to the types they already use.
+    /// Wire records remain unconstrained; this is Python API policy, not a shared model change.
+    fn operation_ref_parameter(
+        &self,
+        kind: &PlannedType,
+        operation_parameters: &BTreeSet<String>,
+        optional: bool,
+    ) -> Option<RenderedRefParameter> {
+        let PlannedType::Record(record) = kind.without_option() else {
+            return None;
+        };
+        let phantom = ref_type_parameters(self.api_plan, &record.full_name);
+        if !phantom
+            .iter()
+            .any(|parameter| operation_parameters.contains(&parameter.full_name))
+        {
+            return None;
+        }
+        let arguments = self
+            .api_plan
+            .record_type_parameters(&record.full_name)
+            .into_iter()
+            .map(|usage| usage.parameter)
+            .chain(phantom)
+            .map(|parameter| {
+                operation_parameters
+                    .contains(&parameter.full_name)
+                    .then_some(parameter.name)
+            })
+            .collect();
+        Some(RenderedRefParameter {
+            model_name: record.model_name.clone(),
+            arguments,
+            optional,
         })
     }
 
@@ -4146,8 +4205,64 @@ struct RenderedUnpackedInput {
 struct RenderedUnpackedInputField {
     attr_name: String,
     annotation: String,
+    reference: Option<RenderedRefParameter>,
     default_kind: PythonFieldDefaultKind,
     doc: Option<String>,
+}
+
+#[derive(Debug)]
+struct RenderedRefParameter {
+    model_name: String,
+    /// None denotes an unrelated payload parameter, which remains unconstrained.
+    arguments: Vec<Option<String>>,
+    optional: bool,
+}
+
+impl RenderedRefParameter {
+    fn annotation(&self, signature: RuntimeTypeSignature<'_>, runtime_types: &[String]) -> String {
+        let arguments = self
+            .arguments
+            .iter()
+            .map(|argument| match (argument, signature) {
+                (Some(argument), RuntimeTypeSignature::Implementation)
+                    if runtime_types.contains(argument) =>
+                {
+                    "typing.Any".to_string()
+                }
+                (Some(argument), _) => argument.clone(),
+                (None, _) => "typing.Any".to_string(),
+            })
+            .collect::<Vec<_>>();
+        let typed = python_type_annotation_with_arguments(&self.model_name, &arguments);
+        let RuntimeTypeSignature::Overload(supplied) = signature else {
+            return typed;
+        };
+        let unknown_arguments = self
+            .arguments
+            .iter()
+            .zip(&arguments)
+            .map(|(parameter, annotation)| {
+                if parameter.as_ref().is_some_and(|name| {
+                    runtime_types
+                        .iter()
+                        .zip(supplied)
+                        .any(|(runtime, supplied)| runtime == name && *supplied)
+                }) {
+                    "object".to_string()
+                } else {
+                    annotation.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        if unknown_arguments == arguments {
+            typed
+        } else {
+            format!(
+                "{typed} | {}",
+                python_type_annotation_with_arguments(&self.model_name, &unknown_arguments)
+            )
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -10243,7 +10358,7 @@ fn render_unpacked_operation_function(
     output.push('\n');
     let body_indent = target_body_indent(target);
     render_unpacked_operation_docstring(output, body_indent, operation, unpacked_input, None);
-    render_untyped_runtime_type_fallbacks(output, body_indent, &operation.runtime_type_arguments);
+    render_operation_ref_runtime_types(output, body_indent, operation, unpacked_input);
     for flattened_message in &unpacked_input.flattened_messages {
         render_flattened_message_setup(output, body_indent, flattened_message);
     }
@@ -10287,7 +10402,14 @@ fn render_unpacked_operation_signature(
         start_line(output, target, "    ");
         output.push_str(&field.attr_name);
         output.push_str(": ");
-        output.push_str(&field.annotation);
+        if let Some(reference) = &field.reference {
+            output.push_str(&reference.annotation(signature, &operation.runtime_type_arguments));
+            if reference.optional {
+                output.push_str(" | None");
+            }
+        } else {
+            output.push_str(&field.annotation);
+        }
         if let Some(default_expr) = python_parameter_default_expr(&field.default_kind) {
             render_python_default_expr(output, &default_expr, body_indent);
         }
@@ -10304,11 +10426,91 @@ fn render_unpacked_operation_signature(
     }
     let mut annotation = String::new();
     render_unpacked_return_annotation(&mut annotation, target, service, operation);
+    let inferred_supplied = match signature {
+        RuntimeTypeSignature::Overload(supplied) => supplied
+            .iter()
+            .zip(&operation.runtime_type_arguments)
+            .map(|(supplied, name)| {
+                *supplied
+                    || unpacked_input
+                        .parameters
+                        .iter()
+                        .filter_map(|field| field.reference.as_ref())
+                        .any(|reference| {
+                            reference
+                                .arguments
+                                .iter()
+                                .any(|argument| argument.as_ref() == Some(name))
+                        })
+            })
+            .collect::<Vec<_>>(),
+        RuntimeTypeSignature::Implementation => Vec::new(),
+    };
+    let result_signature = match signature {
+        RuntimeTypeSignature::Overload(_) => RuntimeTypeSignature::Overload(&inferred_supplied),
+        RuntimeTypeSignature::Implementation => RuntimeTypeSignature::Implementation,
+    };
     output.push_str(
-        signature
+        result_signature
             .annotation(&annotation, &operation.runtime_type_arguments)
             .trim_end_matches('\n'),
     );
+}
+
+/// Resolve decoding types from public ref parameters before packing them into wire models.
+fn render_operation_ref_runtime_types(
+    output: &mut String,
+    indent: &str,
+    operation: &RenderedOperation<'_>,
+    input: &RenderedUnpackedInput,
+) {
+    let local_identifier = |base: &str| {
+        let mut name = base.to_string();
+        while input.parameters.iter().any(|field| field.attr_name == name)
+            || operation
+                .runtime_type_arguments
+                .iter()
+                .any(|variable| python_runtime_type_argument_name(variable) == name)
+        {
+            name.push('_');
+        }
+        name
+    };
+    let arguments = local_identifier("_ref_arguments");
+    for name in &operation.runtime_type_arguments {
+        let variable = python_runtime_type_argument_name(name);
+        let known = local_identifier(&format!("_{variable}_refs"));
+        let references = input
+            .parameters
+            .iter()
+            .filter_map(|field| {
+                let reference = field.reference.as_ref()?;
+                let position = reference
+                    .arguments
+                    .iter()
+                    .position(|argument| argument.as_ref() == Some(name))?;
+                Some((&field.attr_name, position))
+            })
+            .collect::<Vec<_>>();
+        if references.is_empty() {
+            render_untyped_runtime_type_fallbacks(output, indent, std::slice::from_ref(name));
+            continue;
+        }
+        output.push_str(&format!("{indent}{known}: list[type[typing.Any]] = []\n"));
+        for (field, position) in references {
+            output.push_str(&format!(
+                "{indent}{arguments} = typing.get_args(getattr({field}, \"__orig_class__\", None))\n\
+                 {indent}if {arguments} and {arguments}[{position}] is not object:\n\
+                 {indent}    {known}.append({arguments}[{position}])\n"
+            ));
+        }
+        output.push_str(&format!(
+            "{indent}if {variable} is None:\n\
+             {indent}    {variable} = {known}[0] if {known} else object\n\
+             {indent}if any(value != {variable} for value in {known}):\n\
+             {indent}    raise TypeError(\"The decoding type must match the typed ref\")\n"
+        ));
+    }
 }
 
 /// The return annotation of an unpacked operation. A Workflow function returns the operation

@@ -1,0 +1,1 @@
+Python public resource operation functions preserve the ref's payload type: reads infer their decoding type from typed refs, reject conflicting explicit types, and writes require matching ref and record payload types.

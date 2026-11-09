@@ -2123,6 +2123,13 @@ An explicit `body_type` must agree with an already-typed ref; it cannot
 reinterpret `StreamRef[Turn]` as `StreamRef[str]`. Wire-model fields that merely
 carry a ref accept any payload specialization without constraining it.
 
+Public operation functions preserve this relationship too:
+`read_records(ref=ref)` infers and decodes `Turn` bodies from a
+`StreamRef[Turn]`, while an unknown ref yields `ReadRecordsResponse[object]`. An
+explicit `body_type=Turn` can select the decoder for an unknown ref, but cannot
+contradict a typed ref. Write operations such as `append_records` require the
+ref and the records to have the same payload type.
+
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
 operation with no `@nexus.proto` message can't return one yet.
 

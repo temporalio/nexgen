@@ -121,7 +121,7 @@ async def _append_records(
 
 async def append_records(
     *,
-    ref: StreamRef[typing.Any],
+    ref: StreamRef[BodyT],
     records: list[AppendRecord[BodyT]],
     sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
@@ -184,7 +184,7 @@ async def _read_records(
 @typing.overload
 async def read_records(
     *,
-    ref: StreamRef[typing.Any],
+    ref: StreamRef[BodyT] | StreamRef[object],
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -199,7 +199,7 @@ async def read_records(
 @typing.overload
 async def read_records(
     *,
-    ref: StreamRef[typing.Any],
+    ref: StreamRef[BodyT],
     from_offset: int | None = None,
     start: StreamReadStart | None = None,
     max_records: int | None = None,
@@ -208,7 +208,7 @@ async def read_records(
     last: int | None = None,
     max_bytes: int | None = None,
     body_type: None = None,
-) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[object],]: ...
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]: ...
 
 
 async def read_records(
@@ -239,8 +239,14 @@ async def read_records(
         max_bytes: The maximum Record bytes in a page. A larger Record is still returned
             alone.
     """
+    _body_type_refs: list[type[typing.Any]] = []
+    _ref_arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+    if _ref_arguments and _ref_arguments[0] is not object:
+        _body_type_refs.append(_ref_arguments[0])
     if body_type is None:
-        body_type = typing.Any
+        body_type = _body_type_refs[0] if _body_type_refs else object
+    if any(value != body_type for value in _body_type_refs):
+        raise TypeError("The decoding type must match the typed ref")
     request = ReadRecordsRequest(
         ref=ref,
         from_offset=from_offset,
