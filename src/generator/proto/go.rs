@@ -12,7 +12,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResource, PlannedResourceField, PlannedSpec,
     PlannedType, PlannedWireFieldBinding,
 };
-use crate::spec::{ExternalTypeSpec, FieldOrigin, RecordSpec};
+use crate::spec::{ExternalTypeSpec, FieldPolicy, RecordSpec};
 
 use crate::generator::go::{
     GoPackageContext, OperationExecution, PlannedEnumType, PlannedFieldKind, PlannedMessageSource,
@@ -1066,7 +1066,7 @@ fn validate_record_conversion(record: &RecordSpec<PlannedFamily>) -> Result<()> 
     for (field_name, field) in record
         .fields
         .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
         match &field.data.wire_binding {
             Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
@@ -1345,7 +1345,7 @@ fn build_rendered_resource_return(
                 // Sourced request fields live on the generated model as
                 // unexported fields (populated at the call site), so they read
                 // the same way as public fields.
-                if origin.as_ref().is_some_and(FieldOrigin::is_omitted) {
+                if origin.as_ref().is_some_and(FieldPolicy::is_omitted) {
                     return Err(Error::UnsupportedGoProtoConversion {
                         context: format!(
                             "resource return field `{}.{}`",

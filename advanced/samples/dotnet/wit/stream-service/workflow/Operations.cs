@@ -121,10 +121,6 @@ namespace Temporalio.Workflows
         /// </summary>
         public System.TimeSpan? CreateWait { get; set; }
         /// <summary>
-        /// Read the newest this many Records, oldest first. No from-offset. No wait.
-        /// </summary>
-        public int? Last { get; set; }
-        /// <summary>
         /// The maximum Record bytes in a page. A larger Record is still returned alone.
         /// </summary>
         public long? MaxBytes { get; set; }
@@ -244,7 +240,6 @@ namespace Temporalio.Workflows
                 MaxRecords = options.MaxRecords,
                 Wait = options.Wait,
                 CreateWait = options.CreateWait,
-                Last = options.Last,
                 MaxBytes = options.MaxBytes,
             };
             return ReadRecordsAsync<TBody>(request);

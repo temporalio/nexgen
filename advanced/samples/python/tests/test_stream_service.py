@@ -4,6 +4,7 @@ import asyncio
 import collections.abc
 import dataclasses
 import importlib
+import inspect
 import subprocess
 import sys
 import types
@@ -168,6 +169,22 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 
     with pytest.raises(ValueError, match="9 is not a valid StreamReadStart"):
         _ = converter.from_transfer_type(wire, models.ReadRecordsRequest)
+
+
+@pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+def test_a_workflow_read_takes_no_last(
+    api: types.ModuleType, model_types: types.ModuleType
+) -> None:
+    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
+    assert "last" not in inspect.signature(api.read_records).parameters
+    request = model_types.ReadRecordsRequest(
+        ref=model_types.StreamRef(id="s-1"), last=3
+    )
+    assert request.last == 3
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,7 @@ use crate::planning::{
     PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
 };
 use crate::spec::{
-    AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, RecordFieldSpec,
+    AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec,
     RecordSpec, TypeReplacementSpec,
 };
 
@@ -382,7 +382,7 @@ fn validate_record_conversion(
     for (_, field) in record
         .fields
         .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
         if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
             &field.data.wire_binding
@@ -749,7 +749,7 @@ fn render_model_from_wire_method(
     for (field_name, field) in model
         .fields
         .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
         render_field_from_wire_setup(
             output,
@@ -800,14 +800,9 @@ fn render_model_from_wire_method(
     let init_fields = model
         .fields
         .iter()
+        .filter(|(_, field)| !field.required || field.has_source())
         .filter(|(_, field)| {
-            !field.required || matches!(field.origin, Some(FieldOrigin::Source { .. }))
-        })
-        .filter(|(_, field)| {
-            !matches!(
-                field.origin,
-                Some(FieldOrigin::Omitted | FieldOrigin::Source { .. })
-            )
+            !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted) && !field.has_source()
         })
         .collect::<Vec<_>>();
     if init_fields.is_empty() {
