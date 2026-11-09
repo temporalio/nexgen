@@ -38,7 +38,9 @@ async def _create_stream(
     if result.ref is None:
         raise RuntimeError("CreateStream answered without `ref`")
     return Stream[body_type](
-        ref=result.ref,
+        ref=StreamRef[body_type](
+            id=result.ref.id, owner=result.ref.owner, backend=result.ref.backend
+        ),
         created=result.created or None,
     )
 

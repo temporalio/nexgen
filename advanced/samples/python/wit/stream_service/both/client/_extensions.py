@@ -48,41 +48,37 @@ class StreamServiceClientExtension(abc.ABC):
     def get_stream(
         self,
         ref: StreamRef[BodyT],
-        /,
         *,
         created: bool | None = None,
+        body_type: None = None,
     ) -> Stream[BodyT]: ...
     @typing.overload
     def get_stream(
         self,
-        ref: StreamRef,
+        ref: StreamRef[BodyT] | StreamRef[object],
         *,
         created: bool | None = None,
         body_type: type[BodyT],
     ) -> Stream[BodyT]: ...
-    @typing.overload
     def get_stream(
         self,
-        *,
-        ref: StreamRef,
-        created: bool | None = None,
-        body_type: None = None,
-    ) -> Stream[object]: ...
-    def get_stream(
-        self,
-        ref: StreamRef[BodyT],
+        ref: StreamRef[typing.Any],
         *,
         created: bool | None = None,
         body_type: type[BodyT] | None = None,
     ) -> Stream[BodyT]:
         """Return the ``Stream`` handle for this ref."""
         arguments = typing.get_args(getattr(ref, "__orig_class__", None))
-        # None means no explicit type, so the ref's type argument decides, else Any.
+        # None means no explicit type, so use the ref's type argument, else object.
         if body_type is None:
             body_type = typing.cast(
                 "type[BodyT]",
-                arguments[0] if arguments else typing.Any,
+                arguments[0] if arguments else object,
             )
+        elif arguments and arguments[0] is not object and arguments[0] != body_type:
+            raise TypeError("The decoding type must match the typed ref")
+        if arguments != (body_type,):
+            ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
@@ -116,7 +112,9 @@ class StreamServiceClientExtension(abc.ABC):
             raise RuntimeError("CreateStream answered without `ref`")
         resource = Stream[body_type](
             nexus_client,
-            ref=result.ref,
+            ref=StreamRef[body_type](
+                id=result.ref.id, owner=result.ref.owner, backend=result.ref.backend
+            ),
             created=result.created or None,
         )
         return resource

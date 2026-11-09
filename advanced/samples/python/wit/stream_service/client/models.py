@@ -61,14 +61,14 @@ def _stream_status_from_proto(value: int) -> StreamStatus:
 
 
 BodyT = typing.TypeVar("BodyT")
-_BodyT = typing_extensions.TypeVar("_BodyT", default=typing.Any)
+_BodyT = typing_extensions.TypeVar("_BodyT", default=object)
 
 
 @dataclasses.dataclass(slots=True)
 class CreateStreamRequest:
     """Create a Stream. If it exists, fail, or with use-existing get the open one."""
 
-    stream_ref: StreamRef
+    stream_ref: StreamRef[typing.Any]
     retention: datetime.timedelta | None = None
     withdraw_run: str | None = None
     id_conflict_policy: StreamIdConflictPolicy | None = None
@@ -95,7 +95,7 @@ class _CreateStreamRequestTransferTypeConverter(
         if not value.HasField("stream_ref"):
             raise ValueError("missing required field CreateStreamRequest.stream_ref")
         stream_ref = _StreamRefTransferTypeConverter().from_transfer_type(
-            value.stream_ref, StreamRef
+            value.stream_ref, StreamRef[typing.Any]
         )
         return CreateStreamRequest(
             stream_ref=stream_ref,
@@ -252,7 +252,7 @@ temporalio.converter.transfer_type_convertible(_ExecutionTransferTypeConverter)(
 
 @dataclasses.dataclass(slots=True)
 class CreateStreamResult:
-    ref: StreamRef | None = None
+    ref: StreamRef[typing.Any] | None = None
     created: bool | None = None
 
 
@@ -275,7 +275,7 @@ class _CreateStreamResultTransferTypeConverter(
     ) -> CreateStreamResult:
         return CreateStreamResult(
             ref=_StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef
+                value.ref, StreamRef[typing.Any]
             )
             if value.HasField("ref")
             else None,
@@ -310,7 +310,7 @@ class AppendRecordsRequest(typing.Generic[BodyT]):
     sequence.
     """
 
-    ref: StreamRef
+    ref: StreamRef[typing.Any]
     records: list[AppendRecord[BodyT]]
     producer: Producer | None = None
     sequence: int | None = None
@@ -337,7 +337,9 @@ class _AppendRecordsRequestTransferTypeConverter(
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
         if not value.HasField("ref"):
             raise ValueError("missing required field AppendRecordsRequest.ref")
-        ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
+        ref = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.ref, StreamRef[typing.Any]
+        )
         records = [
             typing.cast(
                 AppendRecord[BodyT],
@@ -907,7 +909,7 @@ temporalio.converter.transfer_type_convertible(
 class CloseStreamRequest:
     """Close a Stream. Readers drain what is left, then end. Later appends are refused."""
 
-    ref: StreamRef
+    ref: StreamRef[typing.Any]
     producer: Producer | None = None
 
 
@@ -930,7 +932,9 @@ class _CloseStreamRequestTransferTypeConverter(
     ) -> CloseStreamRequest:
         if not value.HasField("ref"):
             raise ValueError("missing required field CloseStreamRequest.ref")
-        ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
+        ref = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.ref, StreamRef[typing.Any]
+        )
         return CloseStreamRequest(
             ref=ref,
             producer=_ProducerTransferTypeConverter().from_transfer_type(
@@ -1007,7 +1011,7 @@ temporalio.converter.transfer_type_convertible(
 class ReadRecordsRequest:
     """Read Records from an offset."""
 
-    ref: StreamRef
+    ref: StreamRef[typing.Any]
     from_offset: int | None = None
     start: StreamReadStart | None = None
     max_records: int | None = None
@@ -1036,7 +1040,9 @@ class _ReadRecordsRequestTransferTypeConverter(
     ) -> ReadRecordsRequest:
         if not value.HasField("ref"):
             raise ValueError("missing required field ReadRecordsRequest.ref")
-        ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
+        ref = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.ref, StreamRef[typing.Any]
+        )
         return ReadRecordsRequest(
             ref=ref,
             from_offset=value.from_offset if value.from_offset != 0 else None,
@@ -1367,7 +1373,7 @@ temporalio.converter.transfer_type_convertible(_StreamSupersededTransferTypeConv
 
 @dataclasses.dataclass(slots=True)
 class DescribeStreamRequest:
-    ref: StreamRef
+    ref: StreamRef[typing.Any]
 
 
 class _DescribeStreamRequestTransferTypeConverter(
@@ -1389,7 +1395,9 @@ class _DescribeStreamRequestTransferTypeConverter(
     ) -> DescribeStreamRequest:
         if not value.HasField("ref"):
             raise ValueError("missing required field DescribeStreamRequest.ref")
-        ref = _StreamRefTransferTypeConverter().from_transfer_type(value.ref, StreamRef)
+        ref = _StreamRefTransferTypeConverter().from_transfer_type(
+            value.ref, StreamRef[typing.Any]
+        )
         return DescribeStreamRequest(
             ref=ref,
         )

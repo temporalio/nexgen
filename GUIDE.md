@@ -2150,27 +2150,42 @@ resource %stream {
 ```
 
 The handle keeps a runtime type for each type parameter and decodes responses
-with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or a
+with it. Python takes `Stream[Turn](...)` with a `StreamRef[Turn]`, or a
 keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
-`client.get_stream(ref=ref, body_type=Turn)`. A call with no `body_type` decodes
-as `typing.Any`, but its static return type is `Stream[object]`; a concrete
-`Stream[Turn]` requires `body_type=Turn`. TypeScript takes `bodyType` after the
-fields, and .NET takes the type argument, as in
-`CreateStreamAsync<Turn>(options)`.
+`client.get_stream(ref=ref, body_type=Turn)`. A create call with no `body_type`
+decodes as `typing.Any`, but its static return type is `Stream[object]`; a
+concrete `Stream[Turn]` requires a typed ref or `body_type=Turn`. Generic Python
+resource handles do not support subclasses; constructing one raises `TypeError`.
+TypeScript takes `bodyType` after the fields, and .NET takes the type argument,
+as in `CreateStreamAsync<Turn>(options)`.
 
 In Python, a generic resource's ref takes the resource's type parameters too, so
 the `ref` of a `Stream[Turn]` is a `StreamRef[Turn]`. No field uses them, so
-they default to `typing.Any`, and the ref keeps the same wire message, equality
-and repr. The type argument rides in memory, in `__orig_class__`.
-`StreamRef[Turn]`, the `ref` of a `Stream[Turn]`, and a decode with the type
+they default to `object`, and the ref keeps the same wire message, equality and
+repr. The type argument rides in memory, in `__orig_class__`. `StreamRef[Turn]`,
+the ref returned by a factory with `body_type=Turn`, and a decode with the type
 hint `StreamRef[Turn]`, such as a Workflow input's, each set it.
 `get_stream(ref)` infers the handle's type from the ref, so a reader that gets a
-ref keeps its payload type.
+ref keeps its payload type. An untyped ref produces `Stream[object]`, whose
+bodies decode as ordinary Python values. The `ref` attribute is a plain field:
+direct construction preserves the supplied ref rather than attaching the
+handle's type to it.
 
 ```python
 stream = client.get_stream(ref)  # Stream[Turn] for a StreamRef[Turn]
-stream = client.get_stream(ref=ref, body_type=str)  # body_type wins over the ref
+stream = client.get_stream(StreamRef(id="s1"), body_type=Turn)  # Choose a decoder
 ```
+
+An explicit `body_type` must agree with an already-typed ref; it cannot
+reinterpret `StreamRef[Turn]` as `StreamRef[str]`. Wire-model fields that merely
+carry a ref accept any payload specialization without constraining it.
+
+Public operation functions preserve this relationship too:
+`read_records(ref=ref)` infers and decodes `Turn` bodies from a
+`StreamRef[Turn]`, while an unknown ref yields `ReadRecordsResponse[object]`. An
+explicit `body_type=Turn` can select the decoder for an unknown ref, but cannot
+contradict a typed ref. Write operations such as `append_records` require the
+ref and the records to have the same payload type.
 
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
 operation with no `@nexus.proto` message can't return one yet.
