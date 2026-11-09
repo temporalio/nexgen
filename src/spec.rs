@@ -685,6 +685,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub output: Option<TypeSpec<F>>,
     pub output_transform: Option<OperationOutputTransformSpec<F>>,
     pub serialization_context: F::Text,
+    /// Input record field key that receives outbound context headers.
+    pub context_propagation_header: F::Text,
     /// The `@nexus.poll` settings. None when the operation has no poll.
     pub poll: Option<OperationPollSpec<F>>,
     pub data: F::OperationData,
@@ -723,6 +725,7 @@ impl<F: TypeFamily> OperationSpec<F> {
                 .output_transform
                 .map(|transform| transform.map_names_with(map)),
             serialization_context: map.map_text(self.serialization_context),
+            context_propagation_header: map.map_text(self.context_propagation_header),
             poll: self.poll.map(|poll| poll.map_names_with(map)),
             data,
         }

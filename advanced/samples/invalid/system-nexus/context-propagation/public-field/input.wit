@@ -1,0 +1,8 @@
+package test:context-public;
+world system { export api; }
+/// @nexus.namespace go="go.temporal.io/sdk/internal"
+interface api {
+  record request { headers: string }
+  /// @nexus.context-propagation go="request.headers"
+  send: func(request: request);
+}

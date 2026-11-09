@@ -657,6 +657,7 @@ impl<'a> TypePlanningContext<'a> {
                 }
             }),
             serialization_context: operation.serialization_context.clone(),
+            context_propagation_header: operation.context_propagation_header.clone(),
             poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
                 next: poll.next.clone(),
                 targets: poll.targets.clone(),
@@ -1901,6 +1902,7 @@ interface alerts {
                     )))),
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
+                    context_propagation_header: LanguageStringSpec::default(),
                     poll: None,
                     data: (),
                 }],

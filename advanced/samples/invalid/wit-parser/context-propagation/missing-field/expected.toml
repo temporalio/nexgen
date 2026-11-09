@@ -1,0 +1,5 @@
+system_nexus = true
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["`missing` isn't a field of the request"]
