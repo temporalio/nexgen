@@ -272,29 +272,28 @@ namespace Temporalio.Workflows
     [GeneratedCode("nexgen", null)]
     public record AppendRecordsResponse
     {
-        public long? FirstOffset { get; init; }
-        public long? LastOffset { get; init; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AppendRecordsResponse"/> class.
+        /// </summary>
+        public AppendRecordsResponse(long firstOffset, long lastOffset)
+        {
+            FirstOffset = firstOffset;
+            LastOffset = lastOffset;
+        }
+
+        public long FirstOffset { get; init; }
+        public long LastOffset { get; init; }
 
         internal static AppendRecordsResponse FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsResponse wire)
         {
-            return new AppendRecordsResponse()
-            {
-                FirstOffset = wire.FirstOffset == 0 ? null : wire.FirstOffset,
-                LastOffset = wire.LastOffset == 0 ? null : wire.LastOffset,
-            };
+            return new AppendRecordsResponse(wire.FirstOffset, wire.LastOffset);
         }
 
         internal Temporalio.Api.StreamService.V1.AppendRecordsResponse ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsResponse();
-            if (FirstOffset is { } firstOffset)
-            {
-                proto.FirstOffset = firstOffset;
-            }
-            if (LastOffset is { } lastOffset)
-            {
-                proto.LastOffset = lastOffset;
-            }
+            proto.FirstOffset = FirstOffset;
+            proto.LastOffset = LastOffset;
             return proto;
         }
 

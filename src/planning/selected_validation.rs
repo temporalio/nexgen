@@ -281,7 +281,7 @@ fn validate_flattened_field_names(
         let fields = record
             .fields
             .values()
-            .filter(|field| !matches!(field.origin, Some(FieldOrigin::Omitted)))
+            .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .count();
         // TypeScript sends a record with no proto as it is, so only a proto converter can wrap.
         let reason = if fields != 1 {

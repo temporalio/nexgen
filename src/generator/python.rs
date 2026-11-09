@@ -1895,7 +1895,7 @@ impl<'a> ApiPlanner<'a> {
         record
             .fields
             .iter()
-            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .zip(&model.fields)
             .find(|((name, _), _)| name.as_str() == key)
             .map(|(_, field)| field.attr_name.clone())

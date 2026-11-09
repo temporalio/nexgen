@@ -265,16 +265,24 @@ export const createStreamRequestTransferTypeConverter = {
   },
 };
 export interface AppendRecordsResponse {
-  firstOffset?: Long;
-  lastOffset?: Long;
+  firstOffset: Long;
+  lastOffset: Long;
 }
 
 function appendRecordsResponseFromProto(
   proto: temporal.api.streamservice.v1.IAppendRecordsResponse,
 ): AppendRecordsResponse {
   return {
-    firstOffset: proto.firstOffset ?? undefined,
-    lastOffset: proto.lastOffset ?? undefined,
+    firstOffset: requiredField(
+      proto.firstOffset ?? Long.ZERO,
+      "AppendRecordsResponse",
+      "firstOffset",
+    ),
+    lastOffset: requiredField(
+      proto.lastOffset ?? Long.ZERO,
+      "AppendRecordsResponse",
+      "lastOffset",
+    ),
   };
 }
 
@@ -282,8 +290,12 @@ function appendRecordsResponseToProto(
   model: AppendRecordsResponse,
 ): temporal.api.streamservice.v1.IAppendRecordsResponse {
   return {
-    firstOffset: model.firstOffset,
-    lastOffset: model.lastOffset,
+    firstOffset: requiredField(
+      model.firstOffset,
+      "AppendRecordsResponse",
+      "firstOffset",
+    ),
+    lastOffset: requiredField(model.lastOffset, "AppendRecordsResponse", "lastOffset"),
   };
 }
 
