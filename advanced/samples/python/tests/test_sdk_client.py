@@ -812,6 +812,8 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     _ = assert_type(plain_stream, Stream[object])
     _ = assert_type(client.get_stream(ref=typed), Stream[Turn])
     assert plain_stream.body_type is object
+    assert typed_stream.ref is typed
+    assert client.get_stream(typed, body_type=Turn).ref is typed
     [typed_record] = (await typed_stream.read()).records
     [plain_record] = (await plain_stream.read()).records
     assert typed_record.item == StreamItemData(StreamData(body=Turn(role="model")))
@@ -821,15 +823,20 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     override = client.get_stream(plain, body_type=Turn)
     _ = assert_type(override, Stream[Turn])
     assert override.body_type is Turn
+    assert override.ref is not plain
+    assert not typing.get_args(getattr(plain, "__orig_class__", None))
     assert client.get_stream(ref=plain, body_type=Turn).body_type is Turn
-    explicit_unknown = client.get_stream(StreamRef[object](id="s1"))
+    unknown_ref = StreamRef[object](id="s1")
+    explicit_unknown = client.get_stream(unknown_ref)
     assert explicit_unknown.body_type is object
+    assert explicit_unknown.ref is unknown_ref
     assert (await explicit_unknown.read()).records == (
         await plain_stream.read()
     ).records
-    assert (
-        client.get_stream(StreamRef[object](id="s1"), body_type=Turn).body_type is Turn
-    )
+    specialized = client.get_stream(unknown_ref, body_type=Turn)
+    assert specialized.body_type is Turn
+    assert specialized.ref is not unknown_ref
+    assert typing.get_args(getattr(unknown_ref, "__orig_class__", None)) == (object,)
     # A mismatch is rejected at runtime too, even when the caller bypasses static checking.
     with pytest.raises(TypeError, match="decoding type must match"):
         _ = client.get_stream(typing.cast(typing.Any, typed), body_type=str)

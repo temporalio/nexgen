@@ -1364,7 +1364,8 @@ impl<'a> ApiPlanner<'a> {
         self.render_ref_runtime_type_fallbacks(output, resource, &ref_name);
         let typed_ref = self.rendered_resource_ref(resource).expect("a typed ref");
         output.push_str(&format!(
-            "        {ref_name} = {}\n",
+            "        if arguments != ({},):\n            {ref_name} = {}\n",
+            typed_ref.arguments.join(", "),
             typed_ref.expression(&ref_name, "")
         ));
         self.render_client_resource_factory_return(output, service, resource, &receiver);

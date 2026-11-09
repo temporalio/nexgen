@@ -77,7 +77,8 @@ class StreamServiceClientExtension(abc.ABC):
             )
         elif arguments and arguments[0] is not object and arguments[0] != body_type:
             raise TypeError("The decoding type must match the typed ref")
-        ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+        if arguments != (body_type,):
+            ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
