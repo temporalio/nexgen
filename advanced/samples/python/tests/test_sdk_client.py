@@ -366,15 +366,15 @@ async def test_a_publish_wraps_each_value_and_returns_the_last_offset() -> None:
     last_offset = await stream.publish("a", "b")
     empty = await stream.publish()
 
-    _ = assert_type(last_offset, int)
+    _ = assert_type(last_offset, int | None)
     assert last_offset == 5
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
         producer=Producer(id="client:sample"),
     )
-    # `last_offset` has no presence on the wire, so an empty publish answers 0.
-    assert empty == 0
+    # An empty publish writes no Record, so it has no last offset and answers none.
+    assert empty is None
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.publish(1)  # pyright: ignore[reportArgumentType]

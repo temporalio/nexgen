@@ -414,8 +414,9 @@ interface stream-service {
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
   /// @nexus.doc "Append one batch. Workflow code makes the call from a Local Activity."
-  // An empty append writes no Record, so it has no last offset. The transform gives 0 then.
-  /// @nexus.output-transform python-type="int" python="result.last_offset or 0"
+  // An empty append writes no Record, so it has no last offset. The result is none then, so the
+  // return keeps the option instead of a 0 that reads like a real offset.
+  /// @nexus.output-transform python-type="int | None" python="result.last_offset"
   /// @nexus.operation name="AppendRecords"
   append-records: func(request: append-records-request) -> append-records-response;
 

@@ -65,7 +65,7 @@ class Stream(typing.Generic[BodyT]):
         *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> int:
+    ) -> int | None:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
@@ -81,7 +81,7 @@ class Stream(typing.Generic[BodyT]):
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
-        return result.last_offset or 0
+        return result.last_offset
 
     async def close(
         self,

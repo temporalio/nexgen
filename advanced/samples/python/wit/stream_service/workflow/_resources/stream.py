@@ -57,7 +57,7 @@ class Stream(typing.Generic[BodyT]):
     async def publish(
         self,
         *records: BodyT,
-    ) -> int:
+    ) -> int | None:
         """Publish values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
@@ -113,7 +113,7 @@ class Stream(typing.Generic[BodyT]):
 
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
-) -> int:
+) -> int | None:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -124,7 +124,7 @@ async def _append_records(
         output_type=AppendRecordsResponse,
     )
     result = await handle
-    return result.last_offset or 0
+    return result.last_offset
 
 
 async def append_records(
@@ -132,7 +132,7 @@ async def append_records(
     ref: StreamRef,
     records: list[BodyT],
     sequence: int | None = None,
-) -> int:
+) -> int | None:
     """Append one batch. Workflow code makes the call from a Local Activity.
 
     Args:
