@@ -79,7 +79,9 @@ describe("stream-service generated output", () => {
       readRecordsResponseTransferTypeConverter.toTransferType(model);
 
     expect(proto.records?.map((record) => record.item)).toEqual(["data", "close"]);
-    expect(proto.records?.[1].close?.status).toBe(StreamCloseStatus.StreamCloseStatusClosed);
+    expect(proto.records?.[1].close?.status).toBe(
+      StreamCloseStatus.StreamCloseStatusClosed,
+    );
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
     );
