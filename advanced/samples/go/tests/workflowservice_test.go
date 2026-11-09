@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	common "go.temporal.io/api/common/v1"
 	enums "go.temporal.io/api/enums/v1"
+	sdkpb "go.temporal.io/api/sdk/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
@@ -137,11 +139,16 @@ func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
 	calls := append([]interceptor.ExecuteNexusOperationInput(nil), capture.calls...)
 	capture.mu.Unlock()
 	s.Require().Len(calls, 1)
-	request := calls[0].Input.(ws.SignalWithStartWorkflowRequest)
-	s.Equal("emptyArgsWorkflow", request.Workflow)
-	s.Empty(request.Args)
-	s.Equal(s.taskQueue, request.TaskQueue)
-	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, request.WorkflowIDReusePolicy)
+	request := calls[0].Input.(interface {
+		GetWorkflow() string
+		GetArgs() []any
+		GetTaskQueue() string
+		GetWorkflowIDReusePolicy() enums.WorkflowIdReusePolicy
+	})
+	s.Equal("emptyArgsWorkflow", request.GetWorkflow())
+	s.Empty(request.GetArgs())
+	s.Equal(s.taskQueue, request.GetTaskQueue())
+	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, request.GetWorkflowIDReusePolicy())
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
@@ -458,25 +465,32 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	)
 	headerPayload, err := converter.GetDefaultDataConverter().ToPayload("parent")
 	s.Require().NoError(err)
+	emptySummary, err := converter.GetDefaultDataConverter().ToPayload("")
+	s.Require().NoError(err)
 	wire := workflowservicepb.SignalWithStartWorkflowExecutionRequest{
 		WorkflowId: s.targetID("target"),
 		Header: &common.Header{
 			Fields: map[string]*common.Payload{"trace": headerPayload},
 		},
+		UserMetadata: &sdkpb.UserMetadata{Summary: emptySummary},
 	}
 	payload, err := converter.GetDefaultDataConverter().ToPayload(&wire)
 	s.Require().NoError(err)
-	var decoded ws.SignalWithStartWorkflowRequest
-	s.Require().NoError(dc.FromPayload(payload, &decoded))
-	s.Require().True(proto.Equal(headerPayload, decoded.Headers["trace"]), "workflow header changed during payload conversion")
+	decoded := reflect.New(reflect.TypeOf(call.Input)).Interface()
+	s.Require().NoError(dc.FromPayload(payload, decoded))
+	headers := decoded.(interface {
+		GetHeaders() map[string]*common.Payload
+	}).GetHeaders()
+	s.Require().True(proto.Equal(headerPayload, headers["trace"]), "workflow header changed during payload conversion")
 	interceptedPayload, err := converter.GetDefaultDataConverter().ToPayload("intercepted")
 	s.Require().NoError(err)
-	decoded.Headers["trace"] = interceptedPayload
-	payload, err = dc.ToPayload(&decoded)
+	headers["trace"] = interceptedPayload
+	payload, err = dc.ToPayload(decoded)
 	s.Require().NoError(err)
 	var encoded workflowservicepb.SignalWithStartWorkflowExecutionRequest
 	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(payload, &encoded))
 	var header string
 	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(encoded.Header.Fields["trace"], &header))
 	s.Equal("intercepted", header)
+	s.Require().True(proto.Equal(wire.UserMetadata, encoded.UserMetadata), "present empty metadata changed during payload conversion")
 }
