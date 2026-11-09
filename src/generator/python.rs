@@ -6965,11 +6965,7 @@ fn runtime_type_argument_names(type_variables: &[String]) -> Vec<String> {
 }
 
 /// The implementation fixes an omitted runtime type to Any.
-fn render_resource_factory_impl_body(
-    output: &mut String,
-    indent: &str,
-    type_variables: &[String],
-) {
+fn render_resource_factory_impl_body(output: &mut String, indent: &str, type_variables: &[String]) {
     render_untyped_runtime_type_fallbacks(output, indent, type_variables);
 }
 
