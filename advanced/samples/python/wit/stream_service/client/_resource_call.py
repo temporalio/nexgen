@@ -30,7 +30,9 @@ class ResourceCall(
     collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT],
     typing.Generic[_ResourceT],
 ):
-    """Await it for the resource, or use ``async with`` to close it at the end."""
+    """The create call. You can use it two ways. Await it to get the resource and manage it
+    yourself. Or open it with ``async with`` to get the resource and close it at the end of the
+    block. The ``async with`` form does the create for you, so you do not add a separate await."""
 
     def __init__(
         self, call: collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT]
