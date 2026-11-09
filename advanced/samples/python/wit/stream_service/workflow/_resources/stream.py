@@ -124,7 +124,7 @@ async def _append_records(
         output_type=AppendRecordsResponse,
     )
     result = await handle
-    return _support.last_offset(result)
+    return result.last_offset or 0
 
 
 async def append_records(

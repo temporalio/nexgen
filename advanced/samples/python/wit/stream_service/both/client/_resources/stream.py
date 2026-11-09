@@ -81,7 +81,7 @@ class Stream(typing.Generic[BodyT]):
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
-        return _support.last_offset(result)
+        return result.last_offset or 0
 
     async def close(
         self,
