@@ -31,10 +31,6 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// The run chain or Standalone Activity of a bound Stream. Empty if standalone.
-        /// </summary>
-        public Execution? Owner { get; set; }
-        /// <summary>
         /// Registered backend name, empty for the default. The Store never reads it.
         /// </summary>
         public string? Backend { get; set; }
@@ -109,7 +105,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public StreamReadStart? Start { get; set; }
         /// <summary>
-        /// About this many items per page, 1 to 1000. A Superseded item stays with its Record.
+        /// About this many items per page, 1 to 1000.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
@@ -163,7 +159,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamOptions options)
         {
-            var request = new CreateStreamRequest(new StreamRef(options.Id) { Owner = options.Owner, Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.RequestId())
+            var request = new CreateStreamRequest(new StreamRef(options.Id) { Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.RequestId())
             {
                 Retention = options.Retention,
                 IdConflictPolicy = options.IdConflictPolicy,

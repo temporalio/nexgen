@@ -10,7 +10,6 @@ import temporalio.workflow
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
-    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -64,7 +63,6 @@ class _CreateStream(typing.Generic[BodyT]):
         self,
         *,
         id: str,
-        owner: Execution | None = None,
         backend: str | None = None,
         retention: datetime.timedelta | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
@@ -72,8 +70,6 @@ class _CreateStream(typing.Generic[BodyT]):
         """
         Args:
             id: The Stream id, 1 to 4096 bytes.
-            owner: The run chain or Standalone Activity of a bound Stream. Empty if
-                standalone.
             backend: Registered backend name, empty for the default. The Store never
                 reads it.
             retention: The age after which a Record is dropped. Empty is the Store
@@ -83,13 +79,11 @@ class _CreateStream(typing.Generic[BodyT]):
         """
         stream_ref = StreamRef(
             id=id,
-            owner=owner,
             backend=backend,
         )
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             retention=retention,
-            withdraw_run=_support.withdraw_run(),
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )

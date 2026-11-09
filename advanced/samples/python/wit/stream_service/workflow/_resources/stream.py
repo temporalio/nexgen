@@ -17,7 +17,6 @@ from ..models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Execution,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamReadStart,
@@ -143,12 +142,11 @@ class _GetStream(typing.Generic[BodyT]):
         self,
         *,
         id: str,
-        owner: Execution | None = None,
         backend: str | None = None,
         created: bool | None = None,
     ) -> Stream[BodyT]:
         """A handle on an existing ``Stream``, with no call."""
-        ref = StreamRef(id=id, owner=owner, backend=backend)
+        ref = StreamRef(id=id, backend=backend)
         return Stream[self.body_type](
             ref=ref,
             created=created,
@@ -268,8 +266,7 @@ class _ReadRecords(typing.Generic[BodyT]):
                 1 fails.
             start: Where to start when from-offset is empty. Unspecified is the
                 beginning.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
+            max_records: About this many items per page, 1 to 1000.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
             create_wait: How long to wait for an uncreated Stream. Empty fails at once.

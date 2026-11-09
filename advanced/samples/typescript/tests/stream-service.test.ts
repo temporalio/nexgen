@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type ReadRecordsResponse,
+  StreamCloseStatus,
   StreamStatus,
   appendRecordsRequestTransferTypeConverter,
   createReadRecordsResponseTransferTypeConverter,
@@ -58,12 +59,13 @@ describe("stream-service generated output", () => {
         },
         {
           item: {
-            tag: "superseded",
+            tag: "close",
             value: {
-              writer: {
-                producer: { id: "workflow-1" },
-                failedTasks: [Long.fromNumber(7)],
+              producer: {
+                id: "wf:r1",
+                kind: { tag: "workflow", value: { runId: "r1" } },
               },
+              status: StreamCloseStatus.StreamCloseStatusClosed,
             },
           },
           offset: Long.fromNumber(2),
@@ -76,8 +78,8 @@ describe("stream-service generated output", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse =
       readRecordsResponseTransferTypeConverter.toTransferType(model);
 
-    expect(proto.records?.map((record) => record.item)).toEqual(["data", "superseded"]);
-    expect(proto.records?.[1].superseded?.writer?.failedTasks?.[0].toNumber()).toBe(7);
+    expect(proto.records?.map((record) => record.item)).toEqual(["data", "close"]);
+    expect(proto.records?.[1].close?.status).toBe(StreamCloseStatus.StreamCloseStatusClosed);
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
     );
@@ -118,7 +120,7 @@ describe("stream-service generated output", () => {
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
-      ref: { id: "stream-1", owner: { businessId: "workflow-1" } },
+      ref: { id: "stream-1" },
       fromOffset: Long.fromNumber(7),
       maxRecords: 10,
     };
@@ -126,7 +128,6 @@ describe("stream-service generated output", () => {
     const model = readRecordsRequestTransferTypeConverter.fromTransferType(proto);
 
     expect(model.ref.id).toBe("stream-1");
-    expect(model.ref.owner?.businessId).toBe("workflow-1");
     expect(model.fromOffset?.toNumber()).toBe(7);
     expect(model.maxRecords).toBe(10);
     expect(readRecordsRequestTransferTypeConverter.toTransferType(model).ref?.id).toBe(
@@ -138,7 +139,7 @@ describe("stream-service generated output", () => {
     const proto = appendRecordsRequestTransferTypeConverter.toTransferType({
       ref: { id: "stream-1" },
       records: ["a", "b"],
-      writer: { producer: { id: "client:sample" }, failedTasks: [] },
+      writer: { producer: { id: "client:sample" } },
     });
 
     // `append-record` flattens, so the model holds the values and the proto holds the records.

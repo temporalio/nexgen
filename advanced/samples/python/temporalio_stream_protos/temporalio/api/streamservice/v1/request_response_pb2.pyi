@@ -26,8 +26,8 @@ class CreateStreamRequest(_message.Message):
     """Experimental. Might change in the future.
     Creates the Stream. When the Stream exists, FAIL fails with ALREADY_EXISTS, and USE_EXISTING
     gets it with created false and its own Retention. A retry of the create that made the Stream,
-    with the same request_id, gets created true. Each policy fails with CLOSED on a closed Stream,
-    EXPIRED on an expired one, and NOT_OWNER on one with another owner.
+    with the same request_id, gets created true. Each policy fails with CLOSED on a closed Stream
+    and EXPIRED on an expired one.
     (-- api-linter: core::0133=disabled
         aip.dev/not-precedent: The request identifies a Stream by namespace and ref. --)
     """
@@ -37,26 +37,14 @@ class CreateStreamRequest(_message.Message):
     NAMESPACE_FIELD_NUMBER: _builtins.int
     STREAM_REF_FIELD_NUMBER: _builtins.int
     RETENTION_FIELD_NUMBER: _builtins.int
-    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
-    OWNER_FIELD_NUMBER: _builtins.int
-    CLOSE_WITH_RUN_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: _builtins.int
     REQUEST_ID_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
-    withdraw_run: _builtins.str
-    """Workflow only. The previous run on a retry run's first create, to withdraw its Records."""
-    close_with_run: _builtins.bool
-    """Only read by the server. When set, the server closes the Stream when the owner's run chain
-    ends, also on a terminate or a timeout. It needs owner, and a ref with a Workflow owner.
-    (-- api-linter: core::0140::prepositions=disabled
-        aip.dev/not-precedent: "with" ties the close to the owner's run chain. --)
-    """
     task_token: _builtins.bytes
     """Only read by the server, for a Stream bound to a Standalone Activity. The server checks that
     the token is the Activity's current attempt, so a caller can't bind a Stream to a Standalone
-    Activity that it isn't. The server knows the run of a Workflow's call, and a standalone
-    Stream has no owner, so neither needs a token.
+    Activity that it isn't.
     """
     id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType
     """What the create does when the Stream exists. Unspecified is FAIL."""
@@ -66,19 +54,11 @@ class CreateStreamRequest(_message.Message):
     """
     @_builtins.property
     def stream_ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream to create. Its id is the Stream id, and is never empty. A bound
-        Stream's ref has the owner's run chain as its owner.
-        """
+        """The ref of the Stream to create. Its id is the Stream id, and is never empty."""
 
     @_builtins.property
     def retention(self) -> _duration_pb2.Duration:
         """The age after which a Record is dropped. Empty is the Store default."""
-
-    @_builtins.property
-    def owner(self) -> _message_pb2.Producer:
-        """The Workflow run that owns a bound Stream, with its run_id and a Workflow epoch. It needs a
-        ref whose owner is the run's chain. Unset for a standalone Stream.
-        """
 
     def __init__(
         self,
@@ -86,16 +66,13 @@ class CreateStreamRequest(_message.Message):
         namespace: _builtins.str = ...,
         stream_ref: _message_pb2.StreamRef | None = ...,
         retention: _duration_pb2.Duration | None = ...,
-        withdraw_run: _builtins.str = ...,
-        owner: _message_pb2.Producer | None = ...,
-        close_with_run: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
         id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType = ...,
         request_id: _builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["owner", b"owner", "retention", b"retention", "stream_ref", b"stream_ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["retention", b"retention", "stream_ref", b"stream_ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["close_with_run", b"close_with_run", "id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "owner", b"owner", "request_id", b"request_id", "retention", b"retention", "stream_ref", b"stream_ref", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "request_id", b"request_id", "retention", b"retention", "stream_ref", b"stream_ref", "task_token", b"task_token"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -115,7 +92,7 @@ class CreateStreamResponse(_message.Message):
     """False when USE_EXISTING got a Stream that existed."""
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef:
-        """The ref, with the owner of a bound Stream."""
+        """The ref of the Stream."""
 
     def __init__(
         self,
@@ -145,16 +122,11 @@ class AppendRecordsRequest(_message.Message):
     WRITER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
-    DEFER_WITHDRAWAL_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     sequence: _builtins.int
     """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
     the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
-    """
-    defer_withdrawal: _builtins.bool
-    """Only read by the server, on a Workflow Producer's batch. The batch withdraws no Workflow
-    Task and keeps no task facts, but the writer's withdraw_run still applies.
     """
     task_token: _builtins.bytes
     """Only read by the server. The server checks the Producer against the Activity's current
@@ -176,12 +148,11 @@ class AppendRecordsRequest(_message.Message):
         writer: _message_pb2.StreamWriter | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
-        defer_withdrawal: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "namespace", b"namespace", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -218,8 +189,6 @@ class CloseStreamRequest(_message.Message):
     """Experimental. Might change in the future.
     Closes a Stream. Readers drain what is left, then end, and later appends fail with CLOSED. A
     close writes no Record and carries no value, so code that has a last value publishes it first.
-    Only the owner's run chain closes a bound Stream. Only a Workflow or a client closes a
-    standalone Stream.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -235,9 +204,7 @@ class CloseStreamRequest(_message.Message):
     def ref(self) -> _message_pb2.StreamRef: ...
     @_builtins.property
     def writer(self) -> _message_pb2.StreamWriter:
-        """The writer that closes the Stream. An SDK Store reads only its Producer, and the server
-        also reads its withdrawal fields.
-        """
+        """The writer that closes the Stream. A Store reads only its Producer."""
 
     def __init__(
         self,
@@ -305,9 +272,7 @@ class ReadRecordsRequest(_message.Message):
     start: _stream_pb2.StreamReadStart.ValueType
     """Where to start when from_offset is zero. Unspecified is the beginning."""
     max_records: _builtins.int
-    """The most items in one page, Superseded items included. Zero is 1000. A Superseded item and
-    the Record after it stay in one page, so a page of one Record can hold two items.
-    """
+    """The most Records in one page. Zero is 1000."""
     to_offset: _builtins.int
     """The exclusive end of the read. The read scans no entry at or after it, so a replay reads the
     same range. Zero means no end. Only the server serves it, and a Store refuses it.
@@ -453,7 +418,7 @@ class DescribeStreamResponse(_message.Message):
     RETENTION_FIELD_NUMBER: _builtins.int
     status: _stream_pb2.StreamStatus.ValueType
     last_offset: _builtins.int
-    """The newest offset, of a Record or a Superseded item. Zero when the Stream has none."""
+    """The newest offset, of a Record. Zero when the Stream has none."""
     @_builtins.property
     def retention(self) -> _duration_pb2.Duration: ...
     def __init__(

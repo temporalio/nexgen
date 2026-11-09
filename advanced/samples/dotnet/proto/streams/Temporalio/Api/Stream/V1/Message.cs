@@ -27,60 +27,67 @@ namespace Temporalio.Api.Stream.V1 {
             "CiR0ZW1wb3JhbC9hcGkvc3RyZWFtL3YxL21lc3NhZ2UucHJvdG8SFnRlbXBv",
             "cmFsLmFwaS5zdHJlYW0udjEaH2dvb2dsZS9wcm90b2J1Zi90aW1lc3RhbXAu",
             "cHJvdG8aJHRlbXBvcmFsL2FwaS9jb21tb24vdjEvbWVzc2FnZS5wcm90bxoi",
-            "dGVtcG9yYWwvYXBpL2VudW1zL3YxL3N0cmVhbS5wcm90byJaCglTdHJlYW1S",
-            "ZWYSCgoCaWQYASABKAkSMAoFb3duZXIYAiABKAsyIS50ZW1wb3JhbC5hcGku",
-            "Y29tbW9uLnYxLkV4ZWN1dGlvbhIPCgdiYWNrZW5kGAMgASgJItQCCg1Qcm9k",
-            "dWNlckVwb2NoEj0KCHdvcmtmbG93GAEgASgLMikudGVtcG9yYWwuYXBpLnN0",
-            "cmVhbS52MS5Xb3JrZmxvd1Rhc2tFcG9jaEgAEkQKDmxvY2FsX2FjdGl2aXR5",
-            "GAIgASgLMioudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Mb2NhbEFjdGl2aXR5",
-            "RXBvY2hIABI5CghhY3Rpdml0eRgDIAEoCzIlLnRlbXBvcmFsLmFwaS5zdHJl",
-            "YW0udjEuQWN0aXZpdHlFcG9jaEgAEkQKE3N0YW5kYWxvbmVfYWN0aXZpdHkY",
-            "BCABKAsyJS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkFjdGl2aXR5RXBvY2hI",
-            "ABI1CgZjbGllbnQYBSABKAsyIy50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkNs",
-            "aWVudEVwb2NoSABCBgoEa2luZCJwChFXb3JrZmxvd1Rhc2tFcG9jaBIYChBz",
-            "dGFydGVkX2V2ZW50X2lkGAEgASgDEg8KB2F0dGVtcHQYAiABKAUSMAoMc3Rh",
-            "cnRlZF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJe",
-            "ChJMb2NhbEFjdGl2aXR5RXBvY2gSNwoEdGFzaxgBIAEoCzIpLnRlbXBvcmFs",
-            "LmFwaS5zdHJlYW0udjEuV29ya2Zsb3dUYXNrRXBvY2gSDwoHYXR0ZW1wdBgC",
-            "IAEoBSJcCg1BY3Rpdml0eUVwb2NoEjoKFmF0dGVtcHRfc2NoZWR1bGVkX3Rp",
-            "bWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2F0dGVt",
-            "cHQYAiABKAUiHgoLQ2xpZW50RXBvY2gSDwoHYXR0ZW1wdBgBIAEoBSJcCghQ",
-            "cm9kdWNlchIKCgJpZBgBIAEoCRI0CgVlcG9jaBgCIAEoCzIlLnRlbXBvcmFs",
-            "LmFwaS5zdHJlYW0udjEuUHJvZHVjZXJFcG9jaBIOCgZydW5faWQYAyABKAki",
-            "ugEKDFN0cmVhbVdyaXRlchIyCghwcm9kdWNlchgBIAEoCzIgLnRlbXBvcmFs",
-            "LmFwaS5zdHJlYW0udjEuUHJvZHVjZXISSgoXcHJldmlvdXNfY29tcGxldGVk",
-            "X3Rhc2sYAiABKAsyKS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLldvcmtmbG93",
-            "VGFza0Vwb2NoEhQKDGZhaWxlZF90YXNrcxgDIAMoAxIUCgx3aXRoZHJhd19y",
-            "dW4YBCABKAkiPQoMQXBwZW5kUmVjb3JkEi0KBGJvZHkYASABKAsyHy50ZW1w",
-            "b3JhbC5hcGkuY29tbW9uLnYxLlBheWxvYWQiSAoQU3RyZWFtU3VwZXJzZWRl",
-            "ZBI0CgZ3cml0ZXIYASABKAsyJC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlN0",
-            "cmVhbVdyaXRlciJvCgpTdHJlYW1EYXRhEjIKCHByb2R1Y2VyGAEgASgLMiAu",
-            "dGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Qcm9kdWNlchItCgRib2R5GAIgASgL",
-            "Mh8udGVtcG9yYWwuYXBpLmNvbW1vbi52MS5QYXlsb2FkIpoBCgxTdHJlYW1S",
-            "ZWNvcmQSDgoGb2Zmc2V0GAEgASgDEjIKBGRhdGEYAiABKAsyIi50ZW1wb3Jh",
-            "bC5hcGkuc3RyZWFtLnYxLlN0cmVhbURhdGFIABI+CgpzdXBlcnNlZGVkGAMg",
-            "ASgLMigudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1TdXBlcnNlZGVk",
-            "SABCBgoEaXRlbSJOChJTdHJlYW1FcnJvckRldGFpbHMSOAoGcmVhc29uGAEg",
-            "ASgOMigudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbUVycm9yUmVhc29u",
-            "QokBChlpby50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxQgxNZXNzYWdlUHJvdG9Q",
-            "AVojZ28udGVtcG9yYWwuaW8vYXBpL3N0cmVhbS92MTtzdHJlYW2qAhhUZW1w",
-            "b3JhbGlvLkFwaS5TdHJlYW0uVjHqAhtUZW1wb3JhbGlvOjpBcGk6OlN0cmVh",
-            "bTo6VjFiBnByb3RvMw=="));
+            "dGVtcG9yYWwvYXBpL2VudW1zL3YxL3N0cmVhbS5wcm90byIoCglTdHJlYW1S",
+            "ZWYSCgoCaWQYASABKAkSDwoHYmFja2VuZBgDIAEoCSJwChFXb3JrZmxvd1Rh",
+            "c2tFcG9jaBIYChBzdGFydGVkX2V2ZW50X2lkGAEgASgDEg8KB2F0dGVtcHQY",
+            "AiABKAUSMAoMc3RhcnRlZF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVm",
+            "LlRpbWVzdGFtcCJeChJMb2NhbEFjdGl2aXR5RXBvY2gSNwoEdGFzaxgBIAEo",
+            "CzIpLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuV29ya2Zsb3dUYXNrRXBvY2gS",
+            "DwoHYXR0ZW1wdBgCIAEoBSJcCg1BY3Rpdml0eUVwb2NoEjoKFmF0dGVtcHRf",
+            "c2NoZWR1bGVkX3RpbWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0",
+            "YW1wEg8KB2F0dGVtcHQYAiABKAUiHgoLQ2xpZW50RXBvY2gSDwoHYXR0ZW1w",
+            "dBgBIAEoBSJcChBXb3JrZmxvd1Byb2R1Y2VyEg4KBnJ1bl9pZBgBIAEoCRI4",
+            "CgVlcG9jaBgCIAEoCzIpLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuV29ya2Zs",
+            "b3dUYXNrRXBvY2giYgoVTG9jYWxBY3Rpdml0eVByb2R1Y2VyEg4KBnJ1bl9p",
+            "ZBgBIAEoCRI5CgVlcG9jaBgCIAEoCzIqLnRlbXBvcmFsLmFwaS5zdHJlYW0u",
+            "djEuTG9jYWxBY3Rpdml0eUVwb2NoIlgKEEFjdGl2aXR5UHJvZHVjZXISDgoG",
+            "cnVuX2lkGAEgASgJEjQKBWVwb2NoGAIgASgLMiUudGVtcG9yYWwuYXBpLnN0",
+            "cmVhbS52MS5BY3Rpdml0eUVwb2NoIkQKDkNsaWVudFByb2R1Y2VyEjIKBWVw",
+            "b2NoGAEgASgLMiMudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5DbGllbnRFcG9j",
+            "aCLmAgoIUHJvZHVjZXISCgoCaWQYASABKAkSPAoId29ya2Zsb3cYAiABKAsy",
+            "KC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLldvcmtmbG93UHJvZHVjZXJIABJH",
+            "Cg5sb2NhbF9hY3Rpdml0eRgDIAEoCzItLnRlbXBvcmFsLmFwaS5zdHJlYW0u",
+            "djEuTG9jYWxBY3Rpdml0eVByb2R1Y2VySAASPAoIYWN0aXZpdHkYBCABKAsy",
+            "KC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkFjdGl2aXR5UHJvZHVjZXJIABJH",
+            "ChNzdGFuZGFsb25lX2FjdGl2aXR5GAUgASgLMigudGVtcG9yYWwuYXBpLnN0",
+            "cmVhbS52MS5BY3Rpdml0eVByb2R1Y2VySAASOAoGY2xpZW50GAYgASgLMiYu",
+            "dGVtcG9yYWwuYXBpLnN0cmVhbS52MS5DbGllbnRQcm9kdWNlckgAQgYKBGtp",
+            "bmQiQgoMU3RyZWFtV3JpdGVyEjIKCHByb2R1Y2VyGAEgASgLMiAudGVtcG9y",
+            "YWwuYXBpLnN0cmVhbS52MS5Qcm9kdWNlciI9CgxBcHBlbmRSZWNvcmQSLQoE",
+            "Ym9keRgBIAEoCzIfLnRlbXBvcmFsLmFwaS5jb21tb24udjEuUGF5bG9hZCJv",
+            "CgpTdHJlYW1EYXRhEjIKCHByb2R1Y2VyGAEgASgLMiAudGVtcG9yYWwuYXBp",
+            "LnN0cmVhbS52MS5Qcm9kdWNlchItCgRib2R5GAIgASgLMh8udGVtcG9yYWwu",
+            "YXBpLmNvbW1vbi52MS5QYXlsb2FkIpgBCgtTdHJlYW1DbG9zZRIyCghwcm9k",
+            "dWNlchgBIAEoCzIgLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuUHJvZHVjZXIS",
+            "OAoGc3RhdHVzGAQgASgOMigudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVh",
+            "bUNsb3NlU3RhdHVzSgQIAhADSgQIAxAEUgZyZXN1bHRSB2ZhaWx1cmUikAEK",
+            "DFN0cmVhbVJlY29yZBIOCgZvZmZzZXQYASABKAMSMgoEZGF0YRgCIAEoCzIi",
+            "LnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuU3RyZWFtRGF0YUgAEjQKBWNsb3Nl",
+            "GAQgASgLMiMudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1DbG9zZUgA",
+            "QgYKBGl0ZW0iTgoSU3RyZWFtRXJyb3JEZXRhaWxzEjgKBnJlYXNvbhgBIAEo",
+            "DjIoLnRlbXBvcmFsLmFwaS5lbnVtcy52MS5TdHJlYW1FcnJvclJlYXNvbkKJ",
+            "AQoZaW8udGVtcG9yYWwuYXBpLnN0cmVhbS52MUIMTWVzc2FnZVByb3RvUAFa",
+            "I2dvLnRlbXBvcmFsLmlvL2FwaS9zdHJlYW0vdjE7c3RyZWFtqgIYVGVtcG9y",
+            "YWxpby5BcGkuU3RyZWFtLlYx6gIbVGVtcG9yYWxpbzo6QXBpOjpTdHJlYW06",
+            "OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Temporalio.Api.Common.V1.MessageReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRef), global::Temporalio.Api.Stream.V1.StreamRef.Parser, new[]{ "Id", "Owner", "Backend" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ProducerEpoch), global::Temporalio.Api.Stream.V1.ProducerEpoch.Parser, new[]{ "Workflow", "LocalActivity", "Activity", "StandaloneActivity", "Client" }, new[]{ "Kind" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRef), global::Temporalio.Api.Stream.V1.StreamRef.Parser, new[]{ "Id", "Backend" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch), global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch.Parser, new[]{ "StartedEventId", "Attempt", "StartedTime" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.LocalActivityEpoch), global::Temporalio.Api.Stream.V1.LocalActivityEpoch.Parser, new[]{ "Task", "Attempt" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ActivityEpoch), global::Temporalio.Api.Stream.V1.ActivityEpoch.Parser, new[]{ "AttemptScheduledTime", "Attempt" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ClientEpoch), global::Temporalio.Api.Stream.V1.ClientEpoch.Parser, new[]{ "Attempt" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.Producer), global::Temporalio.Api.Stream.V1.Producer.Parser, new[]{ "Id", "Epoch", "RunId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamWriter), global::Temporalio.Api.Stream.V1.StreamWriter.Parser, new[]{ "Producer", "PreviousCompletedTask", "FailedTasks", "WithdrawRun" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.WorkflowProducer), global::Temporalio.Api.Stream.V1.WorkflowProducer.Parser, new[]{ "RunId", "Epoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.LocalActivityProducer), global::Temporalio.Api.Stream.V1.LocalActivityProducer.Parser, new[]{ "RunId", "Epoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ActivityProducer), global::Temporalio.Api.Stream.V1.ActivityProducer.Parser, new[]{ "RunId", "Epoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ClientProducer), global::Temporalio.Api.Stream.V1.ClientProducer.Parser, new[]{ "Epoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.Producer), global::Temporalio.Api.Stream.V1.Producer.Parser, new[]{ "Id", "Workflow", "LocalActivity", "Activity", "StandaloneActivity", "Client" }, new[]{ "Kind" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamWriter), global::Temporalio.Api.Stream.V1.StreamWriter.Parser, new[]{ "Producer" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.AppendRecord), global::Temporalio.Api.Stream.V1.AppendRecord.Parser, new[]{ "Body" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamSuperseded), global::Temporalio.Api.Stream.V1.StreamSuperseded.Parser, new[]{ "Writer" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamData), global::Temporalio.Api.Stream.V1.StreamData.Parser, new[]{ "Producer", "Body" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRecord), global::Temporalio.Api.Stream.V1.StreamRecord.Parser, new[]{ "Offset", "Data", "Superseded" }, new[]{ "Item" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamClose), global::Temporalio.Api.Stream.V1.StreamClose.Parser, new[]{ "Producer", "Status" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRecord), global::Temporalio.Api.Stream.V1.StreamRecord.Parser, new[]{ "Offset", "Data", "Close" }, new[]{ "Item" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamErrorDetails), global::Temporalio.Api.Stream.V1.StreamErrorDetails.Parser, new[]{ "Reason" }, null, null, null, null)
           }));
     }
@@ -128,7 +135,6 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public StreamRef(StreamRef other) : this() {
       id_ = other.id_;
-      owner_ = other.owner_ != null ? other.owner_.Clone() : null;
       backend_ = other.backend_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -148,24 +154,6 @@ namespace Temporalio.Api.Stream.V1 {
       get { return id_; }
       set {
         id_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "owner" field.</summary>
-    public const int OwnerFieldNumber = 2;
-    private global::Temporalio.Api.Common.V1.Execution owner_;
-    /// <summary>
-    /// Unset for a standalone Stream. For a Stream bound to a Workflow, business_id is the Workflow
-    /// ID and run_id is the first execution run id of its run chain. For a Standalone Activity,
-    /// business_id is the activity ID and run_id is its run id. A create and a close of a
-    /// Workflow-owned Stream must carry its owner.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Common.V1.Execution Owner {
-      get { return owner_; }
-      set {
-        owner_ = value;
       }
     }
 
@@ -202,7 +190,6 @@ namespace Temporalio.Api.Stream.V1 {
         return true;
       }
       if (Id != other.Id) return false;
-      if (!object.Equals(Owner, other.Owner)) return false;
       if (Backend != other.Backend) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -212,7 +199,6 @@ namespace Temporalio.Api.Stream.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Id.Length != 0) hash ^= Id.GetHashCode();
-      if (owner_ != null) hash ^= Owner.GetHashCode();
       if (Backend.Length != 0) hash ^= Backend.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -236,10 +222,6 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (owner_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Owner);
-      }
       if (Backend.Length != 0) {
         output.WriteRawTag(26);
         output.WriteString(Backend);
@@ -258,10 +240,6 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (owner_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(Owner);
-      }
       if (Backend.Length != 0) {
         output.WriteRawTag(26);
         output.WriteString(Backend);
@@ -278,9 +256,6 @@ namespace Temporalio.Api.Stream.V1 {
       int size = 0;
       if (Id.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Id);
-      }
-      if (owner_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Owner);
       }
       if (Backend.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Backend);
@@ -299,12 +274,6 @@ namespace Temporalio.Api.Stream.V1 {
       }
       if (other.Id.Length != 0) {
         Id = other.Id;
-      }
-      if (other.owner_ != null) {
-        if (owner_ == null) {
-          Owner = new global::Temporalio.Api.Common.V1.Execution();
-        }
-        Owner.MergeFrom(other.Owner);
       }
       if (other.Backend.Length != 0) {
         Backend = other.Backend;
@@ -332,13 +301,6 @@ namespace Temporalio.Api.Stream.V1 {
             Id = input.ReadString();
             break;
           }
-          case 18: {
-            if (owner_ == null) {
-              Owner = new global::Temporalio.Api.Common.V1.Execution();
-            }
-            input.ReadMessage(Owner);
-            break;
-          }
           case 26: {
             Backend = input.ReadString();
             break;
@@ -366,491 +328,8 @@ namespace Temporalio.Api.Stream.V1 {
             Id = input.ReadString();
             break;
           }
-          case 18: {
-            if (owner_ == null) {
-              Owner = new global::Temporalio.Api.Common.V1.Execution();
-            }
-            input.ReadMessage(Owner);
-            break;
-          }
           case 26: {
             Backend = input.ReadString();
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
-  /// The ordered attempt of a Producer. A higher epoch supersedes the Records of a lower epoch of the
-  /// same Producer. The case is the kind of the Producer. It decides how the Store orders the epochs,
-  /// and which earlier Records a higher epoch withdraws.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ProducerEpoch : pb::IMessage<ProducerEpoch>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<ProducerEpoch> _parser = new pb::MessageParser<ProducerEpoch>(() => new ProducerEpoch());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ProducerEpoch> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[1]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProducerEpoch() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProducerEpoch(ProducerEpoch other) : this() {
-      switch (other.KindCase) {
-        case KindOneofCase.Workflow:
-          Workflow = other.Workflow.Clone();
-          break;
-        case KindOneofCase.LocalActivity:
-          LocalActivity = other.LocalActivity.Clone();
-          break;
-        case KindOneofCase.Activity:
-          Activity = other.Activity.Clone();
-          break;
-        case KindOneofCase.StandaloneActivity:
-          StandaloneActivity = other.StandaloneActivity.Clone();
-          break;
-        case KindOneofCase.Client:
-          Client = other.Client.Clone();
-          break;
-      }
-
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProducerEpoch Clone() {
-      return new ProducerEpoch(this);
-    }
-
-    /// <summary>Field number for the "workflow" field.</summary>
-    public const int WorkflowFieldNumber = 1;
-    /// <summary>
-    /// A Workflow run, which writes in its Workflow Task. A higher epoch withdraws the Records
-    /// of the run's Workflow Tasks that never completed, also those of their Local Activities.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch Workflow {
-      get { return kindCase_ == KindOneofCase.Workflow ? (global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch) kind_ : null; }
-      set {
-        kind_ = value;
-        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Workflow;
-      }
-    }
-
-    /// <summary>Field number for the "local_activity" field.</summary>
-    public const int LocalActivityFieldNumber = 2;
-    /// <summary>
-    /// A Local Activity. A higher epoch withdraws the Producer's lower epochs.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.LocalActivityEpoch LocalActivity {
-      get { return kindCase_ == KindOneofCase.LocalActivity ? (global::Temporalio.Api.Stream.V1.LocalActivityEpoch) kind_ : null; }
-      set {
-        kind_ = value;
-        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.LocalActivity;
-      }
-    }
-
-    /// <summary>Field number for the "activity" field.</summary>
-    public const int ActivityFieldNumber = 3;
-    /// <summary>
-    /// An Activity of a Workflow. A higher epoch withdraws the Producer's lower epochs.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.ActivityEpoch Activity {
-      get { return kindCase_ == KindOneofCase.Activity ? (global::Temporalio.Api.Stream.V1.ActivityEpoch) kind_ : null; }
-      set {
-        kind_ = value;
-        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Activity;
-      }
-    }
-
-    /// <summary>Field number for the "standalone_activity" field.</summary>
-    public const int StandaloneActivityFieldNumber = 4;
-    /// <summary>
-    /// A Standalone Activity. A higher epoch withdraws the Producer's lower epochs.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.ActivityEpoch StandaloneActivity {
-      get { return kindCase_ == KindOneofCase.StandaloneActivity ? (global::Temporalio.Api.Stream.V1.ActivityEpoch) kind_ : null; }
-      set {
-        kind_ = value;
-        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.StandaloneActivity;
-      }
-    }
-
-    /// <summary>Field number for the "client" field.</summary>
-    public const int ClientFieldNumber = 5;
-    /// <summary>
-    /// A client. A higher epoch only fences the lower ones, since a restarted client's earlier
-    /// Records are real messages, not the Records of a failed attempt.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.ClientEpoch Client {
-      get { return kindCase_ == KindOneofCase.Client ? (global::Temporalio.Api.Stream.V1.ClientEpoch) kind_ : null; }
-      set {
-        kind_ = value;
-        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Client;
-      }
-    }
-
-    private object kind_;
-    /// <summary>Enum of possible cases for the "kind" oneof.</summary>
-    public enum KindOneofCase {
-      None = 0,
-      Workflow = 1,
-      LocalActivity = 2,
-      Activity = 3,
-      StandaloneActivity = 4,
-      Client = 5,
-    }
-    private KindOneofCase kindCase_ = KindOneofCase.None;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public KindOneofCase KindCase {
-      get { return kindCase_; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearKind() {
-      kindCase_ = KindOneofCase.None;
-      kind_ = null;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as ProducerEpoch);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ProducerEpoch other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Workflow, other.Workflow)) return false;
-      if (!object.Equals(LocalActivity, other.LocalActivity)) return false;
-      if (!object.Equals(Activity, other.Activity)) return false;
-      if (!object.Equals(StandaloneActivity, other.StandaloneActivity)) return false;
-      if (!object.Equals(Client, other.Client)) return false;
-      if (KindCase != other.KindCase) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (kindCase_ == KindOneofCase.Workflow) hash ^= Workflow.GetHashCode();
-      if (kindCase_ == KindOneofCase.LocalActivity) hash ^= LocalActivity.GetHashCode();
-      if (kindCase_ == KindOneofCase.Activity) hash ^= Activity.GetHashCode();
-      if (kindCase_ == KindOneofCase.StandaloneActivity) hash ^= StandaloneActivity.GetHashCode();
-      if (kindCase_ == KindOneofCase.Client) hash ^= Client.GetHashCode();
-      hash ^= (int) kindCase_;
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (kindCase_ == KindOneofCase.Workflow) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Workflow);
-      }
-      if (kindCase_ == KindOneofCase.LocalActivity) {
-        output.WriteRawTag(18);
-        output.WriteMessage(LocalActivity);
-      }
-      if (kindCase_ == KindOneofCase.Activity) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Activity);
-      }
-      if (kindCase_ == KindOneofCase.StandaloneActivity) {
-        output.WriteRawTag(34);
-        output.WriteMessage(StandaloneActivity);
-      }
-      if (kindCase_ == KindOneofCase.Client) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Client);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (kindCase_ == KindOneofCase.Workflow) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Workflow);
-      }
-      if (kindCase_ == KindOneofCase.LocalActivity) {
-        output.WriteRawTag(18);
-        output.WriteMessage(LocalActivity);
-      }
-      if (kindCase_ == KindOneofCase.Activity) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Activity);
-      }
-      if (kindCase_ == KindOneofCase.StandaloneActivity) {
-        output.WriteRawTag(34);
-        output.WriteMessage(StandaloneActivity);
-      }
-      if (kindCase_ == KindOneofCase.Client) {
-        output.WriteRawTag(42);
-        output.WriteMessage(Client);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (kindCase_ == KindOneofCase.Workflow) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Workflow);
-      }
-      if (kindCase_ == KindOneofCase.LocalActivity) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(LocalActivity);
-      }
-      if (kindCase_ == KindOneofCase.Activity) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Activity);
-      }
-      if (kindCase_ == KindOneofCase.StandaloneActivity) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(StandaloneActivity);
-      }
-      if (kindCase_ == KindOneofCase.Client) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Client);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ProducerEpoch other) {
-      if (other == null) {
-        return;
-      }
-      switch (other.KindCase) {
-        case KindOneofCase.Workflow:
-          if (Workflow == null) {
-            Workflow = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-          }
-          Workflow.MergeFrom(other.Workflow);
-          break;
-        case KindOneofCase.LocalActivity:
-          if (LocalActivity == null) {
-            LocalActivity = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
-          }
-          LocalActivity.MergeFrom(other.LocalActivity);
-          break;
-        case KindOneofCase.Activity:
-          if (Activity == null) {
-            Activity = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-          }
-          Activity.MergeFrom(other.Activity);
-          break;
-        case KindOneofCase.StandaloneActivity:
-          if (StandaloneActivity == null) {
-            StandaloneActivity = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-          }
-          StandaloneActivity.MergeFrom(other.StandaloneActivity);
-          break;
-        case KindOneofCase.Client:
-          if (Client == null) {
-            Client = new global::Temporalio.Api.Stream.V1.ClientEpoch();
-          }
-          Client.MergeFrom(other.Client);
-          break;
-      }
-
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch subBuilder = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            if (kindCase_ == KindOneofCase.Workflow) {
-              subBuilder.MergeFrom(Workflow);
-            }
-            input.ReadMessage(subBuilder);
-            Workflow = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Temporalio.Api.Stream.V1.LocalActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
-            if (kindCase_ == KindOneofCase.LocalActivity) {
-              subBuilder.MergeFrom(LocalActivity);
-            }
-            input.ReadMessage(subBuilder);
-            LocalActivity = subBuilder;
-            break;
-          }
-          case 26: {
-            global::Temporalio.Api.Stream.V1.ActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-            if (kindCase_ == KindOneofCase.Activity) {
-              subBuilder.MergeFrom(Activity);
-            }
-            input.ReadMessage(subBuilder);
-            Activity = subBuilder;
-            break;
-          }
-          case 34: {
-            global::Temporalio.Api.Stream.V1.ActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-            if (kindCase_ == KindOneofCase.StandaloneActivity) {
-              subBuilder.MergeFrom(StandaloneActivity);
-            }
-            input.ReadMessage(subBuilder);
-            StandaloneActivity = subBuilder;
-            break;
-          }
-          case 42: {
-            global::Temporalio.Api.Stream.V1.ClientEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ClientEpoch();
-            if (kindCase_ == KindOneofCase.Client) {
-              subBuilder.MergeFrom(Client);
-            }
-            input.ReadMessage(subBuilder);
-            Client = subBuilder;
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch subBuilder = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            if (kindCase_ == KindOneofCase.Workflow) {
-              subBuilder.MergeFrom(Workflow);
-            }
-            input.ReadMessage(subBuilder);
-            Workflow = subBuilder;
-            break;
-          }
-          case 18: {
-            global::Temporalio.Api.Stream.V1.LocalActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
-            if (kindCase_ == KindOneofCase.LocalActivity) {
-              subBuilder.MergeFrom(LocalActivity);
-            }
-            input.ReadMessage(subBuilder);
-            LocalActivity = subBuilder;
-            break;
-          }
-          case 26: {
-            global::Temporalio.Api.Stream.V1.ActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-            if (kindCase_ == KindOneofCase.Activity) {
-              subBuilder.MergeFrom(Activity);
-            }
-            input.ReadMessage(subBuilder);
-            Activity = subBuilder;
-            break;
-          }
-          case 34: {
-            global::Temporalio.Api.Stream.V1.ActivityEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
-            if (kindCase_ == KindOneofCase.StandaloneActivity) {
-              subBuilder.MergeFrom(StandaloneActivity);
-            }
-            input.ReadMessage(subBuilder);
-            StandaloneActivity = subBuilder;
-            break;
-          }
-          case 42: {
-            global::Temporalio.Api.Stream.V1.ClientEpoch subBuilder = new global::Temporalio.Api.Stream.V1.ClientEpoch();
-            if (kindCase_ == KindOneofCase.Client) {
-              subBuilder.MergeFrom(Client);
-            }
-            input.ReadMessage(subBuilder);
-            Client = subBuilder;
             break;
           }
         }
@@ -880,7 +359,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[2]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[1]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1169,7 +648,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[3]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[2]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1423,7 +902,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[4]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[3]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1675,7 +1154,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[5]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[4]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1860,7 +1339,970 @@ namespace Temporalio.Api.Stream.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// The code that wrote a batch. Its id stays the same across attempts, and its epoch orders them.
+  /// A Workflow run Producer. It writes in its Workflow Task. A higher epoch supersedes the Records of
+  /// the run's Workflow Tasks that never completed, with those of their Local Activities.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class WorkflowProducer : pb::IMessage<WorkflowProducer>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<WorkflowProducer> _parser = new pb::MessageParser<WorkflowProducer>(() => new WorkflowProducer());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<WorkflowProducer> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[5]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public WorkflowProducer() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public WorkflowProducer(WorkflowProducer other) : this() {
+      runId_ = other.runId_;
+      epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public WorkflowProducer Clone() {
+      return new WorkflowProducer(this);
+    }
+
+    /// <summary>Field number for the "run_id" field.</summary>
+    public const int RunIdFieldNumber = 1;
+    private string runId_ = "";
+    /// <summary>
+    /// The first execution run id of the run chain.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string RunId {
+      get { return runId_; }
+      set {
+        runId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "epoch" field.</summary>
+    public const int EpochFieldNumber = 2;
+    private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch epoch_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch Epoch {
+      get { return epoch_; }
+      set {
+        epoch_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as WorkflowProducer);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(WorkflowProducer other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (RunId != other.RunId) return false;
+      if (!object.Equals(Epoch, other.Epoch)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (RunId.Length != 0) hash ^= RunId.GetHashCode();
+      if (epoch_ != null) hash ^= Epoch.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (RunId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(RunId);
+      }
+      if (epoch_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Epoch);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(WorkflowProducer other) {
+      if (other == null) {
+        return;
+      }
+      if (other.RunId.Length != 0) {
+        RunId = other.RunId;
+      }
+      if (other.epoch_ != null) {
+        if (epoch_ == null) {
+          Epoch = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
+        }
+        Epoch.MergeFrom(other.Epoch);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
+  /// A Local Activity Producer. A higher epoch supersedes the Producer's lower epochs.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class LocalActivityProducer : pb::IMessage<LocalActivityProducer>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<LocalActivityProducer> _parser = new pb::MessageParser<LocalActivityProducer>(() => new LocalActivityProducer());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<LocalActivityProducer> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[6]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalActivityProducer() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalActivityProducer(LocalActivityProducer other) : this() {
+      runId_ = other.runId_;
+      epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalActivityProducer Clone() {
+      return new LocalActivityProducer(this);
+    }
+
+    /// <summary>Field number for the "run_id" field.</summary>
+    public const int RunIdFieldNumber = 1;
+    private string runId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string RunId {
+      get { return runId_; }
+      set {
+        runId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "epoch" field.</summary>
+    public const int EpochFieldNumber = 2;
+    private global::Temporalio.Api.Stream.V1.LocalActivityEpoch epoch_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.LocalActivityEpoch Epoch {
+      get { return epoch_; }
+      set {
+        epoch_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as LocalActivityProducer);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(LocalActivityProducer other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (RunId != other.RunId) return false;
+      if (!object.Equals(Epoch, other.Epoch)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (RunId.Length != 0) hash ^= RunId.GetHashCode();
+      if (epoch_ != null) hash ^= Epoch.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (RunId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(RunId);
+      }
+      if (epoch_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Epoch);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(LocalActivityProducer other) {
+      if (other == null) {
+        return;
+      }
+      if (other.RunId.Length != 0) {
+        RunId = other.RunId;
+      }
+      if (other.epoch_ != null) {
+        if (epoch_ == null) {
+          Epoch = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
+        }
+        Epoch.MergeFrom(other.Epoch);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.LocalActivityEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
+  /// An Activity Producer, for an Activity of a Workflow or a Standalone Activity. A higher epoch
+  /// supersedes the Producer's lower epochs.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ActivityProducer : pb::IMessage<ActivityProducer>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ActivityProducer> _parser = new pb::MessageParser<ActivityProducer>(() => new ActivityProducer());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ActivityProducer> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[7]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ActivityProducer() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ActivityProducer(ActivityProducer other) : this() {
+      runId_ = other.runId_;
+      epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ActivityProducer Clone() {
+      return new ActivityProducer(this);
+    }
+
+    /// <summary>Field number for the "run_id" field.</summary>
+    public const int RunIdFieldNumber = 1;
+    private string runId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string RunId {
+      get { return runId_; }
+      set {
+        runId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "epoch" field.</summary>
+    public const int EpochFieldNumber = 2;
+    private global::Temporalio.Api.Stream.V1.ActivityEpoch epoch_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.ActivityEpoch Epoch {
+      get { return epoch_; }
+      set {
+        epoch_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ActivityProducer);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ActivityProducer other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (RunId != other.RunId) return false;
+      if (!object.Equals(Epoch, other.Epoch)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (RunId.Length != 0) hash ^= RunId.GetHashCode();
+      if (epoch_ != null) hash ^= Epoch.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (RunId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(RunId);
+      }
+      if (epoch_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (RunId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(RunId);
+      }
+      if (epoch_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Epoch);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ActivityProducer other) {
+      if (other == null) {
+        return;
+      }
+      if (other.RunId.Length != 0) {
+        RunId = other.RunId;
+      }
+      if (other.epoch_ != null) {
+        if (epoch_ == null) {
+          Epoch = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
+        }
+        Epoch.MergeFrom(other.Epoch);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            RunId = input.ReadString();
+            break;
+          }
+          case 18: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.ActivityEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
+  /// A client Producer. A higher epoch only fences the lower ones, since a restarted client's earlier
+  /// Records are real messages, not the Records of a failed attempt. A client has no run.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ClientProducer : pb::IMessage<ClientProducer>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ClientProducer> _parser = new pb::MessageParser<ClientProducer>(() => new ClientProducer());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ClientProducer> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[8]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ClientProducer() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ClientProducer(ClientProducer other) : this() {
+      epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ClientProducer Clone() {
+      return new ClientProducer(this);
+    }
+
+    /// <summary>Field number for the "epoch" field.</summary>
+    public const int EpochFieldNumber = 1;
+    private global::Temporalio.Api.Stream.V1.ClientEpoch epoch_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.ClientEpoch Epoch {
+      get { return epoch_; }
+      set {
+        epoch_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ClientProducer);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ClientProducer other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Epoch, other.Epoch)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (epoch_ != null) hash ^= Epoch.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (epoch_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (epoch_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Epoch);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (epoch_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Epoch);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ClientProducer other) {
+      if (other == null) {
+        return;
+      }
+      if (other.epoch_ != null) {
+        if (epoch_ == null) {
+          Epoch = new global::Temporalio.Api.Stream.V1.ClientEpoch();
+        }
+        Epoch.MergeFrom(other.Epoch);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.ClientEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (epoch_ == null) {
+              Epoch = new global::Temporalio.Api.Stream.V1.ClientEpoch();
+            }
+            input.ReadMessage(Epoch);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
+  /// The code that wrote a batch. Its id stays the same across attempts, and the kind's case orders
+  /// its epochs and picks which earlier Records a higher epoch supersedes. A run-based kind carries its
+  /// run, so a client can't.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class Producer : pb::IMessage<Producer>
@@ -1877,7 +2319,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[6]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[9]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1898,8 +2340,24 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Producer(Producer other) : this() {
       id_ = other.id_;
-      epoch_ = other.epoch_ != null ? other.epoch_.Clone() : null;
-      runId_ = other.runId_;
+      switch (other.KindCase) {
+        case KindOneofCase.Workflow:
+          Workflow = other.Workflow.Clone();
+          break;
+        case KindOneofCase.LocalActivity:
+          LocalActivity = other.LocalActivity.Clone();
+          break;
+        case KindOneofCase.Activity:
+          Activity = other.Activity.Clone();
+          break;
+        case KindOneofCase.StandaloneActivity:
+          StandaloneActivity = other.StandaloneActivity.Clone();
+          break;
+        case KindOneofCase.Client:
+          Client = other.Client.Clone();
+          break;
+      }
+
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1924,34 +2382,88 @@ namespace Temporalio.Api.Stream.V1 {
       }
     }
 
-    /// <summary>Field number for the "epoch" field.</summary>
-    public const int EpochFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.ProducerEpoch epoch_;
-    /// <summary>
-    /// Required. Its case gives the kind of the Producer.
-    /// </summary>
+    /// <summary>Field number for the "workflow" field.</summary>
+    public const int WorkflowFieldNumber = 2;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.ProducerEpoch Epoch {
-      get { return epoch_; }
+    public global::Temporalio.Api.Stream.V1.WorkflowProducer Workflow {
+      get { return kindCase_ == KindOneofCase.Workflow ? (global::Temporalio.Api.Stream.V1.WorkflowProducer) kind_ : null; }
       set {
-        epoch_ = value;
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Workflow;
       }
     }
 
-    /// <summary>Field number for the "run_id" field.</summary>
-    public const int RunIdFieldNumber = 3;
-    private string runId_ = "";
-    /// <summary>
-    /// The run of the Producer, so nobody parses the id. Empty for a client.
-    /// </summary>
+    /// <summary>Field number for the "local_activity" field.</summary>
+    public const int LocalActivityFieldNumber = 3;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string RunId {
-      get { return runId_; }
+    public global::Temporalio.Api.Stream.V1.LocalActivityProducer LocalActivity {
+      get { return kindCase_ == KindOneofCase.LocalActivity ? (global::Temporalio.Api.Stream.V1.LocalActivityProducer) kind_ : null; }
       set {
-        runId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.LocalActivity;
       }
+    }
+
+    /// <summary>Field number for the "activity" field.</summary>
+    public const int ActivityFieldNumber = 4;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.ActivityProducer Activity {
+      get { return kindCase_ == KindOneofCase.Activity ? (global::Temporalio.Api.Stream.V1.ActivityProducer) kind_ : null; }
+      set {
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Activity;
+      }
+    }
+
+    /// <summary>Field number for the "standalone_activity" field.</summary>
+    public const int StandaloneActivityFieldNumber = 5;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.ActivityProducer StandaloneActivity {
+      get { return kindCase_ == KindOneofCase.StandaloneActivity ? (global::Temporalio.Api.Stream.V1.ActivityProducer) kind_ : null; }
+      set {
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.StandaloneActivity;
+      }
+    }
+
+    /// <summary>Field number for the "client" field.</summary>
+    public const int ClientFieldNumber = 6;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.ClientProducer Client {
+      get { return kindCase_ == KindOneofCase.Client ? (global::Temporalio.Api.Stream.V1.ClientProducer) kind_ : null; }
+      set {
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.Client;
+      }
+    }
+
+    private object kind_;
+    /// <summary>Enum of possible cases for the "kind" oneof.</summary>
+    public enum KindOneofCase {
+      None = 0,
+      Workflow = 2,
+      LocalActivity = 3,
+      Activity = 4,
+      StandaloneActivity = 5,
+      Client = 6,
+    }
+    private KindOneofCase kindCase_ = KindOneofCase.None;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public KindOneofCase KindCase {
+      get { return kindCase_; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearKind() {
+      kindCase_ = KindOneofCase.None;
+      kind_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1970,8 +2482,12 @@ namespace Temporalio.Api.Stream.V1 {
         return true;
       }
       if (Id != other.Id) return false;
-      if (!object.Equals(Epoch, other.Epoch)) return false;
-      if (RunId != other.RunId) return false;
+      if (!object.Equals(Workflow, other.Workflow)) return false;
+      if (!object.Equals(LocalActivity, other.LocalActivity)) return false;
+      if (!object.Equals(Activity, other.Activity)) return false;
+      if (!object.Equals(StandaloneActivity, other.StandaloneActivity)) return false;
+      if (!object.Equals(Client, other.Client)) return false;
+      if (KindCase != other.KindCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1980,8 +2496,12 @@ namespace Temporalio.Api.Stream.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Id.Length != 0) hash ^= Id.GetHashCode();
-      if (epoch_ != null) hash ^= Epoch.GetHashCode();
-      if (RunId.Length != 0) hash ^= RunId.GetHashCode();
+      if (kindCase_ == KindOneofCase.Workflow) hash ^= Workflow.GetHashCode();
+      if (kindCase_ == KindOneofCase.LocalActivity) hash ^= LocalActivity.GetHashCode();
+      if (kindCase_ == KindOneofCase.Activity) hash ^= Activity.GetHashCode();
+      if (kindCase_ == KindOneofCase.StandaloneActivity) hash ^= StandaloneActivity.GetHashCode();
+      if (kindCase_ == KindOneofCase.Client) hash ^= Client.GetHashCode();
+      hash ^= (int) kindCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2004,13 +2524,25 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (epoch_ != null) {
+      if (kindCase_ == KindOneofCase.Workflow) {
         output.WriteRawTag(18);
-        output.WriteMessage(Epoch);
+        output.WriteMessage(Workflow);
       }
-      if (RunId.Length != 0) {
+      if (kindCase_ == KindOneofCase.LocalActivity) {
         output.WriteRawTag(26);
-        output.WriteString(RunId);
+        output.WriteMessage(LocalActivity);
+      }
+      if (kindCase_ == KindOneofCase.Activity) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Activity);
+      }
+      if (kindCase_ == KindOneofCase.StandaloneActivity) {
+        output.WriteRawTag(42);
+        output.WriteMessage(StandaloneActivity);
+      }
+      if (kindCase_ == KindOneofCase.Client) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Client);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -2026,13 +2558,25 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (epoch_ != null) {
+      if (kindCase_ == KindOneofCase.Workflow) {
         output.WriteRawTag(18);
-        output.WriteMessage(Epoch);
+        output.WriteMessage(Workflow);
       }
-      if (RunId.Length != 0) {
+      if (kindCase_ == KindOneofCase.LocalActivity) {
         output.WriteRawTag(26);
-        output.WriteString(RunId);
+        output.WriteMessage(LocalActivity);
+      }
+      if (kindCase_ == KindOneofCase.Activity) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Activity);
+      }
+      if (kindCase_ == KindOneofCase.StandaloneActivity) {
+        output.WriteRawTag(42);
+        output.WriteMessage(StandaloneActivity);
+      }
+      if (kindCase_ == KindOneofCase.Client) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Client);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -2047,11 +2591,20 @@ namespace Temporalio.Api.Stream.V1 {
       if (Id.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Id);
       }
-      if (epoch_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Epoch);
+      if (kindCase_ == KindOneofCase.Workflow) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Workflow);
       }
-      if (RunId.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(RunId);
+      if (kindCase_ == KindOneofCase.LocalActivity) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(LocalActivity);
+      }
+      if (kindCase_ == KindOneofCase.Activity) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Activity);
+      }
+      if (kindCase_ == KindOneofCase.StandaloneActivity) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(StandaloneActivity);
+      }
+      if (kindCase_ == KindOneofCase.Client) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Client);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2068,15 +2621,39 @@ namespace Temporalio.Api.Stream.V1 {
       if (other.Id.Length != 0) {
         Id = other.Id;
       }
-      if (other.epoch_ != null) {
-        if (epoch_ == null) {
-          Epoch = new global::Temporalio.Api.Stream.V1.ProducerEpoch();
-        }
-        Epoch.MergeFrom(other.Epoch);
+      switch (other.KindCase) {
+        case KindOneofCase.Workflow:
+          if (Workflow == null) {
+            Workflow = new global::Temporalio.Api.Stream.V1.WorkflowProducer();
+          }
+          Workflow.MergeFrom(other.Workflow);
+          break;
+        case KindOneofCase.LocalActivity:
+          if (LocalActivity == null) {
+            LocalActivity = new global::Temporalio.Api.Stream.V1.LocalActivityProducer();
+          }
+          LocalActivity.MergeFrom(other.LocalActivity);
+          break;
+        case KindOneofCase.Activity:
+          if (Activity == null) {
+            Activity = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+          }
+          Activity.MergeFrom(other.Activity);
+          break;
+        case KindOneofCase.StandaloneActivity:
+          if (StandaloneActivity == null) {
+            StandaloneActivity = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+          }
+          StandaloneActivity.MergeFrom(other.StandaloneActivity);
+          break;
+        case KindOneofCase.Client:
+          if (Client == null) {
+            Client = new global::Temporalio.Api.Stream.V1.ClientProducer();
+          }
+          Client.MergeFrom(other.Client);
+          break;
       }
-      if (other.RunId.Length != 0) {
-        RunId = other.RunId;
-      }
+
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -2101,14 +2678,48 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 18: {
-            if (epoch_ == null) {
-              Epoch = new global::Temporalio.Api.Stream.V1.ProducerEpoch();
+            global::Temporalio.Api.Stream.V1.WorkflowProducer subBuilder = new global::Temporalio.Api.Stream.V1.WorkflowProducer();
+            if (kindCase_ == KindOneofCase.Workflow) {
+              subBuilder.MergeFrom(Workflow);
             }
-            input.ReadMessage(Epoch);
+            input.ReadMessage(subBuilder);
+            Workflow = subBuilder;
             break;
           }
           case 26: {
-            RunId = input.ReadString();
+            global::Temporalio.Api.Stream.V1.LocalActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.LocalActivityProducer();
+            if (kindCase_ == KindOneofCase.LocalActivity) {
+              subBuilder.MergeFrom(LocalActivity);
+            }
+            input.ReadMessage(subBuilder);
+            LocalActivity = subBuilder;
+            break;
+          }
+          case 34: {
+            global::Temporalio.Api.Stream.V1.ActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+            if (kindCase_ == KindOneofCase.Activity) {
+              subBuilder.MergeFrom(Activity);
+            }
+            input.ReadMessage(subBuilder);
+            Activity = subBuilder;
+            break;
+          }
+          case 42: {
+            global::Temporalio.Api.Stream.V1.ActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+            if (kindCase_ == KindOneofCase.StandaloneActivity) {
+              subBuilder.MergeFrom(StandaloneActivity);
+            }
+            input.ReadMessage(subBuilder);
+            StandaloneActivity = subBuilder;
+            break;
+          }
+          case 50: {
+            global::Temporalio.Api.Stream.V1.ClientProducer subBuilder = new global::Temporalio.Api.Stream.V1.ClientProducer();
+            if (kindCase_ == KindOneofCase.Client) {
+              subBuilder.MergeFrom(Client);
+            }
+            input.ReadMessage(subBuilder);
+            Client = subBuilder;
             break;
           }
         }
@@ -2135,14 +2746,48 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 18: {
-            if (epoch_ == null) {
-              Epoch = new global::Temporalio.Api.Stream.V1.ProducerEpoch();
+            global::Temporalio.Api.Stream.V1.WorkflowProducer subBuilder = new global::Temporalio.Api.Stream.V1.WorkflowProducer();
+            if (kindCase_ == KindOneofCase.Workflow) {
+              subBuilder.MergeFrom(Workflow);
             }
-            input.ReadMessage(Epoch);
+            input.ReadMessage(subBuilder);
+            Workflow = subBuilder;
             break;
           }
           case 26: {
-            RunId = input.ReadString();
+            global::Temporalio.Api.Stream.V1.LocalActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.LocalActivityProducer();
+            if (kindCase_ == KindOneofCase.LocalActivity) {
+              subBuilder.MergeFrom(LocalActivity);
+            }
+            input.ReadMessage(subBuilder);
+            LocalActivity = subBuilder;
+            break;
+          }
+          case 34: {
+            global::Temporalio.Api.Stream.V1.ActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+            if (kindCase_ == KindOneofCase.Activity) {
+              subBuilder.MergeFrom(Activity);
+            }
+            input.ReadMessage(subBuilder);
+            Activity = subBuilder;
+            break;
+          }
+          case 42: {
+            global::Temporalio.Api.Stream.V1.ActivityProducer subBuilder = new global::Temporalio.Api.Stream.V1.ActivityProducer();
+            if (kindCase_ == KindOneofCase.StandaloneActivity) {
+              subBuilder.MergeFrom(StandaloneActivity);
+            }
+            input.ReadMessage(subBuilder);
+            StandaloneActivity = subBuilder;
+            break;
+          }
+          case 50: {
+            global::Temporalio.Api.Stream.V1.ClientProducer subBuilder = new global::Temporalio.Api.Stream.V1.ClientProducer();
+            if (kindCase_ == KindOneofCase.Client) {
+              subBuilder.MergeFrom(Client);
+            }
+            input.ReadMessage(subBuilder);
+            Client = subBuilder;
             break;
           }
         }
@@ -2154,8 +2799,8 @@ namespace Temporalio.Api.Stream.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// The Producer of a write, and which earlier Records the write withdraws. An append, a close and
-  /// a writer carry the same fields, so the Store orders and withdraws each write the same way.
+  /// The Producer of a write. An append and a close carry the same writer, so the Store orders each
+  /// write the same way.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class StreamWriter : pb::IMessage<StreamWriter>
@@ -2172,7 +2817,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[7]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[10]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2193,9 +2838,6 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public StreamWriter(StreamWriter other) : this() {
       producer_ = other.producer_ != null ? other.producer_.Clone() : null;
-      previousCompletedTask_ = other.previousCompletedTask_ != null ? other.previousCompletedTask_.Clone() : null;
-      failedTasks_ = other.failedTasks_.Clone();
-      withdrawRun_ = other.withdrawRun_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2209,7 +2851,7 @@ namespace Temporalio.Api.Stream.V1 {
     public const int ProducerFieldNumber = 1;
     private global::Temporalio.Api.Stream.V1.Producer producer_;
     /// <summary>
-    /// Required on a write. Its epoch's case picks the withdrawal rule.
+    /// Required on a write.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2217,54 +2859,6 @@ namespace Temporalio.Api.Stream.V1 {
       get { return producer_; }
       set {
         producer_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "previous_completed_task" field.</summary>
-    public const int PreviousCompletedTaskFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch previousCompletedTask_;
-    /// <summary>
-    /// Workflow and Local Activity only. The run's last completed Workflow Task, from a Local
-    /// Activity's start. Its started_event_id is 0 before the first. The write withdraws the run's
-    /// Local Activity Records whose Workflow Task never completed.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch PreviousCompletedTask {
-      get { return previousCompletedTask_; }
-      set {
-        previousCompletedTask_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "failed_tasks" field.</summary>
-    public const int FailedTasksFieldNumber = 3;
-    private static readonly pb::FieldCodec<long> _repeated_failedTasks_codec
-        = pb::FieldCodec.ForInt64(26);
-    private readonly pbc::RepeatedField<long> failedTasks_ = new pbc::RepeatedField<long>();
-    /// <summary>
-    /// Workflow and Local Activity only. The started event ids of the run's failed or timed out
-    /// Workflow Tasks. The write withdraws the run's Local Activity Records of these tasks.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<long> FailedTasks {
-      get { return failedTasks_; }
-    }
-
-    /// <summary>Field number for the "withdraw_run" field.</summary>
-    public const int WithdrawRunFieldNumber = 4;
-    private string withdrawRun_ = "";
-    /// <summary>
-    /// Retry run only. The previous run, on the retry run's first write. Every Record whose
-    /// Producer carries it is withdrawn.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string WithdrawRun {
-      get { return withdrawRun_; }
-      set {
-        withdrawRun_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -2284,9 +2878,6 @@ namespace Temporalio.Api.Stream.V1 {
         return true;
       }
       if (!object.Equals(Producer, other.Producer)) return false;
-      if (!object.Equals(PreviousCompletedTask, other.PreviousCompletedTask)) return false;
-      if(!failedTasks_.Equals(other.failedTasks_)) return false;
-      if (WithdrawRun != other.WithdrawRun) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2295,9 +2886,6 @@ namespace Temporalio.Api.Stream.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (producer_ != null) hash ^= Producer.GetHashCode();
-      if (previousCompletedTask_ != null) hash ^= PreviousCompletedTask.GetHashCode();
-      hash ^= failedTasks_.GetHashCode();
-      if (WithdrawRun.Length != 0) hash ^= WithdrawRun.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2320,15 +2908,6 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteMessage(Producer);
       }
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(WithdrawRun);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2343,15 +2922,6 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteMessage(Producer);
       }
-      if (previousCompletedTask_ != null) {
-        output.WriteRawTag(18);
-        output.WriteMessage(PreviousCompletedTask);
-      }
-      failedTasks_.WriteTo(ref output, _repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteString(WithdrawRun);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2364,13 +2934,6 @@ namespace Temporalio.Api.Stream.V1 {
       int size = 0;
       if (producer_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
-      }
-      if (previousCompletedTask_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(PreviousCompletedTask);
-      }
-      size += failedTasks_.CalculateSize(_repeated_failedTasks_codec);
-      if (WithdrawRun.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(WithdrawRun);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2389,16 +2952,6 @@ namespace Temporalio.Api.Stream.V1 {
           Producer = new global::Temporalio.Api.Stream.V1.Producer();
         }
         Producer.MergeFrom(other.Producer);
-      }
-      if (other.previousCompletedTask_ != null) {
-        if (previousCompletedTask_ == null) {
-          PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-        }
-        PreviousCompletedTask.MergeFrom(other.PreviousCompletedTask);
-      }
-      failedTasks_.Add(other.failedTasks_);
-      if (other.WithdrawRun.Length != 0) {
-        WithdrawRun = other.WithdrawRun;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2426,22 +2979,6 @@ namespace Temporalio.Api.Stream.V1 {
             input.ReadMessage(Producer);
             break;
           }
-          case 18: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 26:
-          case 24: {
-            failedTasks_.AddEntriesFrom(input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 34: {
-            WithdrawRun = input.ReadString();
-            break;
-          }
         }
       }
     #endif
@@ -2466,22 +3003,6 @@ namespace Temporalio.Api.Stream.V1 {
               Producer = new global::Temporalio.Api.Stream.V1.Producer();
             }
             input.ReadMessage(Producer);
-            break;
-          }
-          case 18: {
-            if (previousCompletedTask_ == null) {
-              PreviousCompletedTask = new global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
-            }
-            input.ReadMessage(PreviousCompletedTask);
-            break;
-          }
-          case 26:
-          case 24: {
-            failedTasks_.AddEntriesFrom(ref input, _repeated_failedTasks_codec);
-            break;
-          }
-          case 34: {
-            WithdrawRun = input.ReadString();
             break;
           }
         }
@@ -2510,7 +3031,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[8]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[11]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2704,223 +3225,6 @@ namespace Temporalio.Api.Stream.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Which earlier Records a retried Producer withdraws. The Store keeps these facts for the first
-  /// batch of a higher epoch, or for a retry run's first write, and a read builds a Superseded item
-  /// from them. A reader drops the earlier Records that the facts match.
-  /// </summary>
-  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class StreamSuperseded : pb::IMessage<StreamSuperseded>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
-    private static readonly pb::MessageParser<StreamSuperseded> _parser = new pb::MessageParser<StreamSuperseded>(() => new StreamSuperseded());
-    private pb::UnknownFieldSet _unknownFields;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<StreamSuperseded> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[9]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamSuperseded() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamSuperseded(StreamSuperseded other) : this() {
-      writer_ = other.writer_ != null ? other.writer_.Clone() : null;
-      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public StreamSuperseded Clone() {
-      return new StreamSuperseded(this);
-    }
-
-    /// <summary>Field number for the "writer" field.</summary>
-    public const int WriterFieldNumber = 1;
-    private global::Temporalio.Api.Stream.V1.StreamWriter writer_;
-    /// <summary>
-    /// The writer of the batch that withdraws. Its Producer's epoch is empty when only
-    /// withdraw_run applies.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamWriter Writer {
-      get { return writer_; }
-      set {
-        writer_ = value;
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override bool Equals(object other) {
-      return Equals(other as StreamSuperseded);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(StreamSuperseded other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      if (!object.Equals(Writer, other.Writer)) return false;
-      return Equals(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override int GetHashCode() {
-      int hash = 1;
-      if (writer_ != null) hash ^= Writer.GetHashCode();
-      if (_unknownFields != null) {
-        hash ^= _unknownFields.GetHashCode();
-      }
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void WriteTo(pb::CodedOutputStream output) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      output.WriteRawMessage(this);
-    #else
-      if (writer_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Writer);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(output);
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (writer_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Writer);
-      }
-      if (_unknownFields != null) {
-        _unknownFields.WriteTo(ref output);
-      }
-    }
-    #endif
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int CalculateSize() {
-      int size = 0;
-      if (writer_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Writer);
-      }
-      if (_unknownFields != null) {
-        size += _unknownFields.CalculateSize();
-      }
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(StreamSuperseded other) {
-      if (other == null) {
-        return;
-      }
-      if (other.writer_ != null) {
-        if (writer_ == null) {
-          Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
-        }
-        Writer.MergeFrom(other.Writer);
-      }
-      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
-            break;
-          case 10: {
-            if (writer_ == null) {
-              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
-            }
-            input.ReadMessage(Writer);
-            break;
-          }
-        }
-      }
-    #endif
-    }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-      if ((tag & 7) == 4) {
-        // Abort on any end group tag.
-        return;
-      }
-      switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            if (writer_ == null) {
-              Writer = new global::Temporalio.Api.Stream.V1.StreamWriter();
-            }
-            input.ReadMessage(Writer);
-            break;
-          }
-        }
-      }
-    }
-    #endif
-
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
   /// One Record that a Producer appended.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
@@ -2938,7 +3242,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[10]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[12]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3178,6 +3482,260 @@ namespace Temporalio.Api.Stream.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
+  /// The close of a Stream. A Stream has at most one, and a read returns it last.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class StreamClose : pb::IMessage<StreamClose>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<StreamClose> _parser = new pb::MessageParser<StreamClose>(() => new StreamClose());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<StreamClose> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[13]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StreamClose() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StreamClose(StreamClose other) : this() {
+      producer_ = other.producer_ != null ? other.producer_.Clone() : null;
+      status_ = other.status_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StreamClose Clone() {
+      return new StreamClose(this);
+    }
+
+    /// <summary>Field number for the "producer" field.</summary>
+    public const int ProducerFieldNumber = 1;
+    private global::Temporalio.Api.Stream.V1.Producer producer_;
+    /// <summary>
+    /// The Producer that closed the Stream.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Stream.V1.Producer Producer {
+      get { return producer_; }
+      set {
+        producer_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "status" field.</summary>
+    public const int StatusFieldNumber = 4;
+    private global::Temporalio.Api.Enums.V1.StreamCloseStatus status_ = global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified;
+    /// <summary>
+    /// Why the Stream closed.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Temporalio.Api.Enums.V1.StreamCloseStatus Status {
+      get { return status_; }
+      set {
+        status_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as StreamClose);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(StreamClose other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Producer, other.Producer)) return false;
+      if (Status != other.Status) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (producer_ != null) hash ^= Producer.GetHashCode();
+      if (Status != global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified) hash ^= Status.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (producer_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Producer);
+      }
+      if (Status != global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified) {
+        output.WriteRawTag(32);
+        output.WriteEnum((int) Status);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (producer_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Producer);
+      }
+      if (Status != global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified) {
+        output.WriteRawTag(32);
+        output.WriteEnum((int) Status);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (producer_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
+      }
+      if (Status != global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Status);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(StreamClose other) {
+      if (other == null) {
+        return;
+      }
+      if (other.producer_ != null) {
+        if (producer_ == null) {
+          Producer = new global::Temporalio.Api.Stream.V1.Producer();
+        }
+        Producer.MergeFrom(other.Producer);
+      }
+      if (other.Status != global::Temporalio.Api.Enums.V1.StreamCloseStatus.Unspecified) {
+        Status = other.Status;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (producer_ == null) {
+              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            }
+            input.ReadMessage(Producer);
+            break;
+          }
+          case 32: {
+            Status = (global::Temporalio.Api.Enums.V1.StreamCloseStatus) input.ReadEnum();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (producer_ == null) {
+              Producer = new global::Temporalio.Api.Stream.V1.Producer();
+            }
+            input.ReadMessage(Producer);
+            break;
+          }
+          case 32: {
+            Status = (global::Temporalio.Api.Enums.V1.StreamCloseStatus) input.ReadEnum();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Experimental. Might change in the future.
   /// An offset is ordered and unique in one Stream, and it is sparse. Offsets have gaps, so they
   /// don't count Records. Zero is never an offset. A read gives its Stream, so the read checks the
   /// offset against that Stream.
@@ -3197,7 +3755,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[11]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[14]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3222,8 +3780,8 @@ namespace Temporalio.Api.Stream.V1 {
         case ItemOneofCase.Data:
           Data = other.Data.Clone();
           break;
-        case ItemOneofCase.Superseded:
-          Superseded = other.Superseded.Clone();
+        case ItemOneofCase.Close:
+          Close = other.Close.Clone();
           break;
       }
 
@@ -3260,20 +3818,15 @@ namespace Temporalio.Api.Stream.V1 {
       }
     }
 
-    /// <summary>Field number for the "superseded" field.</summary>
-    public const int SupersededFieldNumber = 3;
-    /// <summary>
-    /// The Store keeps only the withdrawal facts of the first batch of a higher epoch. A read
-    /// builds this item from them. It withdraws the earlier Records that the facts match, and a
-    /// reader drops them.
-    /// </summary>
+    /// <summary>Field number for the "close" field.</summary>
+    public const int CloseFieldNumber = 4;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamSuperseded Superseded {
-      get { return itemCase_ == ItemOneofCase.Superseded ? (global::Temporalio.Api.Stream.V1.StreamSuperseded) item_ : null; }
+    public global::Temporalio.Api.Stream.V1.StreamClose Close {
+      get { return itemCase_ == ItemOneofCase.Close ? (global::Temporalio.Api.Stream.V1.StreamClose) item_ : null; }
       set {
         item_ = value;
-        itemCase_ = value == null ? ItemOneofCase.None : ItemOneofCase.Superseded;
+        itemCase_ = value == null ? ItemOneofCase.None : ItemOneofCase.Close;
       }
     }
 
@@ -3282,7 +3835,7 @@ namespace Temporalio.Api.Stream.V1 {
     public enum ItemOneofCase {
       None = 0,
       Data = 2,
-      Superseded = 3,
+      Close = 4,
     }
     private ItemOneofCase itemCase_ = ItemOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3315,7 +3868,7 @@ namespace Temporalio.Api.Stream.V1 {
       }
       if (Offset != other.Offset) return false;
       if (!object.Equals(Data, other.Data)) return false;
-      if (!object.Equals(Superseded, other.Superseded)) return false;
+      if (!object.Equals(Close, other.Close)) return false;
       if (ItemCase != other.ItemCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -3326,7 +3879,7 @@ namespace Temporalio.Api.Stream.V1 {
       int hash = 1;
       if (Offset != 0L) hash ^= Offset.GetHashCode();
       if (itemCase_ == ItemOneofCase.Data) hash ^= Data.GetHashCode();
-      if (itemCase_ == ItemOneofCase.Superseded) hash ^= Superseded.GetHashCode();
+      if (itemCase_ == ItemOneofCase.Close) hash ^= Close.GetHashCode();
       hash ^= (int) itemCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -3354,9 +3907,9 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Data);
       }
-      if (itemCase_ == ItemOneofCase.Superseded) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Superseded);
+      if (itemCase_ == ItemOneofCase.Close) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Close);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -3376,9 +3929,9 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Data);
       }
-      if (itemCase_ == ItemOneofCase.Superseded) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Superseded);
+      if (itemCase_ == ItemOneofCase.Close) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Close);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -3396,8 +3949,8 @@ namespace Temporalio.Api.Stream.V1 {
       if (itemCase_ == ItemOneofCase.Data) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Data);
       }
-      if (itemCase_ == ItemOneofCase.Superseded) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Superseded);
+      if (itemCase_ == ItemOneofCase.Close) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Close);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -3421,11 +3974,11 @@ namespace Temporalio.Api.Stream.V1 {
           }
           Data.MergeFrom(other.Data);
           break;
-        case ItemOneofCase.Superseded:
-          if (Superseded == null) {
-            Superseded = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
+        case ItemOneofCase.Close:
+          if (Close == null) {
+            Close = new global::Temporalio.Api.Stream.V1.StreamClose();
           }
-          Superseded.MergeFrom(other.Superseded);
+          Close.MergeFrom(other.Close);
           break;
       }
 
@@ -3461,13 +4014,13 @@ namespace Temporalio.Api.Stream.V1 {
             Data = subBuilder;
             break;
           }
-          case 26: {
-            global::Temporalio.Api.Stream.V1.StreamSuperseded subBuilder = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
-            if (itemCase_ == ItemOneofCase.Superseded) {
-              subBuilder.MergeFrom(Superseded);
+          case 34: {
+            global::Temporalio.Api.Stream.V1.StreamClose subBuilder = new global::Temporalio.Api.Stream.V1.StreamClose();
+            if (itemCase_ == ItemOneofCase.Close) {
+              subBuilder.MergeFrom(Close);
             }
             input.ReadMessage(subBuilder);
-            Superseded = subBuilder;
+            Close = subBuilder;
             break;
           }
         }
@@ -3502,13 +4055,13 @@ namespace Temporalio.Api.Stream.V1 {
             Data = subBuilder;
             break;
           }
-          case 26: {
-            global::Temporalio.Api.Stream.V1.StreamSuperseded subBuilder = new global::Temporalio.Api.Stream.V1.StreamSuperseded();
-            if (itemCase_ == ItemOneofCase.Superseded) {
-              subBuilder.MergeFrom(Superseded);
+          case 34: {
+            global::Temporalio.Api.Stream.V1.StreamClose subBuilder = new global::Temporalio.Api.Stream.V1.StreamClose();
+            if (itemCase_ == ItemOneofCase.Close) {
+              subBuilder.MergeFrom(Close);
             }
             input.ReadMessage(subBuilder);
-            Superseded = subBuilder;
+            Close = subBuilder;
             break;
           }
         }
@@ -3538,7 +4091,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[12]; }
+      get { return global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor.MessageTypes[15]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

@@ -16,25 +16,23 @@ function requiredField<T>(
   return value;
 }
 
-export enum ExecutionType {
-  ExecutionTypeUnspecified = 0,
-  ExecutionTypeWorkflow = 1,
-  ExecutionTypeActivity = 2,
-  ExecutionTypeNexusOperation = 3,
-}
-
-function executionTypeFromNumber(value: number): ExecutionType {
-  if (value in ExecutionType) {
-    return value as ExecutionType;
-  }
-  // A newer peer can send a case that this enum doesn't know.
-  return ExecutionType.ExecutionTypeUnspecified;
-}
-
 export enum StreamIdConflictPolicy {
   StreamIdConflictPolicyUnspecified = 0,
   StreamIdConflictPolicyFail = 1,
   StreamIdConflictPolicyUseExisting = 2,
+}
+
+export enum StreamCloseStatus {
+  StreamCloseStatusUnspecified = 0,
+  StreamCloseStatusClosed = 1,
+}
+
+function streamCloseStatusFromNumber(value: number): StreamCloseStatus {
+  if (value in StreamCloseStatus) {
+    return value as StreamCloseStatus;
+  }
+  // A newer peer can send a case that this enum doesn't know.
+  return StreamCloseStatus.StreamCloseStatusUnspecified;
 }
 
 export enum StreamReadStart {
@@ -59,21 +57,21 @@ function streamStatusFromNumber(value: number): StreamStatus {
 }
 
 /**
- * The epoch of each kind of Producer.
+ * The kind of a Producer, with its run and epoch.
  */
-export type ProducerEpochKind =
-  | { tag: "workflow"; value: WorkflowTaskEpoch }
-  | { tag: "local-activity"; value: LocalActivityEpoch }
-  | { tag: "activity"; value: ActivityEpoch }
-  | { tag: "standalone-activity"; value: ActivityEpoch }
-  | { tag: "client"; value: ClientEpoch };
+export type ProducerKind =
+  | { tag: "workflow"; value: WorkflowProducer }
+  | { tag: "local-activity"; value: LocalActivityProducer }
+  | { tag: "activity"; value: ActivityProducer }
+  | { tag: "standalone-activity"; value: ActivityProducer }
+  | { tag: "client"; value: ClientProducer };
 
 /**
- * A read item: a Record or a Superseded item. A close writes no item.
+ * A read item: a Record or the close.
  */
 export type StreamItem<BodyT> =
   | { tag: "data"; value: StreamData<BodyT> }
-  | { tag: "superseded"; value: StreamSuperseded };
+  | { tag: "close"; value: StreamClose };
 
 export interface CreateStreamResult {
   ref?: StreamRef;
@@ -117,10 +115,6 @@ export interface StreamRef {
    */
   id: string;
   /**
-   * The run chain or Standalone Activity of a bound Stream. Empty if standalone.
-   */
-  owner?: Execution;
-  /**
    * Registered backend name, empty for the default. The Store never reads it.
    */
   backend?: string;
@@ -129,7 +123,6 @@ export interface StreamRef {
 function streamRefFromProto(proto: temporal.api.stream.v1.IStreamRef): StreamRef {
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "StreamRef", "id"),
-    owner: proto.owner == null ? undefined : executionFromProto(proto.owner),
     backend: proto.backend ?? undefined,
   };
 }
@@ -137,7 +130,6 @@ function streamRefFromProto(proto: temporal.api.stream.v1.IStreamRef): StreamRef
 function streamRefToProto(model: StreamRef): temporal.api.stream.v1.IStreamRef {
   return {
     id: requiredField(model.id, "StreamRef", "id"),
-    owner: model.owner == null ? undefined : executionToProto(model.owner),
     backend: model.backend,
   };
 }
@@ -149,47 +141,6 @@ export const streamRefTransferTypeConverter = {
 
   toTransferType(value: StreamRef): temporal.api.stream.v1.IStreamRef {
     return streamRefToProto(value);
-  },
-};
-export interface Execution {
-  type?: ExecutionType;
-  /**
-   * The Workflow id, or the Standalone Activity's id.
-   */
-  businessId?: string;
-  /**
-   * The run chain's first run id, or the Standalone Activity's run id.
-   */
-  runId?: string;
-}
-
-function executionFromProto(proto: temporal.api.common.v1.IExecution): Execution {
-  return {
-    type:
-      proto.type == null ? undefined : executionTypeFromNumber(proto.type as number),
-    businessId: proto.businessId ?? undefined,
-    runId: proto.runId ?? undefined,
-  };
-}
-
-function executionToProto(model: Execution): temporal.api.common.v1.IExecution {
-  return {
-    type:
-      model.type == null
-        ? undefined
-        : (model.type as number as temporal.api.enums.v1.ExecutionType),
-    businessId: model.businessId,
-    runId: model.runId,
-  };
-}
-
-export const executionTransferTypeConverter = {
-  fromTransferType(value: temporal.api.common.v1.IExecution): Execution {
-    return executionFromProto(value);
-  },
-
-  toTransferType(value: Execution): temporal.api.common.v1.IExecution {
-    return executionToProto(value);
   },
 };
 export interface CreateStreamRequest {
@@ -205,10 +156,6 @@ export interface CreateStreamRequest {
    * What the create does when the Stream exists. Unspecified is fail.
    */
   idConflictPolicy?: StreamIdConflictPolicy;
-  /**
-   * Retry run only. The previous run, whose Records this withdraws.
-   */
-  withdrawRun?: string;
   /**
    * Unique for each create call, and the same on its retries.
    */
@@ -228,7 +175,6 @@ function createStreamRequestFromProto(
       proto.idConflictPolicy == null
         ? undefined
         : (proto.idConflictPolicy as number as StreamIdConflictPolicy),
-    withdrawRun: proto.withdrawRun ?? undefined,
     requestId: proto.requestId ?? undefined,
   };
 }
@@ -246,7 +192,6 @@ function createStreamRequestToProto(
       model.idConflictPolicy == null
         ? undefined
         : (model.idConflictPolicy as number as temporal.api.enums.v1.StreamIdConflictPolicy),
-    withdrawRun: model.withdrawRun,
     requestId: model.requestId,
   };
 }
@@ -456,21 +401,9 @@ export function createAppendRecordTransferTypeConverter<BodyT>(
 }
 export interface StreamWriter {
   /**
-   * Required on a write. Its epoch's case picks the withdrawal rule.
+   * Required on a write.
    */
   producer?: Producer;
-  /**
-   * Workflow and Local Activity only. The run's last completed Workflow Task.
-   */
-  previousCompletedTask?: WorkflowTaskEpoch;
-  /**
-   * Workflow and Local Activity only. The run's failed or timed out Workflow Tasks.
-   */
-  failedTasks: Long[];
-  /**
-   * Retry run only. The previous run, all of whose Records are withdrawn.
-   */
-  withdrawRun?: string;
 }
 
 function streamWriterFromProto(
@@ -478,16 +411,6 @@ function streamWriterFromProto(
 ): StreamWriter {
   return {
     producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
-    previousCompletedTask:
-      proto.previousCompletedTask == null
-        ? undefined
-        : workflowTaskEpochFromProto(proto.previousCompletedTask),
-    failedTasks: requiredField(
-      proto.failedTasks?.map((value: any) => Long.fromValue(value, false)),
-      "StreamWriter",
-      "failedTasks",
-    ),
-    withdrawRun: proto.withdrawRun ?? undefined,
   };
 }
 
@@ -496,16 +419,6 @@ function streamWriterToProto(
 ): temporal.api.stream.v1.IStreamWriter {
   return {
     producer: model.producer == null ? undefined : producerToProto(model.producer),
-    previousCompletedTask:
-      model.previousCompletedTask == null
-        ? undefined
-        : workflowTaskEpochToProto(model.previousCompletedTask),
-    failedTasks: requiredField(
-      model.failedTasks?.map((value) => Long.fromValue(value, false)),
-      "StreamWriter",
-      "failedTasks",
-    ),
-    withdrawRun: model.withdrawRun,
   };
 }
 
@@ -524,29 +437,99 @@ export interface Producer {
    */
   id: string;
   /**
-   * Required. Its case gives the kind of the Producer.
+   * Required. The case is the kind of the Producer.
    */
-  epoch?: ProducerEpoch;
-  /**
-   * The run of the Producer, so nobody parses the id. Empty for a client.
-   */
-  runId?: string;
+  kind?: ProducerKind;
 }
 
 function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
+  let result1: ProducerKind | undefined;
+  switch (proto.kind) {
+    case "workflow":
+      result1 = {
+        tag: "workflow",
+        value: workflowProducerFromProto(
+          requiredField(proto.workflow, "Producer", "workflow"),
+        ),
+      };
+      break;
+    case "localActivity":
+      result1 = {
+        tag: "local-activity",
+        value: localActivityProducerFromProto(
+          requiredField(proto.localActivity, "Producer", "localActivity"),
+        ),
+      };
+      break;
+    case "activity":
+      result1 = {
+        tag: "activity",
+        value: activityProducerFromProto(
+          requiredField(proto.activity, "Producer", "activity"),
+        ),
+      };
+      break;
+    case "standaloneActivity":
+      result1 = {
+        tag: "standalone-activity",
+        value: activityProducerFromProto(
+          requiredField(proto.standaloneActivity, "Producer", "standaloneActivity"),
+        ),
+      };
+      break;
+    case "client":
+      result1 = {
+        tag: "client",
+        value: clientProducerFromProto(
+          requiredField(proto.client, "Producer", "client"),
+        ),
+      };
+      break;
+    case undefined:
+      result1 = undefined;
+      break;
+    default:
+      proto.kind satisfies never;
+      throw new Error("invalid oneof discriminator for Producer.kind");
+  }
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "Producer", "id"),
-    epoch: proto.epoch == null ? undefined : producerEpochFromProto(proto.epoch),
-    runId: proto.runId ?? undefined,
+    kind: result1,
   };
 }
 
 function producerToProto(model: Producer): temporal.api.stream.v1.IProducer {
-  return {
-    id: requiredField(model.id, "Producer", "id"),
-    epoch: model.epoch == null ? undefined : producerEpochToProto(model.epoch),
-    runId: model.runId,
-  };
+  const proto: temporal.api.stream.v1.IProducer = {};
+  proto.id = requiredField(model.id, "Producer", "id");
+  const result1 = model.kind;
+  if (result1 != null) {
+    switch (result1.tag) {
+      case "workflow":
+        proto.kind = "workflow";
+        proto.workflow = workflowProducerToProto(result1.value);
+        break;
+      case "local-activity":
+        proto.kind = "localActivity";
+        proto.localActivity = localActivityProducerToProto(result1.value);
+        break;
+      case "activity":
+        proto.kind = "activity";
+        proto.activity = activityProducerToProto(result1.value);
+        break;
+      case "standalone-activity":
+        proto.kind = "standaloneActivity";
+        proto.standaloneActivity = activityProducerToProto(result1.value);
+        break;
+      case "client":
+        proto.kind = "client";
+        proto.client = clientProducerToProto(result1.value);
+        break;
+      default:
+        result1 satisfies never;
+        throw new Error("invalid oneof tag for Producer.kind");
+    }
+  }
+  return proto;
 }
 
 export const producerTransferTypeConverter = {
@@ -558,113 +541,39 @@ export const producerTransferTypeConverter = {
     return producerToProto(value);
   },
 };
-export interface ProducerEpoch {
-  kind?: ProducerEpochKind;
+export interface WorkflowProducer {
+  /**
+   * The first execution run id of the run chain.
+   */
+  runId?: string;
+  epoch?: WorkflowTaskEpoch;
 }
 
-function producerEpochFromProto(
-  proto: temporal.api.stream.v1.IProducerEpoch,
-): ProducerEpoch {
-  let result: ProducerEpochKind | undefined;
-  switch (proto.kind) {
-    case "workflow":
-      result = {
-        tag: "workflow",
-        value: workflowTaskEpochFromProto(
-          requiredField(proto.workflow, "ProducerEpoch", "workflow"),
-        ),
-      };
-      break;
-    case "localActivity":
-      result = {
-        tag: "local-activity",
-        value: localActivityEpochFromProto(
-          requiredField(proto.localActivity, "ProducerEpoch", "localActivity"),
-        ),
-      };
-      break;
-    case "activity":
-      result = {
-        tag: "activity",
-        value: activityEpochFromProto(
-          requiredField(proto.activity, "ProducerEpoch", "activity"),
-        ),
-      };
-      break;
-    case "standaloneActivity":
-      result = {
-        tag: "standalone-activity",
-        value: activityEpochFromProto(
-          requiredField(
-            proto.standaloneActivity,
-            "ProducerEpoch",
-            "standaloneActivity",
-          ),
-        ),
-      };
-      break;
-    case "client":
-      result = {
-        tag: "client",
-        value: clientEpochFromProto(
-          requiredField(proto.client, "ProducerEpoch", "client"),
-        ),
-      };
-      break;
-    case undefined:
-      result = undefined;
-      break;
-    default:
-      proto.kind satisfies never;
-      throw new Error("invalid oneof discriminator for ProducerEpoch.kind");
-  }
+function workflowProducerFromProto(
+  proto: temporal.api.stream.v1.IWorkflowProducer,
+): WorkflowProducer {
   return {
-    kind: result,
+    runId: proto.runId ?? undefined,
+    epoch: proto.epoch == null ? undefined : workflowTaskEpochFromProto(proto.epoch),
   };
 }
 
-function producerEpochToProto(
-  model: ProducerEpoch,
-): temporal.api.stream.v1.IProducerEpoch {
-  const proto: temporal.api.stream.v1.IProducerEpoch = {};
-  const result = model.kind;
-  if (result != null) {
-    switch (result.tag) {
-      case "workflow":
-        proto.kind = "workflow";
-        proto.workflow = workflowTaskEpochToProto(result.value);
-        break;
-      case "local-activity":
-        proto.kind = "localActivity";
-        proto.localActivity = localActivityEpochToProto(result.value);
-        break;
-      case "activity":
-        proto.kind = "activity";
-        proto.activity = activityEpochToProto(result.value);
-        break;
-      case "standalone-activity":
-        proto.kind = "standaloneActivity";
-        proto.standaloneActivity = activityEpochToProto(result.value);
-        break;
-      case "client":
-        proto.kind = "client";
-        proto.client = clientEpochToProto(result.value);
-        break;
-      default:
-        result satisfies never;
-        throw new Error("invalid oneof tag for ProducerEpoch.kind");
-    }
-  }
-  return proto;
+function workflowProducerToProto(
+  model: WorkflowProducer,
+): temporal.api.stream.v1.IWorkflowProducer {
+  return {
+    runId: model.runId,
+    epoch: model.epoch == null ? undefined : workflowTaskEpochToProto(model.epoch),
+  };
 }
 
-export const producerEpochTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IProducerEpoch): ProducerEpoch {
-    return producerEpochFromProto(value);
+export const workflowProducerTransferTypeConverter = {
+  fromTransferType(value: temporal.api.stream.v1.IWorkflowProducer): WorkflowProducer {
+    return workflowProducerFromProto(value);
   },
 
-  toTransferType(value: ProducerEpoch): temporal.api.stream.v1.IProducerEpoch {
-    return producerEpochToProto(value);
+  toTransferType(value: WorkflowProducer): temporal.api.stream.v1.IWorkflowProducer {
+    return workflowProducerToProto(value);
   },
 };
 export interface WorkflowTaskEpoch {
@@ -743,6 +652,42 @@ export const timestampTransferTypeConverter = {
     return timestampToProto(value);
   },
 };
+export interface LocalActivityProducer {
+  runId?: string;
+  epoch?: LocalActivityEpoch;
+}
+
+function localActivityProducerFromProto(
+  proto: temporal.api.stream.v1.ILocalActivityProducer,
+): LocalActivityProducer {
+  return {
+    runId: proto.runId ?? undefined,
+    epoch: proto.epoch == null ? undefined : localActivityEpochFromProto(proto.epoch),
+  };
+}
+
+function localActivityProducerToProto(
+  model: LocalActivityProducer,
+): temporal.api.stream.v1.ILocalActivityProducer {
+  return {
+    runId: model.runId,
+    epoch: model.epoch == null ? undefined : localActivityEpochToProto(model.epoch),
+  };
+}
+
+export const localActivityProducerTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.stream.v1.ILocalActivityProducer,
+  ): LocalActivityProducer {
+    return localActivityProducerFromProto(value);
+  },
+
+  toTransferType(
+    value: LocalActivityProducer,
+  ): temporal.api.stream.v1.ILocalActivityProducer {
+    return localActivityProducerToProto(value);
+  },
+};
 export interface LocalActivityEpoch {
   /**
    * The Workflow Task attempt that dispatched the Local Activity.
@@ -785,6 +730,38 @@ export const localActivityEpochTransferTypeConverter = {
     return localActivityEpochToProto(value);
   },
 };
+export interface ActivityProducer {
+  runId?: string;
+  epoch?: ActivityEpoch;
+}
+
+function activityProducerFromProto(
+  proto: temporal.api.stream.v1.IActivityProducer,
+): ActivityProducer {
+  return {
+    runId: proto.runId ?? undefined,
+    epoch: proto.epoch == null ? undefined : activityEpochFromProto(proto.epoch),
+  };
+}
+
+function activityProducerToProto(
+  model: ActivityProducer,
+): temporal.api.stream.v1.IActivityProducer {
+  return {
+    runId: model.runId,
+    epoch: model.epoch == null ? undefined : activityEpochToProto(model.epoch),
+  };
+}
+
+export const activityProducerTransferTypeConverter = {
+  fromTransferType(value: temporal.api.stream.v1.IActivityProducer): ActivityProducer {
+    return activityProducerFromProto(value);
+  },
+
+  toTransferType(value: ActivityProducer): temporal.api.stream.v1.IActivityProducer {
+    return activityProducerToProto(value);
+  },
+};
 export interface ActivityEpoch {
   /**
    * When the server scheduled this attempt. A reset makes it later.
@@ -824,6 +801,35 @@ export const activityEpochTransferTypeConverter = {
 
   toTransferType(value: ActivityEpoch): temporal.api.stream.v1.IActivityEpoch {
     return activityEpochToProto(value);
+  },
+};
+export interface ClientProducer {
+  epoch?: ClientEpoch;
+}
+
+function clientProducerFromProto(
+  proto: temporal.api.stream.v1.IClientProducer,
+): ClientProducer {
+  return {
+    epoch: proto.epoch == null ? undefined : clientEpochFromProto(proto.epoch),
+  };
+}
+
+function clientProducerToProto(
+  model: ClientProducer,
+): temporal.api.stream.v1.IClientProducer {
+  return {
+    epoch: model.epoch == null ? undefined : clientEpochToProto(model.epoch),
+  };
+}
+
+export const clientProducerTransferTypeConverter = {
+  fromTransferType(value: temporal.api.stream.v1.IClientProducer): ClientProducer {
+    return clientProducerFromProto(value);
+  },
+
+  toTransferType(value: ClientProducer): temporal.api.stream.v1.IClientProducer {
+    return clientProducerToProto(value);
   },
 };
 export interface ClientEpoch {
@@ -1021,11 +1027,11 @@ function streamRecordFromProto<BodyT>(
         }),
       };
       break;
-    case "superseded":
+    case "close":
       result = {
-        tag: "superseded",
-        value: streamSupersededFromProto(
-          requiredField(proto.superseded, "StreamRecord", "superseded"),
+        tag: "close",
+        value: streamCloseFromProto(
+          requiredField(proto.close, "StreamRecord", "close"),
         ),
       };
       break;
@@ -1056,9 +1062,9 @@ function streamRecordToProto<BodyT>(
         proto.item = "data";
         proto.data = streamDataToProto(result.value, { bodyT: typeInfo.bodyT });
         break;
-      case "superseded":
-        proto.item = "superseded";
-        proto.superseded = streamSupersededToProto(result.value);
+      case "close":
+        proto.item = "close";
+        proto.close = streamCloseToProto(result.value);
         break;
       default:
         result satisfies never;
@@ -1161,36 +1167,44 @@ export function createStreamDataTransferTypeConverter<BodyT>(
     },
   };
 }
-export interface StreamSuperseded {
+export interface StreamClose {
   /**
-   * The writer that withdraws. Its epoch is empty when only withdraw-run applies.
+   * The Producer that closed the Stream.
    */
-  writer?: StreamWriter;
+  producer?: Producer;
+  /**
+   * Why the Stream closed.
+   */
+  status?: StreamCloseStatus;
 }
 
-function streamSupersededFromProto(
-  proto: temporal.api.stream.v1.IStreamSuperseded,
-): StreamSuperseded {
+function streamCloseFromProto(proto: temporal.api.stream.v1.IStreamClose): StreamClose {
   return {
-    writer: proto.writer == null ? undefined : streamWriterFromProto(proto.writer),
+    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
+    status:
+      proto.status == null
+        ? undefined
+        : streamCloseStatusFromNumber(proto.status as number),
   };
 }
 
-function streamSupersededToProto(
-  model: StreamSuperseded,
-): temporal.api.stream.v1.IStreamSuperseded {
+function streamCloseToProto(model: StreamClose): temporal.api.stream.v1.IStreamClose {
   return {
-    writer: model.writer == null ? undefined : streamWriterToProto(model.writer),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
+    status:
+      model.status == null
+        ? undefined
+        : (model.status as number as temporal.api.enums.v1.StreamCloseStatus),
   };
 }
 
-export const streamSupersededTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IStreamSuperseded): StreamSuperseded {
-    return streamSupersededFromProto(value);
+export const streamCloseTransferTypeConverter = {
+  fromTransferType(value: temporal.api.stream.v1.IStreamClose): StreamClose {
+    return streamCloseFromProto(value);
   },
 
-  toTransferType(value: StreamSuperseded): temporal.api.stream.v1.IStreamSuperseded {
-    return streamSupersededToProto(value);
+  toTransferType(value: StreamClose): temporal.api.stream.v1.IStreamClose {
+    return streamCloseToProto(value);
   },
 };
 export interface ReadRecordsRequest {
@@ -1204,7 +1218,7 @@ export interface ReadRecordsRequest {
    */
   start?: StreamReadStart;
   /**
-   * About this many items per page, 1 to 1000. A Superseded item stays with its Record.
+   * About this many items per page, 1 to 1000.
    */
   maxRecords?: number;
   /**
@@ -1282,7 +1296,7 @@ export const readRecordsRequestTransferTypeConverter = {
 export interface DescribeStreamResponse {
   status?: StreamStatus;
   /**
-   * The newest offset, of a Record or a Superseded item. Empty for none.
+   * The newest offset, of a Record. Empty for none.
    */
   lastOffset?: Long;
   retention?: common.Duration;

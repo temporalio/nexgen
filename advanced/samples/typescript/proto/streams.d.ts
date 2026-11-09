@@ -11,6 +11,10 @@ declare module "@temporalio/proto" {
       STREAM_STATUS_CLOSED = 2,
       STREAM_STATUS_EXPIRED = 3,
     }
+    enum StreamCloseStatus {
+      STREAM_CLOSE_STATUS_UNSPECIFIED = 0,
+      STREAM_CLOSE_STATUS_CLOSED = 1,
+    }
     enum StreamReadStart {
       STREAM_READ_START_UNSPECIFIED = 0,
       STREAM_READ_START_BEGINNING = 1,
@@ -46,21 +50,7 @@ declare module "@temporalio/proto" {
   namespace temporal.api.stream.v1 {
     interface IStreamRef {
       id?: string | null;
-      owner?: temporal.api.common.v1.IExecution | null;
       backend?: string | null;
-    }
-    interface IProducerEpoch {
-      workflow?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
-      localActivity?: temporal.api.stream.v1.ILocalActivityEpoch | null;
-      activity?: temporal.api.stream.v1.IActivityEpoch | null;
-      standaloneActivity?: temporal.api.stream.v1.IActivityEpoch | null;
-      client?: temporal.api.stream.v1.IClientEpoch | null;
-      kind?:
-        | "workflow"
-        | "localActivity"
-        | "activity"
-        | "standaloneActivity"
-        | "client";
     }
     interface IWorkflowTaskEpoch {
       startedEventId?: Long | null;
@@ -78,32 +68,54 @@ declare module "@temporalio/proto" {
     interface IClientEpoch {
       attempt?: number | null;
     }
+    interface IWorkflowProducer {
+      runId?: string | null;
+      epoch?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
+    }
+    interface ILocalActivityProducer {
+      runId?: string | null;
+      epoch?: temporal.api.stream.v1.ILocalActivityEpoch | null;
+    }
+    interface IActivityProducer {
+      runId?: string | null;
+      epoch?: temporal.api.stream.v1.IActivityEpoch | null;
+    }
+    interface IClientProducer {
+      epoch?: temporal.api.stream.v1.IClientEpoch | null;
+    }
     interface IProducer {
       id?: string | null;
-      epoch?: temporal.api.stream.v1.IProducerEpoch | null;
-      runId?: string | null;
+      workflow?: temporal.api.stream.v1.IWorkflowProducer | null;
+      localActivity?: temporal.api.stream.v1.ILocalActivityProducer | null;
+      activity?: temporal.api.stream.v1.IActivityProducer | null;
+      standaloneActivity?: temporal.api.stream.v1.IActivityProducer | null;
+      client?: temporal.api.stream.v1.IClientProducer | null;
+      kind?:
+        | "workflow"
+        | "localActivity"
+        | "activity"
+        | "standaloneActivity"
+        | "client";
     }
     interface IStreamWriter {
       producer?: temporal.api.stream.v1.IProducer | null;
-      previousCompletedTask?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
-      failedTasks?: Long[] | null;
-      withdrawRun?: string | null;
     }
     interface IAppendRecord {
       body?: temporal.api.common.v1.IPayload | null;
-    }
-    interface IStreamSuperseded {
-      writer?: temporal.api.stream.v1.IStreamWriter | null;
     }
     interface IStreamData {
       producer?: temporal.api.stream.v1.IProducer | null;
       body?: temporal.api.common.v1.IPayload | null;
     }
+    interface IStreamClose {
+      producer?: temporal.api.stream.v1.IProducer | null;
+      status?: temporal.api.enums.v1.StreamCloseStatus | null;
+    }
     interface IStreamRecord {
       offset?: Long | null;
       data?: temporal.api.stream.v1.IStreamData | null;
-      superseded?: temporal.api.stream.v1.IStreamSuperseded | null;
-      item?: "data" | "superseded";
+      close?: temporal.api.stream.v1.IStreamClose | null;
+      item?: "data" | "close";
     }
     interface IStreamErrorDetails {
       reason?: temporal.api.enums.v1.StreamErrorReason | null;
@@ -116,9 +128,6 @@ declare module "@temporalio/proto" {
       namespace?: string | null;
       streamRef?: temporal.api.stream.v1.IStreamRef | null;
       retention?: google.protobuf.IDuration | null;
-      withdrawRun?: string | null;
-      owner?: temporal.api.stream.v1.IProducer | null;
-      closeWithRun?: boolean | null;
       taskToken?: Uint8Array | null;
       idConflictPolicy?: temporal.api.enums.v1.StreamIdConflictPolicy | null;
       requestId?: string | null;
@@ -133,7 +142,6 @@ declare module "@temporalio/proto" {
       writer?: temporal.api.stream.v1.IStreamWriter | null;
       sequence?: Long | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
-      deferWithdrawal?: boolean | null;
       taskToken?: Uint8Array | null;
     }
     interface IAppendRecordsResponse {

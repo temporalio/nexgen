@@ -80,14 +80,15 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                         body={"text": "hi"},
                         producer=models.Producer(
                             id="la:r1:1",
-                            epoch=models.ProducerEpoch(
-                                kind=models.ProducerEpochKindLocalActivity(
-                                    models.LocalActivityEpoch(
+                            kind=models.ProducerKindLocalActivity(
+                                models.LocalActivityProducer(
+                                    run_id="r1",
+                                    epoch=models.LocalActivityEpoch(
                                         task=models.WorkflowTaskEpoch(
                                             started_event_id=4
                                         ),
                                         attempt=2,
-                                    )
+                                    ),
                                 )
                             ),
                         ),
@@ -96,11 +97,15 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                 offset=1,
             ),
             models.StreamRecord(
-                item=models.StreamItemSuperseded(
-                    models.StreamSuperseded(
-                        writer=models.StreamWriter(
-                            producer=models.Producer(id="workflow-1"), failed_tasks=[7]
-                        )
+                item=models.StreamItemClose(
+                    models.StreamClose(
+                        producer=models.Producer(
+                            id="wf:r1",
+                            kind=models.ProducerKindWorkflow(
+                                models.WorkflowProducer(run_id="r1")
+                            ),
+                        ),
+                        status=models.StreamCloseStatus.StreamCloseStatusClosed,
                     )
                 ),
                 offset=2,
@@ -117,10 +122,13 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
     assert all(isinstance(record, message_pb2.StreamRecord) for record in wire.records)
     assert [record.WhichOneof("item") for record in wire.records] == [
         "data",
-        "superseded",
+        "close",
     ]
-    assert wire.records[0].data.producer.epoch.WhichOneof("kind") == "local_activity"
-    assert wire.records[1].superseded.writer.failed_tasks == [7]
+    assert wire.records[0].data.producer.WhichOneof("kind") == "local_activity"
+    assert (
+        wire.records[1].close.status
+        == stream_pb2.StreamCloseStatus.STREAM_CLOSE_STATUS_CLOSED
+    )
     assert converter.from_transfer_type(wire, models.ReadRecordsResponse) == model
 
 
@@ -240,7 +248,12 @@ async def test_workflow_apis_call_the_stream_service(
     assert await api.append_records(ref=ref, records=["a", "b"]) == 3
     # The Workflow API fills the request id and the writer from its sources.
     writer = model_types.StreamWriter(
-        producer=model_types.Producer(id="wf:r2", run_id="r2"), failed_tasks=[]
+        producer=model_types.Producer(
+            id="wf:r2",
+            kind=model_types.ProducerKindWorkflow(
+                model_types.WorkflowProducer(run_id="r2")
+            ),
+        )
     )
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [

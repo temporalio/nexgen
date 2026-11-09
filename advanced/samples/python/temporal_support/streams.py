@@ -16,13 +16,14 @@ def _models() -> typing.Any:
 
 
 def workflow_writer() -> typing.Any:
-    """The run's Workflow Producer, with the run that a retry run retries."""
+    """The run's Workflow Producer."""
     models = _models()
     run_id = temporalio.workflow.info().run_id
     return models.StreamWriter(
-        producer=models.Producer(id=f"wf:{run_id}", run_id=run_id),
-        failed_tasks=[],
-        withdraw_run=withdraw_run(),
+        producer=models.Producer(
+            id=f"wf:{run_id}",
+            kind=models.ProducerKindWorkflow(models.WorkflowProducer(run_id=run_id)),
+        ),
     )
 
 
@@ -33,20 +34,16 @@ def client_writer() -> typing.Any:
         info = temporalio.activity.info()
         producer = models.Producer(
             id=f"act:{info.workflow_run_id}:{info.activity_id}",
-            run_id=info.workflow_run_id,
+            kind=models.ProducerKindActivity(
+                models.ActivityProducer(run_id=info.workflow_run_id)
+            ),
         )
     else:
-        producer = models.Producer(id="client:sample")
-    # The sample has no Local Activity context, so a client writer withdraws nothing.
-    return models.StreamWriter(producer=producer, failed_tasks=[])
-
-
-def withdraw_run() -> str | None:
-    """The run that a retry run's Workflow retries. None elsewhere."""
-    if not temporalio.workflow.in_workflow():
-        return None
-    info = temporalio.workflow.info()
-    return info.continued_run_id if info.attempt > 1 else None
+        producer = models.Producer(
+            id="client:sample",
+            kind=models.ProducerKindClient(models.ClientProducer()),
+        )
+    return models.StreamWriter(producer=producer)
 
 
 def request_id() -> str:

@@ -37,13 +37,15 @@ namespace Nexgen.DotNetExamples.Tests
             {
                 new StreamServiceExample.StreamRecord<Turn>
                 {
-                    Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
-                        new StreamServiceExample.StreamSuperseded
+                    Item = new StreamServiceExample.StreamItem<Turn>.Close(
+                        new StreamServiceExample.StreamClose
                         {
-                            Writer = new StreamServiceExample.StreamWriter(new long[] { 7 })
+                            Producer = new StreamServiceExample.Producer("wf:r1")
                             {
-                                Producer = new StreamServiceExample.Producer("workflow-1"),
+                                Kind = new StreamServiceExample.ProducerKind.Workflow(
+                                    new StreamServiceExample.WorkflowProducer { RunId = "r1" }),
                             },
+                            Status = StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
                         }),
                     Offset = 2,
                 },
@@ -53,15 +55,17 @@ namespace Nexgen.DotNetExamples.Tests
                 CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsResponse<Turn>))
                     .ToTransferType(model));
             Assert.Equal(
-                new[] { WireStreamRecord.ItemOneofCase.Superseded },
+                new[] { WireStreamRecord.ItemOneofCase.Close },
                 wire.Records.Select(record => record.ItemCase));
 
             var decoded = FromPayload<StreamServiceExample.ReadRecordsResponse<Turn>>(
                 ToPayload(model));
-            var superseded = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Superseded>(
+            var close = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Close>(
                 decoded.Records[0].Item);
-            Assert.Equal("workflow-1", superseded.Value.Writer?.Producer?.Id);
-            Assert.Equal(new long[] { 7 }, superseded.Value.Writer?.FailedTasks);
+            Assert.Equal("wf:r1", close.Value.Producer?.Id);
+            Assert.Equal(
+                StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
+                close.Value.Status);
             Assert.Equal(2, decoded.Records[0].Offset);
         }
 

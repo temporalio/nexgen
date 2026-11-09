@@ -35,17 +35,20 @@ from wit.stream_service.client.client import (
 )
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
+    ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
+    ClientProducer,
     CloseStreamRequest,
     CloseStreamResponse,
     CreateStreamRequest,
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Execution,
     Producer,
+    ProducerKindActivity,
+    ProducerKindClient,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamData,
@@ -243,7 +246,9 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "AppendRecords",
     )
     # A client call fills the writer from its source.
-    writer = StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[])
+    writer = StreamWriter(
+        producer=Producer(id="client:sample", kind=ProducerKindClient(ClientProducer()))
+    )
     assert append.arg == AppendRecordsRequest(ref=stream.ref, records=[], writer=writer)
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
@@ -285,7 +290,11 @@ async def test_a_clean_block_closes_its_stream() -> None:
     assert closes(answers) == [
         CloseStreamRequest(
             ref=stream.ref,
-            writer=StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[]),
+            writer=StreamWriter(
+                producer=Producer(
+                    id="client:sample", kind=ProducerKindClient(ClientProducer())
+                )
+            ),
         )
     ]
 
@@ -331,7 +340,11 @@ async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
-        writer=StreamWriter(producer=Producer(id="client:sample"), failed_tasks=[]),
+        writer=StreamWriter(
+            producer=Producer(
+                id="client:sample", kind=ProducerKindClient(ClientProducer())
+            )
+        ),
     )
     # `last_offset` has no presence on the wire, so an empty append answers 0.
     assert empty == 0
@@ -344,14 +357,7 @@ async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
     ("fields", "ref"),
     [
         ({}, StreamRef(id="s1")),
-        (
-            {"backend": "redis", "owner": Execution(business_id="wf-1", run_id="r1")},
-            StreamRef(
-                id="s1",
-                backend="redis",
-                owner=Execution(business_id="wf-1", run_id="r1"),
-            ),
-        ),
+        ({"backend": "redis"}, StreamRef(id="s1", backend="redis")),
     ],
 )
 async def test_a_create_takes_the_fields_of_the_ref(
@@ -366,8 +372,6 @@ async def test_a_create_takes_the_fields_of_the_ref(
     wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
     assert wire.stream_ref.id == "s1"
     assert wire.stream_ref.backend == fields.get("backend", "")
-    assert wire.stream_ref.HasField("owner") == ("owner" in fields)
-    assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
 
 
 @dataclasses.dataclass
@@ -392,19 +396,19 @@ async def test_a_client_append_sends_the_writer_of_its_activity(
 
     (append,) = answers.started
     writer = StreamWriter(
-        producer=Producer(id="act:r1:7", run_id="r1"), failed_tasks=[]
+        producer=Producer(
+            id="act:r1:7",
+            kind=ProducerKindActivity(ActivityProducer(run_id="r1")),
+        )
     )
     assert append.arg == AppendRecordsRequest(
         ref=StreamRef(id="s1"), records=[], writer=writer
     )
-    # The writer's fields go in the request's one writer field.
+    # The writer's Producer goes in the request's one writer field.
     converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
     wire = converter.to_transfer_type(append.arg)
     assert wire.writer.producer.id == "act:r1:7"
-    assert wire.writer.producer.run_id == "r1"
-    assert not wire.writer.HasField("previous_completed_task")
-    assert list(wire.writer.failed_tasks) == []
-    assert wire.writer.withdraw_run == ""
+    assert wire.writer.producer.activity.run_id == "r1"
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
