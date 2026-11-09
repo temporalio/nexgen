@@ -3966,9 +3966,16 @@ fn typescript_workflow_module() -> &'static str {
 fn render_typescript_requirement_imports(
     output: &mut String,
     requirements: &TypeScriptRequirements,
+    body: &str,
 ) {
     if requirements.long {
-        output.push_str("import type Long from 'long';\n");
+        // A no-presence `s64`/`u64` default reads `Long.ZERO`, so the body uses `Long` as a value
+        // and a type-only import would not compile.
+        if contains_qualified_identifier(body, "Long") {
+            output.push_str("import Long from 'long';\n");
+        } else {
+            output.push_str("import type Long from 'long';\n");
+        }
     }
 }
 
@@ -4700,7 +4707,7 @@ fn render_models_module(
         &model_language_imports,
         &generated_value_imports,
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, requirements, &body);
     render_support_import_if(
         &mut imports,
         support_package,
@@ -4955,7 +4962,7 @@ fn render_resources_module(
             ("common", "@temporalio/common", true),
         ],
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, requirements, &body);
     render_value_imports(
         &mut imports,
         "./models",
@@ -7777,11 +7784,15 @@ mod tests {
         };
 
         let mut imports = String::new();
-        render_typescript_requirement_imports(&mut imports, &requirements);
+        render_typescript_requirement_imports(&mut imports, &requirements, "");
         assert_eq!(imports, "import type Long from 'long';\n");
 
         let mut imports = String::new();
-        render_typescript_requirement_imports(&mut imports, &TypeScriptRequirements::default());
+        render_typescript_requirement_imports(&mut imports, &requirements, "value ?? Long.ZERO");
+        assert_eq!(imports, "import Long from 'long';\n");
+
+        let mut imports = String::new();
+        render_typescript_requirement_imports(&mut imports, &TypeScriptRequirements::default(), "");
         assert!(imports.is_empty());
     }
 

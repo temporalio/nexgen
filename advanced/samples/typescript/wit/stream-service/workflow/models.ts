@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { google, temporal } from "@temporalio/proto";
-import type Long from "long";
+import Long from "long";
 import * as support from "../../../support/temporal_model_converters";
 
 function requiredField<T>(
