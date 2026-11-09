@@ -112,6 +112,39 @@ class Stream(typing.Generic[BodyT]):
         return await handle
 
 
+@typing.overload
+def get_stream(
+    *,
+    ref: StreamRef,
+    created: bool | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
+
+
+@typing.overload
+def get_stream(
+    *,
+    ref: StreamRef,
+    created: bool | None = None,
+    body_type: None = None,
+) -> Stream[object]: ...
+
+
+def get_stream(
+    *,
+    ref: StreamRef,
+    created: bool | None = None,
+    body_type: typing.Any = None,
+) -> Stream[typing.Any]:
+    """A handle on an existing ``Stream``, with no call."""
+    if body_type is None:
+        body_type = typing.Any
+    return Stream[body_type](
+        ref=ref,
+        created=created,
+    )
+
+
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:

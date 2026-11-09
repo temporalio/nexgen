@@ -1,0 +1,25 @@
+package test:python-workflow-factory@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  // The Workflow factory of `job` has the name of an operation that doesn't return a job.
+  resource job {
+    constructor(id: string);
+
+    /// @nexus.operation "run"
+    run: func();
+  }
+
+  record job-request {
+    id: string,
+  }
+
+  record job-status {
+    done: bool,
+  }
+
+  run: func(request: job-request);
+  get-job: func(request: job-request) -> job-status;
+}

@@ -1701,6 +1701,15 @@ await job.restart()
 nexgen refuses a factory name that is also the name of a client method of a
 service in the package.
 
+In Python, the Workflow package has the same `get_<resource>` factory for each
+resource with a method. nexgen refuses one with the name of an operation
+function of the package. The factory returns the handle from its ref, with no
+call.
+
+```python
+stream = get_stream(ref=StreamRef(id="chat-1:turns", backend="redis"), body_type=Turn)
+```
+
 Sources work in the client target as well. Restrict workflow-only helpers with
 `targets="workflow"`. If a required resource-method request field has neither an
 applicable source nor a resource field or method parameter supplying it,

@@ -375,6 +375,22 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
 
 
 @pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+def test_a_workflow_factory_builds_a_handle_with_no_call(
+    api: types.ModuleType, model_types: types.ModuleType
+) -> None:
+    ref = model_types.StreamRef(id="turns", backend="redis")
+    stream = api.get_stream(ref=ref, body_type=str)
+
+    assert stream.ref == ref
+    assert stream.created is None
+    assert stream.body_type is str
+
+
+@pytest.mark.parametrize(
     ("package", "forbidden"),
     [
         ("wit.stream_service.both.client", "wit.stream_service.both.workflow"),
