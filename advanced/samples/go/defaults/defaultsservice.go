@@ -141,6 +141,7 @@ func (m FlattenedRecordWithDefaults) GetDetails() *string {
 	return m.Details
 }
 
+// SubmitOptions - Options for Submit.
 type SubmitOptions struct {
 	// Attempts - Optional.
 	Attempts int32
@@ -164,6 +165,7 @@ type SubmitOptions struct {
 	Details string
 }
 
+// Submit.
 func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 	var attempts int32
 	if opts.Attempts != 0 {
@@ -240,9 +242,11 @@ func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 	return fut
 }
 
+// GetSenderOptions - Options for GetSender.
 type GetSenderOptions struct {
 }
 
+// GetSender.
 func GetSender(ctx workflow.Context, opts GetSenderOptions, token string) workflow.Future {
 	request := getSenderRequest{
 		Token: token,
@@ -252,6 +256,7 @@ func GetSender(ctx workflow.Context, opts GetSenderOptions, token string) workfl
 	return fut
 }
 
+// SubmitFromSenderOptions - Options for SubmitFromSender.
 type SubmitFromSenderOptions struct {
 	// Attempts - Optional.
 	Attempts int32
@@ -275,6 +280,7 @@ type SubmitFromSenderOptions struct {
 	Details string
 }
 
+// SubmitFromSender.
 func SubmitFromSender(ctx workflow.Context, opts SubmitFromSenderOptions) workflow.Future {
 	var attempts int32
 	if opts.Attempts != 0 {

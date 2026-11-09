@@ -603,6 +603,7 @@ func (CallbackNexus) TransferTypeConverter() (converter.TransferTypeConverter, e
 	)
 }
 
+// ActivityOptionsOperationOptions - Options for ActivityOptionsOperation.
 type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
@@ -612,6 +613,7 @@ type ActivityOptionsOperationOptions struct {
 	Priority *internal.Priority
 }
 
+// ActivityOptionsOperation.
 func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions, retryPolicy internal.RetryPolicy) workflow.Future {
 	var taskQueue *string
 	if opts.TaskQueue != "" {
@@ -641,11 +643,13 @@ func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperatio
 	return result
 }
 
+// FailureOperationOptions - Options for FailureOperation.
 type FailureOperationOptions struct {
 	// Failure - Optional.
 	Failure error
 }
 
+// FailureOperation.
 func FailureOperation(ctx workflow.Context, opts FailureOperationOptions) workflow.Future {
 	request := FailureContainer{
 		Failure: opts.Failure,
@@ -664,11 +668,13 @@ func FailureOperation(ctx workflow.Context, opts FailureOperationOptions) workfl
 	return result
 }
 
+// WorkflowExecutionInfoOperationOptions - Options for WorkflowExecutionInfoOperation.
 type WorkflowExecutionInfoOperationOptions struct {
 	// ParentExecution - Optional.
 	ParentExecution *WorkflowExecution
 }
 
+// WorkflowExecutionInfoOperation.
 func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions, execution WorkflowExecution) workflow.Future {
 	request := WorkflowExecutionInfo{
 		Execution:       execution,
@@ -688,11 +694,13 @@ func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecution
 	return result
 }
 
+// TaskQueuePartitionsOperationOptions - Options for TaskQueuePartitionsOperation.
 type TaskQueuePartitionsOperationOptions struct {
 	// WorkflowTaskQueuePartitions - Optional.
 	WorkflowTaskQueuePartitions []TaskQueuePartition
 }
 
+// TaskQueuePartitionsOperation.
 func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions, activityTaskQueuePartitions []TaskQueuePartition) workflow.Future {
 	request := TaskQueuePartitions{
 		WorkflowTaskQueuePartitions: opts.WorkflowTaskQueuePartitions,
@@ -712,11 +720,13 @@ func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitions
 	return result
 }
 
+// BadBinariesOperationOptions - Options for BadBinariesOperation.
 type BadBinariesOperationOptions struct {
 	// Binaries - Optional.
 	Binaries map[string]BadBinary
 }
 
+// BadBinariesOperation.
 func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions) workflow.Future {
 	request := BadBinaries{
 		Binaries: opts.Binaries,
@@ -735,11 +745,13 @@ func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions
 	return result
 }
 
+// AlertOperationOptions - Options for AlertOperation.
 type AlertOperationOptions struct {
 	// Severity - Optional.
 	Severity AlertLevel
 }
 
+// AlertOperation.
 func AlertOperation(ctx workflow.Context, opts AlertOperationOptions, message string) workflow.Future {
 	var severity *AlertLevel
 	if opts.Severity != 0 {
@@ -763,9 +775,11 @@ func AlertOperation(ctx workflow.Context, opts AlertOperationOptions, message st
 	return result
 }
 
+// CallbackInternalOperationOptions - Options for CallbackInternalOperation.
 type CallbackInternalOperationOptions struct {
 }
 
+// CallbackInternalOperation.
 func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions, data []byte) workflow.Future {
 	request := CallbackInternal{
 		Data: data,
@@ -784,9 +798,11 @@ func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperat
 	return result
 }
 
+// CallbackNexusOperationOptions - Options for CallbackNexusOperation.
 type CallbackNexusOperationOptions struct {
 }
 
+// CallbackNexusOperation.
 func CallbackNexusOperation(
 	ctx workflow.Context,
 	opts CallbackNexusOperationOptions,
@@ -811,6 +827,7 @@ func CallbackNexusOperation(
 	return result
 }
 
+// NamespaceInfoOperationOptions - Options for NamespaceInfoOperation.
 type NamespaceInfoOperationOptions struct {
 	// Name - Optional.
 	Name string
@@ -818,6 +835,7 @@ type NamespaceInfoOperationOptions struct {
 	State NamespaceState
 }
 
+// NamespaceInfoOperation.
 func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOptions) workflow.Future {
 	var name *string
 	if opts.Name != "" {

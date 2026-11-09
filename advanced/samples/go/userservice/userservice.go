@@ -88,9 +88,11 @@ func (u *User) Notify(ctx workflow.Context, reason string, channels []string, se
 
 // --- Operations (public API) ---
 
+// GetUserOptions - Options for GetUser.
 type GetUserOptions struct {
 }
 
+// GetUser.
 func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
 	request := getUserRequest{
 		UserID: userID,
@@ -100,9 +102,11 @@ func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.
 	return fut
 }
 
+// UpdateEmailOptions - Options for UpdateEmail.
 type UpdateEmailOptions struct {
 }
 
+// UpdateEmail.
 func UpdateEmail(
 	ctx workflow.Context,
 	opts UpdateEmailOptions,
@@ -118,11 +122,13 @@ func UpdateEmail(
 	return fut
 }
 
+// NotifyOptions - Options for Notify.
 type NotifyOptions struct {
 	// Reason - Optional.
 	Reason string
 }
 
+// Notify.
 func Notify(
 	ctx workflow.Context,
 	opts NotifyOptions,

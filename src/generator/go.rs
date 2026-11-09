@@ -758,10 +758,51 @@ pub(in crate::generator) struct GoPackageContext {
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
     facade: Option<GoFacadeOptions>,
+    facade_exports: BTreeMap<String, String>,
     workflow_interceptors: bool,
 }
 
 impl GoPackageContext {
+    fn documentation_name<'a>(&'a self, name: &'a str) -> &'a str {
+        let name = split_go_type_decl_name(name).0;
+        self.facade_exports
+            .get(name)
+            .map(|public| public.rsplit('.').next().unwrap())
+            .unwrap_or(name)
+    }
+
+    fn render_declaration_doc(
+        &self,
+        output: &mut String,
+        indent: &str,
+        name: &str,
+        doc: Option<&str>,
+    ) {
+        if doc.is_some()
+            || self
+                .facade_exports
+                .contains_key(split_go_type_decl_name(name).0)
+        {
+            render_go_declaration_doc(output, indent, self.documentation_name(name), doc);
+        }
+        self.render_exposed_as(output, indent, name);
+    }
+
+    fn render_exposed_as(&self, output: &mut String, indent: &str, name: &str) {
+        let name = split_go_type_decl_name(name).0;
+        let Some(public) = self.facade_exports.get(name) else {
+            return;
+        };
+        if output
+            .lines()
+            .next_back()
+            .is_some_and(|line| line.trim_start().starts_with("//"))
+        {
+            output.push_str(&format!("{indent}//\n"));
+        }
+        output.push_str(&format!("{indent}// Exposed as: [{public}]\n"));
+    }
+
     fn new(api_plan: &PlannedSpec, options: &GoOptions) -> Result<Self> {
         // `@nexus.namespace go="..."` is WIT-only (the JSON schema parser
         // never populates a per-language namespace), and it names an
@@ -827,6 +868,7 @@ impl GoPackageContext {
                     .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
             facade,
+            facade_exports: BTreeMap::new(),
         })
     }
 
@@ -1716,6 +1758,24 @@ impl<'a> ApiPlanner<'a> {
         for model in self.models.values() {
             validate_model_getter_names(model)?;
         }
+        let facade = self.package.facade.as_ref().map(|options| {
+            facade::plan(
+                options,
+                &self.package,
+                &self.imports,
+                &external_imports,
+                &self.enums,
+                &self.flags,
+                &self.variants,
+                &self.models,
+                &services,
+                self.api_plan,
+                &visibility,
+            )
+        });
+        if let (Some(plan), Some(options)) = (&facade, &self.package.facade) {
+            self.package.facade_exports = plan.exposed_names(&options.import_path);
+        }
         let interceptors = if self.package.workflow_interceptors && has_operations {
             interceptor::render(&services, &self.package, &visibility)?
         } else {
@@ -1751,7 +1811,7 @@ impl<'a> ApiPlanner<'a> {
         });
         files.insert(&file_name, output, primary_origin)?;
 
-        if let Some(options) = &self.package.facade {
+        if let Some(facade) = facade {
             files.insert(
                 file_name.with_file_name(format!(
                     "{}_facade.go",
@@ -1760,19 +1820,7 @@ impl<'a> ApiPlanner<'a> {
                         .expect("Go output has a file stem")
                         .to_string_lossy()
                 )),
-                facade::render(
-                    options,
-                    &self.package,
-                    &self.imports,
-                    &external_imports,
-                    &self.enums,
-                    &self.flags,
-                    &self.variants,
-                    &self.models,
-                    &services,
-                    self.api_plan,
-                    &visibility,
-                ),
+                facade.render(),
                 GeneratedFileOrigin::fixed("generated Go facade"),
             )?;
         }
@@ -4265,15 +4313,15 @@ fn render_file(
         output.push_str("\n// --- Datatypes ---\n");
         for enumeration in private_enums {
             output.push('\n');
-            render_enum(&mut output, enumeration);
+            render_enum(&mut output, enumeration, package);
         }
         for flag_set in private_flags {
             output.push('\n');
-            render_flags(&mut output, flag_set);
+            render_flags(&mut output, flag_set, package);
         }
         for variant in private_variants {
             output.push('\n');
-            render_variant(&mut output, variant);
+            render_variant(&mut output, variant, package);
         }
         for (key, model) in private_models {
             output.push('\n');
@@ -4357,18 +4405,24 @@ fn render_file(
         output.push_str("\n// --- Operations (public API) ---\n");
         for enumeration in public_enums {
             output.push('\n');
-            render_enum(&mut output, enumeration);
+            render_enum(&mut output, enumeration, package);
         }
         for flag_set in public_flags {
             output.push('\n');
-            render_flags(&mut output, flag_set);
+            render_flags(&mut output, flag_set, package);
         }
         for variant in public_variants {
             output.push('\n');
-            render_variant(&mut output, variant);
+            render_variant(&mut output, variant, package);
         }
         for (key, model) in public_models {
             output.push('\n');
+            package.render_declaration_doc(
+                &mut output,
+                "",
+                &model.name,
+                record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
+            );
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
@@ -4382,8 +4436,15 @@ fn render_file(
                 continue;
             }
             for operation in &service.operations {
+                let operation_name = go_declaration_name(&go_field_name(operation.name));
+                let options_name = format!("{operation_name}Options");
+                let options_doc = format!(
+                    "Options for {}.",
+                    package.documentation_name(&operation_name)
+                );
+                output.push('\n');
+                package.render_declaration_doc(&mut output, "", &options_name, Some(&options_doc));
                 if let Some(params) = &operation.unpacked_input {
-                    output.push('\n');
                     render_options_struct(&mut output, operation, params);
                     output.push('\n');
                     render_convenience_wrapper(
@@ -4396,7 +4457,6 @@ fn render_file(
                     );
                 } else {
                     // External input type — keep the request parameter intact.
-                    output.push('\n');
                     render_empty_options_struct(&mut output, operation);
                     output.push('\n');
                     render_external_input_wrapper(&mut output, service, operation, package);
@@ -4461,6 +4521,24 @@ fn uses_go_package(code: &str, name: &str) -> bool {
             previous.is_alphanumeric() || previous == '_' || previous == '.'
         })
     })
+}
+
+fn render_go_declaration_doc(output: &mut String, indent: &str, name: &str, doc: Option<&str>) {
+    let doc = doc.map(str::trim).filter(|doc| !doc.is_empty());
+    let text = match doc {
+        Some(doc)
+            if doc.strip_prefix(name).is_some_and(|rest| {
+                rest.chars()
+                    .next()
+                    .is_none_or(|ch| !ch.is_alphanumeric() && ch != '_')
+            }) =>
+        {
+            doc.to_string()
+        }
+        Some(doc) => format!("{name} - {doc}"),
+        None => format!("{name}."),
+    };
+    render_go_doc_comment(output, indent, &text);
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
@@ -4550,12 +4628,13 @@ fn render_field_doc_comment(
 /// the operation's `@nexus.doc` text and `returns=` text.
 ///
 /// ```go
-/// // Signal a workflow, starting it first if needed.
+/// // SignalWithStartWorkflow - Signal a workflow, starting it first if needed.
 /// //
 /// // Returns: A workflow handle to the started workflow.
 /// ```
 fn render_operation_doc_comment(
     output: &mut String,
+    name: &str,
     operation: &RenderedOperation<'_>,
     input_docs: &[(String, String)],
 ) {
@@ -4564,21 +4643,15 @@ fn render_operation_doc_comment(
         .return_doc
         .map(str::trim)
         .filter(|doc| !doc.is_empty());
-    if let Some(doc) = doc {
-        render_go_doc_comment(output, "", doc);
-    }
+    render_go_declaration_doc(output, "", name, doc);
     if !input_docs.is_empty() {
-        if doc.is_some() {
-            output.push_str("//\n");
-        }
+        output.push_str("//\n");
         for (name, doc) in input_docs {
             render_go_doc_comment(output, "", &format!("Input {name}: {doc}"));
         }
     }
     if let Some(return_doc) = return_doc {
-        if doc.is_some() || !input_docs.is_empty() {
-            output.push_str("//\n");
-        }
+        output.push_str("//\n");
         render_go_doc_comment(output, "", &format!("Returns: {return_doc}"));
     }
 }
@@ -4593,7 +4666,8 @@ fn render_operation_doc_comment(
 ///     UserStatusSuspended UserStatus = 1
 /// )
 /// ```
-fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
+fn render_enum(output: &mut String, enumeration: &RenderedEnum, package: &GoPackageContext) {
+    package.render_declaration_doc(output, "", &enumeration.name, None);
     output.push_str("type ");
     output.push_str(&enumeration.name);
     output.push_str(" int32\n");
@@ -4604,6 +4678,12 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
 
     output.push_str("\nconst (\n");
     for value in &enumeration.values {
+        package.render_declaration_doc(
+            output,
+            "\t",
+            &format!("{}{}", enumeration.name, value.name),
+            None,
+        );
         output.push('\t');
         output.push_str(&enumeration.name);
         output.push_str(&value.name);
@@ -4627,7 +4707,8 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
 ///     UserCapabilityUpdateEmail UserCapability = 1 << 1
 /// )
 /// ```
-fn render_flags(output: &mut String, flags: &RenderedFlags) {
+fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageContext) {
+    package.render_declaration_doc(output, "", &flags.name, None);
     output.push_str("type ");
     output.push_str(&flags.name);
     output.push_str(" int32\n");
@@ -4638,6 +4719,7 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 
     output.push_str("\nconst (\n");
     for flag in &flags.flags {
+        package.render_declaration_doc(output, "\t", &format!("{}{}", flags.name, flag.name), None);
         output.push('\t');
         output.push_str(&flags.name);
         output.push_str(&flag.name);
@@ -4667,9 +4749,16 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 ///
 /// func (NotificationTargetNone) isNotificationTarget() {}
 /// ```
-fn render_variant(output: &mut String, variant: &RenderedVariant) {
+fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPackageContext) {
     if let Some(doc) = variant.doc.value() {
-        render_go_doc_comment(output, "", doc);
+        render_go_declaration_doc(
+            output,
+            "",
+            package.documentation_name(&variant.name),
+            Some(doc),
+        );
+    } else if package.facade_exports.contains_key(&variant.name) {
+        render_go_declaration_doc(output, "", package.documentation_name(&variant.name), None);
     }
     if variant.experimental {
         if variant.doc.value().is_some() {
@@ -4681,6 +4770,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
             "WARNING: This API is experimental and may change in the future.",
         );
     }
+    package.render_exposed_as(output, "", &variant.name);
     output.push_str("type ");
     output.push_str(&go_generic_declaration_name(
         &variant.name,
@@ -4703,9 +4793,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
 
     for case in &variant.cases {
         output.push('\n');
-        if let Some(doc) = case.doc.value() {
-            render_go_doc_comment(output, "", doc);
-        }
+        package.render_declaration_doc(output, "", &case.struct_name, case.doc.value());
         output.push_str("type ");
         output.push_str(&go_generic_declaration_name(
             &case.struct_name,
@@ -4879,6 +4967,7 @@ fn render_resource(
     visibility: &GoVisibility,
     constructor_returns_value: bool,
 ) {
+    package.render_declaration_doc(output, "", &go_declaration_name(&resource.type_name), None);
     output.push_str("type ");
     output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" struct {\n");
@@ -4908,7 +4997,14 @@ fn render_resource(
         output.push_str("}\n");
     }
 
-    output.push_str("\nfunc ");
+    output.push('\n');
+    package.render_declaration_doc(
+        output,
+        "",
+        &go_declaration_name(&format!("New{}", resource.type_name)),
+        None,
+    );
+    output.push_str("func ");
     output.push_str(&go_declaration_name(&format!("New{}", resource.type_name)));
     output.push('(');
     for (index, field) in resource.fields.iter().enumerate() {
@@ -6076,7 +6172,13 @@ fn render_convenience_wrapper(
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
-    render_operation_doc_comment(output, operation, &input_docs);
+    render_operation_doc_comment(
+        output,
+        package.documentation_name(&exported_name),
+        operation,
+        &input_docs,
+    );
+    package.render_exposed_as(output, "", &exported_name);
 
     let mut signature_params: Vec<(String, String)> = vec![(
         "opts".to_string(),
@@ -6402,7 +6504,13 @@ fn render_external_input_wrapper(
 ) {
     let exported_name = go_declaration_name(&go_field_name(operation.name));
 
-    render_operation_doc_comment(output, operation, &[]);
+    render_operation_doc_comment(
+        output,
+        package.documentation_name(&exported_name),
+        operation,
+        &[],
+    );
+    package.render_exposed_as(output, "", &exported_name);
     output.push_str("func ");
     output.push_str(&exported_name);
     output.push_str("(ctx ");
@@ -6444,6 +6552,8 @@ fn render_external_input_wrapper(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::{COMMON_CONVERTER, CONVERTER, INTERNAL, SdkReference, SdkSymbol, WORKFLOW};
     use crate::error::Error;
 
@@ -6568,6 +6678,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            facade_exports: BTreeMap::new(),
         };
         assert_eq!(
             package.import_alias("go.temporal.io/sdk/workflow"),
@@ -6690,6 +6801,7 @@ mod tests {
             has_serialization_context: false,
             support_package: Some("go.temporal.io/sdk/internal".to_string()),
             facade: None,
+            facade_exports: BTreeMap::new(),
             workflow_interceptors: false,
         };
         assert_eq!(
@@ -6811,6 +6923,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            facade_exports: BTreeMap::new(),
             workflow_interceptors: false,
         };
         assert_eq!(
@@ -6829,6 +6942,7 @@ mod tests {
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            facade_exports: BTreeMap::new(),
             workflow_interceptors: false,
         };
         assert_eq!(
