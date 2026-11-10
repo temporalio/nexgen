@@ -26,7 +26,7 @@ _P = typing_extensions.ParamSpec("_P")
 
 
 @typing.final
-class ResourceCall(
+class ResourceContextManager(
     collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT],
     typing.Generic[_ResourceT],
 ):
@@ -79,15 +79,15 @@ class ResourceCall(
             await self._resource.__aexit__(exc_type, exc, tb)
 
 
-def resource_call(
+def resource_context_manager(
     function: collections.abc.Callable[
         _P, collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT]
     ],
-) -> collections.abc.Callable[_P, ResourceCall[_ResourceT]]:
-    """Wraps a call that returns a closable resource in a ``ResourceCall``."""
+) -> collections.abc.Callable[_P, ResourceContextManager[_ResourceT]]:
+    """Wraps a call that returns a closable resource in a ``ResourceContextManager``."""
 
     @functools.wraps(function)
-    def call(*args: _P.args, **kwargs: _P.kwargs) -> ResourceCall[_ResourceT]:
-        return ResourceCall(function(*args, **kwargs))
+    def call(*args: _P.args, **kwargs: _P.kwargs) -> ResourceContextManager[_ResourceT]:
+        return ResourceContextManager(function(*args, **kwargs))
 
     return call

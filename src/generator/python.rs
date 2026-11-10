@@ -886,10 +886,10 @@ impl<'a> ApiPlanner<'a> {
             if let Some(operation) = services
                 .iter()
                 .flat_map(|service| &service.operations)
-                .find(|operation| operation.attr_name == "resource_call")
+                .find(|operation| operation.attr_name == "resource_context_manager")
             {
                 return Err(Error::PythonGeneratedNameConflict {
-                    name: "resource_call".to_string(),
+                    name: "resource_context_manager".to_string(),
                     generated_by: format!("the function of operation `{}`", operation.name),
                     conflicting_declaration: "the decorator of a call that returns a closable \
                                               resource"
@@ -902,9 +902,9 @@ impl<'a> ApiPlanner<'a> {
                 "\nimport collections.abc\nimport functools\nimport types\nimport typing\n\n\
                  import typing_extensions\n\n\n",
             );
-            source.push_str(PYTHON_RESOURCE_CALL);
+            source.push_str(PYTHON_RESOURCE_CONTEXT_MANAGER);
             files.insert(
-                "_resource_call.py",
+                "_resource_context_manager.py",
                 source,
                 GeneratedFileOrigin::fixed("generated Python resource call"),
             )?;
@@ -1270,7 +1270,7 @@ impl<'a> ApiPlanner<'a> {
         }
         render_support_import(&mut output, &body, self.support_package, false);
         render_poll_iterator_import(&mut output, &body, "._poll");
-        render_resource_call_import(&mut output, &body, ".._resource_call");
+        render_resource_context_manager_import(&mut output, &body, ".._resource_context_manager");
         output.push_str("\n\n");
         output.push_str(&body);
         Ok(output)
@@ -1929,7 +1929,11 @@ impl<'a> ApiPlanner<'a> {
         } else {
             ".."
         };
-        render_resource_call_import(&mut output, &body, &format!("{shared}_resource_call"));
+        render_resource_context_manager_import(
+            &mut output,
+            &body,
+            &format!("{shared}_resource_context_manager"),
+        );
         if !body.is_empty() {
             output.push('\n');
             output.push('\n');
@@ -2006,7 +2010,7 @@ impl<'a> ApiPlanner<'a> {
                 &type_variables,
                 self.rendered_resource_ref(resource).as_ref(),
             );
-            render_resource_context_manager(output, resource);
+            render_resource_async_with(output, resource);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -2136,7 +2140,7 @@ impl<'a> ApiPlanner<'a> {
             }
             _ => self.python_resource_method_result_annotation(method),
         };
-        render_resource_call_decorator(
+        render_resource_context_manager_decorator(
             output,
             "    ",
             resource_method_returns_closable_resource(service, method),
@@ -6390,10 +6394,10 @@ fn render_workflow_clients_module(
         render_resource_data_import(&mut output, &body, &service.resources, 1);
     }
     render_support_import(&mut output, &body, support_package, false);
-    render_resource_call_import(
+    render_resource_context_manager_import(
         &mut output,
         &body,
-        &python_api_root_module_import(GenerationTarget::Workflow, 1, "_resource_call"),
+        &python_api_root_module_import(GenerationTarget::Workflow, 1, "_resource_context_manager"),
     );
     output.push_str("\n\n");
     output.push_str(&body);
@@ -6493,10 +6497,10 @@ fn render_operation_module(
     }
     render_resource_data_import(&mut output, &body, &service.resources, 2);
     render_support_import(&mut output, &body, support_package, false);
-    render_resource_call_import(
+    render_resource_context_manager_import(
         &mut output,
         &body,
-        &python_api_root_module_import(GenerationTarget::Workflow, 2, "_resource_call"),
+        &python_api_root_module_import(GenerationTarget::Workflow, 2, "_resource_context_manager"),
     );
     output.push('\n');
     output.push('\n');
@@ -7115,7 +7119,7 @@ fn render_endpoint_service_object_operation_method(
             "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_resource_call_decorator(
+    render_resource_context_manager_decorator(
         output,
         "    ",
         operation_returns_closable_resource(service, operation),
@@ -7153,7 +7157,7 @@ fn render_endpoint_service_object_unpacked_method(
             "    @typing_extensions.deprecated(\"This operation is deprecated.\", category=None)\n",
         );
     }
-    render_resource_call_decorator(
+    render_resource_context_manager_decorator(
         output,
         "    ",
         operation_returns_closable_resource(service, operation),
@@ -7625,8 +7629,8 @@ fn validate_runtime_type_argument_names(services: &[RenderedService<'_>]) -> Res
     Ok(())
 }
 
-/// `ResourceCall` is a `Coroutine`, since `asyncio.create_task` takes only a coroutine.
-const PYTHON_RESOURCE_CALL: &str = r#"class _Closable(typing.Protocol):
+/// `ResourceContextManager` is a `Coroutine`, since `asyncio.create_task` takes only a coroutine.
+const PYTHON_RESOURCE_CONTEXT_MANAGER: &str = r#"class _Closable(typing.Protocol):
     async def __aenter__(self) -> object: ...
 
     async def __aexit__(
@@ -7642,7 +7646,7 @@ _P = typing_extensions.ParamSpec("_P")
 
 
 @typing.final
-class ResourceCall(
+class ResourceContextManager(
     collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT],
     typing.Generic[_ResourceT],
 ):
@@ -7695,16 +7699,16 @@ class ResourceCall(
             await self._resource.__aexit__(exc_type, exc, tb)
 
 
-def resource_call(
+def resource_context_manager(
     function: collections.abc.Callable[
         _P, collections.abc.Coroutine[typing.Any, typing.Any, _ResourceT]
     ],
-) -> collections.abc.Callable[_P, ResourceCall[_ResourceT]]:
-    """Wraps a call that returns a closable resource in a ``ResourceCall``."""
+) -> collections.abc.Callable[_P, ResourceContextManager[_ResourceT]]:
+    """Wraps a call that returns a closable resource in a ``ResourceContextManager``."""
 
     @functools.wraps(function)
-    def call(*args: _P.args, **kwargs: _P.kwargs) -> ResourceCall[_ResourceT]:
-        return ResourceCall(function(*args, **kwargs))
+    def call(*args: _P.args, **kwargs: _P.kwargs) -> ResourceContextManager[_ResourceT]:
+        return ResourceContextManager(function(*args, **kwargs))
 
     return call
 "#;
@@ -10173,14 +10177,14 @@ fn operation_result_annotation(operation: &RenderedOperation<'_>) -> String {
     }
 }
 
-fn render_resource_call_import(output: &mut String, body: &str, module: &str) {
-    if body.contains("@resource_call\n") {
-        output.push_str(&format!("from {module} import resource_call\n"));
+fn render_resource_context_manager_import(output: &mut String, body: &str, module: &str) {
+    if body.contains("@resource_context_manager\n") {
+        output.push_str(&format!("from {module} import resource_context_manager\n"));
     }
 }
 
 /// The end of an `async with` block calls the `@nexus.close` method.
-fn render_resource_context_manager(output: &mut String, resource: &PlannedResource) {
+fn render_resource_async_with(output: &mut String, resource: &PlannedResource) {
     let Some(method) = resource.methods.iter().find(|method| method.close) else {
         return;
     };
@@ -10234,11 +10238,11 @@ fn closable_resource(service: &RenderedService<'_>, type_name: &str) -> bool {
     })
 }
 
-/// The decorated call returns a `ResourceCall`, so a caller can also enter it with `async with`.
-fn render_resource_call_decorator(output: &mut String, indent: &str, closable: bool) {
+/// The decorated call returns a `ResourceContextManager`, so a caller can also enter it with `async with`.
+fn render_resource_context_manager_decorator(output: &mut String, indent: &str, closable: bool) {
     if closable {
         output.push_str(indent);
-        output.push_str("@resource_call\n");
+        output.push_str("@resource_context_manager\n");
     }
 }
 
@@ -10248,7 +10252,7 @@ fn render_public_operation_signature_start(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
-    render_resource_call_decorator(
+    render_resource_context_manager_decorator(
         output,
         target_indent(target),
         operation_returns_closable_resource(service, operation),
@@ -10516,7 +10520,7 @@ fn render_request_only_operation_function(
         );
     }
     if public {
-        render_resource_call_decorator(
+        render_resource_context_manager_decorator(
             output,
             "",
             operation_returns_closable_resource(service, operation),

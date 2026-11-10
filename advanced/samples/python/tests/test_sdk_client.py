@@ -25,7 +25,7 @@ from typing_extensions import assert_type, override
 
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
-from wit.stream_service.both._resource_call import ResourceCall
+from wit.stream_service.both._resource_context_manager import ResourceContextManager
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
 from wit.stream_service.both.client._poll import PollIterator
 from wit.stream_service.both.workflow import _resources as workflow_resources
@@ -411,7 +411,7 @@ async def test_a_clean_block_closes_its_stream() -> None:
     client, answers = closing_client()
     call = client.create_stream(id="s1", body_type=Turn)
 
-    _ = assert_type(call, ResourceCall[Stream[Turn]])
+    _ = assert_type(call, ResourceContextManager[Stream[Turn]])
     async with call as stream:
         _ = assert_type(stream, Stream[Turn])
 

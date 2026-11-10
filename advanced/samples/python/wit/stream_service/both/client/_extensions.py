@@ -20,7 +20,7 @@ from ..models import (
 )
 from ._resources.stream import Stream
 import temporal_support as _support
-from .._resource_call import resource_call
+from .._resource_context_manager import resource_context_manager
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
@@ -118,7 +118,7 @@ class StreamServiceClientExtension(abc.ABC):
         return resource
 
     @typing.overload
-    @resource_call
+    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -133,7 +133,7 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream[BodyT]: ...
 
     @typing.overload
-    @resource_call
+    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -147,7 +147,7 @@ class StreamServiceClientExtension(abc.ABC):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream[object]: ...
 
-    @resource_call
+    @resource_context_manager
     async def create_stream(
         self,
         *,

@@ -361,6 +361,9 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            // The `async with` close is Python-only today. This stays `None` because a language
+            // list makes the generator reject the directive for the other languages in the shared
+            // stream-service WIT, instead of ignoring it.
             languages: None,
             system_nexus: false,
         },

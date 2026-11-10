@@ -1,4 +1,4 @@
-package test:python-resource-call@1.0.0;
+package test:python-resource-context-manager@1.0.0;
 
 world system { export job-service; }
 
@@ -19,12 +19,12 @@ interface job-service {
     reason: option<string>,
   }
 
-  record resource-call-request {
+  record resource-context-manager-request {
     job-id: string,
   }
 
   cancel-job: func(request: cancel-job-request);
 
   // The function of this operation has the name of the decorator that its own module imports.
-  resource-call: func(request: resource-call-request) -> job-result;
+  resource-context-manager: func(request: resource-context-manager-request) -> job-result;
 }
