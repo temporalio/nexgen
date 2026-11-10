@@ -171,6 +171,8 @@ pub(crate) struct PlannedResource {
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
+    /// The method the end of an `async with` block calls, from `@nexus.close`.
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -187,8 +189,6 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) doc: Option<String>,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
-    /// Set by `@nexus.close`. The end of an `async with` block calls this method.
-    pub(crate) close: bool,
     pub(crate) varargs: Option<String>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
 }

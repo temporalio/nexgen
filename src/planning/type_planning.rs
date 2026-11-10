@@ -462,6 +462,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
                 type_parameters: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
+                close: None,
             })
     }
 
@@ -858,7 +859,6 @@ impl<'a> TypePlanningContext<'a> {
                         .result
                         .as_ref()
                         .map(|result| self.planned_resource_method_result(service, result)),
-                    close: method.close,
                     varargs: method.varargs.clone(),
                     binding,
                 })
@@ -876,6 +876,7 @@ impl<'a> TypePlanningContext<'a> {
                 .map(|field| self.planned_resource_field(field))
                 .collect(),
             methods,
+            close: resource.close.clone(),
         })
     }
 

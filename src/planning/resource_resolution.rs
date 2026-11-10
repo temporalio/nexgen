@@ -116,6 +116,7 @@ pub(crate) struct ResolvedResourceSpec {
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,7 +125,6 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) doc: SelectedTextSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
-    pub(crate) close: bool,
     pub(crate) varargs: Option<String>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
@@ -372,6 +372,7 @@ fn resolve_resource_methods(
         type_parameters: Vec::new(),
         fields: resource.fields.clone(),
         methods,
+        close: resource.close.clone(),
     })
 }
 
@@ -433,7 +434,6 @@ fn resolve_resource_method(
             doc: method.doc.clone(),
             params: method.params.clone(),
             result: method.result.clone(),
-            close: method.close,
             varargs: method.varargs.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
@@ -463,7 +463,7 @@ fn resolve_resource_method(
 
     let binding = match matching_operations.len() {
         // A stub close method would fail at the end of each scope.
-        0 if method.close => {
+        0 if resource.close.as_deref() == Some(method.name.as_str()) => {
             return Err(Error::InvalidResourceMethod {
                 service: service.name.clone(),
                 resource: resource.name.to_upper_camel_case(),
@@ -499,7 +499,6 @@ fn resolve_resource_method(
         doc: method.doc.clone(),
         params: method.params.clone(),
         result: method.result.clone(),
-        close: method.close,
         varargs: method.varargs.clone(),
         binding,
     })

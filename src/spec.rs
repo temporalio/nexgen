@@ -738,6 +738,9 @@ pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub doc: F::Text,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
+    /// Set by `@nexus.close` to the method the end of an `async with` block calls. One per
+    /// resource, so it lives here and not as a flag on each method.
+    pub close: Option<String>,
     pub data: F::ResourceData,
 }
 
@@ -756,8 +759,6 @@ pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub params: Vec<ResourceFieldSpec<F>>,
     pub result: Option<ResourceResultSpec<F>>,
     pub operation_name: Option<String>,
-    /// Set by `@nexus.close`. The end of an `async with` block calls this method.
-    pub close: bool,
     /// Set by `@nexus.varargs` to the name of its list parameter.
     pub varargs: Option<String>,
 }
@@ -787,6 +788,7 @@ impl<F: TypeFamily> ResourceSpec<F> {
                 .into_iter()
                 .map(|method| method.map_names_with(map))
                 .collect(),
+            close: self.close,
             data,
         }
     }
@@ -823,7 +825,6 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
                 .collect(),
             result: self.result.map(|result| result.map_names_with(map)),
             operation_name: self.operation_name,
-            close: self.close,
             varargs: self.varargs,
         }
     }

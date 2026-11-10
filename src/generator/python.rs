@@ -10185,7 +10185,7 @@ fn render_resource_context_manager_import(output: &mut String, body: &str, modul
 
 /// The end of an `async with` block calls the `@nexus.close` method.
 fn render_resource_async_with(output: &mut String, resource: &PlannedResource) {
-    let Some(method) = resource.methods.iter().find(|method| method.close) else {
+    let Some(name) = &resource.close else {
         return;
     };
     output.push_str("\n    async def __aenter__(self) -> typing_extensions.Self:\n");
@@ -10198,7 +10198,7 @@ fn render_resource_async_with(output: &mut String, resource: &PlannedResource) {
     output.push_str("    ) -> None:\n");
     output.push_str(&format!(
         "        await self.{}()\n",
-        python_field_name(&method.name)
+        python_field_name(name)
     ));
 }
 
@@ -10233,9 +10233,10 @@ fn resource_method_returns_closable_resource(
 }
 
 fn closable_resource(service: &RenderedService<'_>, type_name: &str) -> bool {
-    service.resources.iter().any(|resource| {
-        resource.type_name == type_name && resource.methods.iter().any(|method| method.close)
-    })
+    service
+        .resources
+        .iter()
+        .any(|resource| resource.type_name == type_name && resource.close.is_some())
 }
 
 /// The decorated call returns a `ResourceContextManager`, so a caller can also enter it with `async with`.
