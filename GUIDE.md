@@ -2172,6 +2172,13 @@ ordinary Python values. The `ref` attribute is a plain field: direct
 construction preserves the supplied ref rather than attaching the handle's type
 to it.
 
+For callable Python resources, a constructor record field that explicitly
+declares any resource type parameters must declare all of them, and only one
+such field is supported. Partial declarations and multiple sources are rejected
+during Python backend planning rather than silently disabling inference.
+Resources without a declared source retain the explicit runtime-type keyword
+API.
+
 ```python
 stream = client.get_stream(ref)  # Stream[Turn] for a StreamRef[Turn]
 stream = client.get_stream(StreamRef(id="s1"), body_type=Turn)  # Choose a decoder

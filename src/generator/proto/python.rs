@@ -7,8 +7,8 @@ use crate::generator::ExternalModelBackend;
 use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
-    ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
-    python_string_literal, render_python_docstring,
+    ResolvedFieldType, RootPackageImports, WireValueConversion, phantom_type_variable,
+    python_authored_type_annotation, python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -827,7 +827,7 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             "{}{}_type",
             if model
                 .phantom_type_parameters
-                .contains(&format!("_{parameter}"))
+                .contains(&phantom_type_variable(parameter))
             {
                 "_"
             } else {

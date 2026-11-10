@@ -524,7 +524,7 @@ impl<'a> ApiPlanner<'a> {
         } else {
             PythonExternalModels::new(api_plan)?
         };
-        Ok(Self {
+        let planner = Self {
             api_plan,
             support_package,
             inline_model_rebuilds,
@@ -535,7 +535,15 @@ impl<'a> ApiPlanner<'a> {
             flags: IndexMap::new(),
             variants: IndexMap::new(),
             models: IndexMap::new(),
-        })
+        };
+        for resource in api_plan
+            .services
+            .iter()
+            .flat_map(|service| &service.resources)
+        {
+            planner.plan_resource_type_source(&resource.data)?;
+        }
+        Ok(planner)
     }
 
     fn build(mut self, module_origin: GeneratedFileOrigin) -> Result<PythonGenerationResult> {
@@ -2510,24 +2518,61 @@ impl<'a> ApiPlanner<'a> {
         &self,
         resource: &'r PlannedResource,
     ) -> Option<&'r PlannedResourceField> {
+        self.plan_resource_type_source(resource)
+            .expect("runtime type sources were validated during Python backend planning")
+    }
+
+    fn plan_resource_type_source<'r>(
+        &self,
+        resource: &'r PlannedResource,
+    ) -> Result<Option<&'r PlannedResourceField>> {
         if resource.methods.is_empty() || resource.type_parameters.is_empty() {
-            return None;
+            return Ok(None);
         }
-        let mut sources = resource.fields.iter().filter(|field| {
+        let unsupported = |reason| Error::UnsupportedResourceTypeInference {
+            language: Language::Python,
+            resource: resource.name.clone(),
+            reason,
+        };
+        let mut sources = Vec::new();
+        for field in &resource.fields {
             let PlannedType::Record(record) = field.kind.without_option() else {
-                return false;
+                continue;
             };
-            self.api_plan
-                .record(&record.full_name)
-                .is_some_and(|record| {
-                    resource
-                        .type_parameters
-                        .iter()
-                        .all(|parameter| record.declared_type_parameters.contains(parameter))
-                })
-        });
-        let field = sources.next()?;
-        sources.next().is_none().then_some(field)
+            let record = planned_record(self.api_plan, &record.full_name);
+            if !resource
+                .type_parameters
+                .iter()
+                .any(|parameter| record.declared_type_parameters.contains(parameter))
+            {
+                continue;
+            }
+            let missing = resource
+                .type_parameters
+                .iter()
+                .filter(|parameter| !record.declared_type_parameters.contains(parameter))
+                .map(|parameter| format!("`{}`", parameter.full_name))
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                return Err(unsupported(format!(
+                    "constructor field `{}` declares only some resource type parameters; missing {}",
+                    field.name,
+                    missing.join(", ")
+                )));
+            }
+            sources.push(field);
+        }
+        if sources.len() > 1 {
+            return Err(unsupported(format!(
+                "multiple constructor fields declare the resource type parameters: {}",
+                sources
+                    .iter()
+                    .map(|field| format!("`{}`", field.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
+        Ok(sources.into_iter().next())
     }
 
     fn resource_ref_record<'r>(
@@ -4999,7 +5044,7 @@ fn python_type_annotation_with_arguments(name: &str, arguments: &[String]) -> St
 }
 
 /// A phantom type variable can't collide with a model's own, since a model name can't start `_`.
-fn phantom_type_variable(type_var: &str) -> String {
+pub(in crate::generator) fn phantom_type_variable(type_var: &str) -> String {
     format!("_{type_var}")
 }
 
