@@ -200,7 +200,9 @@ async def test_workflow_apis_call_the_stream_service(
     ref = model_types.StreamRef(id="workflow-stream")
     replies = {
         "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
-        "AppendRecords": model_types.AppendRecordsResponse(last_offset=3),
+        "AppendRecords": model_types.AppendRecordsResponse(
+            first_offset=2, last_offset=3
+        ),
     }
     calls: list[tuple[str, typing.Any]] = []
 
@@ -231,10 +233,14 @@ async def test_workflow_apis_call_the_stream_service(
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    response = await stream.publish(records=[])
+    response = await stream.publish("a", "b")
     assert response.last_offset == 3
+    # The free function hands back a Nexus handle, so the caller awaits it for the batch.
+    handle = await api.append_records(ref=ref, records=["a", "b"])
+    assert (await handle).last_offset == 3
     # The Workflow API fills the request id and the producer from its sources.
     run = model_types.Producer(id="wf:r2", run_id="r2")
+    records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [
         (
             "CreateStream",
@@ -242,13 +248,23 @@ async def test_workflow_apis_call_the_stream_service(
         ),
         (
             "AppendRecords",
-            model_types.AppendRecordsRequest(ref=ref, records=[], producer=run),
+            model_types.AppendRecordsRequest(ref=ref, records=records, producer=run),
+        ),
+        (
+            "AppendRecords",
+            model_types.AppendRecordsRequest(ref=ref, records=records, producer=run),
         ),
     ]
     # The sources build the models of one package, so the calls compare as data.
     assert [(name, dataclasses.asdict(arg)) for name, arg in calls] == [
         (name, dataclasses.asdict(arg)) for name, arg in expected
     ]
+    wire = model_types._AppendRecordsRequestTransferTypeConverter().to_transfer_type(
+        calls[-1][1]
+    )
+    assert [
+        PayloadConverter.default.from_payload(record.body) for record in wire.records
+    ] == ["a", "b"]
 
 
 @pytest.mark.parametrize("construction", ["create", "direct"])

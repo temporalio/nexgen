@@ -120,7 +120,7 @@ interface stream-service {
 
   /// @nexus.doc "One Record to append."
   /// @nexus.proto "temporal.api.stream.v1.AppendRecord"
-  // TODO: implement @nexus.unwrap.
+  /// @nexus.flatten-in-api
   record append-record {
     /// @nexus.doc "The value."
     body: body-t,
@@ -273,9 +273,10 @@ interface stream-service {
   }
 
   /// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsResponse"
+  // A publish must write at least one Record, so both offsets are always of a real Record.
   record append-records-response {
-    first-offset: option<s64>,
-    last-offset: option<s64>,
+    first-offset: s64,
+    last-offset: s64,
   }
 
   // A close carries no value, so code that has a last value publishes it first.
@@ -380,10 +381,9 @@ interface stream-service {
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);
 
-    /// @nexus.doc "Publish values, and return the offset of the last one."
+    /// @nexus.doc "Publish values, and return the first and the last offset of the batch."
     /// @nexus.operation "append-records"
-    // TODO: implement @nexus.varargs name="values"
-    // TODO: implement @nexus.result-field "last-offset"
+    /// @nexus.varargs "records"
     publish: func(records: list<append-record>) -> append-records-response;
 
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
@@ -415,6 +415,7 @@ interface stream-service {
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
   /// @nexus.doc "Append one batch. Workflow code makes the call from a Local Activity."
+  // Append returns the whole response, so the caller reads both the first and the last offset.
   /// @nexus.operation name="AppendRecords"
   append-records: func(request: append-records-request) -> append-records-response;
 

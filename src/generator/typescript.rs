@@ -22,7 +22,7 @@ use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedOperationResourceReturn,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedRecordType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, PlannedWireFieldBinding, operation_input_model,
+    PlannedSpec, PlannedType, PlannedWireFieldBinding, flattened_list_field, operation_input_model,
     operation_output_direct_result,
 };
 use crate::planning::{RequestPlan, RequestPlanSource, ResolvedResourceBindingSource};
@@ -1210,6 +1210,42 @@ impl<'a> ApiPlanner<'a> {
                 },
                 flattened_fields: Vec::new(),
                 requirements: resolved_type.requirements,
+            };
+        }
+
+        // The model holds the values, and the converter wraps each one in its record.
+        if repeated
+            && let PlannedType::List(item) = &field.field_type
+            && let Some((_, nested)) = flattened_list_field(self.api_plan, item)
+            && let Some(conversion) = resolved_type.wire_conversion.as_ref()
+        {
+            let nested_name = typescript_generated_field_name(&nested.name);
+            let nested_type = self.resolve_planned_value_type(&nested.field_type);
+            let record = if conversion.wire_function_names.is_some() {
+                conversion.from_wire_expr("value")
+            } else {
+                format!("({}!)", conversion.from_wire_expr("value"))
+            };
+            let mut requirements = resolved_type.requirements.clone();
+            requirements.merge(&nested_type.requirements);
+            return RenderedField {
+                name: generated_field_name.to_string(),
+                wire_name: wire_field_name.to_string(),
+                annotation: Self::typescript_field_annotation(
+                    field,
+                    typescript_array_annotation(&nested_type.annotation),
+                ),
+                doc,
+                optional: !field.required,
+                from_wire_expr: collection_value_expr(&format!(
+                    "{wire_field_expr}?.map((value: any) => {record}.{nested_name})"
+                )),
+                to_wire_expr: collection_value_expr(&format!(
+                    "model.{generated_field_name}?.map((value) => {})",
+                    conversion.to_wire_expr(&format!("{{ {nested_name}: value }}"))
+                )),
+                flattened_fields: Vec::new(),
+                requirements,
             };
         }
 
@@ -3930,9 +3966,16 @@ fn typescript_workflow_module() -> &'static str {
 fn render_typescript_requirement_imports(
     output: &mut String,
     requirements: &TypeScriptRequirements,
+    body: &str,
 ) {
     if requirements.long {
-        output.push_str("import type Long from 'long';\n");
+        // A no-presence `s64`/`u64` default reads `Long.ZERO`, so the body uses `Long` as a value
+        // and a type-only import would not compile.
+        if contains_qualified_identifier(body, "Long") {
+            output.push_str("import Long from 'long';\n");
+        } else {
+            output.push_str("import type Long from 'long';\n");
+        }
     }
 }
 
@@ -4664,7 +4707,7 @@ fn render_models_module(
         &model_language_imports,
         &generated_value_imports,
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, requirements, &body);
     render_support_import_if(
         &mut imports,
         support_package,
@@ -4919,7 +4962,7 @@ fn render_resources_module(
             ("common", "@temporalio/common", true),
         ],
     );
-    render_typescript_requirement_imports(&mut imports, requirements);
+    render_typescript_requirement_imports(&mut imports, requirements, &body);
     render_value_imports(
         &mut imports,
         "./models",
@@ -6327,12 +6370,21 @@ fn render_resource(
                 output.push('?');
             }
             output.push_str(": ");
-            output.push_str(&typescript_resource_field_annotation(
-                &param.kind,
-                false,
-                param.function.as_ref(),
-                api_plan,
-            ));
+            let flattened = match &param.kind {
+                PlannedType::List(item) => flattened_list_field(api_plan, item),
+                _ => None,
+            };
+            match flattened {
+                Some((_, nested)) => output.push_str(&typescript_array_annotation(
+                    &typescript_resource_value_annotation(&nested.field_type, api_plan),
+                )),
+                None => output.push_str(&typescript_resource_field_annotation(
+                    &param.kind,
+                    false,
+                    param.function.as_ref(),
+                    api_plan,
+                )),
+            }
             if param.optional && before_required {
                 output.push_str(" | undefined");
             }
@@ -7732,11 +7784,15 @@ mod tests {
         };
 
         let mut imports = String::new();
-        render_typescript_requirement_imports(&mut imports, &requirements);
+        render_typescript_requirement_imports(&mut imports, &requirements, "");
         assert_eq!(imports, "import type Long from 'long';\n");
 
         let mut imports = String::new();
-        render_typescript_requirement_imports(&mut imports, &TypeScriptRequirements::default());
+        render_typescript_requirement_imports(&mut imports, &requirements, "value ?? Long.ZERO");
+        assert_eq!(imports, "import Long from 'long';\n");
+
+        let mut imports = String::new();
+        render_typescript_requirement_imports(&mut imports, &TypeScriptRequirements::default(), "");
         assert!(imports.is_empty());
     }
 

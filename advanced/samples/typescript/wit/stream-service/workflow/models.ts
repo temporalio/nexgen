@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { google, temporal } from "@temporalio/proto";
-import type Long from "long";
+import Long from "long";
 import * as support from "../../../support/temporal_model_converters";
 
 function requiredField<T>(
@@ -265,16 +265,24 @@ export const createStreamRequestTransferTypeConverter = {
   },
 };
 export interface AppendRecordsResponse {
-  firstOffset?: Long;
-  lastOffset?: Long;
+  firstOffset: Long;
+  lastOffset: Long;
 }
 
 function appendRecordsResponseFromProto(
   proto: temporal.api.streamservice.v1.IAppendRecordsResponse,
 ): AppendRecordsResponse {
   return {
-    firstOffset: proto.firstOffset ?? undefined,
-    lastOffset: proto.lastOffset ?? undefined,
+    firstOffset: requiredField(
+      proto.firstOffset ?? Long.ZERO,
+      "AppendRecordsResponse",
+      "firstOffset",
+    ),
+    lastOffset: requiredField(
+      proto.lastOffset ?? Long.ZERO,
+      "AppendRecordsResponse",
+      "lastOffset",
+    ),
   };
 }
 
@@ -282,8 +290,12 @@ function appendRecordsResponseToProto(
   model: AppendRecordsResponse,
 ): temporal.api.streamservice.v1.IAppendRecordsResponse {
   return {
-    firstOffset: model.firstOffset,
-    lastOffset: model.lastOffset,
+    firstOffset: requiredField(
+      model.firstOffset,
+      "AppendRecordsResponse",
+      "firstOffset",
+    ),
+    lastOffset: requiredField(model.lastOffset, "AppendRecordsResponse", "lastOffset"),
   };
 }
 
@@ -302,7 +314,7 @@ export const appendRecordsResponseTransferTypeConverter = {
 };
 export interface AppendRecordsRequest<BodyT> {
   ref: StreamRef;
-  records: AppendRecord<BodyT>[];
+  records: BodyT[];
   /**
    * The batch number in this epoch. Empty takes the next one, and a retry writes it
    * again.
@@ -327,8 +339,8 @@ function appendRecordsRequestFromProto<BodyT>(
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "AppendRecordsRequest", "ref")),
     records: requiredField(
-      proto.records?.map((value: any) =>
-        appendRecordFromProto(value, { bodyT: typeInfo.bodyT }),
+      proto.records?.map(
+        (value: any) => appendRecordFromProto(value, { bodyT: typeInfo.bodyT }).body,
       ),
       "AppendRecordsRequest",
       "records",
@@ -349,7 +361,7 @@ function appendRecordsRequestToProto<BodyT>(
     ref: streamRefToProto(requiredField(model.ref, "AppendRecordsRequest", "ref")),
     records: requiredField(
       model.records?.map((value) =>
-        appendRecordToProto(value, { bodyT: typeInfo.bodyT }),
+        appendRecordToProto({ body: value }, { bodyT: typeInfo.bodyT }),
       ),
       "AppendRecordsRequest",
       "records",

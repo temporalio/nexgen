@@ -22,6 +22,7 @@ of `@nexus` directives.
   - [Resource Declaration](#resource-declaration)
   - [Name-Binding: How Resource Methods Find Operations](#name-binding-how-resource-methods-find-operations)
   - [Resource Return Binding](#resource-return-binding)
+  - [Variadic Items](#variadic-items)
   - [Edge Cases and Error Conditions](#edge-cases-and-error-conditions)
 - [Proto-Backed Models](#proto-backed-models)
   - [Transfer-Type Conversion](#transfer-type-conversion)
@@ -770,7 +771,9 @@ request = CancelWorkflowRequest(
 
 After field matching, the generator also filters candidates by return type. If
 the method returns `own<user>`, only operations that also return `own<user>` (or
-the equivalent proto type) are considered.
+the equivalent proto type) are considered. A method that returns a record binds
+to an operation that returns that record. An output transform on the operation
+changes the method's result too.
 
 **Disambiguation by name:**
 
@@ -834,6 +837,24 @@ record create-job-result {
 ```python
 result = await handle  # CreateJobResponse
 return CreateJobResult(job=Job(job_id=result.job_id), created=result.created)
+```
+
+### Variadic Items
+
+`@nexus.varargs "<parameter>"` makes a resource method take the items of that
+list parameter as positional arguments. Only Python generates it, and Go refuses
+it.
+
+```wit
+resource %stream {
+  /// @nexus.operation "append-records"
+  /// @nexus.varargs "records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
+```
+
+```python
+async def publish(self, *records: BodyT) -> int: ...
 ```
 
 ### Edge Cases and Error Conditions
@@ -1186,6 +1207,22 @@ stream = await client.create_stream(id="s1", backend="redis")
 ```
 
 A resource method can't bind an operation whose request flattens a field.
+
+A list of a flattened record with one field takes that field's values, and the
+call wraps each value in the record. The record must be proto-backed. Go refuses
+such a list.
+
+```wit
+/// @nexus.flatten-in-api
+record append-record {
+  body: body-t,
+}
+```
+
+```python
+# Sends records=[AppendRecord(body="a"), AppendRecord(body="b")].
+await append_records(ref=ref, records=["a", "b"])
+```
 
 ### Output Transforms
 
@@ -1778,6 +1815,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
 | `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
+| `@nexus.varargs`                        | resource method                                                                               |
 
 <!-- annotation-placements:end -->
 
@@ -2484,6 +2522,15 @@ These are Temporal payload headers inside the operation request, not Nexus
 transport headers. The directive does not enable inbound extraction or response
 propagation. Use `go=` in multi-language inputs to keep it inactive for other
 backends.
+
+---
+
+### @nexus.varargs
+
+**Placement:** Resource method **Syntax:** `@nexus.varargs "<parameter>"`
+
+The method takes the items of that list parameter as positional arguments. See
+[Variadic Items](#variadic-items).
 
 ---
 

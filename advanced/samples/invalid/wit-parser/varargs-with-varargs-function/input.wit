@@ -1,0 +1,41 @@
+package test:varargs-with-varargs-function@1.0.0;
+
+world system { export batch-service; }
+
+interface functions {
+  type placeholder = string;
+  type function-args = list<string>;
+
+  /// @nexus.function-args varargs=true
+  varargs-function-call: func(args: function-args) -> string;
+
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="varargs-function-call"
+  type varargs-function = placeholder;
+}
+
+/// @nexus.endpoint "batches"
+interface batch-service {
+  use functions.{varargs-function};
+
+  resource batch {
+    constructor(batch-id: string);
+
+    // The function's arguments and the items can't both be the trailing positional arguments.
+    /// @nexus.varargs "items"
+    add-items: func(function: varargs-function, items: list<string>) -> add-items-response;
+  }
+
+  record add-items-request {
+    batch-id: string,
+    function: varargs-function,
+    items: list<string>,
+  }
+
+  record add-items-response {
+    count: u32,
+  }
+
+  add-items: func(request: add-items-request) -> add-items-response;
+}

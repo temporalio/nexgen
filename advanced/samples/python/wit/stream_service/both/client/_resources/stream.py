@@ -63,15 +63,14 @@ class Stream(typing.Generic[BodyT]):
 
     async def publish(
         self,
-        records: list[AppendRecord[BodyT]],
-        *,
+        *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
-        """Publish values, and return the offset of the last one."""
+        """Publish values, and return the first and the last offset of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            records=records,
+            records=[AppendRecord(body=value) for value in records],
             producer=_support.client_producer(),
             withdraw_run=_support.withdraw_run(),
         )

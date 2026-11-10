@@ -1,0 +1,1 @@
+`@nexus.varargs` makes a Python resource method take the items of a list as positional arguments, and a list of a flattened one-field record takes that field's values. A resource method also has the type of its operation's output transform.

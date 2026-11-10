@@ -56,12 +56,12 @@ class Stream(typing.Generic[BodyT]):
 
     async def publish(
         self,
-        records: list[AppendRecord[BodyT]],
+        *records: BodyT,
     ) -> AppendRecordsResponse:
-        """Publish values, and return the offset of the last one."""
+        """Publish values, and return the first and the last offset of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            records=records,
+            records=[AppendRecord(body=value) for value in records],
             producer=_support.workflow_producer(),
             withdraw_run=_support.withdraw_run(),
         )
@@ -162,7 +162,7 @@ async def _append_records(
 async def append_records(
     *,
     ref: StreamRef,
-    records: list[AppendRecord[BodyT]],
+    records: list[BodyT],
     sequence: int | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     """Append one batch. Workflow code makes the call from a Local Activity.
@@ -173,7 +173,7 @@ async def append_records(
     """
     request = AppendRecordsRequest(
         ref=ref,
-        records=records,
+        records=[AppendRecord(body=value) for value in records],
         producer=_support.workflow_producer(),
         sequence=sequence,
         withdraw_run=_support.withdraw_run(),
