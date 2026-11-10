@@ -399,9 +399,9 @@ def closing_client() -> tuple[Client, Answers]:
     )
 
 
-def closes(answers: Answers) -> list[CloseStreamRequest]:
+def closes(answers: Answers) -> list[CloseStreamRequest[typing.Any]]:
     return [
-        typing.cast(CloseStreamRequest, started.arg)
+        typing.cast(CloseStreamRequest[typing.Any], started.arg)
         for started in answers.started
         if started.operation == "CloseStream"
     ]
