@@ -518,6 +518,33 @@ def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
         )
 
 
+def test_declared_ref_parameters_propagate_through_wire_models() -> None:
+    ref = both_models.StreamRef[Turn](id="typed-stream")
+    create = both_models.CreateStreamRequest(stream_ref=ref)
+    read = both_models.ReadRecordsRequest(ref=ref)
+    result = both_models.CreateStreamResult(ref=ref, created=True)
+    _ = assert_type(create, both_models.CreateStreamRequest[Turn])
+    _ = assert_type(read, both_models.ReadRecordsRequest[Turn])
+    _ = assert_type(result, both_models.CreateStreamResult[Turn])
+
+    decoded_create = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(create), both_models.CreateStreamRequest[Turn]
+    )
+    decoded_read = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(read), both_models.ReadRecordsRequest[Turn]
+    )
+    decoded_result = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(result), both_models.CreateStreamResult[Turn]
+    )
+    for decoded_ref in (
+        decoded_create.stream_ref,
+        decoded_read.ref,
+        decoded_result.ref,
+    ):
+        assert decoded_ref == ref
+        assert typing.get_args(getattr(decoded_ref, "__orig_class__", None)) == (Turn,)
+
+
 async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:
     record = workflow_models.StreamRecord(
         item=workflow_models.StreamItemData(
@@ -669,5 +696,5 @@ def test_root_service_contract_uses_shared_wire_models(package: str) -> None:
     definition = nexusrpc.get_service_definition(shared.StreamService)
     assert definition is not None
     operation = definition.operation_definitions["CreateStream"]
-    assert operation.input_type is shared.CreateStreamRequest
-    assert operation.output_type is shared.CreateStreamResult
+    assert operation.input_type == shared.CreateStreamRequest[typing.Any]
+    assert operation.output_type == shared.CreateStreamResult[typing.Any]

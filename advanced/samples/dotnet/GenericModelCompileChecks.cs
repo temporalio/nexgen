@@ -20,6 +20,9 @@ namespace Nexgen.DotNetExamples
                     "context",
                     new[] { "first" },
                     new Dictionary<string, string> { ["primary"] = "value" },
-                    new GenericModels.Inner<string>("nested")));
+                    new GenericModels.Inner<string>("nested"))
+                {
+                    Reference = new GenericModels.ContextRef<string>("context-1"),
+                });
     }
 }

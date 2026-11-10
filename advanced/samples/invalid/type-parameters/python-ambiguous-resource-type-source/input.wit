@@ -1,0 +1,16 @@
+package test:ambiguous-source;
+
+world system { export sources; }
+
+interface sources {
+  /// @nexus.type-parameter
+  type value-t = string;
+
+  /// @nexus.generic "value-t"
+  record reference { id: string, }
+
+  resource reader {
+    constructor(first: reference, second: reference);
+    peek: func() -> value-t;
+  }
+}

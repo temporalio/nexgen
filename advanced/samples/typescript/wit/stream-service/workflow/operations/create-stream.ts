@@ -18,21 +18,22 @@ function requiredField<T>(
   return value;
 }
 
-type CreateStreamInput = CreateStreamRequest extends infer Input
-  ? Input extends unknown
-    ? Omit<Input, "request_id" | "streamRef" | "withdraw_run"> & {
-        request_id?: never;
-        streamRef?: never;
-        withdraw_run?: never;
-      } & { id: string; owner?: Execution; backend?: string }
-    : never
-  : never;
+type CreateStreamInput<BodyT> =
+  CreateStreamRequest<BodyT> extends infer Input
+    ? Input extends unknown
+      ? Omit<Input, "request_id" | "streamRef" | "withdraw_run"> & {
+          request_id?: never;
+          streamRef?: never;
+          withdraw_run?: never;
+        } & { id: string; owner?: Execution; backend?: string }
+      : never
+    : never;
 
 /**
  * @param request - Request for the operation.
  */
 export async function createStream<BodyT>(
-  requestInput: CreateStreamInput,
+  requestInput: CreateStreamInput<BodyT>,
   bodyType?: common.TypeInfo<BodyT>,
 ): Promise<Stream<BodyT>> {
   const { id, owner, backend, ...requestFields } = requestInput;
@@ -41,7 +42,7 @@ export async function createStream<BodyT>(
     withdrawRun: support.withdrawRun(),
     requestId: support.requestId(),
     streamRef: { id, owner, backend },
-  } as CreateStreamRequest;
+  } as CreateStreamRequest<BodyT>;
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",

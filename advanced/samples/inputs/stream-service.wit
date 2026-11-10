@@ -29,6 +29,7 @@ interface stream-service {
 
   /// @nexus.doc "Identifies one Stream. The id is opaque to callers."
   /// @nexus.proto "temporal.api.stream.v1.StreamRef"
+  /// @nexus.generic "body-t"
   record stream-ref {
     /// @nexus.doc "The Stream id, 1 to 4096 bytes."
     id: string,

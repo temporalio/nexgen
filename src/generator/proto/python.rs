@@ -7,8 +7,8 @@ use crate::generator::ExternalModelBackend;
 use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
-    ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
-    python_string_literal, render_python_docstring,
+    ResolvedFieldType, RootPackageImports, WireValueConversion, phantom_type_variable,
+    python_authored_type_annotation, python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -823,7 +823,18 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             .strip_suffix('T')
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
-        let base_name = format!("{}_type", stem.to_snake_case());
+        let base_name = format!(
+            "{}{}_type",
+            if model
+                .phantom_type_parameters
+                .contains(&phantom_type_variable(parameter))
+            {
+                "_"
+            } else {
+                ""
+            },
+            stem.to_snake_case()
+        );
         let mut name = base_name.clone();
         let mut suffix = 1;
         while arguments

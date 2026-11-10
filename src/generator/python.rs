@@ -7,9 +7,6 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::json_schema::python as python_json;
 use crate::generator::proto::python as python_proto;
-use crate::generator::resource_plan::{
-    ref_type_parameters, resource_ref_field, resource_ref_record,
-};
 use crate::generator::{
     ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
@@ -527,7 +524,7 @@ impl<'a> ApiPlanner<'a> {
         } else {
             PythonExternalModels::new(api_plan)?
         };
-        Ok(Self {
+        let planner = Self {
             api_plan,
             support_package,
             inline_model_rebuilds,
@@ -538,7 +535,15 @@ impl<'a> ApiPlanner<'a> {
             flags: IndexMap::new(),
             variants: IndexMap::new(),
             models: IndexMap::new(),
-        })
+        };
+        for resource in api_plan
+            .services
+            .iter()
+            .flat_map(|service| &service.resources)
+        {
+            planner.plan_resource_type_source(&resource.data)?;
+        }
+        Ok(planner)
     }
 
     fn build(mut self, module_origin: GeneratedFileOrigin) -> Result<PythonGenerationResult> {
@@ -1287,7 +1292,11 @@ impl<'a> ApiPlanner<'a> {
         let ref_name = python_field_name(&ref_field.name);
         let type_variables = resource_type_variable_names(resource);
         let result = python_type_annotation_with_arguments(&resource.type_name, &type_variables);
-        let ref_generic = self.python_resource_constructor_field_annotation(resource, ref_field);
+        let ref_generic = self.python_resource_field_annotation(
+            &ref_field.kind,
+            ref_field.optional,
+            ref_field.function.as_ref(),
+        );
         let ref_unknown = self
             .python_ref_annotation(resource, |_| "object".to_string())
             .expect("a typed ref has type arguments");
@@ -1314,18 +1323,12 @@ impl<'a> ApiPlanner<'a> {
             }
         };
 
-        // A ref gives the payload type, whether positional or keyword.
+        // A typed ref supplies the payload type when no explicit decoder is given.
         output.push_str(&format!(
             "    @typing.overload\n    def {name}(\n        {receiver},\n"
         ));
-        output.push_str(&format!("        {ref_name}: {ref_generic},\n"));
-        if !other_fields.is_empty() {
-            output.push_str("        *,\n");
-            render_other_fields(output);
-        }
-        if other_fields.is_empty() {
-            output.push_str("        *,\n");
-        }
+        output.push_str(&format!("        {ref_name}: {ref_generic},\n        *,\n"));
+        render_other_fields(output);
         for variable in &type_variables {
             output.push_str(&format!(
                 "        {}: None = None,\n",
@@ -1350,12 +1353,21 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str(&format!("    ) -> {result}: ...\n"));
 
-        // The implementation takes the ref either way.
+        // The overloads enforce the public contract; implementation types are erased.
         output.push_str(&format!("    def {name}(\n        {receiver},\n"));
         output.push_str(&format!("        {ref_name}: {ref_dynamic},\n        *,\n"));
         render_other_fields(output);
-        render_runtime_type_keyword_parameters(output, "        ", &type_variables, true, "None");
-        output.push_str(&format!("    ) -> {result}:\n"));
+        RuntimeTypeSignature::Implementation.render_parameters(
+            output,
+            "        ",
+            &type_variables,
+            true,
+        );
+        let dynamic_result = python_type_annotation_with_arguments(
+            &resource.type_name,
+            &vec!["typing.Any".to_string(); type_variables.len()],
+        );
+        output.push_str(&format!("    ) -> {dynamic_result}:\n"));
         render_python_docstring(
             output,
             "        ",
@@ -1420,7 +1432,11 @@ impl<'a> ApiPlanner<'a> {
         let ref_name = python_field_name(&ref_field.name);
         let type_variables = resource_type_variable_names(resource);
         let result = python_type_annotation_with_arguments(&resource.type_name, &type_variables);
-        let ref_generic = self.python_resource_constructor_field_annotation(resource, ref_field);
+        let ref_generic = self.python_resource_field_annotation(
+            &ref_field.kind,
+            ref_field.optional,
+            ref_field.function.as_ref(),
+        );
         let ref_unknown = self
             .python_ref_annotation(resource, |_| "object".to_string())
             .expect("a typed ref has type arguments");
@@ -1479,12 +1495,21 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str(&format!(") -> {result}: ...\n\n\n"));
 
-        // The implementation takes the ref either way.
+        // The overloads enforce the public contract; implementation types are erased.
         output.push_str(&format!("def {name}(\n"));
         output.push_str(&format!("    {ref_name}: {ref_dynamic},\n    *,\n"));
         render_other_fields(output);
-        render_runtime_type_keyword_parameters(output, "    ", &type_variables, true, "None");
-        output.push_str(&format!(") -> {result}:\n"));
+        RuntimeTypeSignature::Implementation.render_parameters(
+            output,
+            "    ",
+            &type_variables,
+            true,
+        );
+        let dynamic_result = python_type_annotation_with_arguments(
+            &resource.type_name,
+            &vec!["typing.Any".to_string(); type_variables.len()],
+        );
+        output.push_str(&format!(") -> {dynamic_result}:\n"));
         render_python_docstring(
             output,
             "    ",
@@ -1651,10 +1676,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "{indent}# None means no explicit type, so use the ref's type argument, else object.\n\
                  {indent}if {argument} is None:\n\
-                 {indent}    {argument} = typing.cast(\n\
-                 {indent}        \"type[{name}]\",\n\
-                 {indent}        arguments[{position}] if arguments else object,\n\
-                 {indent}    )\n\
+                 {indent}    {argument} = arguments[{position}] if arguments else object\n\
                  {indent}elif arguments and arguments[{position}] is not object and arguments[{position}] != {argument}:\n\
                  {indent}    raise TypeError(\"The decoding type must match the typed ref\")\n"
             ));
@@ -1901,7 +1923,11 @@ impl<'a> ApiPlanner<'a> {
             .map(|field| {
                 (
                     python_field_name(&field.name),
-                    self.python_resource_constructor_field_annotation(resource, field),
+                    self.python_resource_field_annotation(
+                        &field.kind,
+                        field.optional,
+                        field.function.as_ref(),
+                    ),
                 )
             })
             .collect::<Vec<_>>();
@@ -1977,7 +2003,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "        {}: {},\n",
                 python_field_name(&field.name),
-                self.python_resource_constructor_field_annotation(resource, field)
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref()
+                )
             ));
         }
         output.push_str("    ) -> None:\n");
@@ -2011,7 +2041,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "        {}: {},\n",
                 python_field_name(&field.name),
-                self.python_resource_constructor_field_annotation(resource, field)
+                self.python_resource_field_annotation(
+                    &field.kind,
+                    field.optional,
+                    field.function.as_ref()
+                )
             ));
         }
         output.push_str("    ) -> None:\n");
@@ -2419,25 +2453,6 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
-    /// The annotation of a resource constructor field. A generic resource's ref takes its payload
-    /// type, so `stream.ref` is a `StreamRef[Turn]`, not a bare `StreamRef`.
-    fn python_resource_constructor_field_annotation(
-        &self,
-        resource: &PlannedResource,
-        field: &PlannedResourceField,
-    ) -> String {
-        resource_ref_field(resource)
-            .filter(|ref_field| ref_field.name == field.name)
-            .and_then(|_| self.python_ref_annotation(resource, |parameter| parameter.name.clone()))
-            .unwrap_or_else(|| {
-                self.python_resource_field_annotation(
-                    &field.kind,
-                    field.optional,
-                    field.function.as_ref(),
-                )
-            })
-    }
-
     /// A generic resource's ref takes the resource's type parameters, so it keeps the resource's
     /// type where code passes it as data. `argument` gives each. `None` for a ref with none.
     fn python_ref_annotation(
@@ -2445,14 +2460,13 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
         argument: impl Fn(&TypeParameterSpec) -> String,
     ) -> Option<String> {
-        let record = resource_ref_record(resource)?;
+        let record = self.resource_ref_record(resource)?;
         let arguments = self.ref_type_arguments(resource, argument);
         (!arguments.is_empty())
             .then(|| python_type_annotation_with_arguments(&record.model_name, &arguments))
     }
 
-    /// The type arguments of a resource's ref, in the order of the ref's own type parameters and
-    /// then the resource's. The ref of another resource can add more, which take `object`.
+    /// Use the record's resolved parameter order, without adding resource-owned parameters.
     fn ref_type_arguments(
         &self,
         resource: &PlannedResource,
@@ -2471,20 +2485,19 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn ref_type_parameters(&self, resource: &PlannedResource) -> Vec<TypeParameterSpec> {
-        let Some(record) = resource_ref_record(resource) else {
+        let Some(record) = self.resource_ref_record(resource) else {
             return Vec::new();
         };
         self.api_plan
             .record_type_parameters(&record.full_name)
             .into_iter()
             .map(|usage| usage.parameter)
-            .chain(ref_type_parameters(self.api_plan, &record.full_name))
             .collect()
     }
 
     fn rendered_resource_ref(&self, resource: &PlannedResource) -> Option<RenderedResourceRef> {
         let field = self.typed_ref_field(resource)?;
-        let record = resource_ref_record(resource)?;
+        let record = self.resource_ref_record(resource)?;
         Some(RenderedResourceRef {
             field_name: field.name.clone(),
             model_name: record.model_name.clone(),
@@ -2499,19 +2512,77 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    /// A generic handle whose ref carries phantom payload type parameters.
+    /// Infer runtime types only from a unique field explicitly declaring all resource parameters.
+    /// A record's shape or position never makes it a resource reference.
     fn typed_ref_field<'r>(
         &self,
         resource: &'r PlannedResource,
     ) -> Option<&'r PlannedResourceField> {
-        let record = resource_ref_record(resource)?;
-        if resource.methods.is_empty()
-            || resource.type_parameters.is_empty()
-            || ref_type_parameters(self.api_plan, &record.full_name).is_empty()
-        {
-            return None;
+        self.plan_resource_type_source(resource)
+            .expect("runtime type sources were validated during Python backend planning")
+    }
+
+    fn plan_resource_type_source<'r>(
+        &self,
+        resource: &'r PlannedResource,
+    ) -> Result<Option<&'r PlannedResourceField>> {
+        if resource.methods.is_empty() || resource.type_parameters.is_empty() {
+            return Ok(None);
         }
-        resource_ref_field(resource)
+        let unsupported = |reason| Error::UnsupportedResourceTypeInference {
+            language: Language::Python,
+            resource: resource.name.clone(),
+            reason,
+        };
+        let mut sources = Vec::new();
+        for field in &resource.fields {
+            let PlannedType::Record(record) = field.kind.without_option() else {
+                continue;
+            };
+            let record = planned_record(self.api_plan, &record.full_name);
+            if !resource
+                .type_parameters
+                .iter()
+                .any(|parameter| record.declared_type_parameters.contains(parameter))
+            {
+                continue;
+            }
+            let missing = resource
+                .type_parameters
+                .iter()
+                .filter(|parameter| !record.declared_type_parameters.contains(parameter))
+                .map(|parameter| format!("`{}`", parameter.full_name))
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                return Err(unsupported(format!(
+                    "constructor field `{}` declares only some resource type parameters; missing {}",
+                    field.name,
+                    missing.join(", ")
+                )));
+            }
+            sources.push(field);
+        }
+        if sources.len() > 1 {
+            return Err(unsupported(format!(
+                "multiple constructor fields declare the resource type parameters: {}",
+                sources
+                    .iter()
+                    .map(|field| format!("`{}`", field.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
+        Ok(sources.into_iter().next())
+    }
+
+    fn resource_ref_record<'r>(
+        &self,
+        resource: &'r PlannedResource,
+    ) -> Option<&'r crate::planning::PlannedRecordType> {
+        match self.typed_ref_field(resource)?.kind.without_option() {
+            PlannedType::Record(record) => Some(record),
+            _ => None,
+        }
     }
 
     fn python_resource_value_annotation(&self, value: &PlannedType) -> String {
@@ -2808,14 +2879,6 @@ impl<'a> ApiPlanner<'a> {
                 .collect(),
             _ => Vec::new(),
         };
-        let resource_ref = output_resource_return.as_ref().and_then(|result| {
-            self.api_plan
-                .services
-                .iter()
-                .flat_map(|service| &service.resources)
-                .find(|resource| resource.data.type_name == result.resource_type_name)
-                .and_then(|resource| self.rendered_resource_ref(&resource.data))
-        });
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
@@ -2845,7 +2908,6 @@ impl<'a> ApiPlanner<'a> {
             poll: operation.poll.as_ref(),
             poll_items,
             output_resource_return,
-            resource_ref,
             output_direct_result,
             resource_data: None,
             output_none: operation.output_type().is_none(),
@@ -3116,19 +3178,16 @@ impl<'a> ApiPlanner<'a> {
         let PlannedType::Record(record) = kind.without_option() else {
             return None;
         };
-        let phantom = ref_type_parameters(self.api_plan, &record.full_name);
-        if !phantom
+        let parameters = self.api_plan.record_type_parameters(&record.full_name);
+        if !parameters
             .iter()
-            .any(|parameter| operation_parameters.contains(&parameter.full_name))
+            .any(|usage| operation_parameters.contains(&usage.parameter.full_name))
         {
             return None;
         }
-        let arguments = self
-            .api_plan
-            .record_type_parameters(&record.full_name)
+        let arguments = parameters
             .into_iter()
             .map(|usage| usage.parameter)
-            .chain(phantom)
             .map(|parameter| {
                 operation_parameters
                     .contains(&parameter.full_name)
@@ -3242,7 +3301,8 @@ impl<'a> ApiPlanner<'a> {
                     .into_iter()
                     .map(|usage| usage.parameter.name)
                     .collect(),
-                phantom_type_parameters: ref_type_parameters(api_plan, full_name)
+                phantom_type_parameters: api_plan
+                    .record_phantom_type_parameters(full_name)
                     .into_iter()
                     .map(|parameter| phantom_type_variable(&parameter.name))
                     .collect(),
@@ -3556,20 +3616,10 @@ fn resolve_python_value_type(
                 .wire_conversion(message_type, planned_record)
                 .expect("message conversion should be model-shaped");
             let annotation = if let PlannedType::Record(record) = message_type {
-                // A containing wire model does not constrain a ref's phantom payload type.
-                // Explicit Any here accepts refs of every specialization; a bare ref created
-                // by a caller still defaults to object.
-                let arguments = api_plan
-                    .record_type_parameters(&record.full_name)
-                    .into_iter()
-                    .map(|usage| usage.parameter.name)
-                    .chain(
-                        ref_type_parameters(api_plan, &record.full_name)
-                            .iter()
-                            .map(|_| "typing.Any".to_string()),
-                    )
-                    .collect::<Vec<_>>();
-                python_type_annotation_with_arguments(&conversion.annotation, &arguments)
+                python_generic_record_annotation(
+                    &conversion.annotation,
+                    &api_plan.record_type_parameters(&record.full_name),
+                )
             } else {
                 conversion.annotation.clone()
             };
@@ -3856,8 +3906,14 @@ fn render_record_model(
     let type_parameters = model
         .type_parameters
         .iter()
-        .chain(&model.phantom_type_parameters)
-        .map(String::as_str)
+        .map(|parameter| {
+            let phantom = phantom_type_variable(parameter);
+            if model.phantom_type_parameters.contains(&phantom) {
+                phantom
+            } else {
+                parameter.clone()
+            }
+        })
         .collect::<Vec<_>>();
     if !type_parameters.is_empty() {
         output.push_str("(typing.Generic[");
@@ -4224,7 +4280,6 @@ struct RenderedOperation<'a> {
     /// The response attribute whose items the item iterator yields, and the item annotation.
     poll_items: Option<(String, String)>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
-    resource_ref: Option<RenderedResourceRef>,
     output_direct_result: bool,
     /// The identity data of a resource returned directly by the operation.
     resource_data: Option<ResourceDataResult>,
@@ -4239,20 +4294,6 @@ struct RenderedOperation<'a> {
 }
 
 impl RenderedOperation<'_> {
-    fn resource_binding_expr(
-        &self,
-        binding: &PlannedOperationResourceFieldBinding,
-        receiver: &str,
-    ) -> String {
-        let value = resource_return_binding_expr_python(binding);
-        match &self.resource_ref {
-            Some(reference) if reference.field_name == binding.field_name => {
-                reference.expression(&value, receiver)
-            }
-            _ => value,
-        }
-    }
-
     /// The data converter decodes a generic output with the runtime types in `output_type`.
     fn output_type_expr_for(&self, receiver: &str) -> String {
         if !self
@@ -4479,8 +4520,8 @@ pub(in crate::generator) struct RenderedModel {
     pub(in crate::generator) name: String,
     pub(in crate::generator) doc: Option<String>,
     pub(in crate::generator) type_parameters: Vec<String>,
-    /// The `TypeVar`s of each generic resource whose ref this record is. No field uses them, so
-    /// only the class takes them, and the converter doesn't.
+    /// Defaulted class TypeVars for explicitly declared parameters not used by fields.
+    /// Converters retain the corresponding ordinary type variables in `type_parameters`.
     pub(in crate::generator) phantom_type_parameters: Vec<String>,
     pub(in crate::generator) experimental: bool,
     pub(in crate::generator) fields: Vec<RenderedField>,
@@ -5003,7 +5044,7 @@ fn python_type_annotation_with_arguments(name: &str, arguments: &[String]) -> St
 }
 
 /// A phantom type variable can't collide with a model's own, since a model name can't start `_`.
-fn phantom_type_variable(type_var: &str) -> String {
+pub(in crate::generator) fn phantom_type_variable(type_var: &str) -> String {
     format!("_{type_var}")
 }
 
@@ -7148,7 +7189,7 @@ fn render_endpoint_service_object_operation_body(
                 output.push_str("            ");
                 output.push_str(&python_field_name(&binding.field_name));
                 output.push('=');
-                output.push_str(&operation.resource_binding_expr(binding, ""));
+                output.push_str(&resource_return_binding_expr_python(binding));
                 output.push_str(",\n");
             }
             output.push_str("        )\n");
@@ -8212,7 +8253,7 @@ fn render_resource_method_inline_operation_body(
                 output.push_str("            ");
                 output.push_str(&python_field_name(&binding.field_name));
                 output.push('=');
-                output.push_str(&operation.resource_binding_expr(binding, "self."));
+                output.push_str(&resource_return_binding_expr_python(binding));
                 output.push_str(",\n");
             }
             output.push_str("        )\n");
@@ -10049,15 +10090,7 @@ fn render_client_operation_body(
             resource_return,
         );
         if let Some(holder) = &resource_return.holder {
-            render_resource_holder_return(
-                output,
-                target,
-                resource_return,
-                holder,
-                Some(client),
-                operation,
-                receiver,
-            );
+            render_resource_holder_return(output, target, resource_return, holder, Some(client));
             return;
         }
         start_line(output, target, "    resource = ");
@@ -10071,7 +10104,7 @@ fn render_client_operation_body(
             start_line(output, target, "        ");
             output.push_str(&python_field_name(&binding.field_name));
             output.push('=');
-            output.push_str(&operation.resource_binding_expr(binding, receiver));
+            output.push_str(&resource_return_binding_expr_python(binding));
             output.push_str(",\n");
         }
         start_line(output, target, "    )\n");
@@ -10398,8 +10431,6 @@ fn render_request_only_operation_function(
                 resource_return,
                 holder,
                 None,
-                operation,
-                "",
             );
             return;
         }
@@ -10411,7 +10442,7 @@ fn render_request_only_operation_function(
             output.push_str("        ");
             output.push_str(&python_field_name(&binding.field_name));
             output.push('=');
-            output.push_str(&operation.resource_binding_expr(binding, ""));
+            output.push_str(&resource_return_binding_expr_python(binding));
             output.push_str(",\n");
         }
         output.push_str("    )\n");
@@ -10426,8 +10457,6 @@ fn render_resource_holder_return(
     resource_return: &PlannedOperationResourceReturn,
     holder: &PlannedResourceHolder,
     client: Option<&str>,
-    operation: &RenderedOperation<'_>,
-    receiver: &str,
 ) {
     start_line(output, target, "    return ");
     output.push_str(&holder.model_name);
@@ -10454,7 +10483,7 @@ fn render_resource_holder_return(
             start_line(output, target, "            ");
             output.push_str(&python_field_name(&binding.field_name));
             output.push('=');
-            output.push_str(&operation.resource_binding_expr(binding, receiver));
+            output.push_str(&resource_return_binding_expr_python(binding));
             output.push_str(",\n");
         }
         start_line(output, target, "        )");

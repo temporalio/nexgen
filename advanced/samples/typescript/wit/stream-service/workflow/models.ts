@@ -75,43 +75,73 @@ export type StreamItem<BodyT> =
   | { tag: "data"; value: StreamData<BodyT> }
   | { tag: "superseded"; value: StreamSuperseded };
 
-export interface CreateStreamResult {
-  ref?: StreamRef;
+export interface CreateStreamResult<BodyT> {
+  ref?: StreamRef<BodyT>;
   created?: boolean;
 }
 
-function createStreamResultFromProto(
+function createStreamResultFromProto<BodyT>(
   proto: temporal.api.streamservice.v1.ICreateStreamResponse,
-): CreateStreamResult {
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): CreateStreamResult<BodyT> {
   return {
-    ref: proto.ref == null ? undefined : streamRefFromProto(proto.ref),
+    ref:
+      proto.ref == null
+        ? undefined
+        : streamRefFromProto(proto.ref, { bodyT: typeInfo.bodyT }),
     created: proto.created ?? undefined,
   };
 }
 
-function createStreamResultToProto(
-  model: CreateStreamResult,
+function createStreamResultToProto<BodyT>(
+  model: CreateStreamResult<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
 ): temporal.api.streamservice.v1.ICreateStreamResponse {
   return {
-    ref: model.ref == null ? undefined : streamRefToProto(model.ref),
+    ref:
+      model.ref == null
+        ? undefined
+        : streamRefToProto(model.ref, { bodyT: typeInfo.bodyT }),
     created: model.created,
   };
 }
 
 export const createStreamResultTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<BodyT>(
     value: temporal.api.streamservice.v1.ICreateStreamResponse,
-  ): CreateStreamResult {
-    return createStreamResultFromProto(value);
+  ): CreateStreamResult<BodyT> {
+    return createStreamResultFromProto<BodyT>(value);
   },
 
-  toTransferType(
-    value: CreateStreamResult,
+  toTransferType<BodyT>(
+    value: CreateStreamResult<BodyT>,
   ): temporal.api.streamservice.v1.ICreateStreamResponse {
     return createStreamResultToProto(value);
   },
 };
-export interface StreamRef {
+
+export function createCreateStreamResultTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<
+  CreateStreamResult<BodyT>,
+  temporal.api.streamservice.v1.ICreateStreamResponse
+> {
+  return {
+    fromTransferType(value) {
+      return createStreamResultFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return createStreamResultToProto(value, typeInfo);
+    },
+  };
+}
+export interface StreamRef<BodyT> {
   /**
    * The Stream id, 1 to 4096 bytes.
    */
@@ -126,7 +156,12 @@ export interface StreamRef {
   backend?: string;
 }
 
-function streamRefFromProto(proto: temporal.api.stream.v1.IStreamRef): StreamRef {
+function streamRefFromProto<BodyT>(
+  proto: temporal.api.stream.v1.IStreamRef,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): StreamRef<BodyT> {
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "StreamRef", "id"),
     owner: proto.owner == null ? undefined : executionFromProto(proto.owner),
@@ -134,7 +169,12 @@ function streamRefFromProto(proto: temporal.api.stream.v1.IStreamRef): StreamRef
   };
 }
 
-function streamRefToProto(model: StreamRef): temporal.api.stream.v1.IStreamRef {
+function streamRefToProto<BodyT>(
+  model: StreamRef<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): temporal.api.stream.v1.IStreamRef {
   return {
     id: requiredField(model.id, "StreamRef", "id"),
     owner: model.owner == null ? undefined : executionToProto(model.owner),
@@ -143,14 +183,29 @@ function streamRefToProto(model: StreamRef): temporal.api.stream.v1.IStreamRef {
 }
 
 export const streamRefTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IStreamRef): StreamRef {
-    return streamRefFromProto(value);
+  fromTransferType<BodyT>(value: temporal.api.stream.v1.IStreamRef): StreamRef<BodyT> {
+    return streamRefFromProto<BodyT>(value);
   },
 
-  toTransferType(value: StreamRef): temporal.api.stream.v1.IStreamRef {
+  toTransferType<BodyT>(value: StreamRef<BodyT>): temporal.api.stream.v1.IStreamRef {
     return streamRefToProto(value);
   },
 };
+
+export function createStreamRefTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<StreamRef<BodyT>, temporal.api.stream.v1.IStreamRef> {
+  return {
+    fromTransferType(value) {
+      return streamRefFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return streamRefToProto(value, typeInfo);
+    },
+  };
+}
 export interface Execution {
   type?: ExecutionType;
   /**
@@ -192,11 +247,11 @@ export const executionTransferTypeConverter = {
     return executionToProto(value);
   },
 };
-export interface CreateStreamRequest {
+export interface CreateStreamRequest<BodyT> {
   /**
    * The ref of the Stream to create. Its id is the Stream id.
    */
-  streamRef: StreamRef;
+  streamRef: StreamRef<BodyT>;
   /**
    * The age after which a Record is dropped. Empty is the Store default.
    */
@@ -215,12 +270,16 @@ export interface CreateStreamRequest {
   requestId?: string;
 }
 
-function createStreamRequestFromProto(
+function createStreamRequestFromProto<BodyT>(
   proto: temporal.api.streamservice.v1.ICreateStreamRequest,
-): CreateStreamRequest {
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): CreateStreamRequest<BodyT> {
   return {
     streamRef: streamRefFromProto(
       requiredField(proto.streamRef, "CreateStreamRequest", "streamRef"),
+      { bodyT: typeInfo.bodyT },
     ),
     retention:
       proto.retention == null ? undefined : support.durationFromProto(proto.retention),
@@ -233,12 +292,16 @@ function createStreamRequestFromProto(
   };
 }
 
-function createStreamRequestToProto(
-  model: CreateStreamRequest,
+function createStreamRequestToProto<BodyT>(
+  model: CreateStreamRequest<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
 ): temporal.api.streamservice.v1.ICreateStreamRequest {
   return {
     streamRef: streamRefToProto(
       requiredField(model.streamRef, "CreateStreamRequest", "streamRef"),
+      { bodyT: typeInfo.bodyT },
     ),
     retention:
       model.retention == null ? undefined : support.durationToProto(model.retention),
@@ -252,18 +315,36 @@ function createStreamRequestToProto(
 }
 
 export const createStreamRequestTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<BodyT>(
     value: temporal.api.streamservice.v1.ICreateStreamRequest,
-  ): CreateStreamRequest {
-    return createStreamRequestFromProto(value);
+  ): CreateStreamRequest<BodyT> {
+    return createStreamRequestFromProto<BodyT>(value);
   },
 
-  toTransferType(
-    value: CreateStreamRequest,
+  toTransferType<BodyT>(
+    value: CreateStreamRequest<BodyT>,
   ): temporal.api.streamservice.v1.ICreateStreamRequest {
     return createStreamRequestToProto(value);
   },
 };
+
+export function createCreateStreamRequestTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<
+  CreateStreamRequest<BodyT>,
+  temporal.api.streamservice.v1.ICreateStreamRequest
+> {
+  return {
+    fromTransferType(value) {
+      return createStreamRequestFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return createStreamRequestToProto(value, typeInfo);
+    },
+  };
+}
 export interface AppendRecordsResponse {
   firstOffset: Long;
   lastOffset: Long;
@@ -313,7 +394,7 @@ export const appendRecordsResponseTransferTypeConverter = {
   },
 };
 export interface AppendRecordsRequest<BodyT> {
-  ref: StreamRef;
+  ref: StreamRef<BodyT>;
   records: BodyT[];
   /**
    * The batch number in this epoch. Empty takes the next one, and a retry writes it
@@ -337,7 +418,9 @@ function appendRecordsRequestFromProto<BodyT>(
   } = {},
 ): AppendRecordsRequest<BodyT> {
   return {
-    ref: streamRefFromProto(requiredField(proto.ref, "AppendRecordsRequest", "ref")),
+    ref: streamRefFromProto(requiredField(proto.ref, "AppendRecordsRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     records: requiredField(
       proto.records?.map(
         (value: any) => appendRecordFromProto(value, { bodyT: typeInfo.bodyT }).body,
@@ -358,7 +441,9 @@ function appendRecordsRequestToProto<BodyT>(
   } = {},
 ): temporal.api.streamservice.v1.IAppendRecordsRequest {
   return {
-    ref: streamRefToProto(requiredField(model.ref, "AppendRecordsRequest", "ref")),
+    ref: streamRefToProto(requiredField(model.ref, "AppendRecordsRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     records: requiredField(
       model.records?.map((value) =>
         appendRecordToProto({ body: value }, { bodyT: typeInfo.bodyT }),
@@ -820,42 +905,70 @@ export const closeStreamResponseTransferTypeConverter = {
     return closeStreamResponseToProto(value);
   },
 };
-export interface CloseStreamRequest {
-  ref: StreamRef;
+export interface CloseStreamRequest<BodyT> {
+  ref: StreamRef<BodyT>;
   producer?: Producer;
 }
 
-function closeStreamRequestFromProto(
+function closeStreamRequestFromProto<BodyT>(
   proto: temporal.api.streamservice.v1.ICloseStreamRequest,
-): CloseStreamRequest {
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): CloseStreamRequest<BodyT> {
   return {
-    ref: streamRefFromProto(requiredField(proto.ref, "CloseStreamRequest", "ref")),
+    ref: streamRefFromProto(requiredField(proto.ref, "CloseStreamRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
   };
 }
 
-function closeStreamRequestToProto(
-  model: CloseStreamRequest,
+function closeStreamRequestToProto<BodyT>(
+  model: CloseStreamRequest<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
 ): temporal.api.streamservice.v1.ICloseStreamRequest {
   return {
-    ref: streamRefToProto(requiredField(model.ref, "CloseStreamRequest", "ref")),
+    ref: streamRefToProto(requiredField(model.ref, "CloseStreamRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 
 export const closeStreamRequestTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<BodyT>(
     value: temporal.api.streamservice.v1.ICloseStreamRequest,
-  ): CloseStreamRequest {
-    return closeStreamRequestFromProto(value);
+  ): CloseStreamRequest<BodyT> {
+    return closeStreamRequestFromProto<BodyT>(value);
   },
 
-  toTransferType(
-    value: CloseStreamRequest,
+  toTransferType<BodyT>(
+    value: CloseStreamRequest<BodyT>,
   ): temporal.api.streamservice.v1.ICloseStreamRequest {
     return closeStreamRequestToProto(value);
   },
 };
+
+export function createCloseStreamRequestTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<
+  CloseStreamRequest<BodyT>,
+  temporal.api.streamservice.v1.ICloseStreamRequest
+> {
+  return {
+    fromTransferType(value) {
+      return closeStreamRequestFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return closeStreamRequestToProto(value, typeInfo);
+    },
+  };
+}
 export interface ReadRecordsResponse<BodyT> {
   records: StreamRecord<BodyT>[];
   /**
@@ -1178,8 +1291,8 @@ export const streamSupersededTransferTypeConverter = {
     return streamSupersededToProto(value);
   },
 };
-export interface ReadRecordsRequest {
-  ref: StreamRef;
+export interface ReadRecordsRequest<BodyT> {
+  ref: StreamRef<BodyT>;
   /**
    * Start offset. Empty uses start. An offset past the newest one + 1 fails.
    */
@@ -1210,11 +1323,16 @@ export interface ReadRecordsRequest {
   maxBytes?: Long;
 }
 
-function readRecordsRequestFromProto(
+function readRecordsRequestFromProto<BodyT>(
   proto: temporal.api.streamservice.v1.IReadRecordsRequest,
-): ReadRecordsRequest {
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): ReadRecordsRequest<BodyT> {
   return {
-    ref: streamRefFromProto(requiredField(proto.ref, "ReadRecordsRequest", "ref")),
+    ref: streamRefFromProto(requiredField(proto.ref, "ReadRecordsRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     fromOffset: proto.fromOffset ?? undefined,
     start: proto.start == null ? undefined : (proto.start as number as StreamReadStart),
     maxRecords: proto.maxRecords ?? undefined,
@@ -1228,11 +1346,16 @@ function readRecordsRequestFromProto(
   };
 }
 
-function readRecordsRequestToProto(
-  model: ReadRecordsRequest,
+function readRecordsRequestToProto<BodyT>(
+  model: ReadRecordsRequest<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
 ): temporal.api.streamservice.v1.IReadRecordsRequest {
   return {
-    ref: streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref")),
+    ref: streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
     fromOffset: model.fromOffset,
     start:
       model.start == null
@@ -1248,18 +1371,36 @@ function readRecordsRequestToProto(
 }
 
 export const readRecordsRequestTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<BodyT>(
     value: temporal.api.streamservice.v1.IReadRecordsRequest,
-  ): ReadRecordsRequest {
-    return readRecordsRequestFromProto(value);
+  ): ReadRecordsRequest<BodyT> {
+    return readRecordsRequestFromProto<BodyT>(value);
   },
 
-  toTransferType(
-    value: ReadRecordsRequest,
+  toTransferType<BodyT>(
+    value: ReadRecordsRequest<BodyT>,
   ): temporal.api.streamservice.v1.IReadRecordsRequest {
     return readRecordsRequestToProto(value);
   },
 };
+
+export function createReadRecordsRequestTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<
+  ReadRecordsRequest<BodyT>,
+  temporal.api.streamservice.v1.IReadRecordsRequest
+> {
+  return {
+    fromTransferType(value) {
+      return readRecordsRequestFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return readRecordsRequestToProto(value, typeInfo);
+    },
+  };
+}
 export interface DescribeStreamResponse {
   status?: StreamStatus;
   /**
@@ -1308,36 +1449,64 @@ export const describeStreamResponseTransferTypeConverter = {
     return describeStreamResponseToProto(value);
   },
 };
-export interface DescribeStreamRequest {
-  ref: StreamRef;
+export interface DescribeStreamRequest<BodyT> {
+  ref: StreamRef<BodyT>;
 }
 
-function describeStreamRequestFromProto(
+function describeStreamRequestFromProto<BodyT>(
   proto: temporal.api.streamservice.v1.IDescribeStreamRequest,
-): DescribeStreamRequest {
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): DescribeStreamRequest<BodyT> {
   return {
-    ref: streamRefFromProto(requiredField(proto.ref, "DescribeStreamRequest", "ref")),
+    ref: streamRefFromProto(requiredField(proto.ref, "DescribeStreamRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
   };
 }
 
-function describeStreamRequestToProto(
-  model: DescribeStreamRequest,
+function describeStreamRequestToProto<BodyT>(
+  model: DescribeStreamRequest<BodyT>,
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
 ): temporal.api.streamservice.v1.IDescribeStreamRequest {
   return {
-    ref: streamRefToProto(requiredField(model.ref, "DescribeStreamRequest", "ref")),
+    ref: streamRefToProto(requiredField(model.ref, "DescribeStreamRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
   };
 }
 
 export const describeStreamRequestTransferTypeConverter = {
-  fromTransferType(
+  fromTransferType<BodyT>(
     value: temporal.api.streamservice.v1.IDescribeStreamRequest,
-  ): DescribeStreamRequest {
-    return describeStreamRequestFromProto(value);
+  ): DescribeStreamRequest<BodyT> {
+    return describeStreamRequestFromProto<BodyT>(value);
   },
 
-  toTransferType(
-    value: DescribeStreamRequest,
+  toTransferType<BodyT>(
+    value: DescribeStreamRequest<BodyT>,
   ): temporal.api.streamservice.v1.IDescribeStreamRequest {
     return describeStreamRequestToProto(value);
   },
 };
+
+export function createDescribeStreamRequestTransferTypeConverter<BodyT>(
+  typeInfo: {
+    bodyT?: common.TypeInfo<BodyT, any>;
+  } = {},
+): common.TransferTypeConverter<
+  DescribeStreamRequest<BodyT>,
+  temporal.api.streamservice.v1.IDescribeStreamRequest
+> {
+  return {
+    fromTransferType(value) {
+      return describeStreamRequestFromProto<BodyT>(value, typeInfo);
+    },
+    toTransferType(value) {
+      return describeStreamRequestToProto(value, typeInfo);
+    },
+  };
+}

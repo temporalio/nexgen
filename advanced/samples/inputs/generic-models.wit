@@ -21,6 +21,11 @@ interface generic-model-service {
     value: context-t,
   }
 
+  /// @nexus.generic "context-t"
+  record context-ref {
+    id: string,
+  }
+
   record getter-probe {
     value: context-t,
     other: option<context-t>,
@@ -43,6 +48,7 @@ interface generic-model-service {
     by-name: map<string, context-t>,
     nested: inner,
     probe: option<getter-probe>,
+    reference: option<context-ref>,
   }
 
   record operation-completion-success {
