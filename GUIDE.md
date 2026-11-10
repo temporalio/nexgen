@@ -1795,6 +1795,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
 | `@nexus.proto`                          | record, enum, flags, variant, type alias, resource                                            |
 | `@nexus.type-parameter`                 | type alias                                                                                    |
+| `@nexus.generic`                        | record                                                                                        |
 | `@nexus.proto-field`                    | record field                                                                                  |
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
@@ -2150,16 +2151,92 @@ resource %stream {
 ```
 
 The handle keeps a runtime type for each type parameter and decodes responses
-with it. Python takes `Stream[Turn](...)`, a subclass of `Stream[Turn]`, or a
+with it. Python takes `Stream[Turn](...)` with a `StreamRef[Turn]`, or a
 keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
-`client.get_stream(ref=ref, body_type=Turn)`. A call with no `body_type` decodes
-as `typing.Any`, but its static return type is `Stream[object]`; a concrete
-`Stream[Turn]` requires `body_type=Turn`. TypeScript takes `bodyType` after the
-fields, and .NET takes the type argument, as in
-`CreateStreamAsync<Turn>(options)`.
+`client.get_stream(ref=ref, body_type=Turn)`. A create call with no `body_type`
+decodes as `typing.Any`, but its static return type is `Stream[object]`; a
+concrete `Stream[Turn]` requires a typed ref or `body_type=Turn`. Generic Python
+resource handles do not support subclasses; constructing one raises `TypeError`.
+TypeScript takes `bodyType` after the fields, and .NET takes the type argument,
+as in `CreateStreamAsync<Turn>(options)`.
+
+In Python, a ref explicitly declared generic with `@nexus.generic "body-t"` can
+carry the payload type without storing a body. Its phantom parameter defaults to
+`object`, and the ref keeps the same wire message, equality and repr. The type
+argument rides in memory, in `__orig_class__`. `StreamRef[Turn]`, the ref
+returned by a factory with `body_type=Turn`, and a decode with the type hint
+`StreamRef[Turn]`, such as a Workflow input's, each set it. `get_stream(ref)`
+infers the handle's type from the ref, so a reader that gets a ref keeps its
+payload type. An untyped ref produces `Stream[object]`, whose bodies decode as
+ordinary Python values. The `ref` attribute is a plain field: direct
+construction preserves the supplied ref rather than attaching the handle's type
+to it.
+
+For callable Python resources, a constructor record field that explicitly
+declares any resource type parameters must declare all of them, and only one
+such field is supported. Partial declarations and multiple sources are rejected
+during Python backend planning rather than silently disabling inference.
+Resources without a declared source retain the explicit runtime-type keyword
+API.
+
+```python
+stream = client.get_stream(ref)  # Stream[Turn] for a StreamRef[Turn]
+stream = client.get_stream(StreamRef(id="s1"), body_type=Turn)  # Choose a decoder
+```
+
+An explicit `body_type` must agree with an already-typed ref; it cannot
+reinterpret `StreamRef[Turn]` as `StreamRef[str]`. Requests and results
+containing a generic ref inherit its parameters too, so
+`CreateStreamRequest[Turn]` contains `StreamRef[Turn]`. Decoding a request or
+result with a concrete type hint preserves the nested ref's type argument.
+
+Public operation functions preserve this relationship too:
+`read_records(ref=ref)` infers and decodes `Turn` bodies from a
+`StreamRef[Turn]`, while an unknown ref yields `ReadRecordsResponse[object]`. An
+explicit `body_type=Turn` can select the decoder for an unknown ref, but cannot
+contradict a typed ref. Write operations such as `append_records` require the
+ref and the records to have the same payload type.
 
 Go and Java refuse a generic resource. A record field can't hold one yet, and an
 operation with no `@nexus.proto` message can't return one yet.
+
+---
+
+### @nexus.generic
+
+**Placement:** Record **Syntax:** `@nexus.generic "type-parameter-alias"`
+
+Explicitly declares a record's dependency on an alias marked
+`@nexus.type-parameter`, even when no field uses that parameter. Repeat the
+annotation to declare multiple parameters. The alias must be in scope in the
+record's interface, including aliases imported with WIT `use`. Declaring the
+same resolved parameter twice is an error.
+
+```wit
+/// @nexus.type-parameter
+type body-t = placeholder;
+
+/// @nexus.generic "body-t"
+record stream-ref {
+  id: string,
+}
+
+record read-request {
+  ref: stream-ref,
+}
+```
+
+Both `stream-ref` and `read-request` are generic in `body-t`. Explicit
+parameters come first in annotation order, followed by parameters inferred from
+fields in first-use order; a parameter used by both is included only once.
+Dependencies propagate through containing records, variants, operations, and
+resources using the same rules as field-inferred parameters.
+
+A parameter unused by the record's fields is a phantom parameter: it affects the
+generated type, but adds no field to the model or wire representation. Python
+defaults phantom parameters to `object` and retains explicit runtime arguments
+for decoding. No record becomes generic merely because a generic resource has a
+constructor field of that record type.
 
 ---
 

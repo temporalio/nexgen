@@ -4,9 +4,12 @@ import Long from "long";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
+  type CreateStreamRequest,
   type ReadRecordsResponse,
+  type StreamRef,
   StreamStatus,
   appendRecordsRequestTransferTypeConverter,
+  createCreateStreamRequestTransferTypeConverter,
   createReadRecordsResponseTransferTypeConverter,
   describeStreamResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
@@ -34,6 +37,20 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("stream-service generated output", () => {
+  test("carries a declared ref parameter through a create request", () => {
+    const ref: StreamRef<Turn> = { id: "typed-stream" };
+    const request: CreateStreamRequest<Turn> = {
+      streamRef: ref,
+      withdrawRun: "run-1",
+      requestId: "request-1",
+    };
+    const converter = createCreateStreamRequestTransferTypeConverter<Turn>();
+    const decoded: CreateStreamRequest<Turn> = converter.fromTransferType(
+      converter.toTransferType(request),
+    );
+    expect(decoded.streamRef).toEqual(ref);
+  });
+
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
   // compile when those declarations drift from what they read and write.
   test("maps each read item kind through the proto oneof", () => {

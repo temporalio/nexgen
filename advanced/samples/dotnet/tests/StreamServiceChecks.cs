@@ -20,12 +20,22 @@ namespace Nexgen.DotNetExamples.Tests
         {
             var converter = DataConverter.Default.PayloadConverter;
             var stream = new StreamServiceExample.Stream<Turn>(
-                new StreamServiceExample.StreamRef("stream-1"), null);
+                new StreamServiceExample.StreamRef<Turn>("stream-1"), null);
 
             var decoded = converter.ToValue<StreamServiceExample.Stream<Turn>>(
                 converter.ToPayload(stream));
 
             Assert.Equal("stream-1", decoded.Ref.Id);
+        }
+
+        [Fact]
+        public void DeclaredRefParametersPropagateThroughRequests()
+        {
+            var reference = new StreamServiceExample.StreamRef<Turn>("stream-1");
+            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null, null);
+            var decoded = FromPayload<StreamServiceExample.CreateStreamRequest<Turn>>(ToPayload(request));
+            Assert.Equal(reference, decoded.StreamRef);
+            Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.StreamRef);
         }
 
         // A data item's body goes through the payload converter of the sample assembly, which a
@@ -78,8 +88,8 @@ namespace Nexgen.DotNetExamples.Tests
         [Fact]
         public void AWorkflowReadTakesNoLast()
         {
-            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions).GetProperty("Last"));
-            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest).GetProperty("Last"));
+            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions<Turn>).GetProperty("Last"));
+            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest<Turn>).GetProperty("Last"));
         }
     }
 }

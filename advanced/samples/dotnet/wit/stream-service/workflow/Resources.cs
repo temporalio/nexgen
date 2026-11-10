@@ -15,13 +15,13 @@ namespace Temporalio.Workflows
     [GeneratedCode("nexgen", null)]
     public class Stream<TBody>
     {
-        public Stream(StreamRef @ref, bool? created)
+        public Stream(StreamRef<TBody> @ref, bool? created)
         {
             Ref = @ref;
             Created = created;
         }
 
-        public StreamRef Ref { get; }
+        public StreamRef<TBody> Ref { get; }
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
@@ -34,21 +34,21 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public Task CloseAsync()
         {
-            var request = new CloseStreamOptions(Ref);
+            var request = new CloseStreamOptions<TBody>(Ref);
             return Operations.CloseStreamAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<ReadRecordsResponse<TBody>> ReadAsync(long? fromOffset, StreamReadStart? start, int? maxRecords, System.TimeSpan? wait, System.TimeSpan? createWait, long? maxBytes)
         {
-            var request = new ReadRecordsOptions(Ref) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait, MaxBytes = maxBytes };
+            var request = new ReadRecordsOptions<TBody>(Ref) { FromOffset = fromOffset, Start = start, MaxRecords = maxRecords, Wait = wait, CreateWait = createWait, MaxBytes = maxBytes };
             return Operations.ReadRecordsAsync<TBody>(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task<DescribeStreamResponse> DescribeAsync()
         {
-            var request = new DescribeStreamOptions(Ref);
+            var request = new DescribeStreamOptions<TBody>(Ref);
             return Operations.DescribeStreamAsync(request);
         }
 

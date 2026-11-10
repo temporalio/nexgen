@@ -13,6 +13,7 @@ import datetime
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    CreateStreamResult,
     Execution,
     StreamIdConflictPolicy,
     StreamRef,
@@ -47,31 +48,35 @@ class StreamServiceClientExtension(abc.ABC):
     @typing.overload
     def get_stream(
         self,
+        ref: StreamRef[BodyT],
         *,
-        ref: StreamRef,
         created: bool | None = None,
-        body_type: type[BodyT],
+        body_type: None = None,
     ) -> Stream[BodyT]: ...
-
     @typing.overload
     def get_stream(
         self,
+        ref: StreamRef[BodyT] | StreamRef[object],
         *,
-        ref: StreamRef,
         created: bool | None = None,
-        body_type: None = None,
-    ) -> Stream[object]: ...
-
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
     def get_stream(
         self,
+        ref: StreamRef[typing.Any],
         *,
-        ref: StreamRef,
         created: bool | None = None,
         body_type: typing.Any = None,
     ) -> Stream[typing.Any]:
-        """Return the ``Stream`` handle that has these identity fields."""
+        """Return the ``Stream`` handle for this ref."""
+        arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+        # None means no explicit type, so use the ref's type argument, else object.
         if body_type is None:
-            body_type = typing.Any
+            body_type = arguments[0] if arguments else object
+        elif arguments and arguments[0] is not object and arguments[0] != body_type:
+            raise TypeError("The decoding type must match the typed ref")
+        if arguments != (body_type,):
+            ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
@@ -83,7 +88,7 @@ class StreamServiceClientExtension(abc.ABC):
 
     async def _stream_service_create_stream(
         self,
-        request: CreateStreamRequest,
+        request: CreateStreamRequest[BodyT],
         body_type: type[BodyT],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -94,9 +99,10 @@ class StreamServiceClientExtension(abc.ABC):
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
-            operation=StreamService.create_stream,
+            operation="CreateStream",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=CreateStreamResult[body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )

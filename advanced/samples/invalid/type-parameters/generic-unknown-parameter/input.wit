@@ -1,0 +1,6 @@
+package test:generic;
+world sample { export model; }
+interface model {
+  /// @nexus.generic "body-t"
+  record reference { id: string, }
+}

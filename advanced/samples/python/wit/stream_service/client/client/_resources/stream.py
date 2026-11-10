@@ -32,7 +32,7 @@ BodyT = typing.TypeVar("BodyT")
 class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
-    ref: StreamRef
+    ref: StreamRef[BodyT]
     created: bool | None
 
     def __init__(
@@ -40,26 +40,19 @@ class Stream(typing.Generic[BodyT]):
         nexus_client: temporalio.client.NexusClient[typing.Any],
         /,
         *,
-        ref: StreamRef,
+        ref: StreamRef[BodyT],
         created: bool | None,
     ) -> None:
         self._nexus_client: temporalio.client.NexusClient[typing.Any] = nexus_client
+        if type(self) is not Stream:
+            raise TypeError("Generic resource subclasses are not supported")
         self.ref = ref
         self.created = created
 
     @property
     def body_type(self) -> type[BodyT]:
-        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
-        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
-            (
-                typing.get_args(base)
-                for klass in type(self).__mro__
-                for base in vars(klass).get("__orig_bases__", ())
-                if typing.get_origin(base) is Stream
-            ),
-            (),
-        )
-        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+        arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
+        return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
     async def publish(
         self,
@@ -202,7 +195,7 @@ class Stream(typing.Generic[BodyT]):
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
+    ) -> PollIterator[ReadRecordsRequest[BodyT], StreamRecord[BodyT]]:
         """Yield each item of ``iter_read``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is

@@ -75,6 +75,13 @@ pub enum Error {
         resource: String,
     },
 
+    #[error("{language} runtime type inference for resource `{resource}` is unsupported: {reason}")]
+    UnsupportedResourceTypeInference {
+        language: Language,
+        resource: String,
+        reason: String,
+    },
+
     #[error("the {language} runtime type `{name}` of `{parameter}` clashes with {conflicting}")]
     RuntimeTypeArgumentNameConflict {
         language: Language,
