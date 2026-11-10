@@ -1,1 +1,0 @@
-Python generic resource factories require an explicit runtime type to return a concretely typed handle. Omitting a type argument exposes decoded bodies as `object` rather than inferring their type from an assignment.
