@@ -1367,7 +1367,7 @@ impl<'a> ApiPlanner<'a> {
             None,
             false,
         );
-        self.render_ref_runtime_type_fallbacks(output, resource, &ref_name);
+        self.render_ref_runtime_type_fallbacks(output, resource, &ref_name, "        ");
         let typed_ref = self.rendered_resource_ref(resource).expect("a typed ref");
         output.push_str(&format!(
             "        if arguments != ({},):\n            {ref_name} = {}\n",
@@ -1408,8 +1408,115 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("        )\n");
     }
 
+    /// The ref factory as a workflow module function, with no receiver and no Nexus client. It
+    /// infers the payload type from the ref the same way the client factory does.
+    fn render_workflow_resource_ref_factory(
+        &self,
+        output: &mut String,
+        resource: &PlannedResource,
+        ref_field: &PlannedResourceField,
+    ) {
+        let name = client_resource_factory_name(resource);
+        let ref_name = python_field_name(&ref_field.name);
+        let type_variables = resource_type_variable_names(resource);
+        let result = python_type_annotation_with_arguments(&resource.type_name, &type_variables);
+        let ref_generic = self.python_resource_constructor_field_annotation(resource, ref_field);
+        let ref_unknown = self
+            .python_ref_annotation(resource, |_| "object".to_string())
+            .expect("a typed ref has type arguments");
+        let ref_dynamic = self
+            .python_ref_annotation(resource, |_| "typing.Any".to_string())
+            .expect("a typed ref has type arguments");
+        let other_fields = resource
+            .fields
+            .iter()
+            .filter(|field| field.name != ref_field.name)
+            .collect::<Vec<_>>();
+        let render_other_fields = |output: &mut String| {
+            for field in &other_fields {
+                output.push_str(&format!(
+                    "    {}: {}{},\n",
+                    python_field_name(&field.name),
+                    self.python_resource_field_annotation(
+                        &field.kind,
+                        field.optional,
+                        field.function.as_ref()
+                    ),
+                    if field.optional { " = None" } else { "" }
+                ));
+            }
+        };
+
+        // A ref gives the payload type, whether positional or keyword.
+        output.push_str(&format!("@typing.overload\ndef {name}(\n"));
+        output.push_str(&format!("    {ref_name}: {ref_generic},\n"));
+        if !other_fields.is_empty() {
+            output.push_str("    *,\n");
+            render_other_fields(output);
+        }
+        if other_fields.is_empty() {
+            output.push_str("    *,\n");
+        }
+        for variable in &type_variables {
+            output.push_str(&format!(
+                "    {}: None = None,\n",
+                python_runtime_type_argument_name(variable)
+            ));
+        }
+        output.push_str(&format!(") -> {result}: ...\n\n\n"));
+
+        // A caller may choose a decoding type for an unknown ref, or confirm a typed ref.
+        output.push_str(&format!("@typing.overload\ndef {name}(\n"));
+        output.push_str(&format!(
+            "    {ref_name}: {ref_generic} | {ref_unknown},\n    *,\n"
+        ));
+        render_other_fields(output);
+        for variable in &type_variables {
+            output.push_str(&format!(
+                "    {}: type[{variable}],\n",
+                python_runtime_type_argument_name(variable)
+            ));
+        }
+        output.push_str(&format!(") -> {result}: ...\n\n\n"));
+
+        // The implementation takes the ref either way.
+        output.push_str(&format!("def {name}(\n"));
+        output.push_str(&format!("    {ref_name}: {ref_dynamic},\n    *,\n"));
+        render_other_fields(output);
+        render_runtime_type_keyword_parameters(output, "    ", &type_variables, true, "None");
+        output.push_str(&format!(") -> {result}:\n"));
+        render_python_docstring(
+            output,
+            "    ",
+            Some(&format!(
+                "Return the ``{}`` handle for this ref.",
+                resource.type_name
+            )),
+            &[],
+            None,
+            false,
+        );
+        self.render_ref_runtime_type_fallbacks(output, resource, &ref_name, "    ");
+        let typed_ref = self.rendered_resource_ref(resource).expect("a typed ref");
+        output.push_str(&format!(
+            "    if arguments != ({},):\n        {ref_name} = {}\n",
+            typed_ref.arguments.join(", "),
+            typed_ref.expression(&ref_name, "")
+        ));
+        output.push_str("    return ");
+        output.push_str(&resource.type_name);
+        render_resource_type_specialization(output, &runtime_type_argument_names(&type_variables));
+        output.push_str("(\n");
+        render_resource_factory_arguments(output, "        ", resource);
+        output.push_str("    )\n");
+    }
+
     /// Workflow code has no client receiver, so the factory is a module function.
     fn render_workflow_resource_factory(&self, output: &mut String, resource: &PlannedResource) {
+        if let Some(ref_field) = self.typed_ref_field(resource) {
+            self.render_workflow_resource_ref_factory(output, resource, ref_field);
+            return;
+        }
         let type_variables = resource_type_variable_names(resource);
         for supplied in runtime_type_overload_cases(&type_variables) {
             output.push_str("@typing.overload\n");
@@ -1526,10 +1633,11 @@ impl<'a> ApiPlanner<'a> {
         output: &mut String,
         resource: &PlannedResource,
         ref_name: &str,
+        indent: &str,
     ) {
         let parameters = self.ref_type_parameters(resource);
         output.push_str(&format!(
-            "        arguments = typing.get_args(getattr({ref_name}, \"__orig_class__\", None))\n"
+            "{indent}arguments = typing.get_args(getattr({ref_name}, \"__orig_class__\", None))\n"
         ));
         for (name, parameter) in resource_type_variable_names(resource)
             .iter()
@@ -1541,14 +1649,14 @@ impl<'a> ApiPlanner<'a> {
                 .position(|candidate| candidate == parameter)
                 .expect("a resource type parameter rides on its ref");
             output.push_str(&format!(
-                "        # None means no explicit type, so use the ref's type argument, else object.\n\
-                 \x20       if {argument} is None:\n\
-                 \x20           {argument} = typing.cast(\n\
-                 \x20               \"type[{name}]\",\n\
-                 \x20               arguments[{position}] if arguments else object,\n\
-                 \x20           )\n\
-                 \x20       elif arguments and arguments[{position}] is not object and arguments[{position}] != {argument}:\n\
-                 \x20           raise TypeError(\"The decoding type must match the typed ref\")\n"
+                "{indent}# None means no explicit type, so use the ref's type argument, else object.\n\
+                 {indent}if {argument} is None:\n\
+                 {indent}    {argument} = typing.cast(\n\
+                 {indent}        \"type[{name}]\",\n\
+                 {indent}        arguments[{position}] if arguments else object,\n\
+                 {indent}    )\n\
+                 {indent}elif arguments and arguments[{position}] is not object and arguments[{position}] != {argument}:\n\
+                 {indent}    raise TypeError(\"The decoding type must match the typed ref\")\n"
             ));
         }
     }

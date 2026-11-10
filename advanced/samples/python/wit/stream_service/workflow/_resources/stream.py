@@ -107,31 +107,40 @@ class Stream(typing.Generic[BodyT]):
 
 @typing.overload
 def get_stream(
+    ref: StreamRef[BodyT],
     *,
-    ref: StreamRef,
     created: bool | None = None,
-    body_type: type[BodyT],
+    body_type: None = None,
 ) -> Stream[BodyT]: ...
 
 
 @typing.overload
 def get_stream(
+    ref: StreamRef[BodyT] | StreamRef[object],
     *,
-    ref: StreamRef,
     created: bool | None = None,
-    body_type: None = None,
-) -> Stream[object]: ...
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
 
 
 def get_stream(
+    ref: StreamRef[typing.Any],
     *,
-    ref: StreamRef,
     created: bool | None = None,
-    body_type: typing.Any = None,
-) -> Stream[typing.Any]:
-    """A handle on an existing ``Stream``, with no call."""
+    body_type: type[BodyT] | None = None,
+) -> Stream[BodyT]:
+    """Return the ``Stream`` handle for this ref."""
+    arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+    # None means no explicit type, so use the ref's type argument, else object.
     if body_type is None:
-        body_type = typing.Any
+        body_type = typing.cast(
+            "type[BodyT]",
+            arguments[0] if arguments else object,
+        )
+    elif arguments and arguments[0] is not object and arguments[0] != body_type:
+        raise TypeError("The decoding type must match the typed ref")
+    if arguments != (body_type,):
+        ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
     return Stream[body_type](
         ref=ref,
         created=created,
