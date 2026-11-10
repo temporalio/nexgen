@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.close` on interface `job-service` resource `Job`",
+  "marks more than one method of the resource",
+]
