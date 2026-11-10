@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["Python generated name `get_job` for the factory of resource `Job` conflicts with the function of operation `JobService.GetJob`"]
