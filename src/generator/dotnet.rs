@@ -1957,7 +1957,13 @@ impl<'a> ApiPlanner<'a> {
         );
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("public class ");
+        // An api-omitted operation keeps its options type for the resource binding, but no longer
+        // exposes it or its convenience method in the public surface.
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal class "
+        } else {
+            "public class "
+        });
         let options_type_name = operation_options_type_name(operation);
         output.push_str(&options_type_name);
         self.render_operation_model_type_parameters(output, operation);
@@ -2113,7 +2119,12 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("    public ");
+        output.push_str("    ");
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal "
+        } else {
+            "public "
+        });
         if !instance_method {
             output.push_str("static ");
         }
@@ -2224,6 +2235,12 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&csharp_parameter_name(&arg_field.name));
         }
     }
+}
+
+/// Whether `@nexus.api-omit` drops this operation's public convenience method and options type.
+/// The private request helper, the service, and the resource binding stay.
+fn operation_public_function_omitted(operation: &PlannedOperation) -> bool {
+    operation.api_omitted.contains(&GenerationTarget::Workflow)
 }
 
 fn api_omitted_list_item(field: &RecordFieldSpec<PlannedFamily>) -> Option<&PlannedType> {

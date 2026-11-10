@@ -2142,6 +2142,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
             unpacked_input,
             wire_binding: None,
+            api_omitted: &operation.api_omitted,
         })
     }
 
@@ -2845,6 +2846,9 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// When present, the operation function converts native values to/from
     /// wire values and types the SDK call in terms of the wire messages.
     pub(in crate::generator) wire_binding: Option<proto::OperationBinding>,
+    /// Targets whose exported convenience wrapper `@nexus.api-omit` suppresses. The internal
+    /// operation function stays, so resource methods still bind.
+    api_omitted: &'a BTreeSet<GenerationTarget>,
 }
 
 /// A single parameter in an unpacked convenience wrapper function signature.
@@ -4498,6 +4502,11 @@ fn render_file(
                 continue;
             }
             for operation in &service.operations {
+                // An api-omitted operation keeps its internal function, which resource methods
+                // call, but drops the exported convenience wrapper from the public API.
+                if operation.api_omitted.contains(&GenerationTarget::Workflow) {
+                    continue;
+                }
                 let operation_name = go_declaration_name(&go_field_name(operation.name));
                 let options_name = format!("{operation_name}Options");
                 let options_doc = format!(

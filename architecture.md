@@ -187,6 +187,15 @@ Data models and their wire converters are shared across API targets. Operation
 wrappers and callable resource classes are target-specific because workflow and
 client code use different SDK entry points.
 
+`@nexus.api-omit` on an operation drops that operation's public top-level
+function and its export for the named targets, while keeping the operation
+registered, in the service, and bindable by resource methods. The private
+per-operation helper that resource methods call stays, so the operation is
+reached through its resource rather than a standalone function. The parser
+records the omitted targets on `OperationSpec`, and each backend gates its own
+public surface (the Python `__all__` entry and function, the TypeScript barrel
+export, the .NET public options type and method, and the Go exported wrapper).
+
 Python emits shared models and service contracts at the package root, regardless
 of API targets. Contracts describe wire data rather than callable resource
 handles. Each API owns its operation wrappers and handles. The client API lives
