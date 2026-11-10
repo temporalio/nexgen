@@ -204,6 +204,17 @@ def test_factory_types_require_an_explicit_runtime_type() -> None:
         _ = assert_type(client.get_stream(ref=ref), Stream[object])
         _ = assert_type(client.get_stream(ref=ref, body_type=None), Stream[object])
         _ = assert_type(client.get_stream(ref=ref, body_type=Turn), Stream[Turn])
+        typed = StreamRef[Turn](id=ref.id)
+        _ = assert_type(client.get_stream(typed), Stream[Turn])
+        _ = assert_type(client.get_stream(ref=typed), Stream[Turn])
+        _ = assert_type(client.get_stream(ref=typed, body_type=None), Stream[Turn])
+        _ = assert_type(client.get_stream(ref=typed, body_type=Turn), Stream[Turn])
+        _ = assert_type(
+            client.get_stream(ref=StreamRef[object](id=ref.id), body_type=str),
+            Stream[str],
+        )
+        mismatched: Stream[str] = client.get_stream(ref=typed)  # pyright: ignore[reportAssignmentType]
+        _ = mismatched
         _ = assert_type(await client.create_stream(id=ref.id), Stream[object])
         _ = assert_type(
             await client.create_stream(id=ref.id, body_type=None),

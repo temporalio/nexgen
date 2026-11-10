@@ -66,16 +66,13 @@ class StreamServiceClientExtension(abc.ABC):
         ref: StreamRef[typing.Any],
         *,
         created: bool | None = None,
-        body_type: type[BodyT] | None = None,
-    ) -> Stream[BodyT]:
+        body_type: typing.Any = None,
+    ) -> Stream[typing.Any]:
         """Return the ``Stream`` handle for this ref."""
         arguments = typing.get_args(getattr(ref, "__orig_class__", None))
         # None means no explicit type, so use the ref's type argument, else object.
         if body_type is None:
-            body_type = typing.cast(
-                "type[BodyT]",
-                arguments[0] if arguments else object,
-            )
+            body_type = arguments[0] if arguments else object
         elif arguments and arguments[0] is not object and arguments[0] != body_type:
             raise TypeError("The decoding type must match the typed ref")
         if arguments != (body_type,):

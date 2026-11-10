@@ -1315,18 +1315,12 @@ impl<'a> ApiPlanner<'a> {
             }
         };
 
-        // A ref gives the payload type, whether positional or keyword.
+        // A typed ref supplies the payload type when no explicit decoder is given.
         output.push_str(&format!(
             "    @typing.overload\n    def {name}(\n        {receiver},\n"
         ));
-        output.push_str(&format!("        {ref_name}: {ref_generic},\n"));
-        if !other_fields.is_empty() {
-            output.push_str("        *,\n");
-            render_other_fields(output);
-        }
-        if other_fields.is_empty() {
-            output.push_str("        *,\n");
-        }
+        output.push_str(&format!("        {ref_name}: {ref_generic},\n        *,\n"));
+        render_other_fields(output);
         for variable in &type_variables {
             output.push_str(&format!(
                 "        {}: None = None,\n",
@@ -1351,12 +1345,21 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str(&format!("    ) -> {result}: ...\n"));
 
-        // The implementation takes the ref either way.
+        // The overloads enforce the public contract; implementation types are erased.
         output.push_str(&format!("    def {name}(\n        {receiver},\n"));
         output.push_str(&format!("        {ref_name}: {ref_dynamic},\n        *,\n"));
         render_other_fields(output);
-        render_runtime_type_keyword_parameters(output, "        ", &type_variables, true, "None");
-        output.push_str(&format!("    ) -> {result}:\n"));
+        RuntimeTypeSignature::Implementation.render_parameters(
+            output,
+            "        ",
+            &type_variables,
+            true,
+        );
+        let dynamic_result = python_type_annotation_with_arguments(
+            &resource.type_name,
+            &vec!["typing.Any".to_string(); type_variables.len()],
+        );
+        output.push_str(&format!("    ) -> {dynamic_result}:\n"));
         render_python_docstring(
             output,
             "        ",
@@ -1484,12 +1487,21 @@ impl<'a> ApiPlanner<'a> {
         }
         output.push_str(&format!(") -> {result}: ...\n\n\n"));
 
-        // The implementation takes the ref either way.
+        // The overloads enforce the public contract; implementation types are erased.
         output.push_str(&format!("def {name}(\n"));
         output.push_str(&format!("    {ref_name}: {ref_dynamic},\n    *,\n"));
         render_other_fields(output);
-        render_runtime_type_keyword_parameters(output, "    ", &type_variables, true, "None");
-        output.push_str(&format!(") -> {result}:\n"));
+        RuntimeTypeSignature::Implementation.render_parameters(
+            output,
+            "    ",
+            &type_variables,
+            true,
+        );
+        let dynamic_result = python_type_annotation_with_arguments(
+            &resource.type_name,
+            &vec!["typing.Any".to_string(); type_variables.len()],
+        );
+        output.push_str(&format!(") -> {dynamic_result}:\n"));
         render_python_docstring(
             output,
             "    ",
@@ -1656,10 +1668,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&format!(
                 "{indent}# None means no explicit type, so use the ref's type argument, else object.\n\
                  {indent}if {argument} is None:\n\
-                 {indent}    {argument} = typing.cast(\n\
-                 {indent}        \"type[{name}]\",\n\
-                 {indent}        arguments[{position}] if arguments else object,\n\
-                 {indent}    )\n\
+                 {indent}    {argument} = arguments[{position}] if arguments else object\n\
                  {indent}elif arguments and arguments[{position}] is not object and arguments[{position}] != {argument}:\n\
                  {indent}    raise TypeError(\"The decoding type must match the typed ref\")\n"
             ));
