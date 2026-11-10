@@ -195,7 +195,7 @@ class Stream(typing.Generic[BodyT]):
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
+    ) -> PollIterator[ReadRecordsRequest[BodyT], StreamRecord[BodyT]]:
         """Yield each item of ``iter_read``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is

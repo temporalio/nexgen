@@ -17,8 +17,14 @@ export type {
   ReadRecordsRequest,
   ReadRecordsResponse,
 } from "./models";
+export { createCreateStreamResultTransferTypeConverter } from "./models";
+export { createStreamRefTransferTypeConverter } from "./models";
+export { createCreateStreamRequestTransferTypeConverter } from "./models";
 export { createAppendRecordsRequestTransferTypeConverter } from "./models";
 export { createAppendRecordTransferTypeConverter } from "./models";
+export { createCloseStreamRequestTransferTypeConverter } from "./models";
 export { createReadRecordsResponseTransferTypeConverter } from "./models";
 export { createStreamRecordTransferTypeConverter } from "./models";
 export { createStreamDataTransferTypeConverter } from "./models";
+export { createReadRecordsRequestTransferTypeConverter } from "./models";
+export { createDescribeStreamRequestTransferTypeConverter } from "./models";

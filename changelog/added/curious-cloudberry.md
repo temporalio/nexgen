@@ -1,0 +1,1 @@
+WIT records can explicitly declare generic dependencies with `@nexus.generic "body-t"`, including phantom parameters that add no wire fields. Dependencies propagate through containing models, operations, and resources; resource constructor fields no longer implicitly make records generic.

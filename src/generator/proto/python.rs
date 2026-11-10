@@ -823,7 +823,18 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             .strip_suffix('T')
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
-        let base_name = format!("{}_type", stem.to_snake_case());
+        let base_name = format!(
+            "{}{}_type",
+            if model
+                .phantom_type_parameters
+                .contains(&format!("_{parameter}"))
+            {
+                "_"
+            } else {
+                ""
+            },
+            stem.to_snake_case()
+        );
         let mut name = base_name.clone();
         let mut suffix = 1;
         while arguments

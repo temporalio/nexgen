@@ -18,7 +18,7 @@ export class Stream<BodyT = unknown> {
   readonly #bodyType: common.TypeInfo<BodyT> | undefined;
 
   public constructor(
-    public readonly ref: StreamRef,
+    public readonly ref: StreamRef<BodyT>,
     public readonly created: boolean | undefined,
     bodyType?: common.TypeInfo<BodyT>,
   ) {

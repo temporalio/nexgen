@@ -200,7 +200,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsRequest{TBody}"/> class.
         /// </summary>
-        public AppendRecordsRequest(StreamRef @ref, IReadOnlyList<AppendRecord<TBody>> records, Producer? producer, string? withdrawRun)
+        public AppendRecordsRequest(StreamRef<TBody> @ref, IReadOnlyList<AppendRecord<TBody>> records, Producer? producer, string? withdrawRun)
         {
             Ref = @ref;
             Records = records;
@@ -208,7 +208,7 @@ namespace Temporalio.Workflows
             WithdrawRun = withdrawRun;
         }
 
-        public StreamRef Ref { get; init; }
+        public StreamRef<TBody> Ref { get; init; }
         public IReadOnlyList<AppendRecord<TBody>> Records { get; init; }
         /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
@@ -225,7 +225,7 @@ namespace Temporalio.Workflows
 
         internal static AppendRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsRequest wire)
         {
-            return new AppendRecordsRequest<TBody>(StreamRef.FromTransferType(wire.Ref), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer), string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun)
+            return new AppendRecordsRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.Ref), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer), string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun)
             {
                 Sequence = wire.Sequence == 0 ? null : wire.Sequence,
             };
@@ -361,25 +361,25 @@ namespace Temporalio.Workflows
     /// <summary>
     /// Close a Stream. Readers drain what is left, then end. Later appends are refused.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CloseStreamRequest.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CloseStreamRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record CloseStreamRequest
+    public record CloseStreamRequest<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="CloseStreamRequest"/> class.
+        /// Initializes a new instance of the <see cref="CloseStreamRequest{TBody}"/> class.
         /// </summary>
-        public CloseStreamRequest(StreamRef @ref, Producer? producer)
+        public CloseStreamRequest(StreamRef<TBody> @ref, Producer? producer)
         {
             Ref = @ref;
             Producer = producer;
         }
 
-        public StreamRef Ref { get; init; }
+        public StreamRef<TBody> Ref { get; init; }
         public Producer? Producer { get; init; }
 
-        internal static CloseStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.CloseStreamRequest wire)
+        internal static CloseStreamRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.CloseStreamRequest wire)
         {
-            return new CloseStreamRequest(StreamRef.FromTransferType(wire.Ref), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer));
+            return new CloseStreamRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.Ref), wire.Producer == null ? null : Producer.FromTransferType(wire.Producer));
         }
 
         internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
@@ -402,10 +402,10 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CloseStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((CloseStreamRequest)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((CloseStreamRequest<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.CloseStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CloseStreamRequest<TBody>.FromTransferType((Temporalio.Api.StreamService.V1.CloseStreamRequest)transferType);
         }
 
     }
@@ -445,14 +445,14 @@ namespace Temporalio.Workflows
     /// <summary>
     /// Create a Stream. If it exists, fail, or with use-existing get the open one.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamRequest.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record CreateStreamRequest
+    public record CreateStreamRequest<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="CreateStreamRequest"/> class.
+        /// Initializes a new instance of the <see cref="CreateStreamRequest{TBody}"/> class.
         /// </summary>
-        public CreateStreamRequest(StreamRef streamRef, string? withdrawRun, string? requestId)
+        public CreateStreamRequest(StreamRef<TBody> streamRef, string? withdrawRun, string? requestId)
         {
             StreamRef = streamRef;
             WithdrawRun = withdrawRun;
@@ -462,7 +462,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// The ref of the Stream to create. Its id is the Stream id.
         /// </summary>
-        public StreamRef StreamRef { get; init; }
+        public StreamRef<TBody> StreamRef { get; init; }
         /// <summary>
         /// The age after which a Record is dropped. Empty is the Store default.
         /// </summary>
@@ -480,9 +480,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public string? RequestId { get; init; }
 
-        internal static CreateStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamRequest wire)
+        internal static CreateStreamRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamRequest wire)
         {
-            return new CreateStreamRequest(StreamRef.FromTransferType(wire.StreamRef), string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun, string.IsNullOrEmpty(wire.RequestId) ? null : wire.RequestId)
+            return new CreateStreamRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.StreamRef), string.IsNullOrEmpty(wire.WithdrawRun) ? null : wire.WithdrawRun, string.IsNullOrEmpty(wire.RequestId) ? null : wire.RequestId)
             {
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
                 IdConflictPolicy = (int)wire.IdConflictPolicy == 0 ? null : (StreamIdConflictPolicy)wire.IdConflictPolicy,
@@ -521,26 +521,26 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CreateStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamRequest)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamRequest<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamRequest<TBody>.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamRequest)transferType);
         }
 
     }
 
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResult.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamResult<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record CreateStreamResult
+    public record CreateStreamResult<TBody>
     {
-        public StreamRef? Ref { get; init; }
+        public StreamRef<TBody>? Ref { get; init; }
         public bool? Created { get; init; }
 
-        internal static CreateStreamResult FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamResponse wire)
+        internal static CreateStreamResult<TBody> FromTransferType(Temporalio.Api.StreamService.V1.CreateStreamResponse wire)
         {
-            return new CreateStreamResult()
+            return new CreateStreamResult<TBody>()
             {
-                Ref = wire.Ref == null ? null : StreamRef.FromTransferType(wire.Ref),
+                Ref = wire.Ref == null ? null : StreamRef<TBody>.FromTransferType(wire.Ref),
                 Created = wire.Created == false ? null : wire.Created,
             };
         }
@@ -568,31 +568,31 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.CreateStreamResponse);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResult)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((CreateStreamResult<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamResponse)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : CreateStreamResult<TBody>.FromTransferType((Temporalio.Api.StreamService.V1.CreateStreamResponse)transferType);
         }
 
     }
 
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(DescribeStreamRequest.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(DescribeStreamRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record DescribeStreamRequest
+    public record DescribeStreamRequest<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="DescribeStreamRequest"/> class.
+        /// Initializes a new instance of the <see cref="DescribeStreamRequest{TBody}"/> class.
         /// </summary>
-        public DescribeStreamRequest(StreamRef @ref)
+        public DescribeStreamRequest(StreamRef<TBody> @ref)
         {
             Ref = @ref;
         }
 
-        public StreamRef Ref { get; init; }
+        public StreamRef<TBody> Ref { get; init; }
 
-        internal static DescribeStreamRequest FromTransferType(Temporalio.Api.StreamService.V1.DescribeStreamRequest wire)
+        internal static DescribeStreamRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.DescribeStreamRequest wire)
         {
-            return new DescribeStreamRequest(StreamRef.FromTransferType(wire.Ref));
+            return new DescribeStreamRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.Ref));
         }
 
         internal Temporalio.Api.StreamService.V1.DescribeStreamRequest ToTransferType()
@@ -611,10 +611,10 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.DescribeStreamRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((DescribeStreamRequest)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((DescribeStreamRequest<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamRequest.FromTransferType((Temporalio.Api.StreamService.V1.DescribeStreamRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : DescribeStreamRequest<TBody>.FromTransferType((Temporalio.Api.StreamService.V1.DescribeStreamRequest)transferType);
         }
 
     }
@@ -946,19 +946,19 @@ namespace Temporalio.Workflows
     /// <summary>
     /// Read Records from an offset.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ReadRecordsRequest.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ReadRecordsRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record ReadRecordsRequest
+    public record ReadRecordsRequest<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ReadRecordsRequest"/> class.
+        /// Initializes a new instance of the <see cref="ReadRecordsRequest{TBody}"/> class.
         /// </summary>
-        public ReadRecordsRequest(StreamRef @ref)
+        public ReadRecordsRequest(StreamRef<TBody> @ref)
         {
             Ref = @ref;
         }
 
-        public StreamRef Ref { get; init; }
+        public StreamRef<TBody> Ref { get; init; }
         /// <summary>
         /// Start offset. Empty uses start. An offset past the newest one + 1 fails.
         /// </summary>
@@ -988,9 +988,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? MaxBytes { get; init; }
 
-        internal static ReadRecordsRequest FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsRequest wire)
+        internal static ReadRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsRequest wire)
         {
-            return new ReadRecordsRequest(StreamRef.FromTransferType(wire.Ref))
+            return new ReadRecordsRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.Ref))
             {
                 FromOffset = wire.FromOffset == 0 ? null : wire.FromOffset,
                 Start = (int)wire.Start == 0 ? null : (StreamReadStart)wire.Start,
@@ -1046,10 +1046,10 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.StreamService.V1.ReadRecordsRequest);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((ReadRecordsRequest)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((ReadRecordsRequest<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsRequest.FromTransferType((Temporalio.Api.StreamService.V1.ReadRecordsRequest)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : ReadRecordsRequest<TBody>.FromTransferType((Temporalio.Api.StreamService.V1.ReadRecordsRequest)transferType);
         }
 
     }
@@ -1254,12 +1254,12 @@ namespace Temporalio.Workflows
     /// <summary>
     /// Identifies one Stream. The id is opaque to callers.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRef.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRef<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record StreamRef
+    public record StreamRef<TBody>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="StreamRef"/> class.
+        /// Initializes a new instance of the <see cref="StreamRef{TBody}"/> class.
         /// </summary>
         public StreamRef(string id)
         {
@@ -1279,9 +1279,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public string? Backend { get; init; }
 
-        internal static StreamRef FromTransferType(Temporalio.Api.Stream.V1.StreamRef wire)
+        internal static StreamRef<TBody> FromTransferType(Temporalio.Api.Stream.V1.StreamRef wire)
         {
-            return new StreamRef(wire.Id)
+            return new StreamRef<TBody>(wire.Id)
             {
                 Owner = wire.Owner == null ? null : Execution.FromTransferType(wire.Owner),
                 Backend = string.IsNullOrEmpty(wire.Backend) ? null : wire.Backend,
@@ -1312,10 +1312,10 @@ namespace Temporalio.Workflows
             public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.StreamRef);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((StreamRef)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((StreamRef<TBody>)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRef.FromTransferType((Temporalio.Api.Stream.V1.StreamRef)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : StreamRef<TBody>.FromTransferType((Temporalio.Api.Stream.V1.StreamRef)transferType);
         }
 
     }

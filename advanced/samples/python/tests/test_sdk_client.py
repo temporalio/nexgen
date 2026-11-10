@@ -298,7 +298,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     )
     assert uuid.UUID(create.arg.request_id)
     assert uuid.UUID(create.id)
-    assert create.result_type is CreateStreamResult
+    assert create.result_type == CreateStreamResult[str]
     assert (append.service, append.endpoint, append.operation) == (
         "temporal.api.streamservice.v1.StreamService",
         "__temporal_system",

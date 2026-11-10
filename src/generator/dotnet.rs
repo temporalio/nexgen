@@ -1219,7 +1219,12 @@ impl<'a> ApiPlanner<'a> {
             }
             output.push_str(").ConfigureAwait(true);\n");
             if raw_return != "void" {
-                output.push_str("        return result;\n");
+                self.render_operation_result_return(
+                    output,
+                    operation,
+                    endpoint_parameter,
+                    high_level_return,
+                );
             }
             output.push_str("    }\n\n");
             return;
@@ -1251,6 +1256,23 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("    }\n\n");
             return;
         }
+        self.render_operation_result_return(
+            output,
+            operation,
+            endpoint_parameter,
+            high_level_return,
+        );
+        output.push_str("    }\n\n");
+    }
+
+    /// Named and expression-based SDK calls share the same high-level result conversion.
+    fn render_operation_result_return(
+        &self,
+        output: &mut String,
+        operation: &PlannedOperation,
+        endpoint_parameter: bool,
+        high_level_return: &str,
+    ) {
         if operation.output_transform.is_some() || operation.data.output_resource_return.is_some() {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
@@ -1279,7 +1301,6 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("        return result;\n");
             }
         }
-        output.push_str("    }\n\n");
     }
 
     fn resource_type_name_for_return_type(&self, return_type: &str) -> Option<String> {
@@ -3607,7 +3628,7 @@ fn flattened_request_field_expr(
     options_required: bool,
 ) -> String {
     if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-        nested_model_init_expr(field, nested_model, options_required)
+        nested_model_init_expr(field, nested_model, options_required, api_plan)
     } else if field.function.is_some()
         && matches!(
             overload.function_mode(field_name),
@@ -3807,6 +3828,7 @@ fn nested_model_init_expr(
     field: &RecordFieldSpec<PlannedFamily>,
     model: &PlannedModel,
     options_required: bool,
+    api_plan: &PlannedSpec,
 ) -> String {
     let option_fields = model
         .api_fields(GenerationTarget::Workflow)
@@ -3825,7 +3847,14 @@ fn nested_model_init_expr(
         .collect::<Vec<_>>()
         .join(" || ");
     let init_expr = model_init_expr(
-        &csharp_type_name(&model.name),
+        &csharp_generic_type(
+            &csharp_type_name(&model.name),
+            &api_plan
+                .record_type_parameters(&model.full_name)
+                .into_iter()
+                .map(|usage| usage.parameter)
+                .collect::<Vec<_>>(),
+        ),
         option_fields
             .into_iter()
             .map(|(_, nested_field)| {

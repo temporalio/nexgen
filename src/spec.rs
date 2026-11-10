@@ -846,6 +846,8 @@ pub struct RecordSpec<F: TypeFamily = AuthoredFamily> {
     pub source: Option<ExternalTypeSourceSpec<F>>,
     pub experimental: bool,
     pub flatten_in_api: bool,
+    /// Explicit generic dependencies, including parameters not used by any field.
+    pub declared_type_parameters: Vec<TypeParameterSpec>,
     pub fields: IndexMap<String, RecordFieldSpec<F>>,
     pub data: F::RecordData,
 }
@@ -1120,6 +1122,7 @@ impl<F: TypeFamily> RecordSpec<F> {
             source: self.source.map(|source| source.map_names_with(map)),
             experimental: self.experimental,
             flatten_in_api: self.flatten_in_api,
+            declared_type_parameters: self.declared_type_parameters,
             fields: self
                 .fields
                 .into_iter()
@@ -2038,14 +2041,33 @@ where
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
-    /// Returns the model parameters in first-use order. Selected field
-    /// annotations are authoritative, so an overridden field does not
+    /// Returns declared parameters first, then field dependencies in first-use order.
+    /// Selected field annotations are authoritative, so an overridden field does not
     /// contribute parameters.
     pub(crate) fn record_type_parameters(&self, record_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
         self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters, &|_| None);
         parameters.into_values().collect()
+    }
+
+    /// Explicit dependencies not carried by this record's fields.
+    pub(crate) fn record_phantom_type_parameters(
+        &self,
+        record_name: &str,
+    ) -> Vec<TypeParameterSpec> {
+        let Some(record) = self.record(record_name) else {
+            return Vec::new();
+        };
+        let mut fields = IndexMap::new();
+        let mut visiting = std::collections::BTreeSet::from([record_name.to_string()]);
+        self.collect_record_field_type_parameters(record, &mut visiting, &mut fields, &|_| None);
+        record
+            .declared_type_parameters
+            .iter()
+            .filter(|parameter| !fields.contains_key(&parameter.full_name))
+            .cloned()
+            .collect()
     }
 
     /// Returns a variant's parameters in first-use order, recursively walking
@@ -2077,19 +2099,36 @@ where
             return;
         }
         if let Some(record) = self.record(record_name) {
-            for field in record.fields.values() {
-                if field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
-                    || field
-                        .annotation
-                        .as_ref()
-                        .is_some_and(|annotation| !annotation.is_empty())
-                {
-                    continue;
-                }
-                self.collect_type_parameters(&field.field_type, visiting, parameters, proto_record);
+            for parameter in &record.declared_type_parameters {
+                parameters
+                    .entry(parameter.full_name.clone())
+                    .or_insert_with(|| TypeParameterUsage {
+                        parameter: parameter.clone(),
+                    });
             }
+            self.collect_record_field_type_parameters(record, visiting, parameters, proto_record);
         }
         visiting.remove(record_name);
+    }
+
+    fn collect_record_field_type_parameters(
+        &self,
+        record: &RecordSpec<F>,
+        visiting: &mut std::collections::BTreeSet<String>,
+        parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
+    ) {
+        for field in record.fields.values() {
+            if field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || field
+                    .annotation
+                    .as_ref()
+                    .is_some_and(|annotation| !annotation.is_empty())
+            {
+                continue;
+            }
+            self.collect_type_parameters(&field.field_type, visiting, parameters, proto_record);
+        }
     }
 
     fn collect_variant_type_parameters(

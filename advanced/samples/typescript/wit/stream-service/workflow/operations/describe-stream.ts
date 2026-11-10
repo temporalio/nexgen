@@ -7,8 +7,8 @@ import type { DescribeStreamResponse, DescribeStreamRequest } from "../models";
 /**
  * @param request - Request for the operation.
  */
-export async function describeStream(
-  request: DescribeStreamRequest,
+export async function describeStream<BodyT>(
+  request: DescribeStreamRequest<BodyT>,
 ): Promise<nexus.NexusOperationHandle<DescribeStreamResponse>> {
   const client = nexus.createNexusServiceClient({
     service: streamService,

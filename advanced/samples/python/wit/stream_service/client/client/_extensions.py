@@ -13,6 +13,7 @@ import datetime
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    CreateStreamResult,
     Execution,
     StreamIdConflictPolicy,
     StreamRef,
@@ -90,7 +91,7 @@ class StreamServiceClientExtension(abc.ABC):
 
     async def _stream_service_create_stream(
         self,
-        request: CreateStreamRequest,
+        request: CreateStreamRequest[BodyT],
         body_type: type[BodyT],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -101,9 +102,10 @@ class StreamServiceClientExtension(abc.ABC):
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
-            operation=StreamService.create_stream,
+            operation="CreateStream",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=CreateStreamResult[body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
@@ -112,9 +114,7 @@ class StreamServiceClientExtension(abc.ABC):
             raise RuntimeError("CreateStream answered without `ref`")
         resource = Stream[body_type](
             nexus_client,
-            ref=StreamRef[body_type](
-                id=result.ref.id, owner=result.ref.owner, backend=result.ref.backend
-            ),
+            ref=result.ref,
             created=result.created or None,
         )
         return resource

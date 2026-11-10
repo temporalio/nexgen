@@ -33,7 +33,7 @@ import type { Stream } from "./resources";
 export const streamService = nexus.service(
   "temporal.api.streamservice.v1.StreamService",
   {
-    createStream: nexus.operation<CreateStreamRequest, CreateStreamResult>({
+    createStream: nexus.operation<CreateStreamRequest<any>, CreateStreamResult<any>>({
       name: "CreateStream",
       inputType: { transferTypeConverter: createStreamRequestTransferTypeConverter },
       outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },
@@ -46,7 +46,7 @@ export const streamService = nexus.service(
       inputType: { transferTypeConverter: appendRecordsRequestTransferTypeConverter },
       outputType: { transferTypeConverter: appendRecordsResponseTransferTypeConverter },
     }),
-    closeStream: nexus.operation<CloseStreamRequest, CloseStreamResponse>({
+    closeStream: nexus.operation<CloseStreamRequest<any>, CloseStreamResponse>({
       name: "CloseStream",
       inputType: { transferTypeConverter: closeStreamRequestTransferTypeConverter },
       outputType: { transferTypeConverter: closeStreamResponseTransferTypeConverter },
@@ -55,17 +55,21 @@ export const streamService = nexus.service(
      * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
      * Activity.
      */
-    readRecords: nexus.operation<ReadRecordsRequest, ReadRecordsResponse<any>>({
+    readRecords: nexus.operation<ReadRecordsRequest<any>, ReadRecordsResponse<any>>({
       name: "ReadRecords",
       inputType: { transferTypeConverter: readRecordsRequestTransferTypeConverter },
       outputType: { transferTypeConverter: readRecordsResponseTransferTypeConverter },
     }),
-    describeStream: nexus.operation<DescribeStreamRequest, DescribeStreamResponse>({
-      name: "DescribeStream",
-      inputType: { transferTypeConverter: describeStreamRequestTransferTypeConverter },
-      outputType: {
-        transferTypeConverter: describeStreamResponseTransferTypeConverter,
+    describeStream: nexus.operation<DescribeStreamRequest<any>, DescribeStreamResponse>(
+      {
+        name: "DescribeStream",
+        inputType: {
+          transferTypeConverter: describeStreamRequestTransferTypeConverter,
+        },
+        outputType: {
+          transferTypeConverter: describeStreamResponseTransferTypeConverter,
+        },
       },
-    }),
+    ),
   },
 );

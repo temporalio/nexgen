@@ -33,6 +33,7 @@ export interface GenericRequest<ContextT> {
   byName: Record<string, ContextT>;
   nested: Inner<ContextT>;
   probe?: GetterProbe<ContextT>;
+  reference?: ContextRef<ContextT>;
 }
 
 export interface Inner<ContextT> {
@@ -49,4 +50,8 @@ export interface GetterProbe<ContextT> {
   elapsed: number;
   namespace: string;
   type: string;
+}
+
+export interface ContextRef<ContextT> {
+  id: string;
 }

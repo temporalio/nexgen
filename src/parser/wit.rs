@@ -914,9 +914,60 @@ fn build_wit_record_spec(
         source,
         experimental,
         flatten_in_api,
+        declared_type_parameters: record_generic_parameters(
+            resolve,
+            type_def.owner,
+            &directives,
+            path,
+            &context,
+        )?,
         fields,
         data: (),
     }))
+}
+
+fn record_generic_parameters(
+    resolve: &Resolve,
+    owner: TypeOwner,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Vec<TypeParameterSpec>> {
+    let mut parameters = Vec::new();
+    for directive in directives
+        .iter()
+        .filter(|directive| directive.name() == "generic")
+    {
+        let invalid = |reason: String| Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.generic".to_string(),
+            reason,
+        };
+        let name = directive
+            .value("value")
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| invalid("requires a type-parameter alias name".to_string()))?;
+        let TypeOwner::Interface(interface_id) = owner else {
+            return Err(invalid("requires an interface-owned record".to_string()));
+        };
+        let id = resolve.interfaces[interface_id]
+            .types
+            .get(name)
+            .ok_or_else(|| invalid(format!("unknown type-parameter alias `{name}`")))?;
+        let TypeSpec::TypeParameter(parameter) =
+            resolve_authored_field_type_spec(resolve, &Type::Id(*id), path, context)?
+        else {
+            return Err(invalid(format!(
+                "`{name}` must name an alias declared with `@nexus.type-parameter`"
+            )));
+        };
+        if parameters.contains(&parameter) {
+            return Err(invalid(format!("duplicate generic parameter `{name}`")));
+        }
+        parameters.push(parameter);
+    }
+    Ok(parameters)
 }
 
 fn build_type_source(
@@ -4151,6 +4202,39 @@ interface generic-service {
                 .map(|usage| usage.parameter.name.as_str())
                 .collect::<Vec<_>>(),
             ["ContextT", "OutputT"]
+        );
+    }
+
+    #[test]
+    fn explicit_record_parameters_propagate_without_resources() {
+        let input = GENERIC_WIT.replace(
+            "record inner { value: context-t, }",
+            "/// @nexus.generic \"output-t\"\n  /// @nexus.generic \"context-t\"\n  record inner { value: context-t, }",
+        );
+        let spec = crate::planning::select_spec(parse(Language::Python, &input), Language::Python);
+        let inner = spec.record("generic-service.inner").unwrap();
+        assert_eq!(
+            inner
+                .declared_type_parameters
+                .iter()
+                .map(|parameter| parameter.full_name.as_str())
+                .collect::<Vec<_>>(),
+            ["generic-service.output-t", "generic-service.context-t"]
+        );
+        let parameters = spec.record_type_parameters("generic-service.request");
+        assert_eq!(
+            parameters
+                .iter()
+                .map(|usage| usage.parameter.name.as_str())
+                .collect::<Vec<_>>(),
+            ["OutputT", "ContextT"]
+        );
+        assert_eq!(
+            spec.record_phantom_type_parameters("generic-service.inner")
+                .iter()
+                .map(|parameter| parameter.name.as_str())
+                .collect::<Vec<_>>(),
+            ["OutputT"]
         );
     }
 

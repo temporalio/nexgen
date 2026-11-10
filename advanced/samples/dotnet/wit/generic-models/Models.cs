@@ -40,6 +40,20 @@ namespace Nexgen.GenericModelService
     }
 
     [GeneratedCode("nexgen", null)]
+    public record ContextRef<TContext>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ContextRef{TContext}"/> class.
+        /// </summary>
+        public ContextRef(string id)
+        {
+            Id = id;
+        }
+
+        public string Id { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record GenericRequest<TContext>
     {
         /// <summary>
@@ -58,6 +72,7 @@ namespace Nexgen.GenericModelService
         public IReadOnlyDictionary<string, TContext> ByName { get; init; }
         public Inner<TContext> Nested { get; init; }
         public GetterProbe<TContext>? Probe { get; init; }
+        public ContextRef<TContext>? Reference { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

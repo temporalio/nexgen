@@ -138,6 +138,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "generic",
+            sites: &[Record],
+            keys: &["value"],
+            language_keys: &[],
+            repeatable: true,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "proto-field",
             sites: &[Field],
             keys: &["value"],

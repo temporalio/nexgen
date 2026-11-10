@@ -22,7 +22,7 @@ BodyT = typing.TypeVar("BodyT")
 
 
 async def _create_stream(
-    request: CreateStreamRequest,
+    request: CreateStreamRequest[BodyT],
     body_type: type[BodyT],
 ) -> Stream[BodyT]:
     nexus_client = temporalio.workflow.create_nexus_client(
@@ -32,15 +32,13 @@ async def _create_stream(
     handle = await nexus_client.start_operation(
         operation="CreateStream",
         input=request,
-        output_type=CreateStreamResult,
+        output_type=CreateStreamResult[body_type],
     )
     result = await handle
     if result.ref is None:
         raise RuntimeError("CreateStream answered without `ref`")
     return Stream[body_type](
-        ref=StreamRef[body_type](
-            id=result.ref.id, owner=result.ref.owner, backend=result.ref.backend
-        ),
+        ref=result.ref,
         created=result.created or None,
     )
 

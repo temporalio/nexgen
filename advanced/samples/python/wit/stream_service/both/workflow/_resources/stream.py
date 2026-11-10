@@ -184,7 +184,7 @@ async def append_records(
 
 
 async def _close_stream(
-    request: CloseStreamRequest,
+    request: CloseStreamRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
@@ -199,7 +199,7 @@ async def _close_stream(
 
 async def close_stream(
     *,
-    ref: StreamRef[typing.Any],
+    ref: StreamRef[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     request = CloseStreamRequest(
         ref=ref,
@@ -209,7 +209,7 @@ async def close_stream(
 
 
 async def _read_records(
-    request: ReadRecordsRequest,
+    request: ReadRecordsRequest[BodyT],
     body_type: type[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
     nexus_client = temporalio.workflow.create_nexus_client(
@@ -298,7 +298,7 @@ async def read_records(
 
 
 async def _describe_stream(
-    request: DescribeStreamRequest,
+    request: DescribeStreamRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
@@ -313,7 +313,7 @@ async def _describe_stream(
 
 async def describe_stream(
     *,
-    ref: StreamRef[typing.Any],
+    ref: StreamRef[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     request = DescribeStreamRequest(
         ref=ref,
