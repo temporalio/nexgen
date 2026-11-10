@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.12] - 2026-11-10
+
+### Added
+
+- Go WIT workflow API generation supports `@nexus.facade go="..."` alongside `@nexus.namespace go="..."` to generate a facade of type aliases and forwarding functions. Implementation and facade files are emitted side by side for placement into their respective packages.
+- `@nexus.fallback` on a case of an enum with `@nexus.proto` decodes a protobuf number that the enum doesn't know as that case, in Python, TypeScript and .NET. Without it, Python still raises on such a number.
+- Generated Go implementation docs link to facade exports with an `Exposed as` paragraph when a facade is generated.
+- Go declaration docs start with their exported API names, and operation options describe the operation they configure.
+- Python adds a Workflow `get_<resource>` factory. It returns the handle for an existing resource from its ref, with no call.
+- `@nexus.flatten-in-api` on a request field makes that call take the fields of its record. Go refuses it.
+- A resource that uses a type parameter, also through its records, is generic in it with no annotation, as in `Stream[Turn]`. The `--system-nexus` interceptors keep its type arguments.
+- Go workflow System Nexus bindings generated into the SDK's internal package can opt into context propagation with `@nexus.context-propagation go="request.headers"`, using the existing workflow interceptor header API.
+- Add Go SDK System Nexus interceptor generation with typed request pointers, forwarding and terminal methods, resolved service/operation dispatch, and facade aliases. Operation-specific hooks expose the request without Nexus scheduling options or transport headers; middleware owns propagation through the optional request header map. Standalone test terminals embed a runtime interface with an ExecuteNexusOperation method, with host declarations grouped under Test-only adapters.
+- `@nexus.poll` on an operation generates a Python `iter_<name>` iterator in the client target, on the client extension and on each client resource method that binds the operation. A support helper turns each request and response into the next request, or into `None` to stop. The directive needs `targets="client"`.
+- `@nexus.api-omit` takes `targets` to omit a field from some targets only, and refuses a required field that isn't a list.
+- Each Python client call takes `rpc_metadata` and `rpc_timeout`, and passes them to the `start_operation` of its Nexus client. The methods of a client resource take them too. nexgen refuses a request field or method parameter with one of these names in the client target.
+- Python System Nexus client APIs can be generated with `--targets client --system-nexus`, alone or alongside workflow APIs. Client extensions use typed SDK operations and preserve service-bound clients on resource handles.
+- `@nexus.source` and `@nexus.default` support target-specific expressions, including repeated directives with disjoint target sets.
+- `@nexus.varargs` makes a Python resource method take the items of a list as positional arguments, and a list of a flattened one-field record takes that field's values. A resource method also has the type of its operation's output transform.
+- `@nexus.poll items="<field>"` also generates a Python `iter_<name>_items` iterator, which yields the items of each page that `iter_<name>` reads. It is a `PollIterator`, whose `next_request` is the request to resume with. With `python-resume="<helper>"`, it resumes after the last item that the iterator yielded. Without it, it reads that item's page again.
+
+### Changed
+
+- Python resources with methods are plain classes, so the payload converter refuses them. Pass the identity fields, such as the stream sample's `StreamRef`, and build the handle again with the factory. A resource with no methods stays a dataclass.
+- Mixed JSON/protobuf record nesting is rejected for every target, including model-only modules and JSON resource-result constructor fields. Independent JSON and protobuf operations may still share a service.
+- Generated C# now targets .NET 7 (`net7.0`, C# 11) or later, down from .NET 8; the C# samples are tested on .NET 7, 8, and 10.
+- Added a guide to using generated C# on older .NET platforms (.NET Core 3.1, .NET Standard 2.0, .NET Framework 4.6.2).
+- The `stream-service` sample's Python project installs the Stream protos of `temporalio/api#895` into `temporalio` from a local `temporalio-stream-protos` package, so basedpyright checks the stream service.
+- Go System Nexus bindings use SDK internal APIs and visibility-preserving prefixed package-level declarations, and support hand-written helpers in the generated package.
+- Restrict WIT .NET namespace and operations-class overrides to System Nexus.
+- TypeScript generation with `--format` now uses oxfmt instead of Prettier.
+- The workflow-service signal-with-start operation now defaults an omitted task queue to the calling workflow's task queue.
+
+### :boom: Breaking Changes
+
+- Go System Nexus workflow interceptors now receive public options and positional arguments, with resolved function names, and return a workflow Future. Public functions apply defaults before entering the SDK's typed chain or calling the standalone generated terminal; terminal implementations construct requests and adapt results after interception, without a service-name dispatcher.
+- Ordinary Go public functions and resource methods inline request execution and result adaptation instead of emitting private operation helpers. Resource methods preserve resource-owned values and use generic Nexus interception rather than the System Nexus free function's typed hook.
+- Go interceptor forwarding and terminal implementations are generated as methods for SDK-internal targets and dependency-injected free functions elsewhere, without extra adapter types or facade re-exports. Standalone public functions call the generated terminal with an inline Nexus-client scheduling callback; no execution helper is required in the support package.
+- The WIT annotation catalog now checks declared language restrictions and System Nexus requirements before lowering. Unqualified `operations-class` and `poll` annotations fail for unsupported output languages instead of silently doing nothing; explicitly language-scoped values remain valid when generating other languages.
+- WIT annotations now reject unknown names, unsupported placements and arguments, duplicate singleton annotations, and duplicate arguments instead of silently ignoring them, including in unused declarations and linked packages.
+- Go operation convenience wrappers now take required input fields as positional arguments after the options struct, rather than as options fields. Optional and defaulted fields remain in options structs.
+- Replace `--native-api` with `--targets workflow`; omitting `--targets` generates only models and service definitions.
+- Rust generation configuration replaces `GenerationMode` with `Vec<GenerationTarget>`; use `generate_source_with_targets` instead of `generate_source_with_mode`.
+- Python keeps shared models and service definitions at the root; when both targets are selected, workflow APIs live in `workflow/` and client APIs in `client/`.
+- Python model constructors no longer evaluate `@nexus.source` expressions; callers must supply sourced fields explicitly.
+- Operations returning resources must return resources owned by their service, including inside result records.
+- `@nexus.default` now accepts target-language expressions on non-option fields instead of language-agnostic enum-case names. Generated operation wrappers and resource forwarders initialize omitted arguments inline; supplied nested records pass through unchanged. Constructors and transfer-type encoding/decoding no longer apply defaults, and initialized model fields remain non-nullable.
+- Go System Nexus operation requests now use value fields for optional scalar-like types, matching the default-punning options API. Zero values represent omission; optional structs and nested record fields retain their existing representation.
+
+### Fixed
+
+- WIT list and map fields in Python and TypeScript now honor authored optionality instead of gaining implicit empty-collection defaults or optional annotations; required Python collection parameters no longer accept omission or normalize `None` to empty collections.
+- Go facades use conventional implementation-package qualifiers and local names for SDK types already re-exported by the facade's package.
+- Python generic resource factories require an explicit runtime type to return a concretely typed handle. Omitting a type argument exposes decoded bodies as `object` rather than inferring their type from an assignment.
+- Generate missing documentation comments for public Go record structs.
+- Go System Nexus bindings no longer export request envelopes or flattened nested records solely because workflow interceptors are enabled.
+- Generic resources infer their type parameters from resolved method bindings, including implicit bindings and models-only generation.
+- Require System Nexus mode for Go facades.
+- Go System Nexus bindings now use the SDK's current context and registry APIs.
+- Fix Python secondary fixed-argument callables referencing undefined `args`.
+- Resource methods in Go, TypeScript, and .NET use their own identity fields instead of evaluating `@nexus.source` for those request fields.
+- Go APIs populate sourced fields for non-protobuf requests.
+- Definitions-only generation omits Go workflow APIs and supports Python operations returning protobuf-backed resources.
+- Allow non-optional protobuf-backed boolean and numeric fields whose wire defaults are valid API values.
+- Make the System Nexus signal-with-start response fields non-optional and resolve its Go future to `workflow.Execution` with the post-interceptor workflow ID and returned run ID.
+
 ## [0.2.11] - 2026-10-29
 
 ### Added

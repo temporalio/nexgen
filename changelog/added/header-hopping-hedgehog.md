@@ -1,1 +1,0 @@
-Go workflow System Nexus bindings generated into the SDK's internal package can opt into context propagation with `@nexus.context-propagation go="request.headers"`, using the existing workflow interceptor header API.

@@ -1,1 +1,0 @@
-The `stream-service` sample's Python project installs the Stream protos of `temporalio/api#895` into `temporalio` from a local `temporalio-stream-protos` package, so basedpyright checks the stream service.
