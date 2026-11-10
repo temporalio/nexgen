@@ -9,6 +9,7 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import datetime
+import inspect
 import typing
 import uuid
 
@@ -713,6 +714,23 @@ async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -
     seen = [(item, read.next_request) async for item in read]
 
     assert seen == [(1, "first"), (2, "second"), (3, None)]
+
+
+async def test_a_client_read_takes_last() -> None:
+    ref = StreamRef(id="s1")
+    client, answers = connect(
+        Client, {"ReadRecords": ReadRecordsResponse[str](records=[], done=True)}
+    )
+    stream = client.get_stream(ref=ref, body_type=str)
+
+    _ = await stream.read(last=20)
+
+    assert [started.arg for started in answers.started] == [
+        ReadRecordsRequest(ref=ref, last=20)
+    ]
+    # Replay needs a fixed range, so the Workflow handle of the same package takes no `last`.
+    workflow_stream = workflow_package.get_stream(ref=ref, body_type=str)
+    assert "last" not in inspect.signature(workflow_stream.read).parameters
 
 
 def test_only_the_client_target_has_the_read_poll() -> None:

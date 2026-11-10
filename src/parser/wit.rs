@@ -2983,6 +2983,7 @@ fn build_resource_method(
         .map(|ty| build_resource_result(resolve, ty, path, &context, language))
         .transpose()?;
     let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
+    let api_omitted = build_resource_method_api_omitted(&params, &directives, path, &context)?;
 
     Ok(ResourceMethodSpec {
         name: method_name,
@@ -2993,7 +2994,42 @@ fn build_resource_method(
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
         varargs,
+        api_omitted,
     })
+}
+
+/// A method declares `@nexus.api-omit param="..."` to drop a parameter for the named targets, so
+/// one method serves targets whose request fields differ.
+fn build_resource_method_api_omitted(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<BTreeMap<String, BTreeSet<GenerationTarget>>> {
+    let Some(directive) = directive(directives, "api-omit", path, context)? else {
+        return Ok(BTreeMap::new());
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.api-omit".to_string(),
+        reason,
+    };
+    let Some(param) = directive.value("param") else {
+        return Err(invalid(
+            "on a method, needs the name of a parameter, such as `param=\"last\"`".to_string(),
+        ));
+    };
+    if !params.iter().any(|candidate| candidate.name == param) {
+        return Err(invalid(format!(
+            "`{param}` isn't a parameter of the method"
+        )));
+    }
+    let targets = build_origin_targets(directive, path, context, "api-omit")?;
+    Ok(BTreeMap::from([(
+        param.to_string(),
+        targets.into_iter().collect(),
+    )]))
 }
 
 fn build_resource_method_varargs(

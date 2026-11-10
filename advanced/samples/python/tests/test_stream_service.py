@@ -179,8 +179,11 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 def test_a_workflow_read_takes_no_last(
     api: types.ModuleType, model_types: types.ModuleType
 ) -> None:
-    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
-    assert "last" not in inspect.signature(api.read_records).parameters
+    # Replay needs a fixed range, so the WIT omits `last` from the Workflow `read` method.
+    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
+    assert "last" not in inspect.signature(stream.read).parameters
+    # The operation and the model keep `last`.
+    assert "last" in inspect.signature(api.read_records).parameters
     request = model_types.ReadRecordsRequest(
         ref=model_types.StreamRef(id="s-1"), last=3
     )

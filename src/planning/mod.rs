@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use heck::ToUpperCamelCase;
@@ -6,6 +7,7 @@ use prost_types::FileOptions;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
     ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
@@ -188,7 +190,56 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
     pub(crate) varargs: Option<String>,
+    /// The parameters that only some selected targets omit. See [`Self::for_target`].
+    pub(crate) api_omitted: BTreeMap<String, BTreeSet<GenerationTarget>>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
+}
+
+impl PlannedResource {
+    /// The resource of one API target. Only a backend with more than one target needs it.
+    pub(crate) fn for_target(&self, target: GenerationTarget) -> Cow<'_, Self> {
+        if self
+            .methods
+            .iter()
+            .all(|method| method.api_omitted.is_empty())
+        {
+            return Cow::Borrowed(self);
+        }
+        let mut resource = self.clone();
+        for method in &mut resource.methods {
+            *method = method.for_target(target).into_owned();
+        }
+        Cow::Owned(resource)
+    }
+}
+
+impl PlannedResourceMethod {
+    /// The method of one API target, without the parameters that the target omits.
+    pub(crate) fn for_target(&self, target: GenerationTarget) -> Cow<'_, Self> {
+        if self.api_omitted.is_empty() {
+            return Cow::Borrowed(self);
+        }
+        let mut method = self.clone();
+        method.params.retain(|param| {
+            !self
+                .api_omitted
+                .get(&param.name)
+                .is_some_and(|targets| targets.contains(&target))
+        });
+        method.api_omitted.clear();
+        if let PlannedResourceMethodBindingSpec::Operation {
+            request_plan,
+            target_request_plans,
+            ..
+        } = &mut method.binding
+        {
+            if let Some(plan) = target_request_plans.remove(&target) {
+                *request_plan = plan;
+            }
+            target_request_plans.clear();
+        }
+        Cow::Owned(method)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -211,6 +262,8 @@ pub(crate) enum PlannedResourceMethodBindingSpec {
     Operation {
         operation_name: String,
         request_plan: RequestPlan,
+        /// The plan of each target that omits a parameter of the method's `api_omitted`.
+        target_request_plans: BTreeMap<GenerationTarget, RequestPlan>,
         direct_return: bool,
     },
     Stub,

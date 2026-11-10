@@ -6398,6 +6398,7 @@ fn render_resource(
                 operation_name,
                 request_plan,
                 direct_return,
+                ..
             } => {
                 let operation = service
                     .operations

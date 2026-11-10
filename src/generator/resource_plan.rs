@@ -112,7 +112,7 @@ pub(crate) fn resource_method_fills_source(
         .flat_map(|resource| &resource.methods)
         .any(|method| {
             matches!(
-                &method.binding,
+                &method.for_target(target).binding,
                 PlannedResourceMethodBindingSpec::Operation {
                     operation_name: name,
                     request_plan,
@@ -131,6 +131,7 @@ pub(crate) fn validate_resource_origins(
     for service in &api_plan.services {
         for resource in service.resources.iter().map(|resource| &resource.data) {
             for method in &resource.methods {
+                let method = method.for_target(target);
                 let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } =
                     &method.binding
                 else {

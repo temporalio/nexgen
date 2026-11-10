@@ -74,12 +74,15 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(StreamServiceExample.StreamStatus.StreamStatusUnspecified, decoded.Status);
         }
 
-        // Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
+        // Replay needs a fixed range, so the WIT omits `last` from the Workflow `ReadAsync` method.
         [Fact]
         public void AWorkflowReadTakesNoLast()
         {
-            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions).GetProperty("Last"));
+            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsOptions).GetProperty("Last"));
             Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest).GetProperty("Last"));
+            Assert.DoesNotContain(
+                typeof(StreamServiceExample.Stream<Turn>).GetMethod("ReadAsync")!.GetParameters(),
+                parameter => parameter.Name == "last");
         }
     }
 }

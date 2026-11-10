@@ -175,8 +175,8 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "api-omit",
-            sites: &[Field],
-            keys: &["targets"],
+            sites: &[Field, Method],
+            keys: &["targets", "param"],
             language_keys: &[],
             repeatable: false,
             languages: None,
@@ -420,6 +420,10 @@ impl Annotation {
             && site != Site::Function
             && (key == "returns" || key.ends_with("-returns"))
         {
+            return false;
+        }
+        // `param` names a method parameter to drop, so a field never takes it.
+        if self.name == "api-omit" && key == "param" && site != Site::Method {
             return false;
         }
         self.keys.contains(&key) || self.argument_language(key).is_some()

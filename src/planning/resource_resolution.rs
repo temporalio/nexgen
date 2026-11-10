@@ -9,6 +9,7 @@ use prost_types::field_descriptor_proto::Type;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, JsonModelSpec, OperationSpec,
     RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
@@ -125,6 +126,9 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
     pub(crate) varargs: Option<String>,
+    /// The parameters that only some selected targets omit, and those targets. A parameter that
+    /// every selected target omits isn't in `params`.
+    pub(crate) api_omitted: BTreeMap<String, BTreeSet<GenerationTarget>>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -133,6 +137,8 @@ pub enum ResolvedResourceMethodBinding {
     Operation {
         operation_name: String,
         request_plan: RequestPlan,
+        /// The plan of each target that omits a parameter of `api_omitted`.
+        target_request_plans: BTreeMap<GenerationTarget, RequestPlan>,
     },
     Stub,
 }
@@ -211,7 +217,7 @@ fn resolve_service_resources(
     descriptors: &DescriptorIndex,
     targets: &[crate::nexgen_config::GenerationTarget],
 ) -> Result<ResolvedServiceResources> {
-    let mut resources = resolve_service_resource_methods(spec, service, descriptors)?;
+    let mut resources = resolve_service_resource_methods(spec, service, descriptors, targets)?;
     if targets.is_empty() {
         for resource in &mut resources {
             resource.methods.clear();
@@ -224,11 +230,12 @@ fn resolve_service_resource_methods(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
+    targets: &[GenerationTarget],
 ) -> Result<Vec<ResolvedResourceSpec>> {
     service
         .resources
         .iter()
-        .map(|resource| resolve_resource_methods(spec, service, resource, descriptors))
+        .map(|resource| resolve_resource_methods(spec, service, resource, descriptors, targets))
         .collect()
 }
 
@@ -359,11 +366,14 @@ fn resolve_resource_methods(
     service: &ServiceSpec<SelectedFamily>,
     resource: &ResourceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
+    targets: &[GenerationTarget],
 ) -> Result<ResolvedResourceSpec> {
     let methods = resource
         .methods
         .iter()
-        .map(|method| resolve_resource_method(spec, service, resource, method, descriptors))
+        .map(|method| {
+            resolve_resource_method(spec, service, resource, method, descriptors, targets)
+        })
         .collect::<Result<Vec<_>>>()?;
     Ok(ResolvedResourceSpec {
         name: resource.name.clone(),
@@ -380,20 +390,9 @@ fn resolve_resource_method(
     resource: &ResourceSpec<SelectedFamily>,
     method: &ResourceMethodSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
+    targets: &[GenerationTarget],
 ) -> Result<ResolvedResourceMethodSpec> {
-    let mut environment = BTreeMap::new();
-    for field in &resource.fields {
-        environment.insert(
-            field.name.clone(),
-            RequestPlanSource::ResourceField(field.name.clone()),
-        );
-    }
-    for param in &method.params {
-        environment.insert(
-            param.name.clone(),
-            RequestPlanSource::MethodParam(param.name.clone()),
-        );
-    }
+    let environment = request_environment(resource, &method.params);
 
     if let Some(operation_name) = &method.operation_name {
         let operation =
@@ -427,17 +426,19 @@ fn resolve_resource_method(
                 ),
             });
         }
-        return Ok(ResolvedResourceMethodSpec {
-            name: method.name.clone(),
-            doc: method.doc.clone(),
-            params: method.params.clone(),
-            result: method.result.clone(),
-            varargs: method.varargs.clone(),
-            binding: ResolvedResourceMethodBinding::Operation {
+        return resolve_api_omitted_params(
+            spec,
+            descriptors,
+            service,
+            resource,
+            method,
+            targets,
+            ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
+                target_request_plans: BTreeMap::new(),
             },
-        });
+        );
     }
 
     let implicit_operation_name = method.name.to_upper_camel_case();
@@ -466,6 +467,7 @@ fn resolve_resource_method(
             ResolvedResourceMethodBinding::Operation {
                 operation_name,
                 request_plan,
+                target_request_plans: BTreeMap::new(),
             }
         }
         _ => {
@@ -483,12 +485,132 @@ fn resolve_resource_method(
         }
     };
 
+    resolve_api_omitted_params(
+        spec,
+        descriptors,
+        service,
+        resource,
+        method,
+        targets,
+        binding,
+    )
+}
+
+/// A method parameter fills the request field of the same name, and shadows a resource field.
+fn request_environment(
+    resource: &ResourceSpec<SelectedFamily>,
+    params: &[ResourceFieldSpec<SelectedFamily>],
+) -> BTreeMap<String, RequestPlanSource> {
+    let mut environment = BTreeMap::new();
+    for field in &resource.fields {
+        environment.insert(
+            field.name.clone(),
+            RequestPlanSource::ResourceField(field.name.clone()),
+        );
+    }
+    for param in params {
+        environment.insert(
+            param.name.clone(),
+            RequestPlanSource::MethodParam(param.name.clone()),
+        );
+    }
+    environment
+}
+
+/// The binding uses every parameter, so it doesn't depend on the targets. A parameter that every
+/// selected target omits is dropped here, so a backend with one target never sees an omission.
+fn resolve_api_omitted_params(
+    spec: &ApiSpec<SelectedFamily>,
+    descriptors: &DescriptorIndex,
+    service: &ServiceSpec<SelectedFamily>,
+    resource: &ResourceSpec<SelectedFamily>,
+    method: &ResourceMethodSpec<SelectedFamily>,
+    targets: &[GenerationTarget],
+    mut binding: ResolvedResourceMethodBinding,
+) -> Result<ResolvedResourceMethodSpec> {
+    let omitted_by = match &binding {
+        ResolvedResourceMethodBinding::Operation { .. } => targets
+            .iter()
+            .map(|&target| {
+                let omitted = method
+                    .api_omitted
+                    .iter()
+                    .filter(|(_, omitting)| omitting.contains(&target))
+                    .map(|(name, _)| name.clone())
+                    .collect::<BTreeSet<_>>();
+                (target, omitted)
+            })
+            .collect::<BTreeMap<_, _>>(),
+        ResolvedResourceMethodBinding::Stub => BTreeMap::new(),
+    };
+    let omitted_by_all = omitted_by
+        .values()
+        .cloned()
+        .reduce(|all, omitted| &all & &omitted)
+        .unwrap_or_default();
+    if let ResolvedResourceMethodBinding::Operation {
+        operation_name,
+        request_plan,
+        target_request_plans,
+    } = &mut binding
+    {
+        let operation = service
+            .operation(operation_name)
+            .expect("a method binds an operation of its service");
+        let plan_without = |omitted: &BTreeSet<String>| -> Result<RequestPlan> {
+            let params = method
+                .params
+                .iter()
+                .filter(|param| !omitted.contains(&param.name))
+                .cloned()
+                .collect::<Vec<_>>();
+            let environment = request_environment(resource, &params);
+            synthesize_operation_request_plan(spec, descriptors, operation, &environment)?
+                .ok_or_else(|| Error::InvalidResourceMethod {
+                    service: service.name.clone(),
+                    resource: resource.name.to_upper_camel_case(),
+                    method: method.name.to_string(),
+                    reason: format!(
+                        "bound operation `{}` can't be called without `{}`, which \
+                         `@nexus.api-omit` drops",
+                        operation.name,
+                        omitted.iter().cloned().collect::<Vec<_>>().join("`, `"),
+                    ),
+                })
+        };
+        for (&target, omitted) in &omitted_by {
+            if *omitted != omitted_by_all {
+                target_request_plans.insert(target, plan_without(omitted)?);
+            }
+        }
+        if !omitted_by_all.is_empty() {
+            *request_plan = plan_without(&omitted_by_all)?;
+        }
+    }
+    let params = method
+        .params
+        .iter()
+        .filter(|param| !omitted_by_all.contains(&param.name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let api_omitted = params
+        .iter()
+        .filter_map(|param| {
+            let omitting = omitted_by
+                .iter()
+                .filter(|(_, omitted)| omitted.contains(&param.name))
+                .map(|(&target, _)| target)
+                .collect::<BTreeSet<_>>();
+            (!omitting.is_empty()).then(|| (param.name.clone(), omitting))
+        })
+        .collect();
     Ok(ResolvedResourceMethodSpec {
         name: method.name.clone(),
         doc: method.doc.clone(),
-        params: method.params.clone(),
+        params,
         result: method.result.clone(),
         varargs: method.varargs.clone(),
+        api_omitted,
         binding,
     })
 }
@@ -994,8 +1116,8 @@ impl<'a> ResourceResolutionPass<'a> {
             .services
             .iter()
             .map(|service| {
-                resolve_service_resource_methods(&spec, service, self.descriptors).map(
-                    |resources| {
+                resolve_service_resource_methods(&spec, service, self.descriptors, &self.targets)
+                    .map(|resources| {
                         (
                             service.name.clone(),
                             ResolvedServiceResources {
@@ -1003,8 +1125,7 @@ impl<'a> ResourceResolutionPass<'a> {
                                 operation_returns: BTreeMap::new(),
                             },
                         )
-                    },
-                )
+                    })
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         type_parameters::infer_and_validate(&spec, &mut bindings, path)?;
@@ -1081,6 +1202,7 @@ impl CompilerPass<SelectedFamily, super::ResourceBoundFamily> for ResourceResolu
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
     use prost_types::FileDescriptorSet;
@@ -1437,6 +1559,7 @@ interface user-service {
             ResolvedResourceMethodBinding::Operation {
                 operation_name,
                 request_plan,
+                ..
             } => {
                 assert_eq!(operation_name, "UpdatesEmail");
                 let RequestPlan::Construct {
@@ -1508,5 +1631,90 @@ interface user-service {
             method.binding,
             ResolvedResourceMethodBinding::Stub
         ));
+    }
+
+    #[test]
+    fn a_target_that_omits_a_parameter_gets_a_request_plan_without_it() {
+        use crate::nexgen_config::GenerationTarget::{Client, Workflow};
+
+        let wit = r#"
+package temporal:users@1.0.0;
+
+world system {
+  export user-service;
+}
+
+/// @nexus.endpoint "__user_service"
+interface user-service {
+  resource user {
+    constructor(user-id: string);
+
+    /// @nexus.api-omit targets="workflow" param="note"
+    update-email: func(email: string, note: option<string>) -> user-result;
+  }
+
+  type user-result = own<user>;
+
+  record update-email-request {
+    user-id: string,
+    email: string,
+    note: option<string>,
+  }
+
+  update-email: func(request: update-email-request) -> user-result;
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let service = &spec.services[0];
+        let resolve = |targets| {
+            let resolved =
+                resolve_service_resources(&spec, service, &empty_descriptors(), targets).unwrap();
+            let method = resolved.resources[0].methods[0].clone();
+            let ResolvedResourceMethodBinding::Operation {
+                request_plan,
+                target_request_plans,
+                ..
+            } = &method.binding
+            else {
+                panic!("update-email should bind to UpdateEmail");
+            };
+            let fields = |plan: &RequestPlan| match plan {
+                RequestPlan::Construct { fields, .. } => fields
+                    .iter()
+                    .map(|field| field.field_name.clone())
+                    .collect::<Vec<_>>(),
+                RequestPlan::Source(_) => panic!("the plan should construct the request"),
+            };
+            let params = method.params.iter().map(|param| param.name.clone());
+            (
+                params.collect::<Vec<_>>(),
+                method.api_omitted.clone(),
+                fields(request_plan),
+                target_request_plans
+                    .iter()
+                    .map(|(target, plan)| (*target, fields(plan)))
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        // With only the Workflow target, the method has no `note`.
+        let (params, api_omitted, plan, target_plans) = resolve(&[Workflow]);
+        assert_eq!(params, ["email"]);
+        assert!(api_omitted.is_empty());
+        assert_eq!(plan, ["user-id", "email"]);
+        assert!(target_plans.is_empty());
+
+        // With both targets, the client takes `note` and the Workflow call leaves it unset.
+        let (params, api_omitted, plan, target_plans) = resolve(&[Workflow, Client]);
+        assert_eq!(params, ["email", "note"]);
+        assert_eq!(
+            api_omitted,
+            BTreeMap::from([("note".to_string(), BTreeSet::from([Workflow]))])
+        );
+        assert_eq!(plan, ["user-id", "email", "note"]);
+        assert_eq!(
+            target_plans,
+            [(Workflow, vec!["user-id".to_string(), "email".to_string()])]
+        );
     }
 }

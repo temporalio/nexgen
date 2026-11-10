@@ -825,6 +825,7 @@ impl<'a> TypePlanningContext<'a> {
                     ResolvedResourceMethodBinding::Operation {
                         operation_name,
                         request_plan,
+                        target_request_plans,
                     } => {
                         let operation = operations
                             .iter()
@@ -840,6 +841,7 @@ impl<'a> TypePlanningContext<'a> {
                         PlannedResourceMethodBindingSpec::Operation {
                             operation_name: operation.name.to_string(),
                             request_plan: request_plan.clone(),
+                            target_request_plans: target_request_plans.clone(),
                             direct_return: operation.direct_return,
                         }
                     }
@@ -859,6 +861,7 @@ impl<'a> TypePlanningContext<'a> {
                         .as_ref()
                         .map(|result| self.planned_resource_method_result(service, result)),
                     varargs: method.varargs.clone(),
+                    api_omitted: method.api_omitted.clone(),
                     binding,
                 })
             })

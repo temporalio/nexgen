@@ -230,6 +230,7 @@ async def read_records(
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
     max_bytes: int | None = None,
     body_type: type[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]: ...
@@ -244,6 +245,7 @@ async def read_records(
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
     max_bytes: int | None = None,
     body_type: None = None,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[object],]: ...
@@ -257,6 +259,7 @@ async def read_records(
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
+    last: int | None = None,
     max_bytes: int | None = None,
     body_type: typing.Any = None,
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[typing.Any],]:
@@ -272,6 +275,7 @@ async def read_records(
         wait: How long to wait for a new Record before an empty answer. At most 60 s.
         create_wait: How long to wait for an uncreated Stream. Empty fails at once. At
             most 60 s.
+        last: Read the newest this many Records, oldest first. No from-offset. No wait.
         max_bytes: The maximum Record bytes in a page. A larger Record is still returned
             alone.
     """
@@ -284,6 +288,7 @@ async def read_records(
         max_records=max_records,
         wait=wait,
         create_wait=create_wait,
+        last=last,
         max_bytes=max_bytes,
     )
     return await _read_records(request, body_type)

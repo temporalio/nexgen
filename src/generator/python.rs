@@ -1402,6 +1402,7 @@ impl<'a> ApiPlanner<'a> {
         model_names: &[String],
         resource_names: &[String],
     ) -> String {
+        let resource = &*resource.for_target(target);
         let mut module_imports = bound_operations
             .iter()
             .flat_map(|bound_operation| {

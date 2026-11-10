@@ -144,7 +144,10 @@ Operations must return resources owned by their service, including those held in
 result records. Return bindings determine shared wire models regardless of API
 targets. Method relationships are resolved for inference even in models-only
 generation; callable method metadata is retained only when an API target is
-selected.
+selected. A method binds with all of its parameters. A method's
+`@nexus.api-omit param="..."` drops the named parameter for its targets, and
+each such target gets a request plan without it. A parameter that every selected
+target omits is dropped from the method.
 
 ### OperationBindingPass
 

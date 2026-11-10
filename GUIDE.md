@@ -1145,12 +1145,22 @@ only. The other targets take it as an argument or from their `@nexus.source`.
 
 ```wit
 /// @nexus.api-omit targets="workflow"
-last: option<s32>,
+cursor: option<s64>,
 ```
 
 The field must be an `option<T>` or a `list<T>`, since a call leaves it unset.
 An omitted list is sent empty. `@nexus.api-omit` cannot be combined with
 `@nexus.omit`, `@nexus.default`, or a `@nexus.source` for the same target.
+
+A resource method serves every target, so to drop a parameter for some targets,
+put `@nexus.api-omit` on the method and name the parameter with `param`. The
+client's `read` takes `last`, and the Workflow `read` doesn't.
+
+```wit
+/// @nexus.operation "read-records"
+/// @nexus.api-omit targets="workflow" param="last"
+read: func(from-offset: option<s64>, last: option<s32>) -> read-records-response;
+```
 
 ### Flattened Records
 
@@ -1799,7 +1809,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
 | `@nexus.omit`                           | record field                                                                                  |
-| `@nexus.api-omit`                       | record field                                                                                  |
+| `@nexus.api-omit`                       | record field, resource method                                                                 |
 | `@nexus.source`                         | record field                                                                                  |
 | `@nexus.default`                        | record field                                                                                  |
 | `@nexus.fallback`                       | enum case                                                                                     |
@@ -2263,13 +2273,14 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.api-omit
 
-**Placement:** Record field **Syntax:**
-`@nexus.api-omit [targets="workflow,client"]`
+**Placement:** Record field, resource method **Syntax:**
+`@nexus.api-omit [targets="workflow,client"] [param="<parameter>"]`
 
-Keeps the field on generated models and in proto conversion, but excludes it
-from generated convenience operation APIs. `targets` limits the omission to
-those targets. Unlike `@nexus.omit`, this preserves the field in the generated
-model. See [API-omitted fields](#api-omitted-fields) for an example.
+On a record field, keeps the field on generated models and in proto conversion,
+but excludes it from generated convenience operation APIs. `targets` limits the
+omission to those targets. Unlike `@nexus.omit`, this preserves the field in the
+generated model. On a resource method, `param` names a parameter to drop for
+those targets. See [API-omitted fields](#api-omitted-fields) for an example.
 
 Cannot be combined with `@nexus.omit`, `@nexus.default`, or a `@nexus.source`
 for the same target.
