@@ -88,8 +88,8 @@ namespace Nexgen.DotNetExamples.Tests
         [Fact]
         public void AWorkflowReadTakesNoLast()
         {
-            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions).GetProperty("Last"));
-            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest).GetProperty("Last"));
+            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions<Turn>).GetProperty("Last"));
+            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest<Turn>).GetProperty("Last"));
         }
     }
 }
