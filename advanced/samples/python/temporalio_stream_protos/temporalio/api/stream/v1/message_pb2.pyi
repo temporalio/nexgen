@@ -365,7 +365,9 @@ class AppendRecord(_message.Message):
 
     BODY_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def body(self) -> _message_pb2.Payload: ...
+    def body(self) -> _message_pb2.Payload:
+        """Required."""
+
     def __init__(
         self,
         *,

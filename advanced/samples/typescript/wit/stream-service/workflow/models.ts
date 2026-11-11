@@ -682,21 +682,21 @@ export const workflowTaskEpochTransferTypeConverter = {
   },
 };
 export interface Timestamp {
-  seconds?: Long;
-  nanos?: number;
+  seconds: Long;
+  nanos: number;
 }
 
 function timestampFromProto(proto: google.protobuf.ITimestamp): Timestamp {
   return {
-    seconds: proto.seconds ?? undefined,
-    nanos: proto.nanos ?? undefined,
+    seconds: requiredField(proto.seconds ?? Long.ZERO, "Timestamp", "seconds"),
+    nanos: requiredField(proto.nanos ?? 0, "Timestamp", "nanos"),
   };
 }
 
 function timestampToProto(model: Timestamp): google.protobuf.ITimestamp {
   return {
-    seconds: model.seconds,
-    nanos: model.nanos,
+    seconds: requiredField(model.seconds, "Timestamp", "seconds"),
+    nanos: requiredField(model.nanos, "Timestamp", "nanos"),
   };
 }
 

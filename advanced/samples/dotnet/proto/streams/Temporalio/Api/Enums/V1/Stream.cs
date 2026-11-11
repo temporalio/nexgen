@@ -35,7 +35,7 @@ namespace Temporalio.Api.Enums.V1 {
             "EhkKFVNUUkVBTV9SRUFEX1NUQVJUX0VORBACKpMBChZTdHJlYW1JZENvbmZs",
             "aWN0UG9saWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVD",
             "SUZJRUQQABIiCh5TVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX0ZBSUwQARIq",
-            "CiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKpAF",
+            "CiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKugE",
             "ChFTdHJlYW1FcnJvclJlYXNvbhIjCh9TVFJFQU1fRVJST1JfUkVBU09OX1VO",
             "U1BFQ0lGSUVEEAASIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfRk9VTkQQ",
             "ARIfChtTVFJFQU1fRVJST1JfUkVBU09OX0VYUElSRUQQAhIeChpTVFJFQU1f",
@@ -47,13 +47,12 @@ namespace Temporalio.Api.Enums.V1 {
             "X1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQCRIhCh1TVFJFQU1fRVJST1JfUkVB",
             "U09OX1RPT19MQVJHRRAKEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fSU5WQUxJ",
             "RBALEisKJ1NUUkVBTV9FUlJPUl9SRUFTT05fU1RPUkFHRV9VTkFWQUlMQUJM",
-            "RRAMEiYKIlNUUkVBTV9FUlJPUl9SRUFTT05fVU5LTk9XTl9XUklURVIQDRIj",
-            "Ch9TVFJFQU1fRVJST1JfUkVBU09OX1VOU1VQUE9SVEVEEA4SJgoiU1RSRUFN",
-            "X0VSUk9SX1JFQVNPTl9BTFJFQURZX0VYSVNUUxAPEicKI1NUUkVBTV9FUlJP",
-            "Ul9SRUFTT05fU1RPUkFHRV9DT1JSVVBUEBBCgwEKGGlvLnRlbXBvcmFsLmFw",
-            "aS5lbnVtcy52MUILU3RyZWFtUHJvdG9QAVohZ28udGVtcG9yYWwuaW8vYXBp",
-            "L2VudW1zL3YxO2VudW1zqgIXVGVtcG9yYWxpby5BcGkuRW51bXMuVjHqAhpU",
-            "ZW1wb3JhbGlvOjpBcGk6OkVudW1zOjpWMWIGcHJvdG8z"));
+            "RRAMEiMKH1NUUkVBTV9FUlJPUl9SRUFTT05fVU5TVVBQT1JURUQQDRImCiJT",
+            "VFJFQU1fRVJST1JfUkVBU09OX0FMUkVBRFlfRVhJU1RTEA4SJwojU1RSRUFN",
+            "X0VSUk9SX1JFQVNPTl9TVE9SQUdFX0NPUlJVUFQQD0KDAQoYaW8udGVtcG9y",
+            "YWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Qcm90b1ABWiFnby50ZW1wb3JhbC5p",
+            "by9hcGkvZW51bXMvdjE7ZW51bXOqAhdUZW1wb3JhbGlvLkFwaS5FbnVtcy5W",
+            "MeoCGlRlbXBvcmFsaW86OkFwaTo6RW51bXM6OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamCloseStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
@@ -130,7 +129,7 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_EXPIRED")] Expired = 2,
     /// <summary>
-    /// The Stream is closed. FAILED_PRECONDITION.
+    /// The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_CLOSED")] Closed = 3,
     /// <summary>
@@ -172,22 +171,18 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_UNAVAILABLE")] StorageUnavailable = 12,
     /// <summary>
-    /// No writer has the id. The SDK's in-process writer only. NOT_FOUND.
-    /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_UNKNOWN_WRITER")] UnknownWriter = 13,
-    /// <summary>
     /// The Store lacks a capability that the call needs. UNIMPLEMENTED.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 14,
+    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 13,
     /// <summary>
     /// A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 15,
+    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 14,
     /// <summary>
     /// The Store gave back data that isn't valid, such as a stored value with the wrong length. A
     /// retry reads the same data. DATA_LOSS.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 16,
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 15,
   }
 
   #endregion

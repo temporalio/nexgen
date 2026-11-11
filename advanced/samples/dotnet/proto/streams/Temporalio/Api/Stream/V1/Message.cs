@@ -2891,6 +2891,9 @@ namespace Temporalio.Api.Stream.V1 {
     /// <summary>Field number for the "body" field.</summary>
     public const int BodyFieldNumber = 1;
     private global::Temporalio.Api.Common.V1.Payload body_;
+    /// <summary>
+    /// Required.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public global::Temporalio.Api.Common.V1.Payload Body {

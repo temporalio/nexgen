@@ -117,7 +117,7 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
     """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
-    """The Stream is closed. FAILED_PRECONDITION."""
+    """The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
     """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
@@ -140,13 +140,11 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     """The request is malformed. INVALID_ARGUMENT."""
     STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: _StreamErrorReason.ValueType  # 12
     """The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
-    STREAM_ERROR_REASON_UNKNOWN_WRITER: _StreamErrorReason.ValueType  # 13
-    """No writer has the id. The SDK's in-process writer only. NOT_FOUND."""
-    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 14
+    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 13
     """The Store lacks a capability that the call needs. UNIMPLEMENTED."""
-    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 15
+    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 14
     """A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
-    STREAM_ERROR_REASON_STORAGE_CORRUPT: _StreamErrorReason.ValueType  # 16
+    STREAM_ERROR_REASON_STORAGE_CORRUPT: _StreamErrorReason.ValueType  # 15
     """The Store gave back data that isn't valid, such as a stored value with the wrong length. A
     retry reads the same data. DATA_LOSS.
     """
@@ -164,7 +162,7 @@ STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
 """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
-"""The Stream is closed. FAILED_PRECONDITION."""
+"""The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
 """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
@@ -187,13 +185,11 @@ STREAM_ERROR_REASON_INVALID: StreamErrorReason.ValueType  # 11
 """The request is malformed. INVALID_ARGUMENT."""
 STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: StreamErrorReason.ValueType  # 12
 """The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
-STREAM_ERROR_REASON_UNKNOWN_WRITER: StreamErrorReason.ValueType  # 13
-"""No writer has the id. The SDK's in-process writer only. NOT_FOUND."""
-STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 14
+STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 13
 """The Store lacks a capability that the call needs. UNIMPLEMENTED."""
-STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 15
+STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 14
 """A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
-STREAM_ERROR_REASON_STORAGE_CORRUPT: StreamErrorReason.ValueType  # 16
+STREAM_ERROR_REASON_STORAGE_CORRUPT: StreamErrorReason.ValueType  # 15
 """The Store gave back data that isn't valid, such as a stored value with the wrong length. A
 retry reads the same data. DATA_LOSS.
 """

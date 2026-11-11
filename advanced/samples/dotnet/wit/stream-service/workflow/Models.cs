@@ -1400,29 +1400,28 @@ namespace Temporalio.Workflows
     [GeneratedCode("nexgen", null)]
     public record Timestamp
     {
-        public long? Seconds { get; init; }
-        public int? Nanos { get; init; }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Timestamp"/> class.
+        /// </summary>
+        public Timestamp(long seconds, int nanos)
+        {
+            Seconds = seconds;
+            Nanos = nanos;
+        }
+
+        public long Seconds { get; init; }
+        public int Nanos { get; init; }
 
         internal static Timestamp FromTransferType(Google.Protobuf.WellKnownTypes.Timestamp wire)
         {
-            return new Timestamp()
-            {
-                Seconds = wire.Seconds == 0 ? null : wire.Seconds,
-                Nanos = wire.Nanos == 0 ? null : wire.Nanos,
-            };
+            return new Timestamp(wire.Seconds, wire.Nanos);
         }
 
         internal Google.Protobuf.WellKnownTypes.Timestamp ToTransferType()
         {
             var proto = new Google.Protobuf.WellKnownTypes.Timestamp();
-            if (Seconds is { } seconds)
-            {
-                proto.Seconds = seconds;
-            }
-            if (Nanos is { } nanos)
-            {
-                proto.Nanos = nanos;
-            }
+            proto.Seconds = Seconds;
+            proto.Nanos = Nanos;
             return proto;
         }
 

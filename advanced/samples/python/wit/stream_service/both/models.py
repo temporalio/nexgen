@@ -599,8 +599,8 @@ temporalio.converter.transfer_type_convertible(_WorkflowTaskEpochTransferTypeCon
 
 @dataclasses.dataclass(slots=True)
 class Timestamp:
-    seconds: int | None = None
-    nanos: int | None = None
+    seconds: int
+    nanos: int
 
 
 class _TimestampTransferTypeConverter(
@@ -618,9 +618,11 @@ class _TimestampTransferTypeConverter(
         value: google.protobuf.timestamp_pb2.Timestamp,
         type_hint: type[Timestamp],
     ) -> Timestamp:
+        seconds = value.seconds
+        nanos = value.nanos
         return Timestamp(
-            seconds=value.seconds if value.seconds != 0 else None,
-            nanos=value.nanos if value.nanos != 0 else None,
+            seconds=seconds,
+            nanos=nanos,
         )
 
     @typing_extensions.override
@@ -629,10 +631,8 @@ class _TimestampTransferTypeConverter(
         value: Timestamp,
     ) -> google.protobuf.timestamp_pb2.Timestamp:
         message = google.protobuf.timestamp_pb2.Timestamp()
-        if value.seconds is not None:
-            message.seconds = value.seconds
-        if value.nanos is not None:
-            message.nanos = value.nanos
+        message.seconds = value.seconds
+        message.nanos = value.nanos
         return message
 
 

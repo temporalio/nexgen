@@ -134,6 +134,7 @@ message Producer {
 // Experimental. Might change in the future.
 // One Record of a batch to append. The Store adds the batch's Producer and an offset.
 message AppendRecord {
+    // Required.
     temporal.api.common.v1.Payload body = 1;
 }
 
