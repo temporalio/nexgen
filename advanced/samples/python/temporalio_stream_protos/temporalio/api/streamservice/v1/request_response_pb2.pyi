@@ -40,6 +40,9 @@ class CreateStreamRequest(_message.Message):
     ID_CONFLICT_POLICY_FIELD_NUMBER: _builtins.int
     REQUEST_ID_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    read it.
+    """
     id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType
     """What the create does when the Stream exists. Unspecified is FAIL."""
     request_id: _builtins.str
@@ -114,6 +117,9 @@ class AppendRecordsRequest(_message.Message):
     RECORDS_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    read it.
+    """
     sequence: _builtins.int
     """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
     the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
@@ -193,6 +199,9 @@ class CloseStreamRequest(_message.Message):
     PRODUCER_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    read it.
+    """
     task_token: _builtins.bytes
     """Only read by the server. It checks the token as on the append."""
     @_builtins.property
@@ -258,6 +267,9 @@ class ReadRecordsRequest(_message.Message):
     MAX_BYTES_FIELD_NUMBER: _builtins.int
     FLOOR_FROM_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    read it.
+    """
     from_offset: _builtins.bytes
     """Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
     (-- api-linter: core::0140::prepositions=disabled
@@ -386,6 +398,9 @@ class DescribeStreamRequest(_message.Message):
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    read it.
+    """
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef:
         """Required."""

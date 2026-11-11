@@ -146,6 +146,10 @@ namespace Temporalio.Api.StreamService.V1 {
     /// <summary>Field number for the "namespace" field.</summary>
     public const int NamespaceFieldNumber = 1;
     private string namespace_ = "";
+    /// <summary>
+    /// The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    /// read it.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Namespace {
@@ -736,6 +740,10 @@ namespace Temporalio.Api.StreamService.V1 {
     /// <summary>Field number for the "namespace" field.</summary>
     public const int NamespaceFieldNumber = 1;
     private string namespace_ = "";
+    /// <summary>
+    /// The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    /// read it.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Namespace {
@@ -1384,6 +1392,10 @@ namespace Temporalio.Api.StreamService.V1 {
     /// <summary>Field number for the "namespace" field.</summary>
     public const int NamespaceFieldNumber = 1;
     private string namespace_ = "";
+    /// <summary>
+    /// The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    /// read it.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Namespace {
@@ -1903,6 +1915,10 @@ namespace Temporalio.Api.StreamService.V1 {
     /// <summary>Field number for the "namespace" field.</summary>
     public const int NamespaceFieldNumber = 1;
     private string namespace_ = "";
+    /// <summary>
+    /// The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    /// read it.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Namespace {
@@ -2868,6 +2884,10 @@ namespace Temporalio.Api.StreamService.V1 {
     /// <summary>Field number for the "namespace" field.</summary>
     public const int NamespaceFieldNumber = 1;
     private string namespace_ = "";
+    /// <summary>
+    /// The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
+    /// read it.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Namespace {

@@ -1300,7 +1300,7 @@ export interface StreamClose {
    */
   status?: StreamCloseStatus;
   /**
-   * The offset after the newest Record. A resume from it has nothing to read.
+   * Where the Stream ended.
    */
   offset: Uint8Array;
 }

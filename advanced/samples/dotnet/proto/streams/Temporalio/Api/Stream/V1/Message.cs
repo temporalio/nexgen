@@ -3436,8 +3436,7 @@ namespace Temporalio.Api.Stream.V1 {
     public const int OffsetFieldNumber = 3;
     private pb::ByteString offset_ = pb::ByteString.Empty;
     /// <summary>
-    /// Required. The offset after the newest Record, so a reader that resumes from it has nothing
-    /// left to read.
+    /// Required. Where the Stream ended.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]

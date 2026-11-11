@@ -1160,7 +1160,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public StreamCloseStatus? Status { get; init; }
         /// <summary>
-        /// The offset after the newest Record. A resume from it has nothing to read.
+        /// Where the Stream ended.
         /// </summary>
         public byte[] Offset { get; init; }
 

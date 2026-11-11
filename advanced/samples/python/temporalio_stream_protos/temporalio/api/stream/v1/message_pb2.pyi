@@ -430,9 +430,7 @@ class StreamClose(_message.Message):
     status: _stream_pb2.StreamCloseStatus.ValueType
     """Why the Stream closed."""
     offset: _builtins.bytes
-    """Required. The offset after the newest Record, so a reader that resumes from it has nothing
-    left to read.
-    """
+    """Required. Where the Stream ended."""
     @_builtins.property
     def producer(self) -> Global___Producer:
         """The Producer that closed the Stream."""
