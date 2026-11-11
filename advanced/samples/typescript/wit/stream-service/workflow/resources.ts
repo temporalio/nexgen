@@ -29,7 +29,7 @@ export class Stream<BodyT = unknown> {
     return this.#bodyType;
   }
 
-  public async publish(records: BodyT[]): Promise<AppendRecordsResponse> {
+  public async append(records: BodyT[]): Promise<AppendRecordsResponse> {
     const request = { ref: this.ref, records: records };
     const handle = await appendRecords(request);
     return await handle.result();

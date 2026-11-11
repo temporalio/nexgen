@@ -21,41 +21,17 @@ import "temporal/api/enums/v1/stream.proto";
 // Identifies one Stream. The id is opaque to callers.
 message StreamRef {
     string id = 1;
-    // Unset for a standalone Stream. For a Stream bound to a Workflow, business_id is the Workflow
-    // ID and run_id is the first execution run id of its run chain. For a Standalone Activity,
-    // business_id is the activity ID and run_id is its run id. A create and a close of a
-    // Workflow-owned Stream must carry its owner.
-    temporal.api.common.v1.Execution owner = 2;
     // The name of the backend that holds the Stream, as the Worker and client config register
-    // it, so every process routes a ref it receives. Empty is the default backend. The Store
-    // never reads it.
+    // it, so every process routes a ref it receives. With no name, the SDK picks the backend from
+    // its config. Only an SDK reads it. A request carries the whole ref, and the server and a
+    // Store ignore this field.
     string backend = 3;
 }
 
 // Experimental. Might change in the future.
-// The ordered attempt of a Producer. A higher epoch supersedes the Records of a lower epoch of the
-// same Producer. The case is the kind of the Producer. It decides how the Store orders the epochs,
-// and which earlier Records a higher epoch withdraws.
-message ProducerEpoch {
-    oneof kind {
-        // A Workflow run, which writes in its Workflow Task. A higher epoch withdraws the Records
-        // of the run's Workflow Tasks that never completed, also those of their Local Activities.
-        WorkflowTaskEpoch workflow = 1;
-        // A Local Activity. A higher epoch withdraws the Producer's lower epochs.
-        LocalActivityEpoch local_activity = 2;
-        // An Activity of a Workflow. A higher epoch withdraws the Producer's lower epochs.
-        ActivityEpoch activity = 3;
-        // A Standalone Activity. A higher epoch withdraws the Producer's lower epochs.
-        ActivityEpoch standalone_activity = 4;
-        // A client. A higher epoch only fences the lower ones, since a restarted client's earlier
-        // Records are real messages, not the Records of a failed attempt.
-        ClientEpoch client = 5;
-    }
-}
-
-// Experimental. Might change in the future.
 // One Workflow Task attempt of a run. It orders by started_event_id, then attempt, then
-// started_time.
+// started_time. An epoch orders the writes of one Producer only, and a Producer is one run. A
+// reset run and the next run of a chain are other Producers, so their epochs start again.
 message WorkflowTaskEpoch {
     int64 started_event_id = 1;
     int32 attempt = 2;
@@ -64,8 +40,9 @@ message WorkflowTaskEpoch {
 }
 
 // Experimental. Might change in the future.
-// The attempt of a Local Activity. It orders by task, then attempt, so a Local Activity of a
-// later Workflow Task supersedes one of an earlier task.
+// The attempt of a Local Activity. It orders by task, then attempt, so the same call in a later
+// Workflow Task is a higher epoch. The Producer carries the run. Records of two runs have no
+// order by epoch, only their order in the Stream.
 message LocalActivityEpoch {
     // The Workflow Task attempt that dispatched the Local Activity.
     WorkflowTaskEpoch task = 1;
@@ -83,46 +60,80 @@ message ActivityEpoch {
 }
 
 // Experimental. Might change in the future.
-// The attempt of a client Producer, which the client picks.
+// The attempt of a client Producer, which the client picks. A client that keeps one Producer
+// name across restarts stores this number and raises it at each start, so the new process
+// fences the old one. A client with no name of its own is a new Producer in each process.
 message ClientEpoch {
     int32 attempt = 1;
 }
 
 // Experimental. Might change in the future.
-// The code that wrote a batch. Its id stays the same across attempts, and its epoch orders them.
+// A Workflow run Producer. It writes in its Workflow Task. A higher epoch fences the lower ones.
+message WorkflowProducer {
+    // The run id of the Workflow run, not of its chain. Each run is its own Producer.
+    string run_id = 1;
+    WorkflowTaskEpoch epoch = 2;
+}
+
+// Experimental. Might change in the future.
+// A Local Activity Producer, one for each call of a run. A higher epoch fences the lower ones.
+message LocalActivityProducer {
+    // The run id of the Workflow run.
+    string run_id = 1;
+    LocalActivityEpoch epoch = 2;
+}
+
+// Experimental. Might change in the future.
+// An Activity Producer, for an Activity of a Workflow or a Standalone Activity. A higher epoch
+// fences the lower ones. Their Records are those of a failed attempt, which a reader may hide.
+message ActivityProducer {
+    // The run id of the Workflow run that scheduled the Activity. Empty for a Standalone
+    // Activity, whose own run id is in the Producer id.
+    string run_id = 1;
+    ActivityEpoch epoch = 2;
+}
+
+// Experimental. Might change in the future.
+// A client Producer. A higher epoch only fences the lower ones, since a restarted client's earlier
+// Records are real messages, not the Records of a failed attempt. A client has no run.
+message ClientProducer {
+    ClientEpoch epoch = 1;
+}
+
+// Experimental. Might change in the future.
+// The code that wrote a batch. Its id stays the same across attempts, and the kind's case orders
+// its epochs. After a write of a higher epoch, a write of a lower epoch of the same Producer
+// fails with FENCED. The epochs of two Producers never compare. A run-based kind carries its run,
+// so a client can't.
 message Producer {
-    // Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run.
+    // Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run. It is
+    // unique in one Stream, and a Stream is in one namespace, so it carries no namespace.
     string id = 1;
-    // Required. Its case gives the kind of the Producer.
-    ProducerEpoch epoch = 2;
-    // The run of the Producer, so nobody parses the id. Empty for a client.
-    string run_id = 3;
+    // Required. The case is the kind of the Producer.
+    oneof kind {
+        WorkflowProducer workflow = 2;
+        LocalActivityProducer local_activity = 3;
+        // An Activity that a Workflow scheduled.
+        ActivityProducer workflow_activity = 4;
+        // An Activity with no Workflow. Both Activity cases order their epochs the same way. The
+        // case tells which identity the Producer has, since only the first has a Workflow run.
+        ActivityProducer standalone_activity = 5;
+        ClientProducer client = 6;
+    }
+}
+
+// Experimental. Might change in the future.
+// The Producer of a write. An append and a close carry the same writer, so the Store orders each
+// write the same way.
+message StreamWriter {
+    // Required on a write.
+    Producer producer = 1;
 }
 
 // Experimental. Might change in the future.
 // One Record of a batch to append. The Store adds the batch's Producer and an offset.
 message AppendRecord {
     temporal.api.common.v1.Payload body = 1;
-}
-
-// Experimental. Might change in the future.
-// Which earlier Records a retried Producer withdraws. The Store keeps these facts for the first
-// batch of a higher epoch, or for a retry run's first write, and a read builds a Superseded item
-// from them. A reader drops the earlier Records that the facts match.
-message StreamSuperseded {
-    // The id of the Producer that withdraws.
-    string producer_id = 1;
-    // The epoch of the Producer that withdraws, whose case picks the rule. Empty when only
-    // withdraw_run applies.
-    ProducerEpoch epoch = 2;
-    // Workflow only. The run's last completed Workflow Task.
-    WorkflowTaskEpoch previous_completed_task = 3;
-    // Workflow only. The started event ids of the run's failed or timed out Workflow Tasks.
-    repeated int64 failed_tasks = 4;
-    // Workflow retry only. The previous run. Every Record whose Producer carries it is withdrawn.
-    string withdraw_run = 5;
-    // The run of the Producer, so nobody parses the id. Empty for a client.
-    string run_id = 6;
 }
 
 // Experimental. Might change in the future.
@@ -133,18 +144,26 @@ message StreamData {
 }
 
 // Experimental. Might change in the future.
+// The close of a Stream, as a read item. A close is its own call and stores no Record. A read
+// builds this item from the close state of the Stream and returns it last, so a reader learns in
+// order that the Stream ended, who closed it and why.
+message StreamClose {
+    // The Producer that closed the Stream.
+    Producer producer = 1;
+    // Why the Stream closed.
+    temporal.api.enums.v1.StreamCloseStatus status = 2;
+}
+
+// Experimental. Might change in the future.
 // An offset is ordered and unique in one Stream, and it is sparse. Offsets have gaps, so they
-// don't count Records. Empty bytes are never an offset. A read gives its Stream, so the read
-// checks the offset against that Stream.
+// don't count Records. An offset is never empty. A read gives its Stream, so the read checks the
+// offset against that Stream.
 message StreamRecord {
     bytes offset = 1;
-    // A read item is a Record or a Superseded item. A close writes no item.
+    // A read item is a Record or the close.
     oneof item {
         StreamData data = 2;
-        // The Store keeps only the withdrawal facts of the first batch of a higher epoch. A read
-        // builds this item from them. It withdraws the earlier Records that the facts match, and a
-        // reader drops them.
-        StreamSuperseded superseded = 3;
+        StreamClose close = 4;
     }
 }
 

@@ -4,7 +4,6 @@ import asyncio
 import collections.abc
 import dataclasses
 import importlib
-import inspect
 import subprocess
 import sys
 import types
@@ -86,14 +85,15 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                         body={"text": "hi"},
                         producer=models.Producer(
                             id="la:r1:1",
-                            epoch=models.ProducerEpoch(
-                                kind=models.ProducerEpochKindLocalActivity(
-                                    models.LocalActivityEpoch(
+                            kind=models.ProducerKindLocalActivity(
+                                models.LocalActivityProducer(
+                                    run_id="r1",
+                                    epoch=models.LocalActivityEpoch(
                                         task=models.WorkflowTaskEpoch(
                                             started_event_id=4
                                         ),
                                         attempt=2,
-                                    )
+                                    ),
                                 )
                             ),
                         ),
@@ -102,13 +102,21 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                 offset=_offset(1),
             ),
             models.StreamRecord(
-                item=models.StreamItemSuperseded(
-                    models.StreamSuperseded(producer_id="workflow-1", failed_tasks=[7])
+                item=models.StreamItemClose(
+                    models.StreamClose(
+                        producer=models.Producer(
+                            id="wf:r1",
+                            kind=models.ProducerKindWorkflow(
+                                models.WorkflowProducer(run_id="r1")
+                            ),
+                        ),
+                        status=models.StreamCloseStatus.StreamCloseStatusClosed,
+                    )
                 ),
                 offset=_offset(2),
             ),
         ],
-        next_offset=_offset(3),
+        last_offset=_offset(3),
         done=True,
     )
 
@@ -119,10 +127,13 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
     assert all(isinstance(record, message_pb2.StreamRecord) for record in wire.records)
     assert [record.WhichOneof("item") for record in wire.records] == [
         "data",
-        "superseded",
+        "close",
     ]
-    assert wire.records[0].data.producer.epoch.WhichOneof("kind") == "local_activity"
-    assert wire.records[1].superseded.failed_tasks == [7]
+    assert wire.records[0].data.producer.WhichOneof("kind") == "local_activity"
+    assert (
+        wire.records[1].close.status
+        == stream_pb2.StreamCloseStatus.STREAM_CLOSE_STATUS_CLOSED
+    )
     assert converter.from_transfer_type(wire, models.ReadRecordsResponse) == model
 
 
@@ -184,24 +195,6 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
     [(workflow_only, workflow_models), (both_workflow, both_models)],
     ids=["workflow", "both"],
 )
-def test_a_workflow_read_takes_no_last(
-    api: types.ModuleType, model_types: types.ModuleType
-) -> None:
-    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only. The read is
-    # reached through the Stream resource, since `@nexus.api-omit` drops the top-level function.
-    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
-    assert "last" not in inspect.signature(stream.read).parameters
-    request = model_types.ReadRecordsRequest(
-        ref=model_types.StreamRef(id="s-1"), last=3
-    )
-    assert request.last == 3
-
-
-@pytest.mark.parametrize(
-    ("api", "model_types"),
-    [(workflow_only, workflow_models), (both_workflow, both_models)],
-    ids=["workflow", "both"],
-)
 async def test_workflow_apis_call_the_stream_service(
     monkeypatch: pytest.MonkeyPatch,
     api: types.ModuleType,
@@ -243,10 +236,16 @@ async def test_workflow_apis_call_the_stream_service(
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    response = await stream.publish("a", "b")
-    assert response.last_offset == _offset(3)
-    # The Workflow API fills the request id and the producer from its sources.
-    run = model_types.Producer(id="wf:r2", run_id="r2")
+    assert await stream.append("a", "b") == _offset(3)
+    # The Workflow API fills the request id and the writer from its sources.
+    writer = model_types.StreamWriter(
+        producer=model_types.Producer(
+            id="wf:r2",
+            kind=model_types.ProducerKindWorkflow(
+                model_types.WorkflowProducer(run_id="r2")
+            ),
+        )
+    )
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [
         (
@@ -255,7 +254,7 @@ async def test_workflow_apis_call_the_stream_service(
         ),
         (
             "AppendRecords",
-            model_types.AppendRecordsRequest(ref=ref, records=records, producer=run),
+            model_types.AppendRecordsRequest(ref=ref, records=records, writer=writer),
         ),
     ]
     # The sources build the models of one package, so the calls compare as data.
@@ -468,10 +467,10 @@ async def test_a_workflow_handle_reads_with_its_refs_payload_type(
     if typing.TYPE_CHECKING:
         _ = workflow_only.get_stream(ref=typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
         records = [Turn(role="model")]
-        _ = await workflow_only.get_stream(ref=typed).publish(*records)
+        _ = await workflow_only.get_stream(ref=typed).append(*records)
         _ = await workflow_only.get_stream(
             ref=workflow_models.StreamRef[str](id="s1")
-        ).publish(*records)  # pyright: ignore[reportArgumentType]
+        ).append(*records)  # pyright: ignore[reportArgumentType]
 
 
 def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
@@ -650,7 +649,7 @@ def test_api_omit_hides_the_public_operation_functions(
     stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
     assert all(
         callable(getattr(stream, method))
-        for method in ("publish", "close", "read", "describe")
+        for method in ("append", "close", "read", "describe")
     )
     # Every operation stays registered, so the service still serves all five.
     assert len(api.__nexus_operation_registry__) == 5

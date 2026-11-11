@@ -60,19 +60,17 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
-    ) -> AppendRecordsResponse:
-        """Publish values, and return the first and the last offset of the batch."""
+    ) -> bytes:
+        """Append values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.workflow_producer(),
-            withdraw_run=_support.withdraw_run(),
+            writer=_support.workflow_writer(),
         )
-        handle = await _append_records(request)
-        return await handle
+        return await _append_records(request)
 
     async def close(
         self,
@@ -80,7 +78,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.workflow_producer(),
+            writer=_support.workflow_writer(),
         )
         handle = await _close_stream(request)
         await handle
@@ -148,7 +146,7 @@ def get_stream(
     elif arguments and arguments[0] is not object and arguments[0] != body_type:
         raise TypeError("The decoding type must match the typed ref")
     if arguments != (body_type,):
-        ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+        ref = StreamRef[body_type](id=ref.id, backend=ref.backend)
     return Stream[body_type](
         ref=ref,
         created=created,
@@ -157,16 +155,18 @@ def get_stream(
 
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
-) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
+) -> bytes:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
-    return await nexus_client.start_operation(
+    handle = await nexus_client.start_operation(
         operation="AppendRecords",
         input=request,
         output_type=AppendRecordsResponse,
     )
+    result = await handle
+    return _support.last_offset(result)
 
 
 async def _close_stream(

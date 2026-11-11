@@ -35,7 +35,7 @@ namespace Nexgen.DotNetExamples.Tests
         public void DeclaredRefParametersPropagateThroughRequests()
         {
             var reference = new StreamServiceExample.StreamRef<Turn>("stream-1");
-            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null, null);
+            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null);
             var decoded = FromPayload<StreamServiceExample.CreateStreamRequest<Turn>>(ToPayload(request));
             Assert.Equal(reference, decoded.StreamRef);
             Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.StreamRef);
@@ -50,8 +50,16 @@ namespace Nexgen.DotNetExamples.Tests
             {
                 new StreamServiceExample.StreamRecord<Turn>
                 {
-                    Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
-                        new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
+                    Item = new StreamServiceExample.StreamItem<Turn>.Close(
+                        new StreamServiceExample.StreamClose
+                        {
+                            Producer = new StreamServiceExample.Producer("wf:r1")
+                            {
+                                Kind = new StreamServiceExample.ProducerKind.Workflow(
+                                    new StreamServiceExample.WorkflowProducer { RunId = "r1" }),
+                            },
+                            Status = StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
+                        }),
                     Offset = new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 },
                 },
             });
@@ -60,15 +68,17 @@ namespace Nexgen.DotNetExamples.Tests
                 CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsResponse<Turn>))
                     .ToTransferType(model));
             Assert.Equal(
-                new[] { WireStreamRecord.ItemOneofCase.Superseded },
+                new[] { WireStreamRecord.ItemOneofCase.Close },
                 wire.Records.Select(record => record.ItemCase));
 
             var decoded = FromPayload<StreamServiceExample.ReadRecordsResponse<Turn>>(
                 ToPayload(model));
-            var superseded = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Superseded>(
+            var close = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Close>(
                 decoded.Records[0].Item);
-            Assert.Equal("workflow-1", superseded.Value.ProducerId);
-            Assert.Equal(new long[] { 7 }, superseded.Value.FailedTasks);
+            Assert.Equal("wf:r1", close.Value.Producer?.Id);
+            Assert.Equal(
+                StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
+                close.Value.Status);
             Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 }, decoded.Records[0].Offset);
         }
 
@@ -133,20 +143,6 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(StreamServiceExample.StreamStatus.StreamStatusUnspecified, decoded.Status);
         }
 
-        // Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
-        [Fact]
-        public void AWorkflowReadTakesNoLast()
-        {
-            var assembly = typeof(StreamServiceExample.Stream<Turn>).Assembly;
-            // `read-records` is api-omitted, so its options type is no longer part of the public API.
-            var options = assembly.GetType("Temporalio.Workflows.ReadRecordsOptions`1");
-            Assert.NotNull(options);
-            Assert.False(options!.IsPublic);
-            Assert.Null(options.GetProperty("Last"));
-            // The wire request keeps `Last`, since the field-level api-omit only hides the convenience.
-            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest<Turn>).GetProperty("Last"));
-        }
-
         // Four operations are api-omitted, so only the create keeps a public convenience method.
         [Fact]
         public void ApiOmitHidesTheOperationConvenienceMethods()
@@ -174,7 +170,7 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(new[] { "CreateStreamAsync" }, publicOperationMethods);
 
             // The Stream resource still binds every operation.
-            foreach (var method in new[] { "PublishAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
+            foreach (var method in new[] { "AppendAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
             {
                 Assert.NotNull(typeof(StreamServiceExample.Stream<Turn>).GetMethod(method));
             }

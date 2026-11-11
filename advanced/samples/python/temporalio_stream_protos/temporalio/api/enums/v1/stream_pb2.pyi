@@ -40,6 +40,27 @@ STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
 STREAM_STATUS_EXPIRED: StreamStatus.ValueType  # 3
 Global___StreamStatus: _TypeAlias = StreamStatus  # noqa: Y015
 
+class _StreamCloseStatus:
+    ValueType = _typing.NewType("ValueType", _builtins.int)
+    V: _TypeAlias = ValueType  # noqa: Y015
+
+class _StreamCloseStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamCloseStatus.ValueType], _builtins.type):
+    DESCRIPTOR: _descriptor.EnumDescriptor
+    STREAM_CLOSE_STATUS_UNSPECIFIED: _StreamCloseStatus.ValueType  # 0
+    STREAM_CLOSE_STATUS_CLOSED: _StreamCloseStatus.ValueType  # 1
+
+class StreamCloseStatus(_StreamCloseStatus, metaclass=_StreamCloseStatusEnumTypeWrapper):
+    """Experimental. Might change in the future.
+    How a Stream closed. CLOSED comes from a Producer that called close(). Native Streams add their
+    own close statuses later.
+    (-- api-linter: core::0216::synonyms=disabled
+        aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
+    """
+
+STREAM_CLOSE_STATUS_UNSPECIFIED: StreamCloseStatus.ValueType  # 0
+STREAM_CLOSE_STATUS_CLOSED: StreamCloseStatus.ValueType  # 1
+Global___StreamCloseStatus: _TypeAlias = StreamCloseStatus  # noqa: Y015
+
 class _StreamReadStart:
     ValueType = _typing.NewType("ValueType", _builtins.int)
     V: _TypeAlias = ValueType  # noqa: Y015
@@ -94,13 +115,11 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
     """Nobody created the Stream, even after `create_wait`. NOT_FOUND."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
-    """The Stream's Retention or safety TTL passed. NOT_FOUND."""
+    """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
     """The Stream is closed. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
-    """The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
-    Workflow retry withdrew its run. FAILED_PRECONDITION.
-    """
+    """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
     """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
@@ -108,14 +127,12 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     FAILED_PRECONDITION.
     """
     STREAM_ERROR_REASON_NOT_OWNER: _StreamErrorReason.ValueType  # 7
-    """A create gives another owner than the Stream has, or the owner doesn't allow this close.
-    FAILED_PRECONDITION.
-    """
+    """The caller may not create or close this Stream. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 8
     """A newer format version wrote the Stream. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 9
-    """The offset is past the newest offset + 1, for example after a failover lost the newest
-    Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+    """The offset is past the newest offset, for example after a failover lost the newest Records.
+    A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
     """
     STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 10
     """A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""
@@ -136,21 +153,20 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
 
 class StreamErrorReason(_StreamErrorReason, metaclass=_StreamErrorReasonEnumTypeWrapper):
     """Experimental. Might change in the future.
-    Why a Stream call failed. Each reason has one gRPC status code. An SDK raises its own error
-    class for each reason that code can act on, and a base class for the others.
+    Why a Stream call failed. Each reason has one gRPC status code, and several reasons share a
+    code. So code matches on the reason, and not on the status code. An SDK raises one error type
+    that carries the reason.
     """
 
 STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 """Nobody created the Stream, even after `create_wait`. NOT_FOUND."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
-"""The Stream's Retention or safety TTL passed. NOT_FOUND."""
+"""The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
 """The Stream is closed. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
-"""The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
-Workflow retry withdrew its run. FAILED_PRECONDITION.
-"""
+"""The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
 """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
@@ -158,14 +174,12 @@ STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
 FAILED_PRECONDITION.
 """
 STREAM_ERROR_REASON_NOT_OWNER: StreamErrorReason.ValueType  # 7
-"""A create gives another owner than the Stream has, or the owner doesn't allow this close.
-FAILED_PRECONDITION.
-"""
+"""The caller may not create or close this Stream. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 8
 """A newer format version wrote the Stream. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 9
-"""The offset is past the newest offset + 1, for example after a failover lost the newest
-Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+"""The offset is past the newest offset, for example after a failover lost the newest Records.
+A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
 """
 STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 10
 """A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""

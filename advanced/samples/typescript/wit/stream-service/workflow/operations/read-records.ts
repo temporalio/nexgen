@@ -8,13 +8,6 @@ import type { ReadRecordsResponse, ReadRecordsRequest } from "../models";
 import "../resources";
 import type { Stream } from "../resources";
 
-type ReadRecordsInput<BodyT> =
-  ReadRecordsRequest<BodyT> extends infer Input
-    ? Input extends unknown
-      ? Omit<Input, "last"> & { last?: never }
-      : never
-    : never;
-
 /**
  * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
  * Activity.
@@ -22,7 +15,7 @@ type ReadRecordsInput<BodyT> =
  * @param request - Request for the operation.
  */
 export async function readRecords<BodyT>(
-  request: ReadRecordsInput<BodyT>,
+  request: ReadRecordsRequest<BodyT>,
   bodyType?: common.TypeInfo<BodyT>,
 ): Promise<nexus.NexusOperationHandle<ReadRecordsResponse<BodyT>>> {
   const client = nexus.createNexusServiceClient({

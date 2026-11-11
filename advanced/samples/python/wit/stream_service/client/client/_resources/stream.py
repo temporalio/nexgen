@@ -14,7 +14,6 @@ from ...services import StreamService
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
-    AppendRecordsResponse,
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
@@ -67,18 +66,17 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> AppendRecordsResponse:
-        """Publish values, and return the first and the last offset of the batch."""
+    ) -> bytes:
+        """Append values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.client_producer(),
-            withdraw_run=_support.withdraw_run(),
+            writer=_support.client_writer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -87,7 +85,8 @@ class Stream(typing.Generic[BodyT]):
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
-        return await handle.result()
+        result = await handle.result()
+        return _support.last_offset(result)
 
     async def close(
         self,
@@ -98,7 +97,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.client_producer(),
+            writer=_support.client_writer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,
@@ -157,8 +156,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             position: Where the read starts. Unset is the beginning. A too high offset
                 fails.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
+            max_records: About this many items per page, 1 to 1000.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
             create_wait: How long to wait for an uncreated Stream. Empty fails at once.
@@ -212,8 +210,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             position: Where the read starts. Unset is the beginning. A too high offset
                 fails.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
+            max_records: About this many items per page, 1 to 1000.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
             create_wait: How long to wait for an uncreated Stream. Empty fails at once.

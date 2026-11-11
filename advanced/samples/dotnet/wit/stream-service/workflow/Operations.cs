@@ -31,17 +31,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// The run chain or Standalone Activity of a bound Stream. Empty if standalone.
-        /// </summary>
-        public Execution? Owner { get; set; }
-        /// <summary>
-        /// Registered backend name, empty for the default. The Store never reads it.
+        /// Registered backend name, empty for the default. Only an SDK reads it.
         /// </summary>
         public string? Backend { get; set; }
-        /// <summary>
-        /// The age after which a Record is dropped. Empty is the Store default.
-        /// </summary>
-        public System.TimeSpan? Retention { get; set; }
         /// <summary>
         /// What the create does when the Stream exists. Unspecified is fail.
         /// </summary>
@@ -105,7 +97,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public ReadPosition? Position { get; set; }
         /// <summary>
-        /// About this many items per page, 1 to 1000. A Superseded item stays with its Record.
+        /// About this many items per page, 1 to 1000.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
@@ -159,9 +151,8 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamOptions<TBody> options)
         {
-            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Owner = options.Owner, Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.WithdrawRun(), Nexgen.Support.StreamWorkflowContext.RequestId())
+            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.RequestId())
             {
-                Retention = options.Retention,
                 IdConflictPolicy = options.IdConflictPolicy,
             };
             return CreateStreamAsync<TBody>(request);
@@ -186,7 +177,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer(), Nexgen.Support.StreamWorkflowContext.WithdrawRun())
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Writer())
             {
                 Sequence = options.Sequence,
             };
@@ -206,7 +197,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
         {
-            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Producer());
+            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Writer());
             return CloseStreamAsync(request);
         }
 

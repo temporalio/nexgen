@@ -14,6 +14,7 @@ import typing
 import uuid
 
 import pytest
+import temporalio.activity
 import temporalio.client
 import temporalio.converter
 import temporalio.nexus.system
@@ -23,6 +24,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.api.stream.v1 import message_pb2
 from typing_extensions import assert_type, override
 
+import wit.stream_service.both.models as both_models
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
 from wit.stream_service.both._resource_context_manager import ResourceContextManager
@@ -34,17 +36,20 @@ from wit.stream_service.client.client import (
 )
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
+    ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
+    ClientProducer,
     CloseStreamRequest,
     CloseStreamResponse,
     CreateStreamRequest,
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Execution,
     Producer,
+    ProducerKindClient,
+    ProducerKindWorkflowActivity,
     ReadPosition,
     ReadPositionFromOffset,
     ReadPositionStart,
@@ -55,6 +60,7 @@ from wit.stream_service.both.models import (
     StreamReadStart,
     StreamRecord,
     StreamRef,
+    StreamWriter,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -307,11 +313,11 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, f"_stream_service_{name}")
 
     stream = await client.create_stream(id="s1", body_type=str)
-    response = await stream.publish("a")
+    last_offset = await stream.append("a")
     await stream.close()
 
     assert stream.ref.id == "s1"
-    assert response.last_offset == _offset(7)
+    assert last_offset == _offset(7)
     assert len(client.created_clients) == 1
     create, append, close = answers.started
     assert (create.service, create.endpoint, create.operation) == (
@@ -331,11 +337,12 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "__temporal_system",
         "AppendRecords",
     )
-    # A client call fills the producer from its source.
+    # A client call fills the writer from its source.
+    writer = StreamWriter(
+        producer=Producer(id="client:sample", kind=ProducerKindClient(ClientProducer()))
+    )
     assert append.arg == AppendRecordsRequest(
-        ref=stream.ref,
-        records=[AppendRecord(body="a")],
-        producer=Producer(id="client:sample"),
+        ref=stream.ref, records=[AppendRecord(body="a")], writer=writer
     )
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
@@ -344,67 +351,8 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         SYSTEM_ENDPOINT,
         "CloseStream",
     )
-    assert close.arg == CloseStreamRequest(
-        ref=stream.ref, producer=Producer(id="client:sample")
-    )
+    assert close.arg == CloseStreamRequest(ref=stream.ref, writer=writer)
     assert close.result_type is CloseStreamResponse
-
-
-@pytest.mark.parametrize(
-    ("fields", "ref"),
-    [
-        ({}, StreamRef(id="s1")),
-        (
-            {"backend": "redis", "owner": Execution(business_id="wf-1", run_id="r1")},
-            StreamRef(
-                id="s1",
-                backend="redis",
-                owner=Execution(business_id="wf-1", run_id="r1"),
-            ),
-        ),
-    ],
-)
-async def test_a_create_takes_the_fields_of_the_ref(
-    fields: dict[str, typing.Any], ref: StreamRef
-) -> None:
-    client, answers = connect(Client, {"CreateStream": CreateStreamResult(ref=ref)})
-
-    _ = await client.create_stream(id="s1", **fields)
-
-    request = answers.started[0].arg
-    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
-    wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
-    assert wire.stream_ref.id == "s1"
-    assert wire.stream_ref.backend == fields.get("backend", "")
-    assert wire.stream_ref.HasField("owner") == ("owner" in fields)
-    assert wire.stream_ref.owner.business_id == ("wf-1" if fields else "")
-
-
-async def test_a_publish_wraps_each_value_and_returns_the_response() -> None:
-    ref = StreamRef(id="s1")
-    client, answers = connect(
-        Client,
-        {
-            "AppendRecords": AppendRecordsResponse(
-                first_offset=_offset(4), last_offset=_offset(5)
-            )
-        },
-    )
-    stream = client.get_stream(ref=ref, body_type=str)
-
-    response = await stream.publish("a", "b")
-
-    _ = assert_type(response, AppendRecordsResponse)
-    assert response.first_offset == _offset(4)
-    assert response.last_offset == _offset(5)
-    assert answers.started[0].arg == AppendRecordsRequest(
-        ref=ref,
-        records=[AppendRecord(body="a"), AppendRecord(body="b")],
-        producer=Producer(id="client:sample"),
-    )
-    if typing.TYPE_CHECKING:
-        # The items take the type argument, so a `Stream[str]` refuses an `int`.
-        _ = stream.publish(1)  # pyright: ignore[reportArgumentType]
 
 
 def closing_client() -> tuple[Client, Answers]:
@@ -434,7 +382,14 @@ async def test_a_clean_block_closes_its_stream() -> None:
         _ = assert_type(stream, Stream[Turn])
 
     assert closes(answers) == [
-        CloseStreamRequest(ref=stream.ref, producer=Producer(id="client:sample"))
+        CloseStreamRequest(
+            ref=stream.ref,
+            writer=StreamWriter(
+                producer=Producer(
+                    id="client:sample", kind=ProducerKindClient(ClientProducer())
+                )
+            ),
+        )
     ]
 
 
@@ -456,6 +411,98 @@ async def test_a_canceled_block_closes_its_stream() -> None:
             raise asyncio.CancelledError("stop")
 
     assert len(closes(answers)) == 1
+
+
+async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
+    ref = StreamRef(id="s1")
+    client, answers = connect(
+        Client,
+        {
+            "AppendRecords": [
+                AppendRecordsResponse(first_offset=_offset(4), last_offset=_offset(5)),
+                AppendRecordsResponse(),
+            ]
+        },
+    )
+    stream = client.get_stream(ref=ref, body_type=str)
+
+    last_offset = await stream.append("a", "b")
+    empty = await stream.append()
+
+    _ = assert_type(last_offset, bytes)
+    assert last_offset == _offset(5)
+    assert answers.started[0].arg == AppendRecordsRequest(
+        ref=ref,
+        records=[AppendRecord(body="a"), AppendRecord(body="b")],
+        writer=StreamWriter(
+            producer=Producer(
+                id="client:sample", kind=ProducerKindClient(ClientProducer())
+            )
+        ),
+    )
+    # An append that wrote no Record has no last offset, so it answers empty bytes.
+    assert empty == b""
+    if typing.TYPE_CHECKING:
+        # The items take the type argument, so a `Stream[str]` refuses an `int`.
+        _ = stream.append(1)  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.parametrize(
+    ("fields", "ref"),
+    [
+        ({}, StreamRef(id="s1")),
+        ({"backend": "redis"}, StreamRef(id="s1", backend="redis")),
+    ],
+)
+async def test_a_create_takes_the_fields_of_the_ref(
+    fields: dict[str, typing.Any], ref: StreamRef
+) -> None:
+    client, answers = connect(Client, {"CreateStream": CreateStreamResult(ref=ref)})
+
+    _ = await client.create_stream(id="s1", **fields)
+
+    request = answers.started[0].arg
+    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
+    wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
+    assert wire.stream_ref.id == "s1"
+    assert wire.stream_ref.backend == fields.get("backend", "")
+
+
+@dataclasses.dataclass
+class FakeActivityInfo:
+    workflow_run_id: str
+    activity_id: str
+
+
+async def test_a_client_append_sends_the_writer_of_its_activity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(temporalio.activity, "in_activity", lambda: True)
+    monkeypatch.setattr(
+        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7")
+    )
+    client, answers = connect(
+        Client, {"AppendRecords": AppendRecordsResponse(last_offset=_offset(1))}
+    )
+    stream = client.get_stream(ref=StreamRef(id="s1"), body_type=str)
+
+    _ = await stream.append()
+
+    (append,) = answers.started
+    writer = StreamWriter(
+        producer=Producer(
+            id="act:r1:7",
+            kind=ProducerKindWorkflowActivity(ActivityProducer(run_id="r1")),
+        )
+    )
+    assert append.arg == AppendRecordsRequest(
+        ref=StreamRef(id="s1"), records=[], writer=writer
+    )
+    # The writer's Producer goes in the request's one writer field.
+    converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
+    wire = converter.to_transfer_type(append.arg)
+    assert wire.writer.producer.id == "act:r1:7"
+    assert wire.writer.producer.workflow_activity.run_id == "r1"
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
@@ -567,9 +614,9 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
                 StreamRecord[str](offset=_offset(1)),
                 StreamRecord[str](offset=_offset(2)),
             ],
-            next_offset=_offset(3),
+            last_offset=_offset(3),
         ),
-        ReadRecordsResponse[str](records=[], next_offset=_offset(3)),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(3)),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
@@ -591,9 +638,9 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     wait = datetime.timedelta(seconds=30)
     pages = [
         ReadRecordsResponse[str](
-            records=[StreamRecord[str](offset=_offset(1))], next_offset=_offset(2)
+            records=[StreamRecord[str](offset=_offset(1))], last_offset=_offset(2)
         ),
-        ReadRecordsResponse[str](records=[], next_offset=_offset(2)),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(2)),
         ReadRecordsResponse[str](records=[], done=True),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
@@ -609,13 +656,13 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     ]
 
 
-async def test_a_stream_read_from_the_end_stays_at_the_first_next_offset() -> None:
+async def test_a_stream_read_from_the_end_resumes_after_its_first_last_offset() -> None:
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
     pages = [
-        ReadRecordsResponse[str](records=[], next_offset=_offset(5)),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(5)),
         ReadRecordsResponse[str](
-            records=[StreamRecord[str](offset=_offset(5))], next_offset=_offset(6)
+            records=[StreamRecord[str](offset=_offset(5))], last_offset=_offset(6)
         ),
         ReadRecordsResponse[str](records=[], done=True),
     ]
@@ -651,7 +698,7 @@ async def test_a_done_first_page_ends_the_read() -> None:
     pages = [
         ReadRecordsResponse[str](
             records=[StreamRecord[str](offset=_offset(1))],
-            next_offset=_offset(2),
+            last_offset=_offset(2),
             done=True,
         )
     ]
@@ -673,7 +720,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
             "ReadRecords": [
                 ReadRecordsResponse[str](
                     records=[StreamRecord[str](offset=_offset(1))],
-                    next_offset=_offset(2),
+                    last_offset=_offset(2),
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
             ]
@@ -682,7 +729,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     stream = client.get_stream(ref=ref, body_type=str)
 
     async for page in stream.iter_read(position=_after(1), wait=wait):
-        page.next_offset = _offset(9)
+        page.last_offset = _offset(9)
 
     assert [started.arg for started in answers.started] == [
         ReadRecordsRequest(ref=ref, position=_after(1), wait=wait),
@@ -702,12 +749,12 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
                         StreamRecord[str](offset=_offset(10)),
                         StreamRecord[str](offset=_offset(12)),
                     ],
-                    next_offset=_offset(12),
+                    last_offset=_offset(12),
                 ),
-                ReadRecordsResponse[str](records=[], next_offset=_offset(12)),
+                ReadRecordsResponse[str](records=[], last_offset=_offset(12)),
                 ReadRecordsResponse[str](
                     records=[StreamRecord[str](offset=_offset(20))],
-                    next_offset=_offset(20),
+                    last_offset=_offset(20),
                     done=True,
                 ),
             ]
@@ -746,11 +793,11 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
                         StreamRecord[str](offset=_offset(1)),
                         StreamRecord[str](offset=_offset(2)),
                     ],
-                    next_offset=_offset(2),
+                    last_offset=_offset(2),
                 ),
                 ReadRecordsResponse[str](
                     records=[StreamRecord[str](offset=_offset(2))],
-                    next_offset=_offset(2),
+                    last_offset=_offset(2),
                     done=True,
                 ),
             ]
@@ -785,7 +832,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
                         StreamRecord[str](offset=_offset(1)),
                         StreamRecord[str](offset=_offset(2)),
                     ],
-                    next_offset=_offset(2),
+                    last_offset=_offset(2),
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
             ]

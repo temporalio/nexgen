@@ -1098,8 +1098,6 @@ interface stream-service {
     wait: placeholder,
     /// @nexus.omit
     create-wait: placeholder,
-    /// @nexus.omit
-    last: placeholder,
     /// @nexus.name typescript="limit"
     /// @nexus.source targets="workflow" typescript="startLimit()"
     max-bytes: option<s64>,
