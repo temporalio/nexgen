@@ -372,7 +372,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class Producer:
-    """The code that wrote a batch. Its id is stable across attempts."""
+    """The code that wrote a batch. A higher epoch fences and supersedes a lower one."""
 
     id: str
     kind: ProducerKind | None = None
@@ -489,7 +489,7 @@ temporalio.converter.transfer_type_convertible(_ProducerTransferTypeConverter)(P
 
 @dataclasses.dataclass(slots=True)
 class WorkflowProducer:
-    """A Workflow run Producer. A higher epoch fences the lower ones."""
+    """A Workflow run Producer."""
 
     run_id: str
     epoch: WorkflowTaskEpoch | None = None
@@ -643,7 +643,7 @@ temporalio.converter.transfer_type_convertible(_TimestampTransferTypeConverter)(
 
 @dataclasses.dataclass(slots=True)
 class LocalActivityProducer:
-    """A Local Activity Producer. A higher epoch fences the lower ones."""
+    """A Local Activity Producer."""
 
     run_id: str
     epoch: LocalActivityEpoch
@@ -750,7 +750,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class ActivityProducer:
-    """An Activity Producer. A higher epoch fences the lower ones."""
+    """An Activity Producer."""
 
     run_id: str | None = None
     epoch: ActivityEpoch
@@ -858,7 +858,7 @@ temporalio.converter.transfer_type_convertible(_ActivityEpochTransferTypeConvert
 
 @dataclasses.dataclass(slots=True)
 class ClientProducer:
-    """A client Producer. A higher epoch only fences the lower ones."""
+    """A client Producer."""
 
     epoch: ClientEpoch
 

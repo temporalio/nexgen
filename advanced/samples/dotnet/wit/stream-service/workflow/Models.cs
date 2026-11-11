@@ -152,7 +152,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// An Activity Producer. A higher epoch fences the lower ones.
+    /// An Activity Producer.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -425,7 +425,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A client Producer. A higher epoch only fences the lower ones.
+    /// A client Producer.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ClientProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -825,7 +825,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A Local Activity Producer. A higher epoch fences the lower ones.
+    /// A Local Activity Producer.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(LocalActivityProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -874,7 +874,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// The code that wrote a batch. Its id is stable across attempts.
+    /// The code that wrote a batch. A higher epoch fences and supersedes a lower one.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Producer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -1444,7 +1444,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A Workflow run Producer. A higher epoch fences the lower ones.
+    /// A Workflow run Producer.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
