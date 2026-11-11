@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { google, temporal } from "@temporalio/proto";
-import Long from "long";
+import type Long from "long";
 import * as support from "../../../support/temporal_model_converters";
 
 function requiredField<T>(
@@ -74,6 +74,13 @@ export type ProducerEpochKind =
 export type StreamItem<BodyT> =
   | { tag: "data"; value: StreamData<BodyT> }
   | { tag: "superseded"; value: StreamSuperseded };
+
+/**
+ * Where a read starts, after an offset, or at the beginning or the end.
+ */
+export type ReadPosition =
+  | { tag: "from-offset"; value: Uint8Array }
+  | { tag: "start"; value: StreamReadStart };
 
 export interface CreateStreamResult<BodyT> {
   ref?: StreamRef<BodyT>;
@@ -346,8 +353,8 @@ export function createCreateStreamRequestTransferTypeConverter<BodyT>(
   };
 }
 export interface AppendRecordsResponse {
-  firstOffset: Long;
-  lastOffset: Long;
+  firstOffset: Uint8Array;
+  lastOffset: Uint8Array;
 }
 
 function appendRecordsResponseFromProto(
@@ -355,12 +362,16 @@ function appendRecordsResponseFromProto(
 ): AppendRecordsResponse {
   return {
     firstOffset: requiredField(
-      proto.firstOffset ?? Long.ZERO,
+      proto.firstOffset == null || proto.firstOffset.length === 0
+        ? undefined
+        : proto.firstOffset,
       "AppendRecordsResponse",
       "firstOffset",
     ),
     lastOffset: requiredField(
-      proto.lastOffset ?? Long.ZERO,
+      proto.lastOffset == null || proto.lastOffset.length === 0
+        ? undefined
+        : proto.lastOffset,
       "AppendRecordsResponse",
       "lastOffset",
     ),
@@ -972,9 +983,9 @@ export function createCloseStreamRequestTransferTypeConverter<BodyT>(
 export interface ReadRecordsResponse<BodyT> {
   records: StreamRecord<BodyT>[];
   /**
-   * The from-offset of the next read, which is the newest offset read + 1.
+   * The from-offset of the next read, which is the newest offset read.
    */
-  nextOffset?: Long;
+  nextOffset?: Uint8Array;
   /**
    * True when the Stream is closed and this read gave its last item.
    */
@@ -1055,7 +1066,7 @@ export interface StreamRecord<BodyT> {
   /**
    * The place of this item in the Stream. Ordered and unique, with gaps.
    */
-  offset?: Long;
+  offset?: Uint8Array;
 }
 
 function streamRecordFromProto<BodyT>(
@@ -1294,13 +1305,9 @@ export const streamSupersededTransferTypeConverter = {
 export interface ReadRecordsRequest<BodyT> {
   ref: StreamRef<BodyT>;
   /**
-   * Start offset. Empty uses start. An offset past the newest one + 1 fails.
+   * Where the read starts. Unset is the beginning. A too high offset fails.
    */
-  fromOffset?: Long;
-  /**
-   * Where to start when from-offset is empty. Unspecified is the beginning.
-   */
-  start?: StreamReadStart;
+  position?: ReadPosition;
   /**
    * About this many items per page, 1 to 1000. A Superseded item stays with its Record.
    */
@@ -1314,7 +1321,7 @@ export interface ReadRecordsRequest<BodyT> {
    */
   createWait?: common.Duration;
   /**
-   * Read the newest this many Records, oldest first. No from-offset. No wait.
+   * Read the newest this many Records, oldest first. No position. No wait.
    */
   last?: number;
   /**
@@ -1329,12 +1336,36 @@ function readRecordsRequestFromProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): ReadRecordsRequest<BodyT> {
+  let result1: ReadPosition | undefined;
+  switch (proto.position) {
+    case "fromOffset":
+      result1 = {
+        tag: "from-offset",
+        value: requiredField(proto.fromOffset, "ReadRecordsRequest", "fromOffset"),
+      };
+      break;
+    case "start":
+      result1 = {
+        tag: "start",
+        value: requiredField(
+          proto.start,
+          "ReadRecordsRequest",
+          "start",
+        ) as number as StreamReadStart,
+      };
+      break;
+    case undefined:
+      result1 = undefined;
+      break;
+    default:
+      proto.position satisfies never;
+      throw new Error("invalid oneof discriminator for ReadRecordsRequest.position");
+  }
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "ReadRecordsRequest", "ref"), {
       bodyT: typeInfo.bodyT,
     }),
-    fromOffset: proto.fromOffset ?? undefined,
-    start: proto.start == null ? undefined : (proto.start as number as StreamReadStart),
+    position: result1,
     maxRecords: proto.maxRecords ?? undefined,
     wait: proto.wait == null ? undefined : support.durationFromProto(proto.wait),
     createWait:
@@ -1352,22 +1383,33 @@ function readRecordsRequestToProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): temporal.api.streamservice.v1.IReadRecordsRequest {
-  return {
-    ref: streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref"), {
-      bodyT: typeInfo.bodyT,
-    }),
-    fromOffset: model.fromOffset,
-    start:
-      model.start == null
-        ? undefined
-        : (model.start as number as temporal.api.enums.v1.StreamReadStart),
-    maxRecords: model.maxRecords,
-    wait: model.wait == null ? undefined : support.durationToProto(model.wait),
-    createWait:
-      model.createWait == null ? undefined : support.durationToProto(model.createWait),
-    last: model.last,
-    maxBytes: model.maxBytes,
-  };
+  const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {};
+  proto.ref = streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref"), {
+    bodyT: typeInfo.bodyT,
+  });
+  const result1 = model.position;
+  if (result1 != null) {
+    switch (result1.tag) {
+      case "from-offset":
+        proto.position = "fromOffset";
+        proto.fromOffset = result1.value;
+        break;
+      case "start":
+        proto.position = "start";
+        proto.start = result1.value as number as temporal.api.enums.v1.StreamReadStart;
+        break;
+      default:
+        result1 satisfies never;
+        throw new Error("invalid oneof tag for ReadRecordsRequest.position");
+    }
+  }
+  proto.maxRecords = model.maxRecords;
+  proto.wait = model.wait == null ? undefined : support.durationToProto(model.wait);
+  proto.createWait =
+    model.createWait == null ? undefined : support.durationToProto(model.createWait);
+  proto.last = model.last;
+  proto.maxBytes = model.maxBytes;
+  return proto;
 }
 
 export const readRecordsRequestTransferTypeConverter = {
@@ -1406,7 +1448,7 @@ export interface DescribeStreamResponse {
   /**
    * The newest offset, of a Record or a Superseded item. Empty for none.
    */
-  lastOffset?: Long;
+  lastOffset?: Uint8Array;
   retention?: common.Duration;
 }
 

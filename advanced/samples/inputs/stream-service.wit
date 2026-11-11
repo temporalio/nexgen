@@ -166,14 +166,15 @@ interface stream-service {
   }
 
   // An offset is ordered and unique in one Stream, and sparse. Offsets have gaps, so they don't
-  // count Records. A read gives its Stream, so the read checks the offset against that Stream.
+  // count Records. A read gives its Stream, so the read checks the offset against that Stream. It
+  // is opaque bytes, which compare in Stream order and have no arithmetic.
   /// @nexus.doc "One item that a read gives."
   /// @nexus.proto "temporal.api.stream.v1.StreamRecord"
   record stream-record {
     // A newer server can send an item kind that this SDK doesn't know. Then the item is empty.
     item: option<stream-item>,
     /// @nexus.doc "The place of this item in the Stream. Ordered and unique, with gaps."
-    offset: option<s64>,
+    offset: option<list<u8>>,
   }
 
   /// @nexus.doc
@@ -276,8 +277,8 @@ interface stream-service {
   /// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsResponse"
   // A publish must write at least one Record, so both offsets are always of a real Record.
   record append-records-response {
-    first-offset: s64,
-    last-offset: s64,
+    first-offset: list<u8>,
+    last-offset: list<u8>,
   }
 
   // A close carries no value, so code that has a last value publishes it first.
@@ -316,14 +317,19 @@ interface stream-service {
     stream-read-start-end,
   }
 
-  /// @nexus.doc "Read Records from an offset."
+  /// @nexus.doc "Where a read starts, after an offset, or at the beginning or the end."
+  /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest.position"
+  variant read-position {
+    from-offset(list<u8>),
+    start(stream-read-start),
+  }
+
+  /// @nexus.doc "Read Records from a position."
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
   record read-records-request {
     ref: stream-ref,
-    /// @nexus.doc "Start offset. Empty uses start. An offset past the newest one + 1 fails."
-    from-offset: option<s64>,
-    /// @nexus.doc "Where to start when from-offset is empty. Unspecified is the beginning."
-    start: option<stream-read-start>,
+    /// @nexus.doc "Where the read starts. Unset is the beginning. A too high offset fails."
+    position: option<read-position>,
     /// @nexus.doc
     ///   "About this many items per page, 1 to 1000. A Superseded item stays with its Record."
     max-records: option<s32>,
@@ -332,7 +338,7 @@ interface stream-service {
     /// @nexus.doc "How long to wait for an uncreated Stream. Empty fails at once. At most 60 s."
     create-wait: option<duration>,
     // Replay needs a fixed range, so the Workflow API omits `last`.
-    /// @nexus.doc "Read the newest this many Records, oldest first. No from-offset. No wait."
+    /// @nexus.doc "Read the newest this many Records, oldest first. No position. No wait."
     /// @nexus.api-omit targets="workflow"
     last: option<s32>,
     /// @nexus.doc "The maximum Record bytes in a page. A larger Record is still returned alone."
@@ -351,8 +357,8 @@ interface stream-service {
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsResponse"
   record read-records-response {
     records: list<stream-record>,
-    /// @nexus.doc "The from-offset of the next read, which is the newest offset read + 1."
-    next-offset: option<s64>,
+    /// @nexus.doc "The from-offset of the next read, which is the newest offset read."
+    next-offset: option<list<u8>>,
     /// @nexus.doc "True when the Stream is closed and this read gave its last item."
     done: option<bool>,
     // Native only. The SDK Stores never set it.
@@ -371,7 +377,7 @@ interface stream-service {
   record describe-stream-response {
     status: option<stream-status>,
     /// @nexus.doc "The newest offset, of a Record or a Superseded item. Empty for none."
-    last-offset: option<s64>,
+    last-offset: option<list<u8>>,
     retention: option<duration>,
   }
 
@@ -395,8 +401,7 @@ interface stream-service {
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."
     /// @nexus.operation "read-records"
     read: func(
-      from-offset: option<s64>,
-      start: option<stream-read-start>,
+      position: option<read-position>,
       max-records: option<s32>,
       wait: option<duration>,
       create-wait: option<duration>,

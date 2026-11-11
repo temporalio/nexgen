@@ -17,9 +17,9 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
-    StreamReadStart,
     StreamRef,
 )
 import temporal_support as _support
@@ -87,8 +87,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -97,8 +96,7 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,

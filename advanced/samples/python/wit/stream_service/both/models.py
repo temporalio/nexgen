@@ -871,8 +871,8 @@ temporalio.converter.transfer_type_convertible(_ClientEpochTransferTypeConverter
 
 @dataclasses.dataclass(slots=True)
 class AppendRecordsResponse:
-    first_offset: int
-    last_offset: int
+    first_offset: bytes
+    last_offset: bytes
 
 
 class _AppendRecordsResponseTransferTypeConverter(
@@ -892,7 +892,13 @@ class _AppendRecordsResponseTransferTypeConverter(
         value: temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsResponse,
         type_hint: type[AppendRecordsResponse],
     ) -> AppendRecordsResponse:
+        if not value.first_offset:
+            raise ValueError(
+                "missing required field AppendRecordsResponse.first_offset"
+            )
         first_offset = value.first_offset
+        if not value.last_offset:
+            raise ValueError("missing required field AppendRecordsResponse.last_offset")
         last_offset = value.last_offset
         return AppendRecordsResponse(
             first_offset=first_offset,
@@ -1025,11 +1031,10 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class ReadRecordsRequest(typing.Generic[BodyT]):
-    """Read Records from an offset."""
+    """Read Records from a position."""
 
     ref: StreamRef[BodyT]
-    from_offset: int | None = None
-    start: StreamReadStart | None = None
+    position: ReadPosition | None = None
     max_records: int | None = None
     wait: datetime.timedelta | None = None
     create_wait: datetime.timedelta | None = None
@@ -1063,10 +1068,17 @@ class _ReadRecordsRequestTransferTypeConverter(
                 value.ref, StreamRef[body_type]
             ),
         )
+        _oneof_position: ReadPositionFromOffset | ReadPositionStart | None
+        match value.WhichOneof("position"):
+            case "from_offset":
+                _oneof_position = ReadPositionFromOffset(value.from_offset)
+            case "start":
+                _oneof_position = ReadPositionStart(StreamReadStart(value.start))
+            case None:
+                _oneof_position = None
         return ReadRecordsRequest(
             ref=ref,
-            from_offset=value.from_offset if value.from_offset != 0 else None,
-            start=StreamReadStart(value.start) if value.start != 0 else None,
+            position=_oneof_position,
             max_records=value.max_records if value.max_records != 0 else None,
             wait=_support.duration_from_proto(value.wait)
             if value.HasField("wait")
@@ -1089,14 +1101,16 @@ class _ReadRecordsRequestTransferTypeConverter(
         message.ref.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
         )
-        if value.from_offset is not None:
-            message.from_offset = value.from_offset
-        if value.start is not None:
-            message.start = (
-                temporalio.api.enums.v1.stream_pb2.StreamReadStart.ValueType(
-                    value.start
-                )
-            )
+        if value.position is not None:
+            match value.position:
+                case ReadPositionFromOffset():
+                    message.from_offset = value.position.value
+                case ReadPositionStart():
+                    message.start = (
+                        temporalio.api.enums.v1.stream_pb2.StreamReadStart.ValueType(
+                            value.position.value
+                        )
+                    )
         if value.max_records is not None:
             message.max_records = value.max_records
         if value.wait is not None:
@@ -1118,7 +1132,7 @@ temporalio.converter.transfer_type_convertible(
 @dataclasses.dataclass(slots=True)
 class ReadRecordsResponse(typing.Generic[BodyT]):
     records: list[StreamRecord[BodyT]]
-    next_offset: int | None = None
+    next_offset: bytes | None = None
     done: bool | None = None
 
 
@@ -1151,7 +1165,7 @@ class _ReadRecordsResponseTransferTypeConverter(
         ]
         return ReadRecordsResponse(
             records=records,
-            next_offset=value.next_offset if value.next_offset != 0 else None,
+            next_offset=value.next_offset if bool(value.next_offset) else None,
             done=value.done if bool(value.done) else None,
         )
 
@@ -1185,7 +1199,7 @@ class StreamRecord(typing.Generic[BodyT]):
     """One item that a read gives."""
 
     item: StreamItem[BodyT] | None = None
-    offset: int | None = None
+    offset: bytes | None = None
 
 
 class _StreamRecordTransferTypeConverter(
@@ -1225,7 +1239,7 @@ class _StreamRecordTransferTypeConverter(
                 _oneof_item = None
         return StreamRecord(
             item=_oneof_item,
-            offset=value.offset if value.offset != 0 else None,
+            offset=value.offset if bool(value.offset) else None,
         )
 
     @typing_extensions.override
@@ -1448,7 +1462,7 @@ temporalio.converter.transfer_type_convertible(
 @dataclasses.dataclass(slots=True)
 class DescribeStreamResponse:
     status: StreamStatus | None = None
-    last_offset: int | None = None
+    last_offset: bytes | None = None
     retention: datetime.timedelta | None = None
 
 
@@ -1475,7 +1489,7 @@ class _DescribeStreamResponseTransferTypeConverter(
             status=_stream_status_from_proto(value.status)
             if value.status != 0
             else None,
-            last_offset=value.last_offset if value.last_offset != 0 else None,
+            last_offset=value.last_offset if bool(value.last_offset) else None,
             retention=_support.duration_from_proto(value.retention)
             if value.HasField("retention")
             else None,
@@ -1536,6 +1550,20 @@ ProducerEpochKind = (
     | ProducerEpochKindClient
 )
 """The epoch of each kind of Producer."""
+
+
+@dataclasses.dataclass(slots=True)
+class ReadPositionFromOffset:
+    value: bytes
+
+
+@dataclasses.dataclass(slots=True)
+class ReadPositionStart:
+    value: StreamReadStart
+
+
+ReadPosition = ReadPositionFromOffset | ReadPositionStart
+"""Where a read starts, after an offset, or at the beginning or the end."""
 
 
 @dataclasses.dataclass(slots=True)

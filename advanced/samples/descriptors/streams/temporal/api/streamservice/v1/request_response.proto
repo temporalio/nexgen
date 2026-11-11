@@ -97,8 +97,8 @@ message AppendRecordsRequest {
 // Experimental. Might change in the future.
 // Where the batch's Records are in the Stream.
 message AppendRecordsResponse {
-    int64 first_offset = 1;
-    int64 last_offset = 2;
+    bytes first_offset = 1;
+    bytes last_offset = 2;
 }
 
 // Experimental. Might change in the future.
@@ -132,13 +132,15 @@ message CloseStreamResponse {
 message ReadRecordsRequest {
     string namespace = 1;
     temporal.api.stream.v1.StreamRef ref = 2;
-    // Start at this offset. Zero uses start. It fails with OFFSET_TOO_HIGH if it is past the newest
-    // offset + 1.
-    // (-- api-linter: core::0140::prepositions=disabled
-    //     aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
-    int64 from_offset = 3;
-    // Where to start when from_offset is zero. Unspecified is the beginning.
-    temporal.api.enums.v1.StreamReadStart start = 4;
+    // Where the read starts. Unset is the beginning of the Stream.
+    oneof position {
+        // Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
+        // (-- api-linter: core::0140::prepositions=disabled
+        //     aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
+        bytes from_offset = 3;
+        // Start at the beginning or at the end of the Stream. Unspecified is the beginning.
+        temporal.api.enums.v1.StreamReadStart start = 4;
+    }
     // The most items in one page, Superseded items included. Zero is 1000. A Superseded item and
     // the Record after it stay in one page, so a page of one Record can hold two items.
     int32 max_records = 5;
@@ -149,17 +151,17 @@ message ReadRecordsRequest {
     // At most 60 s.
     google.protobuf.Duration create_wait = 7;
     // The exclusive end of the read. The read scans no entry at or after it, so a replay reads the
-    // same range. Zero means no end. Only the server serves it, and a Store refuses it.
+    // same range. Empty means no end. Only the server serves it, and a Store refuses it.
     // (-- api-linter: core::0140::prepositions=disabled
     //     aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
-    int64 to_offset = 8;
+    bytes to_offset = 8;
     // Park as a normal read, then answer with no Records and next_offset = from_offset, when a
     // Record at or after from_offset exists, when the Stream closes (done), or when wait ends. Its
     // wait may be days, since a parked read adds nothing to History while it waits. Only the
     // server serves it, and a Store refuses it.
     bool wake_only = 9;
-    // Read the newest `last` Records, oldest first. It needs no from_offset and no start. Not with
-    // wake_only, and not in Workflow code, where replay needs a fixed range.
+    // Read the newest `last` Records, oldest first. It needs no position. Not with wake_only, and
+    // not in Workflow code, where replay needs a fixed range.
     int32 last = 10;
     // The most Record bytes in one page, so a page fits the caller's limit, such as a History
     // marker. A larger Record still comes alone, so the read always moves on. Zero is no cap.
@@ -169,15 +171,15 @@ message ReadRecordsRequest {
     // the server.
     // (-- api-linter: core::0140::prepositions=disabled
     //     aip.dev/not-precedent: The floor is the lowest from_offset of the run's reads. --)
-    int64 floor_from = 12;
+    bytes floor_from = 12;
 }
 
 // Experimental. Might change in the future.
 // One page of a read.
 message ReadRecordsResponse {
     repeated temporal.api.stream.v1.StreamRecord records = 1;
-    // The from_offset of the next read, which is the newest offset read + 1.
-    int64 next_offset = 2;
+    // The from_offset of the next read, which is the newest offset read.
+    bytes next_offset = 2;
     // True when the Stream is closed and this read gave its last item. A read of a closed Stream
     // with no item left answers at once.
     bool done = 3;
@@ -197,7 +199,7 @@ message DescribeStreamRequest {
 // The state of a Stream.
 message DescribeStreamResponse {
     temporal.api.enums.v1.StreamStatus status = 1;
-    // The newest offset, of a Record or a Superseded item. Zero when the Stream has none.
-    int64 last_offset = 2;
+    // The newest offset, of a Record or a Superseded item. Empty when the Stream has none.
+    bytes last_offset = 2;
     google.protobuf.Duration retention = 3;
 }
