@@ -1,0 +1,12 @@
+package temporal:api-omit-operation-targets@1.0.0;
+
+world service { export example; }
+
+/// @nexus.endpoint "example"
+interface example {
+  record request { value: option<s64> }
+  record response { ok: option<bool> }
+
+  /// @nexus.api-omit targets="client"
+  submit: func(request: request) -> response;
+}

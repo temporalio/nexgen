@@ -6187,6 +6187,7 @@ fn build_operation(
         serialization_context: LanguageStringSpec::default(),
         context_propagation_header: LanguageStringSpec::default(),
         poll: None,
+        api_omitted: BTreeSet::new(),
         data: (),
     })
 }

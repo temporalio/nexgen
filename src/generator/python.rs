@@ -951,8 +951,9 @@ impl<'a> ApiPlanner<'a> {
         let has_standalone_operations = services.iter().any(|service| {
             service.endpoint.is_some()
                 && service.operations.iter().any(|operation| {
-                    !resource_operation_owners
-                        .contains_key(&operation_key(service.name, operation.name))
+                    !operation.api_omitted_for(GenerationTarget::Workflow)
+                        && !resource_operation_owners
+                            .contains_key(&operation_key(service.name, operation.name))
                 })
         });
         if has_standalone_operations {
@@ -990,8 +991,11 @@ impl<'a> ApiPlanner<'a> {
                     continue;
                 }
                 for operation in &service.operations {
-                    if resource_operation_owners
-                        .contains_key(&operation_key(service.name, operation.name))
+                    // A standalone operation's only caller is its public wrapper, so an api-omit
+                    // leaves its private helper with no caller. Drop the whole module instead.
+                    if operation.api_omitted_for(GenerationTarget::Workflow)
+                        || resource_operation_owners
+                            .contains_key(&operation_key(service.name, operation.name))
                     {
                         continue;
                     }
@@ -2972,6 +2976,7 @@ impl<'a> ApiPlanner<'a> {
                 .value()
                 .map(|helper| format!("_support.{helper}")),
             poll: operation.poll.as_ref(),
+            api_omitted: &operation.api_omitted,
             poll_items,
             output_resource_return,
             output_direct_result,
@@ -4343,6 +4348,8 @@ struct RenderedOperation<'a> {
     output_transform_expr: Option<String>,
     serialization_context_expr: Option<String>,
     poll: Option<&'a OperationPollSpec<PlannedFamily>>,
+    /// Targets whose public top-level function `@nexus.api-omit` suppresses.
+    api_omitted: &'a BTreeSet<GenerationTarget>,
     /// The response attribute whose items the item iterator yields, and the item annotation.
     poll_items: Option<(String, String)>,
     output_resource_return: Option<PlannedOperationResourceReturn>,
@@ -4430,6 +4437,12 @@ impl RenderedOperation<'_> {
         self.poll
             .and_then(|poll| poll.resume.value())
             .map(|helper| format!("_support.{helper}"))
+    }
+
+    /// Whether `@nexus.api-omit` suppresses this operation's public top-level function for the
+    /// target. The private helper, the registry, the service, and resource binding stay.
+    fn api_omitted_for(&self, target: GenerationTarget) -> bool {
+        self.api_omitted.contains(&target)
     }
 
     /// The poll helper, when the target gets the poll.
@@ -5395,6 +5408,9 @@ fn package_export_names(
                         service
                             .operations
                             .iter()
+                            .filter(|operation| {
+                                !operation.api_omitted_for(GenerationTarget::Workflow)
+                            })
                             .map(|operation| operation.attr_name.clone())
                     }),
             );
@@ -6923,6 +6939,7 @@ fn render_package_init(
             service
                 .operations
                 .iter()
+                .filter(|operation| !operation.api_omitted_for(GenerationTarget::Workflow))
                 .map(|operation| operation.attr_name.clone())
                 .chain(workflow_factory_resources(service).map(workflow_resource_factory_name))
         })
@@ -6969,6 +6986,9 @@ fn render_package_init(
     if !services.is_empty() {
         for service in services {
             for operation in &service.operations {
+                if operation.api_omitted_for(GenerationTarget::Workflow) {
+                    continue;
+                }
                 let module = if let Some(resource_owner) =
                     resource_operation_owners.get(&operation_key(service.name, operation.name))
                 {
@@ -9819,11 +9839,21 @@ fn render_operation_functions(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
 ) {
+    // The public top-level function is a workflow-target concept. The client reaches an operation
+    // through a resource method or an extension method, so an api-omit leaves those untouched.
+    let omit_public = target == GenerationTarget::Workflow && operation.api_omitted_for(target);
     match target {
         GenerationTarget::Workflow => {
-            render_request_only_operation_function(output, service, operation)
+            // A request-only operation with no unpacked function has this function as its public
+            // call, so an api-omit drops it. Otherwise it is the private helper that stays.
+            if operation.unpacked_input.is_some() || !omit_public {
+                render_request_only_operation_function(output, service, operation);
+            }
         }
         GenerationTarget::Client => render_client_operation_method(output, service, operation),
+    }
+    if omit_public {
+        return;
     }
     if let Some(unpacked_input) = operation.target_unpacked_input(target) {
         output.push('\n');
