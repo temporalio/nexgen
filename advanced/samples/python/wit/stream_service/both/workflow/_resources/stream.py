@@ -17,9 +17,9 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
-    StreamReadStart,
     StreamRef,
 )
 import temporal_support as _support
@@ -87,8 +87,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -97,8 +96,7 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,
@@ -237,8 +235,7 @@ async def _read_records(
 async def read_records(
     *,
     ref: StreamRef[BodyT] | StreamRef[object],
-    from_offset: int | None = None,
-    start: StreamReadStart | None = None,
+    position: ReadPosition | None = None,
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
@@ -251,8 +248,7 @@ async def read_records(
 async def read_records(
     *,
     ref: StreamRef[BodyT],
-    from_offset: int | None = None,
-    start: StreamReadStart | None = None,
+    position: ReadPosition | None = None,
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
@@ -264,8 +260,7 @@ async def read_records(
 async def read_records(
     *,
     ref: StreamRef[typing.Any],
-    from_offset: int | None = None,
-    start: StreamReadStart | None = None,
+    position: ReadPosition | None = None,
     max_records: int | None = None,
     wait: datetime.timedelta | None = None,
     create_wait: datetime.timedelta | None = None,
@@ -276,9 +271,8 @@ async def read_records(
     Activity.
 
     Args:
-        from_offset: Start offset. Empty uses start. An offset past the newest one + 1
+        position: Where the read starts. Unset is the beginning. A too high offset
             fails.
-        start: Where to start when from-offset is empty. Unspecified is the beginning.
         max_records: About this many items per page, 1 to 1000. A Superseded item stays
             with its Record.
         wait: How long to wait for a new Record before an empty answer. At most 60 s.
@@ -297,8 +291,7 @@ async def read_records(
         raise TypeError("The decoding type must match the typed ref")
     request = ReadRecordsRequest(
         ref=ref,
-        from_offset=from_offset,
-        start=start,
+        position=position,
         max_records=max_records,
         wait=wait,
         create_wait=create_wait,

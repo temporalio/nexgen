@@ -587,10 +587,11 @@ information, so decoding their wire values produces collections even when empty;
 their API fields do not gain implicit constructor defaults.
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
-nexgen generates Python `bytes`, TypeScript `Uint8Array`, Go `[]byte`, or .NET
-`byte[]`. The .NET converters translate between `byte[]` and protobuf
-`ByteString` at the wire boundary. In other records, `list<u8>` is a list of
-integers, like any other `list<T>`.
+Write a `bytes` member of a oneof the same way, as the case payload of a variant
+with `@nexus.proto`. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
+Go `[]byte`, or .NET `byte[]`. The .NET converters translate between `byte[]`
+and protobuf `ByteString` at the wire boundary. In other records, `list<u8>` is
+a list of integers, like any other `list<T>`.
 
 ---
 

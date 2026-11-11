@@ -6,6 +6,7 @@ using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using StreamServiceExample = Streams::Temporalio.Workflows;
 using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
+using WireReadRecordsRequest = Streams::Temporalio.Api.StreamService.V1.ReadRecordsRequest;
 using WireReadRecordsResponse = Streams::Temporalio.Api.StreamService.V1.ReadRecordsResponse;
 using WireStreamRecord = Streams::Temporalio.Api.Stream.V1.StreamRecord;
 
@@ -49,7 +50,7 @@ namespace Nexgen.DotNetExamples.Tests
                 {
                     Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
                         new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
-                    Offset = 2,
+                    Offset = new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 },
                 },
             });
 
@@ -66,7 +67,53 @@ namespace Nexgen.DotNetExamples.Tests
                 decoded.Records[0].Item);
             Assert.Equal("workflow-1", superseded.Value.ProducerId);
             Assert.Equal(new long[] { 7 }, superseded.Value.FailedTasks);
-            Assert.Equal(2, decoded.Records[0].Offset);
+            Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 }, decoded.Records[0].Offset);
+        }
+
+        // The from-offset case of the read position is a proto `bytes` member of a oneof.
+        [Fact]
+        public void AReadPositionOffsetRoundTripsAsBytes()
+        {
+            var offset = new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 };
+            var model = new StreamServiceExample.ReadRecordsRequest<Turn>(
+                new StreamServiceExample.StreamRef<Turn>("stream-1"))
+            {
+                Position = new StreamServiceExample.ReadPosition.FromOffset(offset),
+            };
+
+            var wire = Assert.IsType<WireReadRecordsRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsRequest<Turn>))
+                    .ToTransferType(model));
+            Assert.Equal(WireReadRecordsRequest.PositionOneofCase.FromOffset, wire.PositionCase);
+            Assert.Equal(offset, wire.FromOffset.ToByteArray());
+
+            var decoded = FromPayload<StreamServiceExample.ReadRecordsRequest<Turn>>(
+                ToPayload(model));
+            var position = Assert.IsType<StreamServiceExample.ReadPosition.FromOffset>(
+                decoded.Position);
+            Assert.Equal(offset, position.Value);
+        }
+
+        // The start case of the read position is a proto enum member of the same oneof.
+        [Fact]
+        public void AReadPositionStartRoundTripsAsItsEnum()
+        {
+            var model = new StreamServiceExample.ReadRecordsRequest<Turn>(
+                new StreamServiceExample.StreamRef<Turn>("stream-1"))
+            {
+                Position = new StreamServiceExample.ReadPosition.Start(
+                    StreamServiceExample.StreamReadStart.StreamReadStartEnd),
+            };
+
+            var wire = Assert.IsType<WireReadRecordsRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsRequest<Turn>))
+                    .ToTransferType(model));
+            Assert.Equal(WireReadRecordsRequest.PositionOneofCase.Start, wire.PositionCase);
+            Assert.Equal(Streams::Temporalio.Api.Enums.V1.StreamReadStart.End, wire.Start);
+
+            var decoded = FromPayload<StreamServiceExample.ReadRecordsRequest<Turn>>(
+                ToPayload(model));
+            Assert.Equal(model.Position, decoded.Position);
         }
 
         // A newer server can send a Stream status that this code doesn't know.

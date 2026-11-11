@@ -839,6 +839,7 @@ fn build_wit_variant_spec(
     let doc = directive(&directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let proto_backed = directive(&directives, "proto", path, &context)?.is_some();
     let cases = variant
         .cases
         .iter()
@@ -852,7 +853,7 @@ fn build_wit_variant_spec(
                 .ty
                 .as_ref()
                 .map(|ty| {
-                    resolve_authored_field_type_spec(resolve, ty, path, &case_context)
+                    resolve_field_type_spec(resolve, ty, proto_backed, path, &case_context)
                         .map(|field_type| authored_field_type_for_language(field_type, language))
                 })
                 .transpose()?;
@@ -1221,13 +1222,7 @@ fn build_fields_from_record(
             }
 
             let field_type = authored_field_type_for_language(
-                resolve_record_field_type_spec(
-                    resolve,
-                    &field.ty,
-                    proto_backed,
-                    path,
-                    &field_context,
-                )?,
+                resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
                 language,
             );
             fields.insert(
@@ -1258,7 +1253,7 @@ fn build_fields_from_record(
             .map(directive_language_string)
             .filter(|doc| !doc.is_empty());
         let field_type = authored_field_type_for_language(
-            resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
+            resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
         let api_omit_targets = api_omit_directive
@@ -1435,9 +1430,10 @@ fn build_type_replacement(
     }))
 }
 
-/// Resolves the type of a record field. A proto-backed record spells a proto `bytes` field as
-/// `list<u8>`, so the field is bytes there. A record without a proto keeps a list of integers.
-fn resolve_record_field_type_spec(
+/// Resolves the type of a record field or a variant case. A proto-backed record or oneof variant
+/// spells a proto `bytes` member as `list<u8>`, so the type is bytes there. Without a proto it
+/// stays a list of integers.
+fn resolve_field_type_spec(
     resolve: &Resolve,
     ty: &Type,
     proto_backed: bool,
