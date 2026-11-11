@@ -16,11 +16,12 @@ import pytest
 from temporalio.api.enums.v1 import stream_pb2
 from temporalio.api.stream.v1 import message_pb2
 from temporalio.api.streamservice.v1 import request_response_pb2
+import temporalio.converter
 from temporalio.converter import FailureConverter, PayloadConverter
 import temporalio.nexus.system
 from temporalio.worker import StartNexusOperationInput
 import temporalio.workflow
-from typing_extensions import override
+from typing_extensions import assert_type, override
 
 from wit.stream_service.models import models as models_only
 from wit.stream_service.workflow import models as workflow_models
@@ -34,6 +35,11 @@ from wit.stream_service.workflow._system_nexus_interceptor import (
     _SystemNexusWorkflowOutboundInterceptorBase,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
 )
+
+
+def _offset(n: int) -> bytes:
+    # Big-endian, so a bytes compare keeps the int order these tests assert.
+    return n.to_bytes(8, "big")
 
 
 @dataclasses.dataclass
@@ -80,38 +86,29 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
                         body={"text": "hi"},
                         producer=models.Producer(
                             id="la:r1:1",
-                            kind=models.ProducerKindLocalActivity(
-                                models.LocalActivityProducer(
-                                    run_id="r1",
-                                    epoch=models.LocalActivityEpoch(
+                            epoch=models.ProducerEpoch(
+                                kind=models.ProducerEpochKindLocalActivity(
+                                    models.LocalActivityEpoch(
                                         task=models.WorkflowTaskEpoch(
                                             started_event_id=4
                                         ),
                                         attempt=2,
-                                    ),
+                                    )
                                 )
                             ),
                         ),
                     )
                 ),
-                offset=1,
+                offset=_offset(1),
             ),
             models.StreamRecord(
-                item=models.StreamItemClose(
-                    models.StreamClose(
-                        producer=models.Producer(
-                            id="wf:r1",
-                            kind=models.ProducerKindWorkflow(
-                                models.WorkflowProducer(run_id="r1")
-                            ),
-                        ),
-                        status=models.StreamCloseStatus.StreamCloseStatusClosed,
-                    )
+                item=models.StreamItemSuperseded(
+                    models.StreamSuperseded(producer_id="workflow-1", failed_tasks=[7])
                 ),
-                offset=2,
+                offset=_offset(2),
             ),
         ],
-        next_offset=3,
+        next_offset=_offset(3),
         done=True,
     )
 
@@ -122,24 +119,23 @@ def test_read_items_round_trip_as_their_records(models: types.ModuleType) -> Non
     assert all(isinstance(record, message_pb2.StreamRecord) for record in wire.records)
     assert [record.WhichOneof("item") for record in wire.records] == [
         "data",
-        "close",
+        "superseded",
     ]
-    assert wire.records[0].data.producer.WhichOneof("kind") == "local_activity"
-    assert (
-        wire.records[1].close.status
-        == stream_pb2.StreamCloseStatus.STREAM_CLOSE_STATUS_CLOSED
-    )
+    assert wire.records[0].data.producer.epoch.WhichOneof("kind") == "local_activity"
+    assert wire.records[1].superseded.failed_tasks == [7]
     assert converter.from_transfer_type(wire, models.ReadRecordsResponse) == model
 
 
 def test_a_record_of_an_unknown_item_kind_has_no_item(models: types.ModuleType) -> None:
     converter = models._StreamRecordTransferTypeConverter[object]()
-    # Offset 1, and an item in field 5, which only a newer server knows.
-    wire = message_pb2.StreamRecord.FromString(b"\x08\x01\x2a\x00")
+    # Offset 1 as 8 big-endian bytes, and an item in field 5, which only a newer server knows.
+    wire = message_pb2.StreamRecord.FromString(
+        b"\x0a\x08\x00\x00\x00\x00\x00\x00\x00\x01\x2a\x00"
+    )
 
     decoded = converter.from_transfer_type(wire, models.StreamRecord)
 
-    assert decoded == models.StreamRecord(item=None, offset=1)
+    assert decoded == models.StreamRecord(item=None, offset=_offset(1))
 
 
 def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> None:
@@ -191,8 +187,10 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 def test_a_workflow_read_takes_no_last(
     api: types.ModuleType, model_types: types.ModuleType
 ) -> None:
-    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
-    assert "last" not in inspect.signature(api.read_records).parameters
+    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only. The read is
+    # reached through the Stream resource, since `@nexus.api-omit` drops the top-level function.
+    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
+    assert "last" not in inspect.signature(stream.read).parameters
     request = model_types.ReadRecordsRequest(
         ref=model_types.StreamRef(id="s-1"), last=3
     )
@@ -212,7 +210,9 @@ async def test_workflow_apis_call_the_stream_service(
     ref = model_types.StreamRef(id="workflow-stream")
     replies = {
         "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
-        "AppendRecords": model_types.AppendRecordsResponse(last_offset=3),
+        "AppendRecords": model_types.AppendRecordsResponse(
+            first_offset=_offset(2), last_offset=_offset(3)
+        ),
     }
     calls: list[tuple[str, typing.Any]] = []
 
@@ -242,19 +242,11 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
-    stream = await api.create_stream[str](id=ref.id)
-    last_offset = await stream.append()
-    assert last_offset == 3
-    assert await api.append_records(ref=ref, records=["a", "b"]) == 3
-    # The Workflow API fills the request id and the writer from its sources.
-    writer = model_types.StreamWriter(
-        producer=model_types.Producer(
-            id="wf:r2",
-            kind=model_types.ProducerKindWorkflow(
-                model_types.WorkflowProducer(run_id="r2")
-            ),
-        )
-    )
+    stream = await api.create_stream(id=ref.id, body_type=str)
+    response = await stream.publish("a", "b")
+    assert response.last_offset == _offset(3)
+    # The Workflow API fills the request id and the producer from its sources.
+    run = model_types.Producer(id="wf:r2", run_id="r2")
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [
         (
@@ -263,11 +255,7 @@ async def test_workflow_apis_call_the_stream_service(
         ),
         (
             "AppendRecords",
-            model_types.AppendRecordsRequest(ref=ref, records=[], writer=writer),
-        ),
-        (
-            "AppendRecords",
-            model_types.AppendRecordsRequest(ref=ref, records=records, writer=writer),
+            model_types.AppendRecordsRequest(ref=ref, records=records, producer=run),
         ),
     ]
     # The sources build the models of one package, so the calls compare as data.
@@ -286,16 +274,17 @@ async def test_workflow_apis_call_the_stream_service(
 async def test_workflow_handle_decodes_with_its_type_parameter(
     monkeypatch: pytest.MonkeyPatch, construction: str
 ) -> None:
-    ref = workflow_models.StreamRef(id="typed-stream")
+    ref = workflow_models.StreamRef[Turn](id="typed-stream")
     record = workflow_models.StreamRecord(
         item=workflow_models.StreamItemData(
             workflow_models.StreamData(body=Turn(role="model"))
         ),
-        offset=1,
+        offset=_offset(1),
     )
     payload = SYSTEM_CONVERTER.to_payload(
         workflow_models.ReadRecordsResponse[Turn](records=[record])
     )
+    inputs: list[typing.Any] = []
 
     class NexusClient:
         async def start_operation(
@@ -305,7 +294,7 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
             *,
             output_type: type[typing.Any],
         ) -> collections.abc.Awaitable[typing.Any]:
-            del input
+            inputs.append(input)
             future: asyncio.Future[typing.Any] = (
                 asyncio.get_running_loop().create_future()
             )
@@ -322,23 +311,222 @@ async def test_workflow_handle_decodes_with_its_type_parameter(
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
     if construction == "create":
-        stream = await workflow_only.create_stream[Turn](id=ref.id)
+        stream = await workflow_only.create_stream(id=ref.id, body_type=Turn)
     else:
         stream = WorkflowStream[Turn](ref=ref, created=None)
 
-    page = await stream.read()
+    end = workflow_models.ReadPositionStart(
+        workflow_models.StreamReadStart.StreamReadStartEnd
+    )
+    page = await stream.read(position=end)
 
     assert page.records == [record]
+    # The resource method's position reaches the request's oneof field.
+    assert inputs[-1].position == end
 
 
-def test_a_subclass_of_a_specialized_handle_takes_its_type_argument() -> None:
+def test_a_subclass_of_a_specialized_handle_is_rejected() -> None:
     class TurnStream(WorkflowStream[Turn]):
         pass
 
-    ref = workflow_models.StreamRef(id="typed-stream")
+    ref = workflow_models.StreamRef[Turn](id="typed-stream")
 
-    assert TurnStream(ref=ref, created=None).body_type is Turn
-    assert WorkflowStream(ref=ref, created=None).body_type is typing.Any
+    with pytest.raises(TypeError, match="Generic resource subclasses"):
+        _ = TurnStream(ref=ref, created=None)
+    assert (
+        WorkflowStream(ref=workflow_models.StreamRef(id="s1"), created=None).body_type
+        is object
+    )
+
+
+async def test_a_decoded_ref_builds_a_typed_workflow_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = workflow_models.StreamRecord(
+        item=workflow_models.StreamItemData(
+            workflow_models.StreamData(body=Turn(role="model"))
+        ),
+        offset=_offset(1),
+    )
+    payload = SYSTEM_CONVERTER.to_payload(
+        workflow_models.ReadRecordsResponse[Turn](records=[record])
+    )
+
+    # A Workflow input crosses the data converter, which sends a ref as its wire message. The
+    # parameter's annotation is the type that it decodes with.
+    data_converter = temporalio.converter.DataConverter.default
+    plain = workflow_models.StreamRef(id="typed-stream")
+    payloads = await data_converter.encode([plain])
+    assert payloads == await data_converter.encode(
+        [message_pb2.StreamRef(id="typed-stream")]
+    )
+    [decoded] = await data_converter.decode(payloads, [workflow_models.StreamRef[Turn]])
+    ref: workflow_models.StreamRef[Turn] = decoded
+
+    class NexusClient:
+        async def start_operation(
+            self, operation: str, input: typing.Any, *, output_type: type[typing.Any]
+        ) -> collections.abc.Awaitable[typing.Any]:
+            del operation, input
+            future: asyncio.Future[typing.Any] = (
+                asyncio.get_running_loop().create_future()
+            )
+            future.set_result(SYSTEM_CONVERTER.from_payload(payload, output_type))
+            return future
+
+    def create_client(*, service: str, endpoint: str) -> NexusClient:
+        del service, endpoint
+        return NexusClient()
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+
+    stream = WorkflowStream[Turn](ref=ref, created=None)
+    page = await stream.read()
+
+    _ = assert_type(stream.ref, workflow_models.StreamRef[Turn])
+    assert page.records == [record]
+    # The type argument rides in memory, so the ref still equals the plain one.
+    assert stream.ref == plain
+    assert repr(stream.ref) == repr(plain)
+
+
+@pytest.mark.parametrize(
+    "construction",
+    ["typed", "matching", "none", "unknown", "override", "explicit-unknown"],
+)
+async def test_a_workflow_handle_reads_with_its_refs_payload_type(
+    monkeypatch: pytest.MonkeyPatch, construction: str
+) -> None:
+    payload = SYSTEM_CONVERTER.to_payload(
+        workflow_models.ReadRecordsResponse[Turn](
+            records=[
+                workflow_models.StreamRecord(
+                    item=workflow_models.StreamItemData(
+                        workflow_models.StreamData(body=Turn(role="model"))
+                    ),
+                    offset=_offset(1),
+                )
+            ]
+        )
+    )
+
+    class NexusClient:
+        async def start_operation(
+            self, operation: str, input: typing.Any, *, output_type: type[typing.Any]
+        ) -> collections.abc.Awaitable[typing.Any]:
+            assert operation == "ReadRecords"
+            assert input.ref.id == "s1"
+            future: asyncio.Future[typing.Any] = (
+                asyncio.get_running_loop().create_future()
+            )
+            future.set_result(SYSTEM_CONVERTER.from_payload(payload, output_type))
+            return future
+
+    def create_client(*, service: str, endpoint: str) -> NexusClient:
+        del service, endpoint
+        return NexusClient()
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    typed = workflow_models.StreamRef[Turn](id="s1")
+    unknown = workflow_models.StreamRef(id="s1")
+    # The operations are api-omitted, so a read goes through the Stream resource.
+    if construction == "typed":
+        stream = workflow_only.get_stream(ref=typed)
+    elif construction == "matching":
+        stream = workflow_only.get_stream(ref=typed, body_type=Turn)
+    elif construction == "none":
+        stream = workflow_only.get_stream(ref=typed, body_type=None)
+    elif construction == "override":
+        stream = workflow_only.get_stream(ref=unknown, body_type=Turn)
+    elif construction == "explicit-unknown":
+        stream = workflow_only.get_stream(
+            ref=workflow_models.StreamRef[object](id="s1"), body_type=Turn
+        )
+    else:
+        unknown_stream = workflow_only.get_stream(ref=unknown)
+        _ = assert_type(unknown_stream, WorkflowStream[object])
+        [record] = (await unknown_stream.read()).records
+        assert record.item == workflow_models.StreamItemData(
+            workflow_models.StreamData(body={"role": "model"})
+        )
+        return
+
+    _ = assert_type(stream, WorkflowStream[Turn])
+    [record] = (await stream.read()).records
+    assert record.item == workflow_models.StreamItemData(
+        workflow_models.StreamData(body=Turn(role="model"))
+    )
+    # The combined package reads with the same payload type.
+    both_stream = both_workflow.get_stream(ref=both_models.StreamRef[Turn](id="s1"))
+    assert (await both_stream.read()).records[0].item == both_models.StreamItemData(
+        both_models.StreamData(body=Turn(role="model"))
+    )
+    with pytest.raises(TypeError, match="decoding type must match"):
+        _ = workflow_only.get_stream(ref=typing.cast(typing.Any, typed), body_type=str)
+
+    if typing.TYPE_CHECKING:
+        _ = workflow_only.get_stream(ref=typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
+        records = [Turn(role="model")]
+        _ = await workflow_only.get_stream(ref=typed).publish(*records)
+        _ = await workflow_only.get_stream(
+            ref=workflow_models.StreamRef[str](id="s1")
+        ).publish(*records)  # pyright: ignore[reportArgumentType]
+
+
+def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
+    plain = workflow_models.StreamRef(id="typed-stream")
+    typed = workflow_models.StreamRef[Turn](id="typed-stream")
+
+    typed_ref = WorkflowStream[Turn](ref=typed, created=None).ref
+    unknown_ref = WorkflowStream(ref=plain, created=None).ref
+    inferred = WorkflowStream(ref=typed, created=None)
+
+    _ = assert_type(typed_ref, workflow_models.StreamRef[Turn])
+    _ = assert_type(inferred, WorkflowStream[Turn])
+    assert inferred.body_type is Turn
+    _ = assert_type(plain, workflow_models.StreamRef[object])
+    _ = assert_type(unknown_ref, workflow_models.StreamRef[object])
+    assert typed_ref is typed
+    assert unknown_ref is plain
+    assert typing.get_args(getattr(typed_ref, "__orig_class__", None)) == (Turn,)
+    # A hand-built typed ref keeps its own type argument.
+    assert typing.get_args(
+        getattr(workflow_models.StreamRef[Turn](id="s1"), "__orig_class__", None)
+    ) == (Turn,)
+
+    if typing.TYPE_CHECKING:
+        _ = WorkflowStream[Turn](
+            ref=plain,  # pyright: ignore[reportArgumentType]
+            created=None,
+        )
+
+
+def test_declared_ref_parameters_propagate_through_wire_models() -> None:
+    ref = both_models.StreamRef[Turn](id="typed-stream")
+    create = both_models.CreateStreamRequest(stream_ref=ref)
+    read = both_models.ReadRecordsRequest(ref=ref)
+    result = both_models.CreateStreamResult(ref=ref, created=True)
+    _ = assert_type(create, both_models.CreateStreamRequest[Turn])
+    _ = assert_type(read, both_models.ReadRecordsRequest[Turn])
+    _ = assert_type(result, both_models.CreateStreamResult[Turn])
+
+    decoded_create = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(create), both_models.CreateStreamRequest[Turn]
+    )
+    decoded_read = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(read), both_models.ReadRecordsRequest[Turn]
+    )
+    decoded_result = SYSTEM_CONVERTER.from_payload(
+        SYSTEM_CONVERTER.to_payload(result), both_models.CreateStreamResult[Turn]
+    )
+    for decoded_ref in (
+        decoded_create.stream_ref,
+        decoded_read.ref,
+        decoded_result.ref,
+    ):
+        assert decoded_ref == ref
+        assert typing.get_args(getattr(decoded_ref, "__orig_class__", None)) == (Turn,)
 
 
 async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> None:
@@ -346,7 +534,7 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
         item=workflow_models.StreamItemData(
             workflow_models.StreamData(body=Turn(role="model"))
         ),
-        offset=1,
+        offset=_offset(1),
     )
     payload = SYSTEM_CONVERTER.to_payload(
         workflow_models.ReadRecordsResponse[Turn](records=[record])
@@ -430,11 +618,52 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
 def test_a_workflow_factory_builds_a_handle_with_no_call(
     api: types.ModuleType, model_types: types.ModuleType
 ) -> None:
-    stream = api.get_stream[str](id="turns", backend="redis")
+    ref = model_types.StreamRef(id="turns", backend="redis")
+    stream = api.get_stream(ref=ref, body_type=str)
 
-    assert stream.ref == model_types.StreamRef(id="turns", backend="redis")
+    assert stream.ref == ref
     assert stream.created is None
     assert stream.body_type is str
+
+
+@pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+def test_api_omit_hides_the_public_operation_functions(
+    api: types.ModuleType, model_types: types.ModuleType
+) -> None:
+    hidden = (
+        "append_records",
+        "close_stream",
+        "describe_stream",
+        "read_records",
+    )
+    for name in hidden:
+        assert not hasattr(api, name)
+        assert name not in api.__all__
+    # No resource method creates a Stream, so the create function stays public.
+    assert "create_stream" in api.__all__
+    # The resource factory and its methods still reach the operations.
+    assert "get_stream" in api.__all__
+    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
+    assert all(
+        callable(getattr(stream, method))
+        for method in ("publish", "close", "read", "describe")
+    )
+    # Every operation stays registered, so the service still serves all five.
+    assert len(api.__nexus_operation_registry__) == 5
+    # The private helpers that the resource methods call stay in the resource module.
+    resources = importlib.import_module(api.__name__ + "._resources.stream")
+    for helper in (
+        "_append_records",
+        "_close_stream",
+        "_read_records",
+        "_describe_stream",
+    ):
+        assert hasattr(resources, helper)
+    assert not hasattr(resources, "append_records")
 
 
 @pytest.mark.parametrize(
@@ -491,5 +720,5 @@ def test_root_service_contract_uses_shared_wire_models(package: str) -> None:
     definition = nexusrpc.get_service_definition(shared.StreamService)
     assert definition is not None
     operation = definition.operation_definitions["CreateStream"]
-    assert operation.input_type is shared.CreateStreamRequest
-    assert operation.output_type is shared.CreateStreamResult
+    assert operation.input_type == shared.CreateStreamRequest[typing.Any]
+    assert operation.output_type == shared.CreateStreamResult[typing.Any]

@@ -23,7 +23,7 @@ use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
     ResolvedResourceBindingSource,
 };
-use crate::spec::FieldOrigin;
+use crate::spec::FieldPolicy;
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
@@ -1219,7 +1219,12 @@ impl<'a> ApiPlanner<'a> {
             }
             output.push_str(").ConfigureAwait(true);\n");
             if raw_return != "void" {
-                output.push_str("        return result;\n");
+                self.render_operation_result_return(
+                    output,
+                    operation,
+                    endpoint_parameter,
+                    high_level_return,
+                );
             }
             output.push_str("    }\n\n");
             return;
@@ -1251,6 +1256,23 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("    }\n\n");
             return;
         }
+        self.render_operation_result_return(
+            output,
+            operation,
+            endpoint_parameter,
+            high_level_return,
+        );
+        output.push_str("    }\n\n");
+    }
+
+    /// Named and expression-based SDK calls share the same high-level result conversion.
+    fn render_operation_result_return(
+        &self,
+        output: &mut String,
+        operation: &PlannedOperation,
+        endpoint_parameter: bool,
+        high_level_return: &str,
+    ) {
         if operation.output_transform.is_some() || operation.data.output_resource_return.is_some() {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
@@ -1279,7 +1301,6 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("        return result;\n");
             }
         }
-        output.push_str("    }\n\n");
     }
 
     fn resource_type_name_for_return_type(&self, return_type: &str) -> Option<String> {
@@ -1936,7 +1957,13 @@ impl<'a> ApiPlanner<'a> {
         );
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("public class ");
+        // An api-omitted operation keeps its options type for the resource binding, but no longer
+        // exposes it or its convenience method in the public surface.
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal class "
+        } else {
+            "public class "
+        });
         let options_type_name = operation_options_type_name(operation);
         output.push_str(&options_type_name);
         self.render_operation_model_type_parameters(output, operation);
@@ -2092,7 +2119,12 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("    public ");
+        output.push_str("    ");
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal "
+        } else {
+            "public "
+        });
         if !instance_method {
             output.push_str("static ");
         }
@@ -2203,6 +2235,12 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&csharp_parameter_name(&arg_field.name));
         }
     }
+}
+
+/// Whether `@nexus.api-omit` drops this operation's public convenience method and options type.
+/// The private request helper, the service, and the resource binding stay.
+fn operation_public_function_omitted(operation: &PlannedOperation) -> bool {
+    operation.api_omitted.contains(&GenerationTarget::Workflow)
 }
 
 fn api_omitted_list_item(field: &RecordFieldSpec<PlannedFamily>) -> Option<&PlannedType> {
@@ -3607,7 +3645,7 @@ fn flattened_request_field_expr(
     options_required: bool,
 ) -> String {
     if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-        nested_model_init_expr(field, nested_model, options_required)
+        nested_model_init_expr(field, nested_model, options_required, api_plan)
     } else if field.function.is_some()
         && matches!(
             overload.function_mode(field_name),
@@ -3807,6 +3845,7 @@ fn nested_model_init_expr(
     field: &RecordFieldSpec<PlannedFamily>,
     model: &PlannedModel,
     options_required: bool,
+    api_plan: &PlannedSpec,
 ) -> String {
     let option_fields = model
         .api_fields(GenerationTarget::Workflow)
@@ -3825,7 +3864,14 @@ fn nested_model_init_expr(
         .collect::<Vec<_>>()
         .join(" || ");
     let init_expr = model_init_expr(
-        &csharp_type_name(&model.name),
+        &csharp_generic_type(
+            &csharp_type_name(&model.name),
+            &api_plan
+                .record_type_parameters(&model.full_name)
+                .into_iter()
+                .map(|usage| usage.parameter)
+                .collect::<Vec<_>>(),
+        ),
         option_fields
             .into_iter()
             .map(|(_, nested_field)| {
@@ -4427,8 +4473,8 @@ fn resource_return_binding_expr(
             proto_field_name: _,
             origin,
         } => {
-            if matches!(origin, Some(FieldOrigin::Omitted))
-                || origin.as_ref().is_some_and(FieldOrigin::is_sourced)
+            if origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || origin.as_ref().is_some_and(FieldPolicy::is_sourced)
             {
                 let expr = format!("{request_expr}.{}", csharp_type_name(field_name));
                 optional_resource_binding_expr(resource, binding, expr, api_plan)

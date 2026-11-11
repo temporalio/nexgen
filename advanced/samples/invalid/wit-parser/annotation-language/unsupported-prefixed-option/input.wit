@@ -1,7 +1,0 @@
-package test:annotations;
-world api { export models; }
-interface models {
-  record request {}
-  /// @nexus.poll python="next_page" typescript-resume="resume" targets="client"
-  read: func(request: request) -> request;
-}

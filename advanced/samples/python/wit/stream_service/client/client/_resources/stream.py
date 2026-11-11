@@ -14,12 +14,13 @@ from ...services import StreamService
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
+    AppendRecordsResponse,
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
-    StreamReadStart,
     StreamRecord,
     StreamRef,
 )
@@ -33,7 +34,7 @@ BodyT = typing.TypeVar("BodyT")
 class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
-    ref: StreamRef
+    ref: StreamRef[BodyT]
     created: bool | None
 
     def __init__(
@@ -41,26 +42,19 @@ class Stream(typing.Generic[BodyT]):
         nexus_client: temporalio.client.NexusClient[typing.Any],
         /,
         *,
-        ref: StreamRef,
+        ref: StreamRef[BodyT],
         created: bool | None,
     ) -> None:
         self._nexus_client: temporalio.client.NexusClient[typing.Any] = nexus_client
+        if type(self) is not Stream:
+            raise TypeError("Generic resource subclasses are not supported")
         self.ref = ref
         self.created = created
 
     @property
     def body_type(self) -> type[BodyT]:
-        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
-        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
-            (
-                typing.get_args(base)
-                for klass in type(self).__mro__
-                for base in vars(klass).get("__orig_bases__", ())
-                if typing.get_origin(base) is Stream
-            ),
-            (),
-        )
-        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+        arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
+        return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
     async def __aenter__(self) -> typing_extensions.Self:
         return self
@@ -73,17 +67,18 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def append(
+    async def publish(
         self,
         *records: BodyT,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> int:
-        """Append values, and return the offset of the last one."""
+    ) -> AppendRecordsResponse:
+        """Publish values, and return the first and the last offset of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            writer=_support.client_writer(),
+            producer=_support.client_producer(),
+            withdraw_run=_support.withdraw_run(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -92,8 +87,7 @@ class Stream(typing.Generic[BodyT]):
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
-        result = await handle.result()
-        return _support.last_offset(result)
+        return await handle.result()
 
     async def close(
         self,
@@ -104,7 +98,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            writer=_support.client_writer(),
+            producer=_support.client_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,
@@ -117,8 +111,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -130,8 +123,7 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,
@@ -149,8 +141,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def iter_read(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -164,11 +155,10 @@ class Stream(typing.Generic[BodyT]):
         Read one page of Records. The poll iterator reads them all.
 
         Args:
-            from_offset: Start offset. Empty uses start. An offset past the newest one +
-                1 fails.
-            start: Where to start when from-offset is empty. Unspecified is the
-                beginning.
-            max_records: About this many items per page, 1 to 1000.
+            position: Where the read starts. Unset is the beginning. A too high offset
+                fails.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
             create_wait: How long to wait for an uncreated Stream. Empty fails at once.
@@ -178,8 +168,7 @@ class Stream(typing.Generic[BodyT]):
         """
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,
@@ -204,8 +193,7 @@ class Stream(typing.Generic[BodyT]):
 
     def iter_read_items(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -213,7 +201,7 @@ class Stream(typing.Generic[BodyT]):
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> PollIterator[ReadRecordsRequest, StreamRecord[BodyT]]:
+    ) -> PollIterator[ReadRecordsRequest[BodyT], StreamRecord[BodyT]]:
         """Yield each item of ``iter_read``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is
@@ -222,11 +210,10 @@ class Stream(typing.Generic[BodyT]):
         Read one page of Records. The poll iterator reads them all.
 
         Args:
-            from_offset: Start offset. Empty uses start. An offset past the newest one +
-                1 fails.
-            start: Where to start when from-offset is empty. Unspecified is the
-                beginning.
-            max_records: About this many items per page, 1 to 1000.
+            position: Where the read starts. Unset is the beginning. A too high offset
+                fails.
+            max_records: About this many items per page, 1 to 1000. A Superseded item
+                stays with its Record.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
             create_wait: How long to wait for an uncreated Stream. Empty fails at once.
@@ -236,8 +223,7 @@ class Stream(typing.Generic[BodyT]):
         """
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,
@@ -246,8 +232,7 @@ class Stream(typing.Generic[BodyT]):
         return PollIterator(
             request,
             self.iter_read(
-                from_offset=from_offset,
-                start=start,
+                position=position,
                 max_records=max_records,
                 wait=wait,
                 create_wait=create_wait,

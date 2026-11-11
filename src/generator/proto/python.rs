@@ -7,15 +7,15 @@ use crate::generator::ExternalModelBackend;
 use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
-    ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
-    python_string_literal, render_python_docstring,
+    ResolvedFieldType, RootPackageImports, WireValueConversion, phantom_type_variable,
+    python_authored_type_annotation, python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
 };
 use crate::spec::{
-    EnumSpec, ExternalTypeSpec, FieldOrigin, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
+    EnumSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
 };
 
 #[derive(Debug)]
@@ -823,7 +823,18 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             .strip_suffix('T')
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
-        let base_name = format!("{}_type", stem.to_snake_case());
+        let base_name = format!(
+            "{}{}_type",
+            if model
+                .phantom_type_parameters
+                .contains(&phantom_type_variable(parameter))
+            {
+                "_"
+            } else {
+                ""
+            },
+            stem.to_snake_case()
+        );
         let mut name = base_name.clone();
         let mut suffix = 1;
         while arguments
@@ -1170,7 +1181,7 @@ fn render_record_wire_block(
     let proto_fields = planned_model
         .fields
         .values()
-        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .map(|field| ModelBackend::analyze_field(api_plan, planned_model, field, resolve_type))
         .collect::<Result<Vec<_>>>()?;
     let type_arguments = runtime_type_arguments(model);
@@ -1208,9 +1219,16 @@ fn render_record_wire_block(
         output.push_str("    ) -> ");
         output.push_str(&converter_model_annotation);
         output.push_str(":\n");
+        // A parameterized hint, such as a Workflow input's `StreamRef[Turn]`, builds a ref that
+        // keeps its type arguments in `__orig_class__`.
+        let constructor = if model.phantom_type_parameters.is_empty() {
+            model.name.as_str()
+        } else {
+            "type_hint"
+        };
         if model.fields.is_empty() {
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("()\n");
         } else {
             if !type_arguments.is_empty() {
@@ -1239,7 +1257,7 @@ fn render_record_wire_block(
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1278,12 +1296,12 @@ fn render_record_wire_block(
             }
 
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("(\n");
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1350,7 +1368,7 @@ fn render_record_wire_block(
         for (((field_name, planned_field), rendered_field), proto_field) in planned_model
             .fields
             .iter()
-            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .map(|(name, field)| (name.as_str(), field))
             .zip(model.fields.iter())
             .zip(proto_fields.iter())

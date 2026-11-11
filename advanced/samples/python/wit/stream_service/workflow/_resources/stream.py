@@ -17,45 +17,37 @@ from ..models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
-    StreamReadStart,
     StreamRef,
 )
 import temporal_support as _support
 
 
 BodyT = typing.TypeVar("BodyT")
-_BodyT = typing.TypeVar("_BodyT")
 
 
 class Stream(typing.Generic[BodyT]):
     """One Stream. Build it from a stream-ref, or get it from a create."""
 
-    ref: StreamRef
+    ref: StreamRef[BodyT]
     created: bool | None
 
     def __init__(
         self,
-        ref: StreamRef,
+        ref: StreamRef[BodyT],
         created: bool | None,
     ) -> None:
+        if type(self) is not Stream:
+            raise TypeError("Generic resource subclasses are not supported")
         self.ref = ref
         self.created = created
 
     @property
     def body_type(self) -> type[BodyT]:
-        # A subclass of a specialized class has no __orig_class__, only __orig_bases__.
-        arguments = typing.get_args(getattr(self, "__orig_class__", None)) or next(
-            (
-                typing.get_args(base)
-                for klass in type(self).__mro__
-                for base in vars(klass).get("__orig_bases__", ())
-                if typing.get_origin(base) is Stream
-            ),
-            (),
-        )
-        return typing.cast("type[BodyT]", arguments[0] if arguments else typing.Any)
+        arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
+        return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
     async def __aenter__(self) -> typing_extensions.Self:
         return self
@@ -68,17 +60,19 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def append(
+    async def publish(
         self,
         *records: BodyT,
-    ) -> int:
-        """Append values, and return the offset of the last one."""
+    ) -> AppendRecordsResponse:
+        """Publish values, and return the first and the last offset of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            writer=_support.workflow_writer(),
+            producer=_support.workflow_producer(),
+            withdraw_run=_support.withdraw_run(),
         )
-        return await _append_records(request)
+        handle = await _append_records(request)
+        return await handle
 
     async def close(
         self,
@@ -86,15 +80,14 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            writer=_support.workflow_writer(),
+            producer=_support.workflow_producer(),
         )
         handle = await _close_stream(request)
         await handle
 
     async def read(
         self,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
+        position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         create_wait: datetime.timedelta | None = None,
@@ -103,8 +96,7 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            from_offset=from_offset,
-            start=start,
+            position=position,
             max_records=max_records,
             wait=wait,
             create_wait=create_wait,
@@ -124,77 +116,61 @@ class Stream(typing.Generic[BodyT]):
         return await handle
 
 
-class _GetStream(typing.Generic[BodyT]):
-    """Subscript it with the type arguments that the call decodes with."""
-
-    def __init__(
-        self,
-        body_type: type[BodyT] | None = None,
-    ) -> None:
-        self.body_type: type[BodyT] = typing.cast(
-            "type[BodyT]", typing.Any if body_type is None else body_type
-        )
-
-    def __getitem__(self, body_type: type[_BodyT]) -> _GetStream[_BodyT]:
-        return _GetStream(body_type)
-
-    def __call__(
-        self,
-        *,
-        id: str,
-        backend: str | None = None,
-        created: bool | None = None,
-    ) -> Stream[BodyT]:
-        """A handle on an existing ``Stream``, with no call."""
-        ref = StreamRef(id=id, backend=backend)
-        return Stream[self.body_type](
-            ref=ref,
-            created=created,
-        )
+@typing.overload
+def get_stream(
+    ref: StreamRef[BodyT],
+    *,
+    created: bool | None = None,
+    body_type: None = None,
+) -> Stream[BodyT]: ...
 
 
-get_stream: _GetStream[typing.Any] = _GetStream()
+@typing.overload
+def get_stream(
+    ref: StreamRef[BodyT] | StreamRef[object],
+    *,
+    created: bool | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
+
+
+def get_stream(
+    ref: StreamRef[typing.Any],
+    *,
+    created: bool | None = None,
+    body_type: typing.Any = None,
+) -> Stream[typing.Any]:
+    """Return the ``Stream`` handle for this ref."""
+    arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+    # None means no explicit type, so use the ref's type argument, else object.
+    if body_type is None:
+        body_type = arguments[0] if arguments else object
+    elif arguments and arguments[0] is not object and arguments[0] != body_type:
+        raise TypeError("The decoding type must match the typed ref")
+    if arguments != (body_type,):
+        ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+    return Stream[body_type](
+        ref=ref,
+        created=created,
+    )
 
 
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
-) -> int:
+) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
-    handle = await nexus_client.start_operation(
+    return await nexus_client.start_operation(
         operation="AppendRecords",
         input=request,
         output_type=AppendRecordsResponse,
     )
-    result = await handle
-    return _support.last_offset(result)
-
-
-async def append_records(
-    *,
-    ref: StreamRef,
-    records: list[BodyT],
-    sequence: int | None = None,
-) -> int:
-    """Append one batch. Workflow code makes the call from a Local Activity.
-
-    Args:
-        sequence: The batch number in this epoch. Empty takes the next one, and a retry
-            writes it again.
-    """
-    request = AppendRecordsRequest(
-        ref=ref,
-        records=[AppendRecord(body=value) for value in records],
-        writer=_support.workflow_writer(),
-        sequence=sequence,
-    )
-    return await _append_records(request)
 
 
 async def _close_stream(
-    request: CloseStreamRequest,
+    request: CloseStreamRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
@@ -207,19 +183,8 @@ async def _close_stream(
     )
 
 
-async def close_stream(
-    *,
-    ref: StreamRef,
-) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
-    request = CloseStreamRequest(
-        ref=ref,
-        writer=_support.workflow_writer(),
-    )
-    return await _close_stream(request)
-
-
 async def _read_records(
-    request: ReadRecordsRequest,
+    request: ReadRecordsRequest[BodyT],
     body_type: type[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
     nexus_client = temporalio.workflow.create_nexus_client(
@@ -233,64 +198,8 @@ async def _read_records(
     )
 
 
-class _ReadRecords(typing.Generic[BodyT]):
-    """Subscript it with the type arguments that the call decodes with."""
-
-    def __init__(
-        self,
-        body_type: type[BodyT] | None = None,
-    ) -> None:
-        self.body_type: type[BodyT] = typing.cast(
-            "type[BodyT]", typing.Any if body_type is None else body_type
-        )
-
-    def __getitem__(self, body_type: type[_BodyT]) -> _ReadRecords[_BodyT]:
-        return _ReadRecords(body_type)
-
-    async def __call__(
-        self,
-        *,
-        ref: StreamRef,
-        from_offset: int | None = None,
-        start: StreamReadStart | None = None,
-        max_records: int | None = None,
-        wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
-        max_bytes: int | None = None,
-    ) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
-        """A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
-        Activity.
-
-        Args:
-            from_offset: Start offset. Empty uses start. An offset past the newest one +
-                1 fails.
-            start: Where to start when from-offset is empty. Unspecified is the
-                beginning.
-            max_records: About this many items per page, 1 to 1000.
-            wait: How long to wait for a new Record before an empty answer. At most 60
-                s.
-            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
-                At most 60 s.
-            max_bytes: The maximum Record bytes in a page. A larger Record is still
-                returned alone.
-        """
-        request = ReadRecordsRequest(
-            ref=ref,
-            from_offset=from_offset,
-            start=start,
-            max_records=max_records,
-            wait=wait,
-            create_wait=create_wait,
-            max_bytes=max_bytes,
-        )
-        return await _read_records(request, self.body_type)
-
-
-read_records: _ReadRecords[typing.Any] = _ReadRecords()
-
-
 async def _describe_stream(
-    request: DescribeStreamRequest,
+    request: DescribeStreamRequest[BodyT],
 ) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
@@ -301,13 +210,3 @@ async def _describe_stream(
         input=request,
         output_type=DescribeStreamResponse,
     )
-
-
-async def describe_stream(
-    *,
-    ref: StreamRef,
-) -> temporalio.workflow.NexusOperationHandle[DescribeStreamResponse,]:
-    request = DescribeStreamRequest(
-        ref=ref,
-    )
-    return await _describe_stream(request)

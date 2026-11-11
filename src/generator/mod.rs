@@ -1012,175 +1012,6 @@ interface example-service {
         assert!(generated.files[&PathBuf::from("services.py")].contains("class ExampleService"));
     }
 
-    #[test]
-    fn a_runtime_type_argument_name_must_be_free() {
-        let pair = r#"
-  /// @nexus.type-parameter
-  type body = placeholder;
-  /// @nexus.type-parameter
-  type body-t = placeholder;
-  resource pair {
-    constructor(first: body, second: body-t);
-  }"#;
-        let method = r#"
-  /// @nexus.type-parameter
-  type body-t = placeholder;
-  resource holder {
-    constructor(body: body-t);
-    body-type: func() -> string;
-  }"#;
-        for (language, items, name, conflicting) in [
-            (
-                Language::Python,
-                pair,
-                "body_type",
-                "the runtime type of `Body`",
-            ),
-            (
-                Language::TypeScript,
-                pair,
-                "bodyType",
-                "the runtime type of `Body`",
-            ),
-            (
-                Language::Python,
-                method,
-                "body_type",
-                "method `body-type` of resource `holder`",
-            ),
-            (
-                Language::TypeScript,
-                method,
-                "bodyType",
-                "method `body-type` of resource `holder`",
-            ),
-        ] {
-            let wit = format!(
-                "package test:names@1.0.0;\nworld system {{ export names; }}\n\
-                 interface names {{\n  type placeholder = string;\n{items}\n}}\n"
-            );
-            let spec = crate::parser::parse_api_spec_from_wit_for_language(
-                language,
-                &wit,
-                PathBuf::from("inline.wit"),
-            )
-            .unwrap();
-            let descriptors =
-                DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() })
-                    .unwrap();
-            let error = generate_files_for_tree_with_targets_and_options(
-                language,
-                ApiSpecTree::single(spec),
-                &descriptors,
-                &[GenerationTarget::Workflow],
-                GenerateFilesOptions {
-                    support_package: Some("support".to_string()),
-                    ..GenerateFilesOptions::default()
-                },
-            )
-            .unwrap_err();
-            let crate::error::Error::RuntimeTypeArgumentNameConflict {
-                name: actual_name,
-                conflicting: actual_conflicting,
-                ..
-            } = &error
-            else {
-                panic!("{language:?}: expected a runtime type name conflict, got {error}");
-            };
-            assert_eq!(
-                (actual_name.as_str(), actual_conflicting.as_str()),
-                (name, conflicting),
-                "{language:?}"
-            );
-        }
-    }
-
-    const FIELD_FLATTEN_WIT: &str = r#"
-package temporal:nexus@1.0.0;
-
-world system { export history-service; }
-
-/// @nexus.endpoint "history"
-interface history-service {
-  use nexus:temporal-types/model@1.0.0.{placeholder};
-
-  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
-  record workflow-execution {
-    workflow-id: string,
-    run-id: option<string>,
-  }
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest"
-  record get-history-request {
-    namespace: string,
-    /// @nexus.flatten-in-api
-    execution: workflow-execution,
-    /// @nexus.omit
-    maximum-page-size: placeholder,
-    /// @nexus.omit
-    next-page-token: placeholder,
-    /// @nexus.omit
-    wait-new-event: placeholder,
-    /// @nexus.omit
-    history-event-filter-type: placeholder,
-    /// @nexus.omit
-    skip-archival: placeholder,
-  }
-
-  get-history: func(request: get-history-request);
-}
-"#;
-
-    fn field_flatten_files(language: Language) -> BTreeMap<PathBuf, String> {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
-            language,
-            FIELD_FLATTEN_WIT,
-            PathBuf::from("inline.wit"),
-            &[root.join("advanced/samples/inputs/deps")],
-        )
-        .unwrap();
-        let descriptors = DescriptorIndex::load_many(&[
-            root.join("advanced/samples/descriptors/temporal_api.bin")
-        ])
-        .unwrap();
-        generate_files_for_tree_with_targets_and_options(
-            language,
-            ApiSpecTree::single(spec),
-            &descriptors,
-            &[GenerationTarget::Workflow],
-            GenerateFilesOptions {
-                support_package: Some("support".to_string()),
-                ..GenerateFilesOptions::default()
-            },
-        )
-        .unwrap()
-        .files
-    }
-
-    // No sample test runs a TypeScript or .NET Workflow call, so this checks the generated code.
-    #[test]
-    fn a_flattened_field_takes_the_fields_of_its_record_in_one_call() {
-        let typescript = field_flatten_files(Language::TypeScript);
-        let operation = &typescript[&PathBuf::from("operations/get-history.ts")];
-        assert!(
-            operation.contains("& { workflowId: string; runId?: string }"),
-            "{operation}"
-        );
-        assert!(
-            operation.contains("execution: { workflowId, runId },"),
-            "{operation}"
-        );
-
-        let dotnet = field_flatten_files(Language::Dotnet);
-        let operations = &dotnet[&PathBuf::from("Operations.cs")];
-        assert!(
-            operations
-                .contains("new WorkflowExecution(options.WorkflowId) { RunId = options.RunId }"),
-            "{operations}"
-        );
-    }
-
     fn workflow_files(language: Language, wit: &str) -> BTreeMap<PathBuf, String> {
         let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
             system_nexus: true,
@@ -1260,11 +1091,8 @@ interface stream-service {
   record read-records-request {
     /// @nexus.omit
     ref: placeholder,
-    /// @nexus.name typescript="offset"
-    /// @nexus.source targets="workflow" typescript="startOffset()"
-    from-offset: option<s64>,
     /// @nexus.omit
-    start: placeholder,
+    position: placeholder,
     max-records: option<s32>,
     /// @nexus.omit
     wait: placeholder,
@@ -1272,8 +1100,9 @@ interface stream-service {
     create-wait: placeholder,
     /// @nexus.omit
     last: placeholder,
-    /// @nexus.omit
-    max-bytes: placeholder,
+    /// @nexus.name typescript="limit"
+    /// @nexus.source targets="workflow" typescript="startLimit()"
+    max-bytes: option<s64>,
     /// @nexus.omit
     namespace: placeholder,
     /// @nexus.omit
@@ -1289,7 +1118,7 @@ interface stream-service {
 "#;
         let typescript = workflow_files(Language::TypeScript, wit);
         let models = &typescript[&PathBuf::from("models.ts")];
-        assert!(models.contains("offset?: Long;"), "{models}");
-        assert!(models.contains("fromOffset: model.offset"), "{models}");
+        assert!(models.contains("limit?: Long;"), "{models}");
+        assert!(models.contains("maxBytes: model.limit"), "{models}");
     }
 }

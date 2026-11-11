@@ -5,7 +5,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResourceMethodBindingSpec, PlannedSpec, RequestPlan,
     RequestPlanField, RequestPlanSource,
 };
-use crate::spec::{ExternalTypeSourceSpec, FieldOrigin, RecordSpec};
+use crate::spec::{ExternalTypeSourceSpec, RecordSpec};
 
 pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>(
     plan: &RequestPlan,
@@ -173,7 +173,7 @@ fn missing_origin_field(
     if let Some(record) = record_for_request_name(api_plan, message_name) {
         for field in record.fields.values() {
             let kind = match field.origin.as_ref() {
-                Some(FieldOrigin::Default { .. }) => "defaulted",
+                _ if field.has_default() => "defaulted",
                 _ if field.has_source() => "sourced",
                 _ => continue,
             };

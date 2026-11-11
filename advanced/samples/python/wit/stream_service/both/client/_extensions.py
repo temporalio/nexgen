@@ -13,104 +13,18 @@ import datetime
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    CreateStreamResult,
+    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
 from ._resources.stream import Stream
 import temporal_support as _support
-from .._resource_call import resource_call
+from .._resource_context_manager import resource_context_manager
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
 BodyT = typing.TypeVar("BodyT")
-_BodyT = typing.TypeVar("_BodyT")
-
-
-class _GetStream(typing.Generic[BodyT]):
-    """Subscript it with the type arguments that the call decodes with."""
-
-    def __init__(
-        self,
-        extension: StreamServiceClientExtension,
-        body_type: type[BodyT] | None = None,
-    ) -> None:
-        self._extension: StreamServiceClientExtension = extension
-        self.body_type: type[BodyT] = typing.cast(
-            "type[BodyT]", typing.Any if body_type is None else body_type
-        )
-
-    def __getitem__(self, body_type: type[_BodyT]) -> _GetStream[_BodyT]:
-        return _GetStream(self._extension, body_type)
-
-    def __call__(
-        self,
-        *,
-        id: str,
-        backend: str | None = None,
-        created: bool | None = None,
-    ) -> Stream[BodyT]:
-        """A handle on an existing ``Stream``, with no call."""
-        ref = StreamRef(id=id, backend=backend)
-        return Stream[self.body_type](
-            self._extension.create_nexus_client(
-                service=StreamService,
-                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
-            ),
-            ref=ref,
-            created=created,
-        )
-
-
-class _CreateStream(typing.Generic[BodyT]):
-    """Subscript it with the type arguments that the call decodes with."""
-
-    def __init__(
-        self,
-        extension: StreamServiceClientExtension,
-        body_type: type[BodyT] | None = None,
-    ) -> None:
-        self._extension: StreamServiceClientExtension = extension
-        self.body_type: type[BodyT] = typing.cast(
-            "type[BodyT]", typing.Any if body_type is None else body_type
-        )
-
-    def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
-        return _CreateStream(self._extension, body_type)
-
-    @resource_call
-    async def __call__(
-        self,
-        *,
-        id: str,
-        backend: str | None = None,
-        retention: datetime.timedelta | None = None,
-        id_conflict_policy: StreamIdConflictPolicy | None = None,
-        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
-        rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream[BodyT]:
-        """
-        Args:
-            id: The Stream id, 1 to 4096 bytes.
-            backend: Registered backend name, empty for the default. The Store never
-                reads it.
-            retention: The age after which a Record is dropped. Empty is the Store
-                default.
-            id_conflict_policy: What the create does when the Stream exists. Unspecified
-                is fail.
-        """
-        stream_ref = StreamRef(
-            id=id,
-            backend=backend,
-        )
-        request = CreateStreamRequest(
-            stream_ref=stream_ref,
-            retention=retention,
-            id_conflict_policy=id_conflict_policy,
-            request_id=_support.request_id(),
-        )
-        return await self._extension._stream_service_create_stream(
-            request, self.body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
-        )
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -132,14 +46,50 @@ class StreamServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
-    @property
-    def get_stream(self) -> _GetStream[typing.Any]:
-        """Subscript it with the type arguments that the call decodes with."""
-        return _GetStream(self)
+    @typing.overload
+    def get_stream(
+        self,
+        ref: StreamRef[BodyT],
+        *,
+        created: bool | None = None,
+        body_type: None = None,
+    ) -> Stream[BodyT]: ...
+    @typing.overload
+    def get_stream(
+        self,
+        ref: StreamRef[BodyT] | StreamRef[object],
+        *,
+        created: bool | None = None,
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
+    def get_stream(
+        self,
+        ref: StreamRef[typing.Any],
+        *,
+        created: bool | None = None,
+        body_type: typing.Any = None,
+    ) -> Stream[typing.Any]:
+        """Return the ``Stream`` handle for this ref."""
+        arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+        # None means no explicit type, so use the ref's type argument, else object.
+        if body_type is None:
+            body_type = arguments[0] if arguments else object
+        elif arguments and arguments[0] is not object and arguments[0] != body_type:
+            raise TypeError("The decoding type must match the typed ref")
+        if arguments != (body_type,):
+            ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+        return Stream[body_type](
+            self.create_nexus_client(
+                service=StreamService,
+                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+            ),
+            ref=ref,
+            created=created,
+        )
 
     async def _stream_service_create_stream(
         self,
-        request: CreateStreamRequest,
+        request: CreateStreamRequest[BodyT],
         body_type: type[BodyT],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -150,9 +100,10 @@ class StreamServiceClientExtension(abc.ABC):
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
-            operation=StreamService.create_stream,
+            operation="CreateStream",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=CreateStreamResult[body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
@@ -166,7 +117,75 @@ class StreamServiceClientExtension(abc.ABC):
         )
         return resource
 
-    @property
-    def create_stream(self) -> _CreateStream[typing.Any]:
-        """Subscript it with the type arguments that the call decodes with."""
-        return _CreateStream(self)
+    @typing.overload
+    @resource_context_manager
+    async def create_stream(
+        self,
+        *,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: type[BodyT],
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    @resource_context_manager
+    async def create_stream(
+        self,
+        *,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[object]: ...
+
+    @resource_context_manager
+    async def create_stream(
+        self,
+        *,
+        id: str,
+        owner: Execution | None = None,
+        backend: str | None = None,
+        retention: datetime.timedelta | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: typing.Any = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[typing.Any]:
+        """
+        Args:
+            id: The Stream id, 1 to 4096 bytes.
+            owner: The run chain or Standalone Activity of a bound Stream. Empty if
+                standalone.
+            backend: Registered backend name, empty for the default. The Store never
+                reads it.
+            retention: The age after which a Record is dropped. Empty is the Store
+                default.
+            id_conflict_policy: What the create does when the Stream exists. Unspecified
+                is fail.
+        """
+        if body_type is None:
+            body_type = typing.Any
+        stream_ref = StreamRef(
+            id=id,
+            owner=owner,
+            backend=backend,
+        )
+        request = CreateStreamRequest(
+            stream_ref=stream_ref,
+            retention=retention,
+            withdraw_run=_support.withdraw_run(),
+            id_conflict_policy=id_conflict_policy,
+            request_id=_support.request_id(),
+        )
+        return await self._stream_service_create_stream(
+            request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )

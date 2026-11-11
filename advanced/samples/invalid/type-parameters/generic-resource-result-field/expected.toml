@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit"
+contains = ["record `jobs.holder` field `jobs` holds the generic resource `job`, which is not supported"]

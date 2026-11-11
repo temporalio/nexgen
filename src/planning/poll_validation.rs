@@ -8,7 +8,7 @@ use std::path::Path;
 use super::{PlannedFamily, PlannedSpec, operation_input_model, operation_output_direct_result};
 use crate::error::{Error, Result};
 use crate::nexgen_config::{self, GenerationTarget};
-use crate::spec::{ApiSpecLeaf, CompilerPass, FieldOrigin, OperationSpec, TypeSpec};
+use crate::spec::{ApiSpecLeaf, CompilerPass, FieldPolicy, OperationSpec, TypeSpec};
 
 pub(crate) struct PollValidationPass;
 
@@ -90,7 +90,7 @@ fn items_reason(
             "has an `items` field `{key}` that its response doesn't have"
         ));
     };
-    if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted) {
+    if field.origin.as_ref().is_some_and(FieldPolicy::is_omitted) {
         return Some(format!(
             "has an `items` field `{key}` that the response model omits"
         ));

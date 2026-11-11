@@ -1,0 +1,6 @@
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "unsupported-resource-type-inference"
+contains = ["multiple constructor fields declare the resource type parameters: `first`, `second`"]

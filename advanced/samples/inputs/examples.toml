@@ -11,11 +11,6 @@ system_nexus = true
 targets = ["workflow"]
 descriptors = "temporal"
 
-[integer-bindings]
-languages = ["typescript"]
-targets = ["workflow"]
-descriptors = "temporal"
-
 [start-workflow]
 targets = ["workflow"]
 descriptors = "temporal"

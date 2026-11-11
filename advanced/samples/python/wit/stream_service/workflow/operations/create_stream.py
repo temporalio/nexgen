@@ -10,20 +10,20 @@ import temporalio.workflow
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
+    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
 from .._resources import Stream
 import temporal_support as _support
-from .._resource_call import resource_call
+from .._resource_context_manager import resource_context_manager
 
 
 BodyT = typing.TypeVar("BodyT")
-_BodyT = typing.TypeVar("_BodyT")
 
 
 async def _create_stream(
-    request: CreateStreamRequest,
+    request: CreateStreamRequest[BodyT],
     body_type: type[BodyT],
 ) -> Stream[BodyT]:
     nexus_client = temporalio.workflow.create_nexus_client(
@@ -33,7 +33,7 @@ async def _create_stream(
     handle = await nexus_client.start_operation(
         operation="CreateStream",
         input=request,
-        output_type=CreateStreamResult,
+        output_type=CreateStreamResult[body_type],
     )
     result = await handle
     if result.ref is None:
@@ -44,50 +44,65 @@ async def _create_stream(
     )
 
 
-class _CreateStream(typing.Generic[BodyT]):
-    """Subscript it with the type arguments that the call decodes with."""
-
-    def __init__(
-        self,
-        body_type: type[BodyT] | None = None,
-    ) -> None:
-        self.body_type: type[BodyT] = typing.cast(
-            "type[BodyT]", typing.Any if body_type is None else body_type
-        )
-
-    def __getitem__(self, body_type: type[_BodyT]) -> _CreateStream[_BodyT]:
-        return _CreateStream(body_type)
-
-    @resource_call
-    async def __call__(
-        self,
-        *,
-        id: str,
-        backend: str | None = None,
-        retention: datetime.timedelta | None = None,
-        id_conflict_policy: StreamIdConflictPolicy | None = None,
-    ) -> Stream[BodyT]:
-        """
-        Args:
-            id: The Stream id, 1 to 4096 bytes.
-            backend: Registered backend name, empty for the default. The Store never
-                reads it.
-            retention: The age after which a Record is dropped. Empty is the Store
-                default.
-            id_conflict_policy: What the create does when the Stream exists. Unspecified
-                is fail.
-        """
-        stream_ref = StreamRef(
-            id=id,
-            backend=backend,
-        )
-        request = CreateStreamRequest(
-            stream_ref=stream_ref,
-            retention=retention,
-            id_conflict_policy=id_conflict_policy,
-            request_id=_support.request_id(),
-        )
-        return await _create_stream(request, self.body_type)
+@typing.overload
+@resource_context_manager
+async def create_stream(
+    *,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: type[BodyT],
+) -> Stream[BodyT]: ...
 
 
-create_stream: _CreateStream[typing.Any] = _CreateStream()
+@typing.overload
+@resource_context_manager
+async def create_stream(
+    *,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: None = None,
+) -> Stream[object]: ...
+
+
+@resource_context_manager
+async def create_stream(
+    *,
+    id: str,
+    owner: Execution | None = None,
+    backend: str | None = None,
+    retention: datetime.timedelta | None = None,
+    id_conflict_policy: StreamIdConflictPolicy | None = None,
+    body_type: typing.Any = None,
+) -> Stream[typing.Any]:
+    """
+    Args:
+        id: The Stream id, 1 to 4096 bytes.
+        owner: The run chain or Standalone Activity of a bound Stream. Empty if
+            standalone.
+        backend: Registered backend name, empty for the default. The Store never reads
+            it.
+        retention: The age after which a Record is dropped. Empty is the Store default.
+        id_conflict_policy: What the create does when the Stream exists. Unspecified is
+            fail.
+    """
+    if body_type is None:
+        body_type = typing.Any
+    stream_ref = StreamRef(
+        id=id,
+        owner=owner,
+        backend=backend,
+    )
+    request = CreateStreamRequest(
+        stream_ref=stream_ref,
+        retention=retention,
+        withdraw_run=_support.withdraw_run(),
+        id_conflict_policy=id_conflict_policy,
+        request_id=_support.request_id(),
+    )
+    return await _create_stream(request, body_type)

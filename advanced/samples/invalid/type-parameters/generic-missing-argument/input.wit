@@ -1,0 +1,6 @@
+package test:generic;
+world sample { export model; }
+interface model {
+  /// @nexus.generic
+  record reference { id: string, }
+}

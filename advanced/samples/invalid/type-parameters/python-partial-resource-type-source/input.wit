@@ -1,0 +1,18 @@
+package test:partial-source;
+
+world system { export sources; }
+
+interface sources {
+  /// @nexus.type-parameter
+  type value-t = string;
+  /// @nexus.type-parameter
+  type extra-t = string;
+
+  /// @nexus.generic "value-t"
+  record reference { id: string, }
+
+  resource reader {
+    constructor(ref: reference, extra: extra-t);
+    peek: func() -> value-t;
+  }
+}

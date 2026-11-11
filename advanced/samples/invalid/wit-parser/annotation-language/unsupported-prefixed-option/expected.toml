@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.poll` on interface `models` function `read`",
-  "argument `typescript-resume` is not supported for typescript",
-]

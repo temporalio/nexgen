@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	common "go.temporal.io/api/common/v1"
+	enums "go.temporal.io/api/enums/v1"
+	sdkpb "go.temporal.io/api/sdk/v1"
 	workflowservicepb "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
@@ -19,6 +21,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+	"google.golang.org/protobuf/proto"
 
 	ws "go.temporal.io/sdk/advanced/samples/go/workflowservice_facade"
 )
@@ -114,68 +117,87 @@ func (s *WorkflowServiceIntegrationSuite) runWorkflow(caller any, result any) {
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestNoWorkflowArguments() {
-	var runID *string
-	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
-		var response ws.SignalWithStartWorkflowResponse
+	capture := &captureNexusInputInterceptor{}
+	s.interceptors = []interceptor.WorkerInterceptor{capture}
+	var execution workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) (workflow.Execution, error) {
+		var execution workflow.Execution
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("minimal")},
-			"wake-up", "signal-value", emptyArgsWorkflow,
-		).Get(ctx, &response)
-		return response.RunID, err
-	}, &runID)
+			ws.SignalWithStartWorkflowOptions{},
+			s.targetID("minimal"), "wake-up", "signal-value", emptyArgsWorkflow,
+		).Get(ctx, &execution)
+		return execution, err
+	}, &execution)
 
-	s.Require().NotNil(runID)
-	s.NotEmpty(*runID)
+	s.Equal(s.targetID("minimal"), execution.ID)
+	s.NotEmpty(execution.RunID)
 	var result string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("minimal"), *runID).Get(s.ctx, &result))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, execution.ID, execution.RunID).Get(s.ctx, &result))
 	s.Equal("signal-value", result)
+
+	capture.mu.Lock()
+	calls := append([]interceptor.ExecuteNexusOperationInput(nil), capture.calls...)
+	capture.mu.Unlock()
+	s.Require().Len(calls, 1)
+	request := calls[0].Input.(interface {
+		GetWorkflow() string
+		GetArgs() []any
+		GetTaskQueue() string
+		GetWorkflowIDReusePolicy() enums.WorkflowIdReusePolicy
+	})
+	s.Equal("emptyArgsWorkflow", request.GetWorkflow())
+	s.Empty(request.GetArgs())
+	s.Equal(s.taskQueue, request.GetTaskQueue())
+	s.Equal(enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, request.GetWorkflowIDReusePolicy())
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestSignalWithStartWorkflowCallForms() {
-	var runIDs []*string
-	s.runWorkflow(func(ctx workflow.Context) ([]*string, error) {
-		var byFunction, byName ws.SignalWithStartWorkflowResponse
+	var executions []workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) ([]workflow.Execution, error) {
+		var byFunction, byName workflow.Execution
 		if err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("function"), TaskQueue: s.taskQueue},
-			"wake-up", "wake-up", exampleWorkflow, 7, "nexus",
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("function"), "wake-up", "wake-up", exampleWorkflow, 7, "nexus",
 		).Get(ctx, &byFunction); err != nil {
 			return nil, err
 		}
 		if err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("name"), TaskQueue: s.taskQueue},
-			"wake-up", nil, "singleArgWorkflow", "positional",
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("name"), "wake-up", nil, "singleArgWorkflow", "positional",
 		).Get(ctx, &byName); err != nil {
 			return nil, err
 		}
-		return []*string{byFunction.RunID, byName.RunID}, nil
-	}, &runIDs)
+		return []workflow.Execution{byFunction, byName}, nil
+	}, &executions)
 
-	s.Require().Len(runIDs, 2)
-	for _, runID := range runIDs {
-		s.Require().NotNil(runID)
-		s.NotEmpty(*runID)
+	s.Require().Len(executions, 2)
+	for _, execution := range executions {
+		s.NotEmpty(execution.RunID)
 	}
+	s.Equal(s.targetID("function"), executions[0].ID)
+	s.Equal(s.targetID("name"), executions[1].ID)
 	var functionResult, nameResult string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("function"), *runIDs[0]).Get(s.ctx, &functionResult))
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("name"), *runIDs[1]).Get(s.ctx, &nameResult))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, executions[0].ID, executions[0].RunID).Get(s.ctx, &functionResult))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, executions[1].ID, executions[1].RunID).Get(s.ctx, &nameResult))
 	s.Equal("example:7:nexus:wake-up", functionResult)
 	s.Equal("single:positional:nil", nameResult)
 }
 
 func (s *WorkflowServiceIntegrationSuite) TestListSignalArgument() {
-	var runID *string
-	s.runWorkflow(func(ctx workflow.Context) (*string, error) {
-		var response ws.SignalWithStartWorkflowResponse
+	var execution workflow.Execution
+	s.runWorkflow(func(ctx workflow.Context) (workflow.Execution, error) {
+		var execution workflow.Execution
 		err := ws.SignalWithStartWorkflow(ctx,
-			ws.SignalWithStartWorkflowOptions{ID: s.targetID("list"), TaskQueue: s.taskQueue},
-			"wake-up", []string{"one", "two"}, listSignalWorkflow,
-		).Get(ctx, &response)
-		return response.RunID, err
-	}, &runID)
+			ws.SignalWithStartWorkflowOptions{TaskQueue: s.taskQueue},
+			s.targetID("list"), "wake-up", []string{"one", "two"}, listSignalWorkflow,
+		).Get(ctx, &execution)
+		return execution, err
+	}, &execution)
 
-	s.Require().NotNil(runID)
+	s.Equal(s.targetID("list"), execution.ID)
+	s.NotEmpty(execution.RunID)
 	var result []string
-	s.Require().NoError(s.client.GetWorkflow(s.ctx, s.targetID("list"), *runID).Get(s.ctx, &result))
+	s.Require().NoError(s.client.GetWorkflow(s.ctx, execution.ID, execution.RunID).Get(s.ctx, &result))
 	s.Equal([]string{"one", "two"}, result)
 }
 
@@ -184,11 +206,10 @@ func (s *WorkflowServiceIntegrationSuite) TestConversionFailureSurfacesOnTheFutu
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID:        s.targetID("invalid"),
 				TaskQueue: s.taskQueue,
 				Memo:      map[string]any{"invalid": func() {}},
 			},
-			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
+			s.targetID("invalid"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		if err == nil {
 			return "", errors.New("expected a payload conversion error")
@@ -231,8 +252,6 @@ func (c recordingDataConverter) ToPayloads(values ...any) (*common.Payloads, err
 	return c.DataConverter.ToPayloads(values...)
 }
 
-// captureNexusInputInterceptor records the ExecuteNexusOperationInput proto
-// created by the generated SignalWithStartWorkflow function.
 type captureNexusInputInterceptor struct {
 	interceptor.WorkerInterceptorBase
 	mu    sync.Mutex
@@ -264,9 +283,14 @@ type captureNexusInputOutbound struct {
 }
 
 func (i *captureNexusInputOutbound) ExecuteNexusOperation(ctx workflow.Context, input interceptor.ExecuteNexusOperationInput) workflow.NexusOperationFuture {
-	i.capture.mu.Lock()
-	i.capture.calls = append(i.capture.calls, input)
-	i.capture.mu.Unlock()
+	if input.Client.Endpoint() != "__temporal_system" {
+		return i.Next.ExecuteNexusOperation(ctx, input)
+	}
+	if !workflow.IsReplaying(ctx) {
+		i.capture.mu.Lock()
+		i.capture.calls = append(i.capture.calls, input)
+		i.capture.mu.Unlock()
+	}
 	return i.Next.ExecuteNexusOperation(ctx, input)
 }
 
@@ -287,11 +311,10 @@ func (s *WorkflowServiceIntegrationSuite) TestFlattenedMetadataPresence() {
 			var result string
 			s.runWorkflow(func(ctx workflow.Context) (string, error) {
 				err := ws.SignalWithStartWorkflow(ctx, ws.SignalWithStartWorkflowOptions{
-					ID:            s.targetID("target"),
 					TaskQueue:     s.taskQueue,
 					StaticSummary: tc.summary,
 					StaticDetails: tc.details,
-				}, "wake-up", "signal", singleArgWorkflow, "input").Get(ctx, nil)
+				}, s.targetID("target"), "wake-up", "signal", singleArgWorkflow, "input").Get(ctx, nil)
 				return "caller-result", err
 			}, &result)
 			s.Require().Equal("caller-result", result)
@@ -361,7 +384,6 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	s.runWorkflow(func(ctx workflow.Context) (string, error) {
 		err := ws.SignalWithStartWorkflow(ctx,
 			ws.SignalWithStartWorkflowOptions{
-				ID:        s.targetID("target"),
 				TaskQueue: s.taskQueue,
 				Memo: map[string]any{
 					"memo-key": "target-memo",
@@ -369,7 +391,7 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 				StaticSummary: "target-summary",
 				StaticDetails: "target-details",
 			},
-			"wake-up", "signal-value", singleArgWorkflow, "workflow-input",
+			s.targetID("target"), "wake-up", "signal-value", singleArgWorkflow, "workflow-input",
 		).Get(ctx, nil)
 		return "caller-result", err
 	}, &callerResult)
@@ -443,21 +465,26 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	)
 	headerPayload, err := converter.GetDefaultDataConverter().ToPayload("parent")
 	s.Require().NoError(err)
+	emptySummary, err := converter.GetDefaultDataConverter().ToPayload("")
+	s.Require().NoError(err)
 	wire := workflowservicepb.SignalWithStartWorkflowExecutionRequest{
 		WorkflowId: s.targetID("target"),
 		Header: &common.Header{
 			Fields: map[string]*common.Payload{"trace": headerPayload},
 		},
+		UserMetadata: &sdkpb.UserMetadata{Summary: emptySummary},
 	}
 	payload, err := converter.GetDefaultDataConverter().ToPayload(&wire)
 	s.Require().NoError(err)
-	// Allocate the private request type without exposing it through the facade.
 	decoded := reflect.New(reflect.TypeOf(call.Input)).Interface()
 	s.Require().NoError(dc.FromPayload(payload, decoded))
-	withHeaders, ok := decoded.(interface{ GetHeaders() map[string]any })
-	s.Require().True(ok)
-	s.Require().Equal("parent", withHeaders.GetHeaders()["trace"])
-	withHeaders.GetHeaders()["trace"] = "intercepted"
+	headers := decoded.(interface {
+		GetHeaders() map[string]*common.Payload
+	}).GetHeaders()
+	s.Require().True(proto.Equal(headerPayload, headers["trace"]), "workflow header changed during payload conversion")
+	interceptedPayload, err := converter.GetDefaultDataConverter().ToPayload("intercepted")
+	s.Require().NoError(err)
+	headers["trace"] = interceptedPayload
 	payload, err = dc.ToPayload(decoded)
 	s.Require().NoError(err)
 	var encoded workflowservicepb.SignalWithStartWorkflowExecutionRequest
@@ -465,4 +492,5 @@ func (s *WorkflowServiceIntegrationSuite) TestSerializationContextsAndOperationR
 	var header string
 	s.Require().NoError(converter.GetDefaultDataConverter().FromPayload(encoded.Header.Fields["trace"], &header))
 	s.Equal("intercepted", header)
+	s.Require().True(proto.Equal(wire.UserMetadata, encoded.UserMetadata), "present empty metadata changed during payload conversion")
 }

@@ -26,8 +26,8 @@ class CreateStreamRequest(_message.Message):
     """Experimental. Might change in the future.
     Creates the Stream. When the Stream exists, FAIL fails with ALREADY_EXISTS, and USE_EXISTING
     gets it with created false and its own Retention. A retry of the create that made the Stream,
-    with the same request_id, gets created true. Each policy fails with CLOSED on a closed Stream
-    and EXPIRED on an expired one.
+    with the same request_id, gets created true. Each policy fails with CLOSED on a closed Stream,
+    EXPIRED on an expired one, and NOT_OWNER on one with another owner.
     (-- api-linter: core::0133=disabled
         aip.dev/not-precedent: The request identifies a Stream by namespace and ref. --)
     """
@@ -37,14 +37,26 @@ class CreateStreamRequest(_message.Message):
     NAMESPACE_FIELD_NUMBER: _builtins.int
     STREAM_REF_FIELD_NUMBER: _builtins.int
     RETENTION_FIELD_NUMBER: _builtins.int
+    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
+    OWNER_FIELD_NUMBER: _builtins.int
+    CLOSE_WITH_RUN_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: _builtins.int
     REQUEST_ID_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    withdraw_run: _builtins.str
+    """Workflow only. The previous run on a retry run's first create, to withdraw its Records."""
+    close_with_run: _builtins.bool
+    """Only read by the server. When set, the server closes the Stream when the owner's run chain
+    ends, also on a terminate or a timeout. It needs owner, and a ref with a Workflow owner.
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: "with" ties the close to the owner's run chain. --)
+    """
     task_token: _builtins.bytes
     """Only read by the server, for a Stream bound to a Standalone Activity. The server checks that
     the token is the Activity's current attempt, so a caller can't bind a Stream to a Standalone
-    Activity that it isn't.
+    Activity that it isn't. The server knows the run of a Workflow's call, and a standalone
+    Stream has no owner, so neither needs a token.
     """
     id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType
     """What the create does when the Stream exists. Unspecified is FAIL."""
@@ -54,11 +66,19 @@ class CreateStreamRequest(_message.Message):
     """
     @_builtins.property
     def stream_ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream to create. Its id is the Stream id, and is never empty."""
+        """The ref of the Stream to create. Its id is the Stream id, and is never empty. A bound
+        Stream's ref has the owner's run chain as its owner.
+        """
 
     @_builtins.property
     def retention(self) -> _duration_pb2.Duration:
         """The age after which a Record is dropped. Empty is the Store default."""
+
+    @_builtins.property
+    def owner(self) -> _message_pb2.Producer:
+        """The Workflow run that owns a bound Stream, with its run_id and a Workflow epoch. It needs a
+        ref whose owner is the run's chain. Unset for a standalone Stream.
+        """
 
     def __init__(
         self,
@@ -66,13 +86,16 @@ class CreateStreamRequest(_message.Message):
         namespace: _builtins.str = ...,
         stream_ref: _message_pb2.StreamRef | None = ...,
         retention: _duration_pb2.Duration | None = ...,
+        withdraw_run: _builtins.str = ...,
+        owner: _message_pb2.Producer | None = ...,
+        close_with_run: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
         id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType = ...,
         request_id: _builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["retention", b"retention", "stream_ref", b"stream_ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["owner", b"owner", "retention", b"retention", "stream_ref", b"stream_ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "request_id", b"request_id", "retention", b"retention", "stream_ref", b"stream_ref", "task_token", b"task_token"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["close_with_run", b"close_with_run", "id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "owner", b"owner", "request_id", b"request_id", "retention", b"retention", "stream_ref", b"stream_ref", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -92,7 +115,7 @@ class CreateStreamResponse(_message.Message):
     """False when USE_EXISTING got a Stream that existed."""
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream."""
+        """The ref, with the owner of a bound Stream."""
 
     def __init__(
         self,
@@ -119,14 +142,24 @@ class AppendRecordsRequest(_message.Message):
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    WRITER_FIELD_NUMBER: _builtins.int
+    PRODUCER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
+    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
+    FAILED_TASKS_FIELD_NUMBER: _builtins.int
+    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
+    DEFER_WITHDRAWAL_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     sequence: _builtins.int
     """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
     the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
+    """
+    withdraw_run: _builtins.str
+    """Local Activity only. The previous run on a retry run's first batch, to withdraw its Records."""
+    defer_withdrawal: _builtins.bool
+    """Only read by the server, on a Workflow Producer's batch. The batch withdraws no Workflow
+    Task and keeps no task facts, but withdraw_run still applies.
     """
     task_token: _builtins.bytes
     """Only read by the server. The server checks the Producer against the Activity's current
@@ -135,24 +168,41 @@ class AppendRecordsRequest(_message.Message):
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef: ...
     @_builtins.property
-    def writer(self) -> _message_pb2.StreamWriter:
+    def producer(self) -> _message_pb2.Producer:
         """Required outside a Workflow. In a Workflow the transport sets it."""
 
     @_builtins.property
     def records(self) -> _containers.RepeatedCompositeFieldContainer[_message_pb2.AppendRecord]: ...
+    @_builtins.property
+    def previous_completed_task(self) -> _message_pb2.WorkflowTaskEpoch:
+        """The run's last completed Workflow Task, from a Local Activity's start. Its started_event_id
+        is 0 before the first. The batch withdraws the run's Local Activity Records whose Workflow
+        Task never completed.
+        """
+
+    @_builtins.property
+    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """The started event ids of the run's failed or timed out Workflow Tasks, from a Local
+        Activity's start. The batch withdraws the run's Local Activity Records of these tasks.
+        """
+
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        writer: _message_pb2.StreamWriter | None = ...,
+        producer: _message_pb2.Producer | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
+        previous_completed_task: _message_pb2.WorkflowTaskEpoch | None = ...,
+        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
+        withdraw_run: _builtins.str = ...,
+        defer_withdrawal: _builtins.bool = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["defer_withdrawal", b"defer_withdrawal", "failed_tasks", b"failed_tasks", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -168,13 +218,13 @@ class AppendRecordsResponse(_message.Message):
 
     FIRST_OFFSET_FIELD_NUMBER: _builtins.int
     LAST_OFFSET_FIELD_NUMBER: _builtins.int
-    first_offset: _builtins.int
-    last_offset: _builtins.int
+    first_offset: _builtins.bytes
+    last_offset: _builtins.bytes
     def __init__(
         self,
         *,
-        first_offset: _builtins.int = ...,
-        last_offset: _builtins.int = ...,
+        first_offset: _builtins.bytes = ...,
+        last_offset: _builtins.bytes = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
@@ -189,34 +239,52 @@ class CloseStreamRequest(_message.Message):
     """Experimental. Might change in the future.
     Closes a Stream. Readers drain what is left, then end, and later appends fail with CLOSED. A
     close writes no Record and carries no value, so code that has a last value publishes it first.
+    Only the owner's run chain closes a bound Stream. Only a Workflow or a client closes a
+    standalone Stream.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    WRITER_FIELD_NUMBER: _builtins.int
+    PRODUCER_FIELD_NUMBER: _builtins.int
+    PREVIOUS_COMPLETED_TASK_FIELD_NUMBER: _builtins.int
+    FAILED_TASKS_FIELD_NUMBER: _builtins.int
+    WITHDRAW_RUN_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    withdraw_run: _builtins.str
+    """Only read by the server. The previous run on a retry run's close, to withdraw its Records."""
     task_token: _builtins.bytes
     """Only read by the server. It checks the token as on the append."""
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef: ...
     @_builtins.property
-    def writer(self) -> _message_pb2.StreamWriter:
-        """The writer that closes the Stream. A Store reads only its Producer."""
+    def producer(self) -> _message_pb2.Producer:
+        """The Producer that closes the Stream."""
+
+    @_builtins.property
+    def previous_completed_task(self) -> _message_pb2.WorkflowTaskEpoch:
+        """Only read by the server. The run's last completed Workflow Task, as on the append."""
+
+    @_builtins.property
+    def failed_tasks(self) -> _containers.RepeatedScalarFieldContainer[_builtins.int]:
+        """Only read by the server. The run's failed or timed out Workflow Tasks, as on the append."""
 
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        writer: _message_pb2.StreamWriter | None = ...,
+        producer: _message_pb2.Producer | None = ...,
+        previous_completed_task: _message_pb2.WorkflowTaskEpoch | None = ...,
+        failed_tasks: _abc.Iterable[_builtins.int] | None = ...,
+        withdraw_run: _builtins.str = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "ref", b"ref", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["failed_tasks", b"failed_tasks", "namespace", b"namespace", "previous_completed_task", b"previous_completed_task", "producer", b"producer", "ref", b"ref", "task_token", b"task_token", "withdraw_run", b"withdraw_run"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -263,19 +331,20 @@ class ReadRecordsRequest(_message.Message):
     MAX_BYTES_FIELD_NUMBER: _builtins.int
     FLOOR_FROM_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
-    from_offset: _builtins.int
-    """Start at this offset. Zero uses start. It fails with OFFSET_TOO_HIGH if it is past the newest
-    offset + 1.
+    from_offset: _builtins.bytes
+    """Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
     """
     start: _stream_pb2.StreamReadStart.ValueType
-    """Where to start when from_offset is zero. Unspecified is the beginning."""
+    """Start at the beginning or at the end of the Stream. Unspecified is the beginning."""
     max_records: _builtins.int
-    """The most Records in one page. Zero is 1000."""
-    to_offset: _builtins.int
+    """The most items in one page, Superseded items included. Zero is 1000. A Superseded item and
+    the Record after it stay in one page, so a page of one Record can hold two items.
+    """
+    to_offset: _builtins.bytes
     """The exclusive end of the read. The read scans no entry at or after it, so a replay reads the
-    same range. Zero means no end. Only the server serves it, and a Store refuses it.
+    same range. Empty means no end. Only the server serves it, and a Store refuses it.
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
     """
@@ -286,14 +355,14 @@ class ReadRecordsRequest(_message.Message):
     server serves it, and a Store refuses it.
     """
     last: _builtins.int
-    """Read the newest `last` Records, oldest first. It needs no from_offset and no start. Not with
-    wake_only, and not in Workflow code, where replay needs a fixed range.
+    """Read the newest `last` Records, oldest first. It needs no position. Not with wake_only, and
+    not in Workflow code, where replay needs a fixed range.
     """
     max_bytes: _builtins.int
     """The most Record bytes in one page, so a page fits the caller's limit, such as a History
     marker. A larger Record still comes alone, so the read always moves on. Zero is no cap.
     """
-    floor_from: _builtins.int
+    floor_from: _builtins.bytes
     """The lowest offset this run read on replay. A reset run copies the earlier run's reads into
     its History, so its floor must cover them too, not only its first live page. Only read by
     the server.
@@ -319,22 +388,24 @@ class ReadRecordsRequest(_message.Message):
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        from_offset: _builtins.int = ...,
+        from_offset: _builtins.bytes = ...,
         start: _stream_pb2.StreamReadStart.ValueType = ...,
         max_records: _builtins.int = ...,
         wait: _duration_pb2.Duration | None = ...,
         create_wait: _duration_pb2.Duration | None = ...,
-        to_offset: _builtins.int = ...,
+        to_offset: _builtins.bytes = ...,
         wake_only: _builtins.bool = ...,
         last: _builtins.int = ...,
         max_bytes: _builtins.int = ...,
-        floor_from: _builtins.int = ...,
+        floor_from: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "ref", b"ref", "wait", b"wait"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "from_offset", b"from_offset", "position", b"position", "ref", b"ref", "start", b"start", "wait", b"wait"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "floor_from", b"floor_from", "from_offset", b"from_offset", "last", b"last", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "ref", b"ref", "start", b"start", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "floor_from", b"floor_from", "from_offset", b"from_offset", "last", b"last", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "position", b"position", "ref", b"ref", "start", b"start", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType_position: _TypeAlias = _typing.Literal["from_offset", "start"]  # noqa: Y015
+    _WhichOneofArgType_position: _TypeAlias = _typing.Literal["position", b"position"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType_position) -> _WhichOneofReturnType_position | None: ...
 
 Global___ReadRecordsRequest: _TypeAlias = ReadRecordsRequest  # noqa: Y015
 
@@ -350,8 +421,8 @@ class ReadRecordsResponse(_message.Message):
     NEXT_OFFSET_FIELD_NUMBER: _builtins.int
     DONE_FIELD_NUMBER: _builtins.int
     CONTINUE_AS_NEW_SUGGESTED_FIELD_NUMBER: _builtins.int
-    next_offset: _builtins.int
-    """The from_offset of the next read, which is the newest offset read + 1."""
+    next_offset: _builtins.bytes
+    """The from_offset of the next read, which is the newest offset read."""
     done: _builtins.bool
     """True when the Stream is closed and this read gave its last item. A read of a closed Stream
     with no item left answers at once.
@@ -366,7 +437,7 @@ class ReadRecordsResponse(_message.Message):
         self,
         *,
         records: _abc.Iterable[_message_pb2.StreamRecord] | None = ...,
-        next_offset: _builtins.int = ...,
+        next_offset: _builtins.bytes = ...,
         done: _builtins.bool = ...,
         continue_as_new_suggested: _builtins.bool = ...,
     ) -> None: ...
@@ -417,15 +488,15 @@ class DescribeStreamResponse(_message.Message):
     LAST_OFFSET_FIELD_NUMBER: _builtins.int
     RETENTION_FIELD_NUMBER: _builtins.int
     status: _stream_pb2.StreamStatus.ValueType
-    last_offset: _builtins.int
-    """The newest offset, of a Record. Zero when the Stream has none."""
+    last_offset: _builtins.bytes
+    """The newest offset, of a Record or a Superseded item. Empty when the Stream has none."""
     @_builtins.property
     def retention(self) -> _duration_pb2.Duration: ...
     def __init__(
         self,
         *,
         status: _stream_pb2.StreamStatus.ValueType = ...,
-        last_offset: _builtins.int = ...,
+        last_offset: _builtins.bytes = ...,
         retention: _duration_pb2.Duration | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["retention", b"retention"]  # noqa: Y015

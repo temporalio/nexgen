@@ -1,4 +1,0 @@
-package test:annotations;
-world api { export models; }
-/// @nexus.operations-class "CustomOperations" dotnet="DotnetOperations"
-interface models { record request {} }

@@ -75,6 +75,13 @@ pub enum Error {
         resource: String,
     },
 
+    #[error("{language} runtime type inference for resource `{resource}` is unsupported: {reason}")]
+    UnsupportedResourceTypeInference {
+        language: Language,
+        resource: String,
+        reason: String,
+    },
+
     #[error("the {language} runtime type `{name}` of `{parameter}` clashes with {conflicting}")]
     RuntimeTypeArgumentNameConflict {
         language: Language,
@@ -99,8 +106,8 @@ pub enum Error {
         conflicting_declaration: String,
     },
 
-    #[error("TypeScript can't flatten a request field of operation `{operation}`: {reason}")]
-    UnsupportedTypeScriptFlatten { operation: String, reason: String },
+    #[error("can't flatten a request field of operation `{operation}`: {reason}")]
+    UnsupportedFlatten { operation: String, reason: String },
 
     #[error(
         ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
@@ -348,13 +355,6 @@ pub enum Error {
         message: String,
         field: String,
         property: &'static str,
-        reason: String,
-    },
-
-    #[error("type override for `{message}.{field}` cannot be marked required: {reason}")]
-    UnsupportedRequiredTypeField {
-        message: String,
-        field: String,
         reason: String,
     },
 

@@ -40,27 +40,6 @@ STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
 STREAM_STATUS_EXPIRED: StreamStatus.ValueType  # 3
 Global___StreamStatus: _TypeAlias = StreamStatus  # noqa: Y015
 
-class _StreamCloseStatus:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
-
-class _StreamCloseStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamCloseStatus.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
-    STREAM_CLOSE_STATUS_UNSPECIFIED: _StreamCloseStatus.ValueType  # 0
-    STREAM_CLOSE_STATUS_CLOSED: _StreamCloseStatus.ValueType  # 1
-
-class StreamCloseStatus(_StreamCloseStatus, metaclass=_StreamCloseStatusEnumTypeWrapper):
-    """Experimental. Might change in the future.
-    How a Stream closed. CLOSED comes from a Producer that called close(). Native Streams add their
-    own close statuses later.
-    (-- api-linter: core::0216::synonyms=disabled
-        aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-    """
-
-STREAM_CLOSE_STATUS_UNSPECIFIED: StreamCloseStatus.ValueType  # 0
-STREAM_CLOSE_STATUS_CLOSED: StreamCloseStatus.ValueType  # 1
-Global___StreamCloseStatus: _TypeAlias = StreamCloseStatus  # noqa: Y015
-
 class _StreamReadStart:
     ValueType = _typing.NewType("ValueType", _builtins.int)
     V: _TypeAlias = ValueType  # noqa: Y015
@@ -119,7 +98,9 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
     """The Stream is closed. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
-    """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
+    """The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
+    Workflow retry withdrew its run. FAILED_PRECONDITION.
+    """
     STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
     """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
@@ -127,7 +108,9 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     FAILED_PRECONDITION.
     """
     STREAM_ERROR_REASON_NOT_OWNER: _StreamErrorReason.ValueType  # 7
-    """The caller may not create or close this Stream. FAILED_PRECONDITION."""
+    """A create gives another owner than the Stream has, or the owner doesn't allow this close.
+    FAILED_PRECONDITION.
+    """
     STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 8
     """A newer format version wrote the Stream. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 9
@@ -165,7 +148,9 @@ STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
 """The Stream is closed. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
-"""The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
+"""The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
+Workflow retry withdrew its run. FAILED_PRECONDITION.
+"""
 STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
 """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
@@ -173,7 +158,9 @@ STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
 FAILED_PRECONDITION.
 """
 STREAM_ERROR_REASON_NOT_OWNER: StreamErrorReason.ValueType  # 7
-"""The caller may not create or close this Stream. FAILED_PRECONDITION."""
+"""A create gives another owner than the Stream has, or the owner doesn't allow this close.
+FAILED_PRECONDITION.
+"""
 STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 8
 """A newer format version wrote the Stream. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 9

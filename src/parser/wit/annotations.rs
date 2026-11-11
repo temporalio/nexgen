@@ -90,7 +90,7 @@ const CATALOG: &[Annotation] = {
             language_keys: &[""],
             repeatable: false,
             languages: Some(&[Language::Go]),
-            system_nexus: false,
+            system_nexus: true,
         },
         Annotation {
             name: "operations-class",
@@ -138,6 +138,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "generic",
+            sites: &[Record],
+            keys: &["value"],
+            language_keys: &[],
+            repeatable: true,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "proto-field",
             sites: &[Field],
             keys: &["value"],
@@ -175,7 +184,7 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "api-omit",
-            sites: &[Field],
+            sites: &[Field, Function],
             keys: &["targets"],
             language_keys: &[],
             repeatable: false,
@@ -263,6 +272,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "context-propagation",
+            sites: &[Function],
+            keys: &["value"],
+            language_keys: &[""],
+            repeatable: false,
+            languages: Some(&[Language::Go]),
+            system_nexus: true,
+        },
+        Annotation {
             name: "output-transform",
             sites: &[Function],
             keys: &["value", "import"],
@@ -273,8 +291,8 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "flatten-in-api",
-            sites: &[Record, Field, Resource],
-            keys: &["param"],
+            sites: &[Record, Field],
+            keys: &[],
             language_keys: &[],
             repeatable: false,
             languages: None,
@@ -343,6 +361,9 @@ const CATALOG: &[Annotation] = {
             keys: &[],
             language_keys: &[],
             repeatable: false,
+            // The `async with` close is Python-only today. This stays `None` because a language
+            // list makes the generator reject the directive for the other languages in the shared
+            // stream-service WIT, instead of ignoring it.
             languages: None,
             system_nexus: false,
         },
@@ -403,10 +424,6 @@ impl Annotation {
     }
 
     fn accepts_key(&self, key: &str, site: Site) -> bool {
-        // WIT can't annotate a constructor parameter, so a resource names the one to flatten.
-        if self.name == "flatten-in-api" {
-            return site == Site::Resource;
-        }
         if self.name == "type"
             && site == Site::Field
             && (key.ends_with("-from") || key.ends_with("-to"))

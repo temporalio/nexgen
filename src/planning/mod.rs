@@ -24,7 +24,6 @@ mod proto;
 mod reachability;
 mod record_backing;
 mod resource_resolution;
-mod resource_type_parameters;
 mod selected_validation;
 mod selection;
 mod type_planning;
@@ -44,7 +43,6 @@ pub(crate) use resource_resolution::{
     ResolvedResourceHolder, ResolvedResourceMethodBinding, ResolvedResourceReturnSpec,
     ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily, ResourceResolutionPass,
 };
-pub(crate) use resource_type_parameters::ResourceTypeParameterPass;
 pub(crate) use selected_validation::SelectedValidationPass;
 pub(crate) use selection::LanguageSelectionPass;
 #[cfg(test)]
@@ -55,7 +53,7 @@ pub(crate) use type_planning::TypePlanningPass;
 pub(crate) struct PlannedFamily;
 
 impl TypeFamily for PlannedFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = PlannedSpecData;
     type Record = PlannedRecordType;
     type Enum = PlannedEnumType;
@@ -108,7 +106,7 @@ pub(crate) fn flattened_list_field<'a>(
         !field
             .origin
             .as_ref()
-            .is_some_and(crate::spec::FieldOrigin::is_omitted)
+            .is_some_and(crate::spec::FieldPolicy::is_omitted)
     });
     let (key, field) = fields.next().filter(|_| record.flatten_in_api)?;
     fields.next().is_none().then_some((key.as_str(), field))
@@ -172,8 +170,9 @@ pub(crate) struct PlannedResource {
     pub(crate) type_name: String,
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
-    pub(crate) flatten: Option<String>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
+    /// The method the end of an `async with` block calls, from `@nexus.close`.
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -190,8 +189,6 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) doc: Option<String>,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
-    /// Set by `@nexus.close`. The end of an `async with` block calls this method.
-    pub(crate) close: bool,
     pub(crate) varargs: Option<String>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
 }

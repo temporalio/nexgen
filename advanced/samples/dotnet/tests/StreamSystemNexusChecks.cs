@@ -19,22 +19,22 @@ namespace Nexgen.DotNetExamples.Tests
         public async Task StreamOfTurnCallsKeepTheirTypes()
         {
             var instance = new WorkflowInstance();
-            var streamRef = new StreamModels.StreamRef("stream-1");
+            var streamRef = new StreamModels.StreamRef<Turn>("stream-1");
 
             await instance.StartAsync<StreamModels.AppendRecordsResponse>(
                 StreamService,
                 "AppendRecords",
                 new StreamModels.AppendRecordsRequest<Turn>(
-                    streamRef, new StreamModels.AppendRecord<Turn>[0], null));
+                    streamRef, new StreamModels.AppendRecord<Turn>[0], null, null));
             await instance.StartAsync<StreamModels.ReadRecordsResponse<Turn>>(
-                StreamService, "ReadRecords", new StreamModels.ReadRecordsRequest(streamRef));
+                StreamService, "ReadRecords", new StreamModels.ReadRecordsRequest<Turn>(streamRef));
 
             Assert.Equal(
                 new[]
                 {
                     (typeof(StreamModels.AppendRecordsRequest<Turn>),
                         typeof(StreamModels.AppendRecordsResponse)),
-                    (typeof(StreamModels.ReadRecordsRequest),
+                    (typeof(StreamModels.ReadRecordsRequest<Turn>),
                         typeof(StreamModels.ReadRecordsResponse<Turn>)),
                 },
                 instance.Root.Scheduled.Select(

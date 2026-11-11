@@ -27,8 +27,8 @@ class StreamService:
     """
 
     create_stream: Operation[
-        CreateStreamRequest,
-        CreateStreamResult,
+        CreateStreamRequest[typing.Any],
+        CreateStreamResult[typing.Any],
     ] = Operation(name="CreateStream")
 
     append_records: Operation[
@@ -37,16 +37,16 @@ class StreamService:
     ] = Operation(name="AppendRecords")
 
     close_stream: Operation[
-        CloseStreamRequest,
+        CloseStreamRequest[typing.Any],
         CloseStreamResponse,
     ] = Operation(name="CloseStream")
 
     read_records: Operation[
-        ReadRecordsRequest,
+        ReadRecordsRequest[typing.Any],
         ReadRecordsResponse[typing.Any],
     ] = Operation(name="ReadRecords")
 
     describe_stream: Operation[
-        DescribeStreamRequest,
+        DescribeStreamRequest[typing.Any],
         DescribeStreamResponse,
     ] = Operation(name="DescribeStream")

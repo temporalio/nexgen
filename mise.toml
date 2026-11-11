@@ -8,3 +8,10 @@ go = "1.26"
 java = "temurin-21"
 google-java-format = "1.24.0"
 dotnet = ["10", "8", "7"]
+
+[tool_alias]
+dotnet = "core:dotnet"
+
+[settings.dotnet]
+# Multi-target tests need one host to see all required runtimes.
+isolated = false

@@ -6,6 +6,7 @@ import typing
 import temporalio.workflow
 
 from ..models import (
+    ContextRef,
     GenericRequest,
     GenericResponse,
     GetterProbe,
@@ -44,6 +45,7 @@ async def complete(
     by_name: dict[str, ContextT],
     nested: Inner[ContextT],
     probe: GetterProbe[ContextT] | None = None,
+    reference: ContextRef[ContextT] | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[
     GenericResponse[ContextT, object, object],
 ]:
@@ -53,5 +55,6 @@ async def complete(
         by_name=by_name,
         nested=nested,
         probe=probe,
+        reference=reference,
     )
     return await _complete(request)

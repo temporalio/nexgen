@@ -28,9 +28,7 @@ namespace Temporalio.Api.Enums.V1 {
             "bC5hcGkuZW51bXMudjEqegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
             "VVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIYChRT",
             "VFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQSVJF",
-            "RBADKlgKEVN0cmVhbUNsb3NlU3RhdHVzEiMKH1NUUkVBTV9DTE9TRV9TVEFU",
-            "VVNfVU5TUEVDSUZJRUQQABIeChpTVFJFQU1fQ0xPU0VfU1RBVFVTX0NMT1NF",
-            "RBABKnAKD1N0cmVhbVJlYWRTdGFydBIhCh1TVFJFQU1fUkVBRF9TVEFSVF9V",
+            "RBADKnAKD1N0cmVhbVJlYWRTdGFydBIhCh1TVFJFQU1fUkVBRF9TVEFSVF9V",
             "TlNQRUNJRklFRBAAEh8KG1NUUkVBTV9SRUFEX1NUQVJUX0JFR0lOTklORxAB",
             "EhkKFVNUUkVBTV9SRUFEX1NUQVJUX0VORBACKpMBChZTdHJlYW1JZENvbmZs",
             "aWN0UG9saWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVD",
@@ -56,7 +54,7 @@ namespace Temporalio.Api.Enums.V1 {
             "ZW1wb3JhbGlvOjpBcGk6OkVudW1zOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamCloseStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
     }
     #endregion
 
@@ -73,18 +71,6 @@ namespace Temporalio.Api.Enums.V1 {
     [pbr::OriginalName("STREAM_STATUS_OPEN")] Open = 1,
     [pbr::OriginalName("STREAM_STATUS_CLOSED")] Closed = 2,
     [pbr::OriginalName("STREAM_STATUS_EXPIRED")] Expired = 3,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
-  /// How a Stream closed. CLOSED comes from a Producer that called close(). Native Streams add their
-  /// own close statuses later.
-  /// (-- api-linter: core::0216::synonyms=disabled
-  ///     aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-  /// </summary>
-  public enum StreamCloseStatus {
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_CLOSED")] Closed = 1,
   }
 
   /// <summary>
@@ -133,7 +119,8 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_CLOSED")] Closed = 3,
     /// <summary>
-    /// The Producer's epoch is lower than the newest one. FAILED_PRECONDITION.
+    /// The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
+    /// Workflow retry withdrew its run. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_FENCED")] Fenced = 4,
     /// <summary>
@@ -146,7 +133,8 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_SEQ_DIVERGENT")] SeqDivergent = 6,
     /// <summary>
-    /// The caller may not create or close this Stream. FAILED_PRECONDITION.
+    /// A create gives another owner than the Stream has, or the owner doesn't allow this close.
+    /// FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_OWNER")] NotOwner = 7,
     /// <summary>

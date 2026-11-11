@@ -127,21 +127,30 @@ Selects the target-language values from authored language maps.
 
 ### SelectedValidationPass
 
-Validates the selected generic surface after selection.
+Validates the selected generic model and operation surface after selection.
 
 ### ResourceResolutionPass
 
 Resolves resource-method and resource-return facts from the API spec and
-descriptors. Operations must return resources owned by their service, including
-those held in result records. Return bindings determine shared wire models
-regardless of API targets; resource methods are bound only when an API target is
-selected. It rejects integer-width mismatches between resource values and the
-request or result fields they bind to, including constructor fields populated by
-operations that return resources.
+descriptors. After resolving method bindings, it infers each resource's type
+parameters, including propagation through returned resources to a fixed point.
+It validates generic-resource restrictions within this pass, before resolving
+return-field bindings. Inferred parameters first appear in
+`ResourceBoundFamily::ResourceData`, alongside the resolved resource facts;
+authored and selected `ResourceSpec` nodes have no type-parameter field.
+Inference also runs for models-only generation.
+
+Operations must return resources owned by their service, including those held in
+result records. Return bindings determine shared wire models regardless of API
+targets. Method relationships are resolved for inference even in models-only
+generation; callable method metadata is retained only when an API target is
+selected.
 
 ### OperationBindingPass
 
-Attaches resolved resource facts to their owning operations and resources.
+Attaches resolved return facts to their owning operations and preserves each
+resource's resolved data, including its inferred type parameters, through
+operation lowering.
 
 ### OperationLoweringPass
 
@@ -178,6 +187,15 @@ Data models and their wire converters are shared across API targets. Operation
 wrappers and callable resource classes are target-specific because workflow and
 client code use different SDK entry points.
 
+`@nexus.api-omit` on an operation drops that operation's public top-level
+function and its export for the named targets, while keeping the operation
+registered, in the service, and bindable by resource methods. The private
+per-operation helper that resource methods call stays, so the operation is
+reached through its resource rather than a standalone function. The parser
+records the omitted targets on `OperationSpec`, and each backend gates its own
+public surface (the Python `__all__` entry and function, the TypeScript barrel
+export, the .NET public options type and method, and the Go exported wrapper).
+
 Python emits shared models and service contracts at the package root, regardless
 of API targets. Contracts describe wire data rather than callable resource
 handles. Each API owns its operation wrappers and handles. The client API lives
@@ -188,11 +206,16 @@ other. Plain resource identity DTOs live in the root
 endpoint clients live in the workflow API's `_clients.py`, not in the shared
 `services.py`.
 
-Field origins retain per-target expression maps through language selection and
-shared planning. API preparation selects its target's source or default
-expression when building a request. Model constructors and converters only
-handle data. This lets workflow and client APIs share models without sharing
-runtime behavior.
+Field policies separate model-level omission from a sparse map of
+target-specific origins. `LanguageFieldPolicies` retains language alternatives
+until selection; the selected `FieldPolicy` survives shared planning. Its
+accessors resolve absent target entries to `FieldOrigin::Parameter`. An explicit
+origin can instead omit the convenience argument, default a caller-overridable
+argument, or source its value. The WIT parser lowers annotations into these
+policies; later stages do not interpret annotation syntax. API preparation
+selects its target's origin when building a request. Model constructors and
+converters only handle data, preserving declared field optionality. This lets
+workflow and client APIs share models without sharing runtime behavior.
 
 Client resources keep their service-bound Nexus client. API code decodes
 returned resource data and constructs handles with that client. Python client

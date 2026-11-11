@@ -17,11 +17,11 @@ import type {
 
 export interface SystemNexusWorkflowOutboundCallsInterceptor {
   createStream?: (
-    input: CreateStreamRequest,
+    input: CreateStreamRequest<unknown>,
     next: (
-      input: CreateStreamRequest,
-    ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>,
-  ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>;
+      input: CreateStreamRequest<unknown>,
+    ) => Promise<nexus.NexusOperationHandle<CreateStreamResult<unknown>>>,
+  ) => Promise<nexus.NexusOperationHandle<CreateStreamResult<unknown>>>;
   appendRecords?: (
     input: AppendRecordsRequest<unknown>,
     next: (
@@ -29,21 +29,21 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
     ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>,
   ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>;
   closeStream?: (
-    input: CloseStreamRequest,
+    input: CloseStreamRequest<unknown>,
     next: (
-      input: CloseStreamRequest,
+      input: CloseStreamRequest<unknown>,
     ) => Promise<nexus.NexusOperationHandle<CloseStreamResponse>>,
   ) => Promise<nexus.NexusOperationHandle<CloseStreamResponse>>;
   readRecords?: (
-    input: ReadRecordsRequest,
+    input: ReadRecordsRequest<unknown>,
     next: (
-      input: ReadRecordsRequest,
+      input: ReadRecordsRequest<unknown>,
     ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse<unknown>>>,
   ) => Promise<nexus.NexusOperationHandle<ReadRecordsResponse<unknown>>>;
   describeStream?: (
-    input: DescribeStreamRequest,
+    input: DescribeStreamRequest<unknown>,
     next: (
-      input: DescribeStreamRequest,
+      input: DescribeStreamRequest<unknown>,
     ) => Promise<nexus.NexusOperationHandle<DescribeStreamResponse>>,
   ) => Promise<nexus.NexusOperationHandle<DescribeStreamResponse>>;
 }
@@ -61,8 +61,8 @@ export function dispatchSystemNexusSpecificInterceptors(
       switch (operation) {
         case "CreateStream":
           return composeInterceptors(interceptors, "createStream", (request) =>
-            next<CreateStreamRequest, CreateStreamResult>(request),
-          )(input as CreateStreamRequest) as Promise<
+            next<CreateStreamRequest<unknown>, CreateStreamResult<unknown>>(request),
+          )(input as CreateStreamRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         case "AppendRecords":
@@ -73,20 +73,20 @@ export function dispatchSystemNexusSpecificInterceptors(
           >;
         case "CloseStream":
           return composeInterceptors(interceptors, "closeStream", (request) =>
-            next<CloseStreamRequest, CloseStreamResponse>(request),
-          )(input as CloseStreamRequest) as Promise<
+            next<CloseStreamRequest<unknown>, CloseStreamResponse>(request),
+          )(input as CloseStreamRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         case "ReadRecords":
           return composeInterceptors(interceptors, "readRecords", (request) =>
-            next<ReadRecordsRequest, ReadRecordsResponse<unknown>>(request),
-          )(input as ReadRecordsRequest) as Promise<
+            next<ReadRecordsRequest<unknown>, ReadRecordsResponse<unknown>>(request),
+          )(input as ReadRecordsRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         case "DescribeStream":
           return composeInterceptors(interceptors, "describeStream", (request) =>
-            next<DescribeStreamRequest, DescribeStreamResponse>(request),
-          )(input as DescribeStreamRequest) as Promise<
+            next<DescribeStreamRequest<unknown>, DescribeStreamResponse>(request),
+          )(input as DescribeStreamRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         default:

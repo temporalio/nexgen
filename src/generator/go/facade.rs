@@ -8,12 +8,29 @@ struct TypeReference {
 
 impl TypeReference {
     fn implementation(name: &str, options: &GoFacadeOptions) -> Self {
+        let qualifier = go_package_name(
+            options
+                .implementation_import_path
+                .rsplit('/')
+                .next()
+                .unwrap(),
+        );
         Self {
-            expression: format!("implementation.{name}"),
-            import: Some((
-                options.implementation_import_path.clone(),
-                "implementation".to_string(),
-            )),
+            expression: format!("{qualifier}.{name}"),
+            import: Some((options.implementation_import_path.clone(), qualifier)),
+        }
+    }
+
+    fn sdk(symbol: SdkSymbol, options: &GoFacadeOptions) -> Self {
+        let reference = symbol.resolve(
+            Some(&options.import_path),
+            crate::nexgen_config::current().system_nexus,
+        );
+        Self {
+            expression: reference.expression,
+            import: reference
+                .import
+                .map(|(path, alias)| (path.to_string(), alias.to_string())),
         }
     }
 
@@ -66,12 +83,7 @@ impl<'a> TypeScope<'a> {
             declarations: BTreeMap::new(),
             imports: imports
                 .iter()
-                .map(|path| {
-                    (
-                        path.rsplit('/').next().unwrap_or(path).to_string(),
-                        path.clone(),
-                    )
-                })
+                .map(|path| (package.import_alias(path).to_string(), path.clone()))
                 .collect(),
         };
         for (path, alias) in external_imports {
@@ -90,12 +102,12 @@ impl<'a> TypeScope<'a> {
                 options.implementation_import_path.clone(),
             );
         }
-        if package.is_self_import(package.workflow_import()) {
-            for name in ["Context", "Future"] {
-                scope.declarations.insert(
-                    name.to_string(),
-                    TypeReference::implementation(name, options),
-                );
+        for symbol in [SdkSymbol::Context, SdkSymbol::Future] {
+            let reference = package.sdk_reference(symbol);
+            if reference.import.is_none() {
+                scope
+                    .declarations
+                    .insert(reference.expression, TypeReference::sdk(symbol, options));
             }
         }
         scope
@@ -142,7 +154,11 @@ impl<'a> TypeScope<'a> {
                     }
                     if let Some(path) = self.imports.get(name) {
                         let member = &expression[member_start..index];
-                        let reference = if path == &self.options.implementation_import_path {
+                        let reference = if let Some(symbol) = SdkSymbol::find(path, member) {
+                            TypeReference::sdk(symbol, self.options)
+                        } else if path == &self.options.import_path {
+                            TypeReference::local(member)
+                        } else if path == &self.options.implementation_import_path {
                             TypeReference::implementation(member, self.options)
                         } else {
                             TypeReference {
@@ -172,7 +188,7 @@ impl<'a> TypeScope<'a> {
 
     fn register_annotation(&mut self, annotation: &str, package: &GoPackageContext) {
         let (imports, expression) = parse_go_expr(annotation);
-        if !imports.iter().any(|path| package.is_self_import(path)) {
+        if !imports.keys().any(|path| package.is_self_import(path)) {
             return;
         }
         let resolved = self.resolve(&expression, &BTreeSet::new());
@@ -180,7 +196,7 @@ impl<'a> TypeScope<'a> {
             if let TypePart::Reference(reference) = part
                 && let Some((path, _)) = &reference.import
                 && path == &self.options.implementation_import_path
-                && let Some(name) = reference.expression.strip_prefix("implementation.")
+                && let Some((_, name)) = reference.expression.split_once('.')
             {
                 self.declarations
                     .insert(name.to_string(), reference.clone());
@@ -274,7 +290,7 @@ struct FunctionPlan {
     documentation: String,
 }
 
-struct FacadePlan {
+pub(super) struct FacadePlan {
     package_name: String,
     imports: BTreeMap<String, String>,
     aliases: Vec<AliasPlan>,
@@ -283,6 +299,33 @@ struct FacadePlan {
 }
 
 impl FacadePlan {
+    pub(super) fn exposed_names(&self, import_path: &str) -> BTreeMap<String, String> {
+        self.aliases
+            .iter()
+            .map(|alias| (&alias.target, &alias.name))
+            .chain(
+                self.constants
+                    .iter()
+                    .map(|constant| (&constant.target, &constant.name)),
+            )
+            .chain(
+                self.functions
+                    .iter()
+                    .map(|function| (&function.target, &function.name)),
+            )
+            .map(|(target, name)| {
+                (
+                    target.expression.rsplit('.').next().unwrap().to_string(),
+                    format!("{import_path}.{name}"),
+                )
+            })
+            .collect()
+    }
+
+    pub(super) fn render(&self) -> String {
+        render_plan(self)
+    }
+
     fn record_reference(&mut self, reference: &TypeReference) {
         if let Some((path, alias)) = &reference.import {
             self.imports.insert(path.clone(), alias.clone());
@@ -341,7 +384,7 @@ impl FacadePlan {
     }
 }
 
-pub(super) fn render(
+pub(super) fn plan(
     options: &GoFacadeOptions,
     package: &GoPackageContext,
     imports: &BTreeSet<String>,
@@ -353,7 +396,7 @@ pub(super) fn render(
     services: &[RenderedService<'_>],
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
-) -> String {
+) -> FacadePlan {
     let mut scope = TypeScope::new(options, package, imports, external_imports);
     let mut plan = FacadePlan {
         package_name: go_package_name(&options.package_name),
@@ -421,6 +464,8 @@ pub(super) fn render(
         }
         if service.endpoint.is_some() {
             for operation in &service.operations {
+                let name =
+                    public_name(&go_declaration_name(&go_field_name(operation.name))).to_string();
                 plan.add_alias(
                     &mut scope,
                     &format!(
@@ -432,7 +477,7 @@ pub(super) fn render(
                         .iter()
                         .map(|usage| usage.parameter.name.clone())
                         .collect(),
-                    None,
+                    Some(&format!("Options for {name}.")),
                 );
             }
         }
@@ -536,7 +581,12 @@ pub(super) fn render(
                 });
                 let positional = ordered_positional_params(unpacked);
                 let docs = wrapper_input_docs(positional.iter().copied());
-                render_operation_doc_comment(&mut documentation, operation, &docs);
+                render_operation_doc_comment(
+                    &mut documentation,
+                    public_name(&name),
+                    operation,
+                    &docs,
+                );
                 for (index, param) in positional.iter().enumerate() {
                     let (name, kind) = wrapper_param_signature(
                         param,
@@ -564,7 +614,12 @@ pub(super) fn render(
                     });
                 }
             } else {
-                render_operation_doc_comment(&mut documentation, operation, &[]);
+                render_operation_doc_comment(
+                    &mut documentation,
+                    public_name(&name),
+                    operation,
+                    &[],
+                );
                 for (name, kind) in [
                     ("opts", format!("{}Options", go_declaration_name(&name))),
                     ("request", operation.input_type.clone()),
@@ -589,7 +644,7 @@ pub(super) fn render(
             });
         }
     }
-    render_plan(&plan)
+    plan
 }
 
 fn public_name(name: &str) -> &str {
@@ -601,15 +656,18 @@ fn render_plan(plan: &FacadePlan) -> String {
     if !plan.imports.is_empty() {
         output.push_str("\nimport (\n");
         for (path, alias) in &plan.imports {
-            output.push_str(&format!("\t{alias} {path:?}\n"));
+            let package_name = go_package_name(path.rsplit('/').next().unwrap());
+            if alias == &package_name {
+                output.push_str(&format!("\t{path:?}\n"));
+            } else {
+                output.push_str(&format!("\t{alias} {path:?}\n"));
+            }
         }
         output.push_str(")\n");
     }
     output.push('\n');
     for alias in &plan.aliases {
-        if let Some(doc) = &alias.documentation {
-            render_go_doc_comment(&mut output, "", doc);
-        }
+        render_go_declaration_doc(&mut output, "", &alias.name, alias.documentation.as_deref());
         output.push_str(&format!("type {}", alias.name));
         if !alias.parameters.is_empty() {
             output.push('[');
@@ -630,13 +688,18 @@ fn render_plan(plan: &FacadePlan) -> String {
         output.push_str("\n\n");
     }
     for constant in &plan.constants {
+        render_go_declaration_doc(&mut output, "", &constant.name, None);
         output.push_str(&format!(
             "const {} = {}\n\n",
             constant.name, constant.target.expression,
         ));
     }
     for function in &plan.functions {
-        output.push_str(&function.documentation);
+        if function.documentation.is_empty() {
+            render_go_declaration_doc(&mut output, "", &function.name, None);
+        } else {
+            output.push_str(&function.documentation);
+        }
         output.push_str(&format!("func {}", function.name));
         if !function.type_parameters.is_empty() {
             output.push('[');
@@ -703,6 +766,7 @@ mod tests {
     fn options() -> GoFacadeOptions {
         GoFacadeOptions {
             package_name: "workflow".to_string(),
+            import_path: "example.org/sdk/workflow".to_string(),
             implementation_import_path: "example.org/sdk/internal".to_string(),
         }
     }
@@ -711,9 +775,12 @@ mod tests {
         GoPackageContext {
             package_name: "internal".to_string(),
             import_path: Some("example.org/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
             facade: None,
+            facade_exports: BTreeMap::new(),
+            workflow_interceptors: false,
         }
     }
 
@@ -756,6 +823,60 @@ mod tests {
     }
 
     #[test]
+    fn exposed_names_follow_facade_aliases_constants_and_functions() {
+        let options = options();
+        let mut scope = TypeScope::new(&options, &package(), &BTreeSet::new(), &[]);
+        let mut plan = FacadePlan {
+            package_name: options.package_name.clone(),
+            imports: BTreeMap::new(),
+            aliases: Vec::new(),
+            constants: Vec::new(),
+            functions: Vec::new(),
+        };
+        assert!(plan.exposed_names(&options.import_path).is_empty());
+        plan.add_alias(
+            &mut scope,
+            "SystemNexus_Result[T]",
+            vec!["T".to_string()],
+            None,
+        );
+        plan.add_constant("SystemNexus_StatusActive".to_string(), &options);
+        plan.add_function(FunctionPlan {
+            name: "Call".to_string(),
+            target: TypeReference::implementation("SystemNexus_Call", &options),
+            parameters: Vec::new(),
+            type_parameters: Vec::new(),
+            result: scope.resolve("any", &BTreeSet::new()),
+            documentation: String::new(),
+        });
+        assert_eq!(
+            plan.exposed_names(&options.import_path),
+            BTreeMap::from([
+                (
+                    "SystemNexus_Result".to_string(),
+                    "example.org/sdk/workflow.Result".to_string()
+                ),
+                (
+                    "SystemNexus_StatusActive".to_string(),
+                    "example.org/sdk/workflow.StatusActive".to_string()
+                ),
+                (
+                    "SystemNexus_Call".to_string(),
+                    "example.org/sdk/workflow.Call".to_string()
+                ),
+            ]),
+        );
+        let mut package = package();
+        package.facade_exports = plan.exposed_names(&options.import_path);
+        assert_eq!(
+            package.documentation_name("SystemNexus_Result[T]"),
+            "Result"
+        );
+        assert_eq!(package.documentation_name("SystemNexus_Call"), "Call");
+        assert_eq!(package.documentation_name("Unrelated[T]"), "Unrelated");
+    }
+
+    #[test]
     fn documentation_does_not_participate_in_dependency_planning() {
         let options = options();
         let scope = TypeScope::new(
@@ -784,10 +905,7 @@ mod tests {
         });
         assert_eq!(
             plan.imports,
-            BTreeMap::from([(
-                options.implementation_import_path,
-                "implementation".to_string(),
-            )]),
+            BTreeMap::from([(options.implementation_import_path, "internal".to_string(),)]),
         );
     }
 
@@ -823,6 +941,62 @@ mod tests {
                 TypePart::Syntax("*".to_string()),
                 TypePart::Reference(TypeReference::implementation("Custom", &options)),
             ],
+        );
+    }
+
+    #[test]
+    fn sdk_workflow_facade_uses_existing_local_types() {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![],
+        });
+        let options = GoFacadeOptions {
+            package_name: "workflow".to_string(),
+            import_path: "go.temporal.io/sdk/workflow".to_string(),
+            implementation_import_path: "go.temporal.io/sdk/internal".to_string(),
+        };
+        let mut package = package();
+        package.import_path = Some(options.implementation_import_path.clone());
+        let scope = TypeScope::new(&options, &package, &BTreeSet::new(), &[]);
+        for (expression, name) in [
+            ("Context", "Context"),
+            ("Future", "Future"),
+            ("internal.Context", "Context"),
+            ("internal.Future", "Future"),
+        ] {
+            assert_eq!(
+                scope.resolve(expression, &BTreeSet::new()).parts,
+                vec![TypePart::Reference(TypeReference::local(name))],
+            );
+        }
+        assert_eq!(
+            scope.resolve("internal.Custom", &BTreeSet::new()).parts,
+            vec![TypePart::Reference(TypeReference::implementation(
+                "Custom", &options
+            ))],
+        );
+    }
+
+    #[test]
+    fn other_workflow_packages_keep_sdk_qualifiers() {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![],
+        });
+        let mut options = options();
+        options.implementation_import_path = "go.temporal.io/sdk/internal".to_string();
+        let mut package = package();
+        package.import_path = Some(options.implementation_import_path.clone());
+        let scope = TypeScope::new(&options, &package, &BTreeSet::new(), &[]);
+        assert_eq!(
+            scope.resolve("internal.Future", &BTreeSet::new()).parts,
+            vec![TypePart::Reference(TypeReference {
+                expression: "internal.Future".to_string(),
+                import: Some((
+                    "go.temporal.io/sdk/internal".to_string(),
+                    "internal".to_string()
+                )),
+            })],
         );
     }
 }

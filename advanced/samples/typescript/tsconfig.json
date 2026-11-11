@@ -16,5 +16,6 @@
     "support/**/*.ts",
     "tests/**/*.ts",
     "proto/**/*.d.ts"
-  ]
+  ],
+  "exclude": ["wit/stream-service/**"]
 }

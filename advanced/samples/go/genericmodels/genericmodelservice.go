@@ -11,11 +11,12 @@ import (
 // --- Datatypes ---
 
 type genericRequest[ContextT any] struct {
-	Context  ContextT
-	Contexts []ContextT
-	ByName   map[string]ContextT
-	Nested   Inner[ContextT]
-	Probe    *GetterProbe[ContextT]
+	Context   ContextT
+	Contexts  []ContextT
+	ByName    map[string]ContextT
+	Nested    Inner[ContextT]
+	Probe     *GetterProbe[ContextT]
+	Reference *ContextRef[ContextT]
 }
 
 func (m genericRequest[ContextT]) GetContext() ContextT {
@@ -38,6 +39,10 @@ func (m genericRequest[ContextT]) GetProbe() *GetterProbe[ContextT] {
 	return m.Probe
 }
 
+func (m genericRequest[ContextT]) GetReference() *ContextRef[ContextT] {
+	return m.Reference
+}
+
 type result[T, E any] struct {
 	Result T
 	Error  E
@@ -49,14 +54,6 @@ func (m result[T, E]) GetResult() T {
 
 func (m result[T, E]) GetError() E {
 	return m.Error
-}
-
-// --- Operations (internal) ---
-
-func complete[ContextT any](ctx workflow.Context, request genericRequest[ContextT]) workflow.Future {
-	c := workflow.NewNexusClient("generic-models", "GenericModelService")
-	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
-	return fut
 }
 
 // --- Operations (public API) ---
@@ -156,6 +153,15 @@ func (m Tuple2[T1, T2]) GetSecond() T2 {
 	return m.Second
 }
 
+type ContextRef[ContextT any] struct {
+	// ID - Required.
+	ID string
+}
+
+func (m ContextRef[ContextT]) GetID() string {
+	return m.ID
+}
+
 type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	// Context - Required.
 	Context ContextT
@@ -234,25 +240,32 @@ func (m GetterPair[ContextT, OutputT]) GetResultValue() result[ContextT, OutputT
 	return m.ResultValue
 }
 
+// CompleteOptions - Options for Complete.
 type CompleteOptions[ContextT any] struct {
-	// Context - Required.
-	Context ContextT
-	// Contexts - Required.
-	Contexts []ContextT
-	// ByName - Required.
-	ByName map[string]ContextT
-	// Nested - Required.
-	Nested Inner[ContextT]
 	// Probe - Optional.
 	Probe *GetterProbe[ContextT]
+	// Reference - Optional.
+	Reference *ContextRef[ContextT]
 }
 
-func Complete[ContextT any](ctx workflow.Context, opts CompleteOptions[ContextT]) workflow.Future {
-	return complete(ctx, genericRequest[ContextT]{
-		Context:  opts.Context,
-		Contexts: opts.Contexts,
-		ByName:   opts.ByName,
-		Nested:   opts.Nested,
-		Probe:    opts.Probe,
-	})
+// Complete.
+func Complete[ContextT any](
+	ctx workflow.Context,
+	opts CompleteOptions[ContextT],
+	context ContextT,
+	contexts []ContextT,
+	byName map[string]ContextT,
+	nested Inner[ContextT],
+) workflow.Future {
+	request := genericRequest[ContextT]{
+		Context:   context,
+		Contexts:  contexts,
+		ByName:    byName,
+		Nested:    nested,
+		Probe:     opts.Probe,
+		Reference: opts.Reference,
+	}
+	c := workflow.NewNexusClient("generic-models", "GenericModelService")
+	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
+	return fut
 }
