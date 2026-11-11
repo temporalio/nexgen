@@ -1355,7 +1355,9 @@ namespace Temporalio.Api.Stream.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// A Workflow run Producer. It writes in its Workflow Task.
+  /// A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
+  /// Workflow Task. On a Store, a Workflow appends as a Local Activity Producer, and this Producer
+  /// only closes the Stream.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class WorkflowProducer : pb::IMessage<WorkflowProducer>
@@ -1422,7 +1424,8 @@ namespace Temporalio.Api.Stream.V1 {
     public const int EpochFieldNumber = 2;
     private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch epoch_;
     /// <summary>
-    /// A Workflow Producer only closes a Stream, and its close sends no epoch.
+    /// The Workflow Task of the write. A close on a Store runs after the Workflow Task and sends
+    /// no epoch.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]

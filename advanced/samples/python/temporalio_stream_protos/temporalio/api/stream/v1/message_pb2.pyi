@@ -182,7 +182,9 @@ Global___ClientEpoch: _TypeAlias = ClientEpoch  # noqa: Y015
 @_typing.final
 class WorkflowProducer(_message.Message):
     """Experimental. Might change in the future.
-    A Workflow run Producer. It writes in its Workflow Task.
+    A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
+    Workflow Task. On a Store, a Workflow appends as a Local Activity Producer, and this Producer
+    only closes the Stream.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -193,7 +195,9 @@ class WorkflowProducer(_message.Message):
     """Required. The run id of the Workflow run, not of its chain. Each run is its own Producer."""
     @_builtins.property
     def epoch(self) -> Global___WorkflowTaskEpoch:
-        """A Workflow Producer only closes a Stream, and its close sends no epoch."""
+        """The Workflow Task of the write. A close on a Store runs after the Workflow Task and sends
+        no epoch.
+        """
 
     def __init__(
         self,
