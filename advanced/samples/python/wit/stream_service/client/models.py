@@ -1152,7 +1152,6 @@ class ReadRecordsRequest(typing.Generic[BodyT]):
     position: ReadPosition | None = None
     max_records: int | None = None
     wait: datetime.timedelta | None = None
-    create_wait: datetime.timedelta | None = None
     max_bytes: int | None = None
 
 
@@ -1197,9 +1196,6 @@ class _ReadRecordsRequestTransferTypeConverter(
             wait=_support.duration_from_proto(value.wait)
             if value.HasField("wait")
             else None,
-            create_wait=_support.duration_from_proto(value.create_wait)
-            if value.HasField("create_wait")
-            else None,
             max_bytes=value.max_bytes if value.max_bytes != 0 else None,
         )
 
@@ -1228,8 +1224,6 @@ class _ReadRecordsRequestTransferTypeConverter(
             message.max_records = value.max_records
         if value.wait is not None:
             message.wait.CopyFrom(_support.duration_to_proto(value.wait))
-        if value.create_wait is not None:
-            message.create_wait.CopyFrom(_support.duration_to_proto(value.create_wait))
         if value.max_bytes is not None:
             message.max_bytes = value.max_bytes
         return message

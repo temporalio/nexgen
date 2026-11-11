@@ -160,7 +160,6 @@ declare module "@temporalio/proto" {
       start?: temporal.api.enums.v1.StreamReadStart | null;
       maxRecords?: number | null;
       wait?: google.protobuf.IDuration | null;
-      createWait?: google.protobuf.IDuration | null;
       toOffset?: Uint8Array | null;
       wakeOnly?: boolean | null;
       maxBytes?: Long | null;

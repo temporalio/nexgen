@@ -113,7 +113,7 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     DESCRIPTOR: _descriptor.EnumDescriptor
     STREAM_ERROR_REASON_UNSPECIFIED: _StreamErrorReason.ValueType  # 0
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
-    """Nobody created the Stream, even after `create_wait`. NOT_FOUND."""
+    """Nobody created the Stream. NOT_FOUND."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
     """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
@@ -160,7 +160,7 @@ class StreamErrorReason(_StreamErrorReason, metaclass=_StreamErrorReasonEnumType
 
 STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
-"""Nobody created the Stream, even after `create_wait`. NOT_FOUND."""
+"""Nobody created the Stream. NOT_FOUND."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
 """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3

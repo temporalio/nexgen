@@ -122,7 +122,7 @@ namespace Temporalio.Api.Enums.V1 {
   public enum StreamErrorReason {
     [pbr::OriginalName("STREAM_ERROR_REASON_UNSPECIFIED")] Unspecified = 0,
     /// <summary>
-    /// Nobody created the Stream, even after `create_wait`. NOT_FOUND.
+    /// Nobody created the Stream. NOT_FOUND.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_FOUND")] NotFound = 1,
     /// <summary>

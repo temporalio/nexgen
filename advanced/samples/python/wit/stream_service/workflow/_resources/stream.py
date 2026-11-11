@@ -88,7 +88,6 @@ class Stream(typing.Generic[BodyT]):
         position: ReadPosition | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
@@ -97,7 +96,6 @@ class Stream(typing.Generic[BodyT]):
             position=position,
             max_records=max_records,
             wait=wait,
-            create_wait=create_wait,
             max_bytes=max_bytes,
         )
         handle = await _read_records(request, self.body_type)

@@ -45,28 +45,27 @@ namespace Temporalio.Api.StreamService.V1 {
             "ZXNwYWNlGAEgASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJl",
             "YW0udjEuU3RyZWFtUmVmEjQKBndyaXRlchgDIAEoCzIkLnRlbXBvcmFsLmFw",
             "aS5zdHJlYW0udjEuU3RyZWFtV3JpdGVyEhIKCnRhc2tfdG9rZW4YBCABKAwi",
-            "FQoTQ2xvc2VTdHJlYW1SZXNwb25zZSLuAgoSUmVhZFJlY29yZHNSZXF1ZXN0",
+            "FQoTQ2xvc2VTdHJlYW1SZXNwb25zZSK+AgoSUmVhZFJlY29yZHNSZXF1ZXN0",
             "EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3JhbC5h",
             "cGkuc3RyZWFtLnYxLlN0cmVhbVJlZhIVCgtmcm9tX29mZnNldBgDIAEoDEgA",
             "EjcKBXN0YXJ0GAQgASgOMiYudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVh",
             "bVJlYWRTdGFydEgAEhMKC21heF9yZWNvcmRzGAUgASgFEicKBHdhaXQYBiAB",
-            "KAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLgoLY3JlYXRlX3dhaXQY",
-            "ByABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SEQoJdG9fb2Zmc2V0",
-            "GAggASgMEhEKCXdha2Vfb25seRgJIAEoCBIRCgltYXhfYnl0ZXMYCiABKAMS",
-            "EgoKZmxvb3JfZnJvbRgLIAEoDEIKCghwb3NpdGlvbiKSAQoTUmVhZFJlY29y",
-            "ZHNSZXNwb25zZRI1CgdyZWNvcmRzGAEgAygLMiQudGVtcG9yYWwuYXBpLnN0",
-            "cmVhbS52MS5TdHJlYW1SZWNvcmQSEwoLbGFzdF9vZmZzZXQYAiABKAwSDAoE",
-            "ZG9uZRgDIAEoCBIhChljb250aW51ZV9hc19uZXdfc3VnZ2VzdGVkGAQgASgI",
-            "IloKFURlc2NyaWJlU3RyZWFtUmVxdWVzdBIRCgluYW1lc3BhY2UYASABKAkS",
-            "LgoDcmVmGAIgASgLMiEudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1S",
-            "ZWYikAEKFkRlc2NyaWJlU3RyZWFtUmVzcG9uc2USMwoGc3RhdHVzGAEgASgO",
-            "MiMudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbVN0YXR1cxITCgtsYXN0",
-            "X29mZnNldBgCIAEoDBIsCglyZXRlbnRpb24YAyABKAsyGS5nb29nbGUucHJv",
-            "dG9idWYuRHVyYXRpb25CtAEKIGlvLnRlbXBvcmFsLmFwaS5zdHJlYW1zZXJ2",
-            "aWNlLnYxQhRSZXF1ZXN0UmVzcG9uc2VQcm90b1ABWjFnby50ZW1wb3JhbC5p",
-            "by9hcGkvc3RyZWFtc2VydmljZS92MTtzdHJlYW1zZXJ2aWNlqgIfVGVtcG9y",
-            "YWxpby5BcGkuU3RyZWFtU2VydmljZS5WMeoCIlRlbXBvcmFsaW86OkFwaTo6",
-            "U3RyZWFtU2VydmljZTo6VjFiBnByb3RvMw=="));
+            "KAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SEQoJdG9fb2Zmc2V0GAcg",
+            "ASgMEhEKCXdha2Vfb25seRgIIAEoCBIRCgltYXhfYnl0ZXMYCSABKAMSEgoK",
+            "Zmxvb3JfZnJvbRgKIAEoDEIKCghwb3NpdGlvbiKSAQoTUmVhZFJlY29yZHNS",
+            "ZXNwb25zZRI1CgdyZWNvcmRzGAEgAygLMiQudGVtcG9yYWwuYXBpLnN0cmVh",
+            "bS52MS5TdHJlYW1SZWNvcmQSEwoLbGFzdF9vZmZzZXQYAiABKAwSDAoEZG9u",
+            "ZRgDIAEoCBIhChljb250aW51ZV9hc19uZXdfc3VnZ2VzdGVkGAQgASgIIloK",
+            "FURlc2NyaWJlU3RyZWFtUmVxdWVzdBIRCgluYW1lc3BhY2UYASABKAkSLgoD",
+            "cmVmGAIgASgLMiEudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1SZWYi",
+            "kAEKFkRlc2NyaWJlU3RyZWFtUmVzcG9uc2USMwoGc3RhdHVzGAEgASgOMiMu",
+            "dGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbVN0YXR1cxITCgtsYXN0X29m",
+            "ZnNldBgCIAEoDBIsCglyZXRlbnRpb24YAyABKAsyGS5nb29nbGUucHJvdG9i",
+            "dWYuRHVyYXRpb25CtAEKIGlvLnRlbXBvcmFsLmFwaS5zdHJlYW1zZXJ2aWNl",
+            "LnYxQhRSZXF1ZXN0UmVzcG9uc2VQcm90b1ABWjFnby50ZW1wb3JhbC5pby9h",
+            "cGkvc3RyZWFtc2VydmljZS92MTtzdHJlYW1zZXJ2aWNlqgIfVGVtcG9yYWxp",
+            "by5BcGkuU3RyZWFtU2VydmljZS5WMeoCIlRlbXBvcmFsaW86OkFwaTo6U3Ry",
+            "ZWFtU2VydmljZTo6VjFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -76,7 +75,7 @@ namespace Temporalio.Api.StreamService.V1 {
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsResponse), global::Temporalio.Api.StreamService.V1.AppendRecordsResponse.Parser, new[]{ "FirstOffset", "LastOffset" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Writer", "TaskToken" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamResponse), global::Temporalio.Api.StreamService.V1.CloseStreamResponse.Parser, null, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "Start", "MaxRecords", "Wait", "CreateWait", "ToOffset", "WakeOnly", "MaxBytes", "FloorFrom" }, new[]{ "Position" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "Start", "MaxRecords", "Wait", "ToOffset", "WakeOnly", "MaxBytes", "FloorFrom" }, new[]{ "Position" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsResponse), global::Temporalio.Api.StreamService.V1.ReadRecordsResponse.Parser, new[]{ "Records", "LastOffset", "Done", "ContinueAsNewSuggested" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamRequest), global::Temporalio.Api.StreamService.V1.DescribeStreamRequest.Parser, new[]{ "Namespace", "Ref" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamResponse), global::Temporalio.Api.StreamService.V1.DescribeStreamResponse.Parser, new[]{ "Status", "LastOffset", "Retention" }, null, null, null, null)
@@ -1872,7 +1871,6 @@ namespace Temporalio.Api.StreamService.V1 {
       ref_ = other.ref_ != null ? other.ref_.Clone() : null;
       maxRecords_ = other.maxRecords_;
       wait_ = other.wait_ != null ? other.wait_.Clone() : null;
-      createWait_ = other.createWait_ != null ? other.createWait_.Clone() : null;
       toOffset_ = other.toOffset_;
       wakeOnly_ = other.wakeOnly_;
       maxBytes_ = other.maxBytes_;
@@ -2010,24 +2008,8 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "create_wait" field.</summary>
-    public const int CreateWaitFieldNumber = 7;
-    private global::Google.Protobuf.WellKnownTypes.Duration createWait_;
-    /// <summary>
-    /// How long to wait for a Stream that nobody created yet. Empty fails at once with NOT_FOUND.
-    /// At most 60 s.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Google.Protobuf.WellKnownTypes.Duration CreateWait {
-      get { return createWait_; }
-      set {
-        createWait_ = value;
-      }
-    }
-
     /// <summary>Field number for the "to_offset" field.</summary>
-    public const int ToOffsetFieldNumber = 8;
+    public const int ToOffsetFieldNumber = 7;
     private pb::ByteString toOffset_ = pb::ByteString.Empty;
     /// <summary>
     /// The exclusive end of the read. The read scans no entry at or after it, so a replay reads the
@@ -2045,7 +2027,7 @@ namespace Temporalio.Api.StreamService.V1 {
     }
 
     /// <summary>Field number for the "wake_only" field.</summary>
-    public const int WakeOnlyFieldNumber = 9;
+    public const int WakeOnlyFieldNumber = 8;
     private bool wakeOnly_;
     /// <summary>
     /// Asks only for a wake-up, for a reader that must not get Records in this answer, such as a
@@ -2065,7 +2047,7 @@ namespace Temporalio.Api.StreamService.V1 {
     }
 
     /// <summary>Field number for the "max_bytes" field.</summary>
-    public const int MaxBytesFieldNumber = 10;
+    public const int MaxBytesFieldNumber = 9;
     private long maxBytes_;
     /// <summary>
     /// The most Record bytes in one page, so a page fits the caller's limit, such as a History
@@ -2081,7 +2063,7 @@ namespace Temporalio.Api.StreamService.V1 {
     }
 
     /// <summary>Field number for the "floor_from" field.</summary>
-    public const int FloorFromFieldNumber = 11;
+    public const int FloorFromFieldNumber = 10;
     private pb::ByteString floorFrom_ = pb::ByteString.Empty;
     /// <summary>
     /// The lowest offset this run read on replay. A reset run copies the earlier run's reads into
@@ -2141,7 +2123,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Start != other.Start) return false;
       if (MaxRecords != other.MaxRecords) return false;
       if (!object.Equals(Wait, other.Wait)) return false;
-      if (!object.Equals(CreateWait, other.CreateWait)) return false;
       if (ToOffset != other.ToOffset) return false;
       if (WakeOnly != other.WakeOnly) return false;
       if (MaxBytes != other.MaxBytes) return false;
@@ -2160,7 +2141,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (HasStart) hash ^= Start.GetHashCode();
       if (MaxRecords != 0) hash ^= MaxRecords.GetHashCode();
       if (wait_ != null) hash ^= Wait.GetHashCode();
-      if (createWait_ != null) hash ^= CreateWait.GetHashCode();
       if (ToOffset.Length != 0) hash ^= ToOffset.GetHashCode();
       if (WakeOnly != false) hash ^= WakeOnly.GetHashCode();
       if (MaxBytes != 0L) hash ^= MaxBytes.GetHashCode();
@@ -2208,24 +2188,20 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(50);
         output.WriteMessage(Wait);
       }
-      if (createWait_ != null) {
-        output.WriteRawTag(58);
-        output.WriteMessage(CreateWait);
-      }
       if (ToOffset.Length != 0) {
-        output.WriteRawTag(66);
+        output.WriteRawTag(58);
         output.WriteBytes(ToOffset);
       }
       if (WakeOnly != false) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(64);
         output.WriteBool(WakeOnly);
       }
       if (MaxBytes != 0L) {
-        output.WriteRawTag(80);
+        output.WriteRawTag(72);
         output.WriteInt64(MaxBytes);
       }
       if (FloorFrom.Length != 0) {
-        output.WriteRawTag(90);
+        output.WriteRawTag(82);
         output.WriteBytes(FloorFrom);
       }
       if (_unknownFields != null) {
@@ -2262,24 +2238,20 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(50);
         output.WriteMessage(Wait);
       }
-      if (createWait_ != null) {
-        output.WriteRawTag(58);
-        output.WriteMessage(CreateWait);
-      }
       if (ToOffset.Length != 0) {
-        output.WriteRawTag(66);
+        output.WriteRawTag(58);
         output.WriteBytes(ToOffset);
       }
       if (WakeOnly != false) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(64);
         output.WriteBool(WakeOnly);
       }
       if (MaxBytes != 0L) {
-        output.WriteRawTag(80);
+        output.WriteRawTag(72);
         output.WriteInt64(MaxBytes);
       }
       if (FloorFrom.Length != 0) {
-        output.WriteRawTag(90);
+        output.WriteRawTag(82);
         output.WriteBytes(FloorFrom);
       }
       if (_unknownFields != null) {
@@ -2309,9 +2281,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (wait_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Wait);
-      }
-      if (createWait_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(CreateWait);
       }
       if (ToOffset.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(ToOffset);
@@ -2354,12 +2323,6 @@ namespace Temporalio.Api.StreamService.V1 {
           Wait = new global::Google.Protobuf.WellKnownTypes.Duration();
         }
         Wait.MergeFrom(other.Wait);
-      }
-      if (other.createWait_ != null) {
-        if (createWait_ == null) {
-          CreateWait = new global::Google.Protobuf.WellKnownTypes.Duration();
-        }
-        CreateWait.MergeFrom(other.CreateWait);
       }
       if (other.ToOffset.Length != 0) {
         ToOffset = other.ToOffset;
@@ -2433,25 +2396,18 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 58: {
-            if (createWait_ == null) {
-              CreateWait = new global::Google.Protobuf.WellKnownTypes.Duration();
-            }
-            input.ReadMessage(CreateWait);
-            break;
-          }
-          case 66: {
             ToOffset = input.ReadBytes();
             break;
           }
-          case 72: {
+          case 64: {
             WakeOnly = input.ReadBool();
             break;
           }
-          case 80: {
+          case 72: {
             MaxBytes = input.ReadInt64();
             break;
           }
-          case 90: {
+          case 82: {
             FloorFrom = input.ReadBytes();
             break;
           }
@@ -2506,25 +2462,18 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 58: {
-            if (createWait_ == null) {
-              CreateWait = new global::Google.Protobuf.WellKnownTypes.Duration();
-            }
-            input.ReadMessage(CreateWait);
-            break;
-          }
-          case 66: {
             ToOffset = input.ReadBytes();
             break;
           }
-          case 72: {
+          case 64: {
             WakeOnly = input.ReadBool();
             break;
           }
-          case 80: {
+          case 72: {
             MaxBytes = input.ReadInt64();
             break;
           }
-          case 90: {
+          case 82: {
             FloorFrom = input.ReadBytes();
             break;
           }

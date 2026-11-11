@@ -247,7 +247,6 @@ class ReadRecordsRequest(_message.Message):
     START_FIELD_NUMBER: _builtins.int
     MAX_RECORDS_FIELD_NUMBER: _builtins.int
     WAIT_FIELD_NUMBER: _builtins.int
-    CREATE_WAIT_FIELD_NUMBER: _builtins.int
     TO_OFFSET_FIELD_NUMBER: _builtins.int
     WAKE_ONLY_FIELD_NUMBER: _builtins.int
     MAX_BYTES_FIELD_NUMBER: _builtins.int
@@ -295,12 +294,6 @@ class ReadRecordsRequest(_message.Message):
         at once, and a wait longer than 60 s waits 60 s.
         """
 
-    @_builtins.property
-    def create_wait(self) -> _duration_pb2.Duration:
-        """How long to wait for a Stream that nobody created yet. Empty fails at once with NOT_FOUND.
-        At most 60 s.
-        """
-
     def __init__(
         self,
         *,
@@ -310,15 +303,14 @@ class ReadRecordsRequest(_message.Message):
         start: _stream_pb2.StreamReadStart.ValueType = ...,
         max_records: _builtins.int = ...,
         wait: _duration_pb2.Duration | None = ...,
-        create_wait: _duration_pb2.Duration | None = ...,
         to_offset: _builtins.bytes = ...,
         wake_only: _builtins.bool = ...,
         max_bytes: _builtins.int = ...,
         floor_from: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "from_offset", b"from_offset", "position", b"position", "ref", b"ref", "start", b"start", "wait", b"wait"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["from_offset", b"from_offset", "position", b"position", "ref", b"ref", "start", b"start", "wait", b"wait"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["create_wait", b"create_wait", "floor_from", b"floor_from", "from_offset", b"from_offset", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "position", b"position", "ref", b"ref", "start", b"start", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["floor_from", b"floor_from", "from_offset", b"from_offset", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "position", b"position", "ref", b"ref", "start", b"start", "to_offset", b"to_offset", "wait", b"wait", "wake_only", b"wake_only"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType_position: _TypeAlias = _typing.Literal["from_offset", "start"]  # noqa: Y015
     _WhichOneofArgType_position: _TypeAlias = _typing.Literal["position", b"position"]  # noqa: Y015

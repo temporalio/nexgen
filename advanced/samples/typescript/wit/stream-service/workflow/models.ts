@@ -1320,10 +1320,6 @@ export interface ReadRecordsRequest<BodyT> {
    */
   wait?: common.Duration;
   /**
-   * How long to wait for an uncreated Stream. Empty fails at once. At most 60 s.
-   */
-  createWait?: common.Duration;
-  /**
    * The maximum Record bytes in a page. A larger Record is still returned alone.
    */
   maxBytes?: Long;
@@ -1367,10 +1363,6 @@ function readRecordsRequestFromProto<BodyT>(
     position: result1,
     maxRecords: proto.maxRecords ?? undefined,
     wait: proto.wait == null ? undefined : support.durationFromProto(proto.wait),
-    createWait:
-      proto.createWait == null
-        ? undefined
-        : support.durationFromProto(proto.createWait),
     maxBytes: proto.maxBytes ?? undefined,
   };
 }
@@ -1403,8 +1395,6 @@ function readRecordsRequestToProto<BodyT>(
   }
   proto.maxRecords = model.maxRecords;
   proto.wait = model.wait == null ? undefined : support.durationToProto(model.wait);
-  proto.createWait =
-    model.createWait == null ? undefined : support.durationToProto(model.createWait);
   proto.maxBytes = model.maxBytes;
   return proto;
 }

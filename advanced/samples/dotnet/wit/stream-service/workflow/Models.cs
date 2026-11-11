@@ -988,10 +988,6 @@ namespace Temporalio.Workflows
         /// </summary>
         public System.TimeSpan? Wait { get; init; }
         /// <summary>
-        /// How long to wait for an uncreated Stream. Empty fails at once. At most 60 s.
-        /// </summary>
-        public System.TimeSpan? CreateWait { get; init; }
-        /// <summary>
         /// The maximum Record bytes in a page. A larger Record is still returned alone.
         /// </summary>
         public long? MaxBytes { get; init; }
@@ -1017,7 +1013,6 @@ namespace Temporalio.Workflows
                 Position = positionOneof,
                 MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
                 Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
-                CreateWait = wire.CreateWait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.CreateWait),
                 MaxBytes = wire.MaxBytes == 0 ? null : wire.MaxBytes,
             };
         }
@@ -1042,10 +1037,6 @@ namespace Temporalio.Workflows
             if (Wait is { } wait)
             {
                 proto.Wait = wait.ToProto();
-            }
-            if (CreateWait is { } createWait)
-            {
-                proto.CreateWait = createWait.ToProto();
             }
             if (MaxBytes is { } maxBytes)
             {

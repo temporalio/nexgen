@@ -105,10 +105,6 @@ namespace Temporalio.Workflows
         /// </summary>
         public System.TimeSpan? Wait { get; set; }
         /// <summary>
-        /// How long to wait for an uncreated Stream. Empty fails at once. At most 60 s.
-        /// </summary>
-        public System.TimeSpan? CreateWait { get; set; }
-        /// <summary>
         /// The maximum Record bytes in a page. A larger Record is still returned alone.
         /// </summary>
         public long? MaxBytes { get; set; }
@@ -225,7 +221,6 @@ namespace Temporalio.Workflows
                 Position = options.Position,
                 MaxRecords = options.MaxRecords,
                 Wait = options.Wait,
-                CreateWait = options.CreateWait,
                 MaxBytes = options.MaxBytes,
             };
             return ReadRecordsAsync<TBody>(request);

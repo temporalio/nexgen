@@ -1096,8 +1096,6 @@ interface stream-service {
     max-records: option<s32>,
     /// @nexus.omit
     wait: placeholder,
-    /// @nexus.omit
-    create-wait: placeholder,
     /// @nexus.name typescript="limit"
     /// @nexus.source targets="workflow" typescript="startLimit()"
     max-bytes: option<s64>,
