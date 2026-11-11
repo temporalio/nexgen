@@ -8,7 +8,7 @@ import * as support from "../../../../support/temporal_model_converters";
 type AppendRecordsInput<BodyT> =
   AppendRecordsRequest<BodyT> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "writer"> & { writer?: never }
+      ? Omit<Input, "producer"> & { producer?: never }
       : never
     : never;
 
@@ -22,7 +22,7 @@ export async function appendRecords<BodyT>(
 ): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const request = {
     ...requestInput,
-    writer: support.workflowWriter(),
+    producer: support.workflowProducer(),
   } as AppendRecordsRequest<BodyT>;
   const client = nexus.createNexusServiceClient({
     service: streamService,

@@ -6,14 +6,10 @@ namespace Nexgen.Support
     internal static class StreamWorkflowContext
     {
         // The run's Workflow Producer.
-        internal static Temporalio.Workflows.StreamWriter Writer() =>
-            new()
+        internal static Temporalio.Workflows.Producer Producer() =>
+            new($"wf:{Workflow.Info.RunId}")
             {
-                Producer = new($"wf:{Workflow.Info.RunId}")
-                {
-                    Kind = new ProducerKind.Workflow(
-                        new WorkflowProducer { RunId = Workflow.Info.RunId }),
-                },
+                Kind = new ProducerKind.Workflow(new WorkflowProducer(Workflow.Info.RunId)),
             };
 
         // A new id for each create call. A Workflow's replay gives the same id.

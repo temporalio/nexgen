@@ -24,8 +24,11 @@ def next_read_request(request: typing.Any, response: typing.Any) -> typing.Any:
     return _read_after(request, last_offset)
 
 
-def resume_read_request(request: typing.Any, item: typing.Any) -> typing.Any:
-    return _read_after(request, item.offset)
+def resume_read_request(request: typing.Any, record: typing.Any) -> typing.Any:
+    if record.item is None:
+        # A newer server's item kind has no offset here, so the read starts at the page again.
+        return request
+    return _read_after(request, record.item.value.offset)
 
 
 def _read_after(request: typing.Any, offset: bytes) -> typing.Any:

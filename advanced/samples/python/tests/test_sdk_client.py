@@ -36,10 +36,12 @@ from wit.stream_service.client.client import (
 )
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
+    ActivityEpoch,
     ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
+    ClientEpoch,
     ClientProducer,
     CloseStreamRequest,
     CloseStreamResponse,
@@ -60,7 +62,7 @@ from wit.stream_service.both.models import (
     StreamReadStart,
     StreamRecord,
     StreamRef,
-    StreamWriter,
+    Timestamp,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -75,9 +77,27 @@ SYSTEM_CONVERTER = temporalio.nexus.system._SystemNexusPayloadConverter(
 )
 
 
+# The Producer that the sample's `client_producer()` source gives outside an Activity.
+CLIENT_PRODUCER = Producer(
+    id="client:sample",
+    kind=ProducerKindClient(ClientProducer(epoch=ClientEpoch(attempt=1))),
+)
+
+
 def _offset(n: int) -> bytes:
     # Big-endian, so a bytes compare keeps the int order these tests assert.
     return n.to_bytes(8, "big")
+
+
+def _record(n: int) -> StreamRecord[str]:
+    # The offset is on the item, so a test record carries a data item.
+    return StreamRecord[str](
+        item=StreamItemData(StreamData[str](body=f"r{n}", offset=_offset(n)))
+    )
+
+
+def _offset_of(record: StreamRecord[typing.Any]) -> bytes | None:
+    return None if record.item is None else record.item.value.offset
 
 
 def _after(n: int) -> ReadPositionFromOffset:
@@ -275,8 +295,9 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
                 ReadRecordsResponse[Turn](
                     records=[
                         StreamRecord(
-                            item=StreamItemData(StreamData(body=Turn(role="model"))),
-                            offset=_offset(1),
+                            item=StreamItemData(
+                                StreamData(body=Turn(role="model"), offset=_offset(1))
+                            )
                         )
                     ]
                 )
@@ -337,12 +358,9 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "__temporal_system",
         "AppendRecords",
     )
-    # A client call fills the writer from its source.
-    writer = StreamWriter(
-        producer=Producer(id="client:sample", kind=ProducerKindClient(ClientProducer()))
-    )
+    # A client call fills the producer from its source.
     assert append.arg == AppendRecordsRequest(
-        ref=stream.ref, records=[AppendRecord(body="a")], writer=writer
+        ref=stream.ref, records=[AppendRecord(body="a")], producer=CLIENT_PRODUCER
     )
     assert uuid.UUID(append.id)
     assert append.result_type is AppendRecordsResponse
@@ -351,7 +369,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         SYSTEM_ENDPOINT,
         "CloseStream",
     )
-    assert close.arg == CloseStreamRequest(ref=stream.ref, writer=writer)
+    assert close.arg == CloseStreamRequest(ref=stream.ref, producer=CLIENT_PRODUCER)
     assert close.result_type is CloseStreamResponse
 
 
@@ -382,14 +400,7 @@ async def test_a_clean_block_closes_its_stream() -> None:
         _ = assert_type(stream, Stream[Turn])
 
     assert closes(answers) == [
-        CloseStreamRequest(
-            ref=stream.ref,
-            writer=StreamWriter(
-                producer=Producer(
-                    id="client:sample", kind=ProducerKindClient(ClientProducer())
-                )
-            ),
-        )
+        CloseStreamRequest(ref=stream.ref, producer=CLIENT_PRODUCER)
     ]
 
 
@@ -434,11 +445,7 @@ async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
-        writer=StreamWriter(
-            producer=Producer(
-                id="client:sample", kind=ProducerKindClient(ClientProducer())
-            )
-        ),
+        producer=CLIENT_PRODUCER,
     )
     # An append that wrote no Record has no last offset, so it answers empty bytes.
     assert empty == b""
@@ -472,14 +479,19 @@ async def test_a_create_takes_the_fields_of_the_ref(
 class FakeActivityInfo:
     workflow_run_id: str
     activity_id: str
+    attempt: int
+    current_attempt_scheduled_time: datetime.datetime
 
 
-async def test_a_client_append_sends_the_writer_of_its_activity(
+async def test_a_client_append_sends_the_producer_of_its_activity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    scheduled = datetime.datetime(
+        2026, 1, 2, 3, 4, 5, 500000, tzinfo=datetime.timezone.utc
+    )
     monkeypatch.setattr(temporalio.activity, "in_activity", lambda: True)
     monkeypatch.setattr(
-        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7")
+        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7", 2, scheduled)
     )
     client, answers = connect(
         Client, {"AppendRecords": AppendRecordsResponse(last_offset=_offset(1))}
@@ -489,20 +501,25 @@ async def test_a_client_append_sends_the_writer_of_its_activity(
     _ = await stream.append()
 
     (append,) = answers.started
-    writer = StreamWriter(
-        producer=Producer(
-            id="act:r1:7",
-            kind=ProducerKindWorkflowActivity(ActivityProducer(run_id="r1")),
-        )
+    epoch = ActivityEpoch(
+        attempt_scheduled_time=Timestamp(
+            seconds=int(scheduled.timestamp()), nanos=500_000_000
+        ),
+        attempt=2,
+    )
+    producer = Producer(
+        id="act:r1:7",
+        kind=ProducerKindWorkflowActivity(ActivityProducer(run_id="r1", epoch=epoch)),
     )
     assert append.arg == AppendRecordsRequest(
-        ref=StreamRef(id="s1"), records=[], writer=writer
+        ref=StreamRef(id="s1"), records=[], producer=producer
     )
-    # The writer's Producer goes in the request's one writer field.
+    # The epoch is the Activity's attempt, so a retry fences the attempt before it.
     converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
     wire = converter.to_transfer_type(append.arg)
-    assert wire.writer.producer.id == "act:r1:7"
-    assert wire.writer.producer.workflow_activity.run_id == "r1"
+    assert wire.producer.id == "act:r1:7"
+    assert wire.producer.workflow_activity.run_id == "r1"
+    assert wire.producer.workflow_activity.epoch.attempt == 2
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
@@ -611,8 +628,8 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
     pages = [
         ReadRecordsResponse[str](
             records=[
-                StreamRecord[str](offset=_offset(1)),
-                StreamRecord[str](offset=_offset(2)),
+                _record(1),
+                _record(2),
             ],
             last_offset=_offset(3),
         ),
@@ -637,9 +654,7 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
     pages = [
-        ReadRecordsResponse[str](
-            records=[StreamRecord[str](offset=_offset(1))], last_offset=_offset(2)
-        ),
+        ReadRecordsResponse[str](records=[_record(1)], last_offset=_offset(2)),
         ReadRecordsResponse[str](records=[], last_offset=_offset(2)),
         ReadRecordsResponse[str](records=[], done=True),
     ]
@@ -661,9 +676,7 @@ async def test_a_stream_read_from_the_end_resumes_after_its_first_last_offset() 
     wait = datetime.timedelta(seconds=30)
     pages = [
         ReadRecordsResponse[str](records=[], last_offset=_offset(5)),
-        ReadRecordsResponse[str](
-            records=[StreamRecord[str](offset=_offset(5))], last_offset=_offset(6)
-        ),
+        ReadRecordsResponse[str](records=[_record(5)], last_offset=_offset(6)),
         ReadRecordsResponse[str](records=[], done=True),
     ]
     client, answers = connect(
@@ -697,7 +710,7 @@ async def test_a_done_first_page_ends_the_read() -> None:
     ref = StreamRef(id="s1")
     pages = [
         ReadRecordsResponse[str](
-            records=[StreamRecord[str](offset=_offset(1))],
+            records=[_record(1)],
             last_offset=_offset(2),
             done=True,
         )
@@ -719,7 +732,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
         {
             "ReadRecords": [
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=_offset(1))],
+                    records=[_record(1)],
                     last_offset=_offset(2),
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
@@ -746,14 +759,14 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
             "ReadRecords": [
                 ReadRecordsResponse[str](
                     records=[
-                        StreamRecord[str](offset=_offset(10)),
-                        StreamRecord[str](offset=_offset(12)),
+                        _record(10),
+                        _record(12),
                     ],
                     last_offset=_offset(12),
                 ),
                 ReadRecordsResponse[str](records=[], last_offset=_offset(12)),
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=_offset(20))],
+                    records=[_record(20)],
                     last_offset=_offset(20),
                     done=True,
                 ),
@@ -765,7 +778,9 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
     read = stream.iter_read_items(position=_after(10), wait=wait)
     seen: list[tuple[bytes | None, ReadPosition | None]] = []
     async for record in read:
-        seen.append((record.offset, read.next_request and read.next_request.position))
+        seen.append(
+            (_offset_of(record), read.next_request and read.next_request.position)
+        )
 
     # A from-offset is exclusive, so after a Record the read resumes after that Record's own
     # offset. After a page's last Record, it goes on after the page's newest offset.
@@ -790,13 +805,13 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
             "ReadRecords": [
                 ReadRecordsResponse[str](
                     records=[
-                        StreamRecord[str](offset=_offset(1)),
-                        StreamRecord[str](offset=_offset(2)),
+                        _record(1),
+                        _record(2),
                     ],
                     last_offset=_offset(2),
                 ),
                 ReadRecordsResponse[str](
-                    records=[StreamRecord[str](offset=_offset(2))],
+                    records=[_record(2)],
                     last_offset=_offset(2),
                     done=True,
                 ),
@@ -808,12 +823,12 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
     read = stream.iter_read_items(position=_after(1))
     first = await anext(read)
     saved = read.next_request
-    assert first.offset == _offset(1)
+    assert _offset_of(first) == _offset(1)
     assert saved is not None
 
     resumed = stream.iter_read_items(position=saved.position)
 
-    assert [record.offset async for record in resumed] == [_offset(2)]
+    assert [_offset_of(record) async for record in resumed] == [_offset(2)]
     assert [started.arg for started in answers.started] == [
         ReadRecordsRequest(ref=ref, position=_after(1)),
         ReadRecordsRequest(ref=ref, position=_after(1)),
@@ -829,8 +844,8 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
             "ReadRecords": [
                 ReadRecordsResponse[str](
                     records=[
-                        StreamRecord[str](offset=_offset(1)),
-                        StreamRecord[str](offset=_offset(2)),
+                        _record(1),
+                        _record(2),
                     ],
                     last_offset=_offset(2),
                 ),
@@ -843,7 +858,8 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
     read = stream.iter_read_items(position=_after(1), wait=wait)
     next_positions: list[ReadPosition | None] = []
     async for record in read:
-        record.offset = _offset(9)
+        assert isinstance(record.item, StreamItemData)
+        record.item.value.offset = _offset(9)
         next_positions.append(read.next_request and read.next_request.position)
 
     assert next_positions == [_after(1), _after(2)]
@@ -910,7 +926,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
 ) -> None:
     ref = StreamRef[Turn](id="s1")
     record = StreamRecord(
-        item=StreamItemData(StreamData(body=Turn(role="model"))), offset=_offset(1)
+        item=StreamItemData(StreamData(body=Turn(role="model"), offset=_offset(1)))
     )
     client, _ = connect(
         Client,
@@ -946,7 +962,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
 
 def turn_pages() -> Payload:
     record = StreamRecord(
-        item=StreamItemData(StreamData(body=Turn(role="model"))), offset=_offset(1)
+        item=StreamItemData(StreamData(body=Turn(role="model"), offset=_offset(1)))
     )
     return SYSTEM_CONVERTER.to_payload(
         ReadRecordsResponse[Turn](records=[record], done=True)
@@ -979,7 +995,9 @@ async def test_a_typed_ref_round_trips_into_a_typed_handle() -> None:
     # The ref of a created handle keeps its type argument too.
     assert client.get_stream(created.ref).body_type is Turn
     [record] = (await stream.read()).records
-    assert record.item == StreamItemData(StreamData(body=Turn(role="model")))
+    assert record.item == StreamItemData(
+        StreamData(body=Turn(role="model"), offset=_offset(1))
+    )
 
 
 async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
@@ -999,9 +1017,13 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     assert client.get_stream(typed, body_type=Turn).ref is typed
     [typed_record] = (await typed_stream.read()).records
     [plain_record] = (await plain_stream.read()).records
-    assert typed_record.item == StreamItemData(StreamData(body=Turn(role="model")))
+    assert typed_record.item == StreamItemData(
+        StreamData(body=Turn(role="model"), offset=_offset(1))
+    )
     # An unknown payload stays a decoded dict.
-    assert plain_record.item == StreamItemData(StreamData(body={"role": "model"}))
+    assert plain_record.item == StreamItemData(
+        StreamData(body={"role": "model"}, offset=_offset(1))
+    )
     # An explicit body_type overrides a ref with no type argument, positionally or by keyword.
     override = client.get_stream(plain, body_type=Turn)
     _ = assert_type(override, Stream[Turn])

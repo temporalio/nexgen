@@ -2,7 +2,7 @@
 
 import type * as common from "@temporalio/common";
 import type { google, temporal } from "@temporalio/proto";
-import type Long from "long";
+import Long from "long";
 import * as support from "../../../support/temporal_model_converters";
 
 function requiredField<T>(
@@ -152,7 +152,7 @@ export interface StreamRef<BodyT> {
    */
   id: string;
   /**
-   * Registered backend name, empty for the default. Only an SDK reads it.
+   * Registered backend name. With none, the SDK picks one. Only an SDK reads it.
    */
   backend?: string;
 }
@@ -334,9 +334,9 @@ export interface AppendRecordsRequest<BodyT> {
    */
   sequence?: Long;
   /**
-   * Required outside a Workflow. In a Workflow the transport sets it.
+   * The Producer of the batch. The helper of each context sets it.
    */
-  writer?: StreamWriter;
+  producer: Producer;
 }
 
 function appendRecordsRequestFromProto<BodyT>(
@@ -357,7 +357,9 @@ function appendRecordsRequestFromProto<BodyT>(
       "records",
     ),
     sequence: proto.sequence ?? undefined,
-    writer: proto.writer == null ? undefined : streamWriterFromProto(proto.writer),
+    producer: producerFromProto(
+      requiredField(proto.producer, "sourced field", "producer"),
+    ),
   };
 }
 
@@ -379,7 +381,7 @@ function appendRecordsRequestToProto<BodyT>(
       "records",
     ),
     sequence: model.sequence,
-    writer: model.writer == null ? undefined : streamWriterToProto(model.writer),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 
@@ -477,38 +479,6 @@ export function createAppendRecordTransferTypeConverter<BodyT>(
     },
   };
 }
-export interface StreamWriter {
-  /**
-   * Required on a write.
-   */
-  producer?: Producer;
-}
-
-function streamWriterFromProto(
-  proto: temporal.api.stream.v1.IStreamWriter,
-): StreamWriter {
-  return {
-    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
-  };
-}
-
-function streamWriterToProto(
-  model: StreamWriter,
-): temporal.api.stream.v1.IStreamWriter {
-  return {
-    producer: model.producer == null ? undefined : producerToProto(model.producer),
-  };
-}
-
-export const streamWriterTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IStreamWriter): StreamWriter {
-    return streamWriterFromProto(value);
-  },
-
-  toTransferType(value: StreamWriter): temporal.api.stream.v1.IStreamWriter {
-    return streamWriterToProto(value);
-  },
-};
 export interface Producer {
   /**
    * Stable across attempts, such as wf:<run id> for a Workflow run.
@@ -623,7 +593,7 @@ export interface WorkflowProducer {
   /**
    * The run id of the Workflow run, not of its chain.
    */
-  runId?: string;
+  runId: string;
   epoch?: WorkflowTaskEpoch;
 }
 
@@ -631,7 +601,11 @@ function workflowProducerFromProto(
   proto: temporal.api.stream.v1.IWorkflowProducer,
 ): WorkflowProducer {
   return {
-    runId: proto.runId ?? undefined,
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "WorkflowProducer",
+      "runId",
+    ),
     epoch: proto.epoch == null ? undefined : workflowTaskEpochFromProto(proto.epoch),
   };
 }
@@ -640,7 +614,7 @@ function workflowProducerToProto(
   model: WorkflowProducer,
 ): temporal.api.stream.v1.IWorkflowProducer {
   return {
-    runId: model.runId,
+    runId: requiredField(model.runId, "WorkflowProducer", "runId"),
     epoch: model.epoch == null ? undefined : workflowTaskEpochToProto(model.epoch),
   };
 }
@@ -655,8 +629,11 @@ export const workflowProducerTransferTypeConverter = {
   },
 };
 export interface WorkflowTaskEpoch {
-  startedEventId?: Long;
-  attempt?: number;
+  startedEventId: Long;
+  /**
+   * 1 or more.
+   */
+  attempt: number;
   /**
    * When the Workflow Task attempt started. It tells a reused started id apart.
    */
@@ -667,8 +644,12 @@ function workflowTaskEpochFromProto(
   proto: temporal.api.stream.v1.IWorkflowTaskEpoch,
 ): WorkflowTaskEpoch {
   return {
-    startedEventId: proto.startedEventId ?? undefined,
-    attempt: proto.attempt ?? undefined,
+    startedEventId: requiredField(
+      proto.startedEventId ?? Long.ZERO,
+      "WorkflowTaskEpoch",
+      "startedEventId",
+    ),
+    attempt: requiredField(proto.attempt ?? 0, "WorkflowTaskEpoch", "attempt"),
     startedTime:
       proto.startedTime == null ? undefined : timestampFromProto(proto.startedTime),
   };
@@ -678,8 +659,12 @@ function workflowTaskEpochToProto(
   model: WorkflowTaskEpoch,
 ): temporal.api.stream.v1.IWorkflowTaskEpoch {
   return {
-    startedEventId: model.startedEventId,
-    attempt: model.attempt,
+    startedEventId: requiredField(
+      model.startedEventId,
+      "WorkflowTaskEpoch",
+      "startedEventId",
+    ),
+    attempt: requiredField(model.attempt, "WorkflowTaskEpoch", "attempt"),
     startedTime:
       model.startedTime == null ? undefined : timestampToProto(model.startedTime),
   };
@@ -725,16 +710,22 @@ export const timestampTransferTypeConverter = {
   },
 };
 export interface LocalActivityProducer {
-  runId?: string;
-  epoch?: LocalActivityEpoch;
+  runId: string;
+  epoch: LocalActivityEpoch;
 }
 
 function localActivityProducerFromProto(
   proto: temporal.api.stream.v1.ILocalActivityProducer,
 ): LocalActivityProducer {
   return {
-    runId: proto.runId ?? undefined,
-    epoch: proto.epoch == null ? undefined : localActivityEpochFromProto(proto.epoch),
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "LocalActivityProducer",
+      "runId",
+    ),
+    epoch: localActivityEpochFromProto(
+      requiredField(proto.epoch, "LocalActivityProducer", "epoch"),
+    ),
   };
 }
 
@@ -742,8 +733,10 @@ function localActivityProducerToProto(
   model: LocalActivityProducer,
 ): temporal.api.stream.v1.ILocalActivityProducer {
   return {
-    runId: model.runId,
-    epoch: model.epoch == null ? undefined : localActivityEpochToProto(model.epoch),
+    runId: requiredField(model.runId, "LocalActivityProducer", "runId"),
+    epoch: localActivityEpochToProto(
+      requiredField(model.epoch, "LocalActivityProducer", "epoch"),
+    ),
   };
 }
 
@@ -764,19 +757,21 @@ export interface LocalActivityEpoch {
   /**
    * The Workflow Task attempt that dispatched the Local Activity.
    */
-  task?: WorkflowTaskEpoch;
+  task: WorkflowTaskEpoch;
   /**
-   * The Local Activity's own attempt in that Workflow Task.
+   * The Local Activity's own attempt in that Workflow Task, 1 or more.
    */
-  attempt?: number;
+  attempt: number;
 }
 
 function localActivityEpochFromProto(
   proto: temporal.api.stream.v1.ILocalActivityEpoch,
 ): LocalActivityEpoch {
   return {
-    task: proto.task == null ? undefined : workflowTaskEpochFromProto(proto.task),
-    attempt: proto.attempt ?? undefined,
+    task: workflowTaskEpochFromProto(
+      requiredField(proto.task, "LocalActivityEpoch", "task"),
+    ),
+    attempt: requiredField(proto.attempt ?? 0, "LocalActivityEpoch", "attempt"),
   };
 }
 
@@ -784,8 +779,10 @@ function localActivityEpochToProto(
   model: LocalActivityEpoch,
 ): temporal.api.stream.v1.ILocalActivityEpoch {
   return {
-    task: model.task == null ? undefined : workflowTaskEpochToProto(model.task),
-    attempt: model.attempt,
+    task: workflowTaskEpochToProto(
+      requiredField(model.task, "LocalActivityEpoch", "task"),
+    ),
+    attempt: requiredField(model.attempt, "LocalActivityEpoch", "attempt"),
   };
 }
 
@@ -803,8 +800,11 @@ export const localActivityEpochTransferTypeConverter = {
   },
 };
 export interface ActivityProducer {
+  /**
+   * The run of the Workflow that scheduled the Activity. Empty when standalone.
+   */
   runId?: string;
-  epoch?: ActivityEpoch;
+  epoch: ActivityEpoch;
 }
 
 function activityProducerFromProto(
@@ -812,7 +812,9 @@ function activityProducerFromProto(
 ): ActivityProducer {
   return {
     runId: proto.runId ?? undefined,
-    epoch: proto.epoch == null ? undefined : activityEpochFromProto(proto.epoch),
+    epoch: activityEpochFromProto(
+      requiredField(proto.epoch, "ActivityProducer", "epoch"),
+    ),
   };
 }
 
@@ -821,7 +823,9 @@ function activityProducerToProto(
 ): temporal.api.stream.v1.IActivityProducer {
   return {
     runId: model.runId,
-    epoch: model.epoch == null ? undefined : activityEpochToProto(model.epoch),
+    epoch: activityEpochToProto(
+      requiredField(model.epoch, "ActivityProducer", "epoch"),
+    ),
   };
 }
 
@@ -838,19 +842,25 @@ export interface ActivityEpoch {
   /**
    * When the server scheduled this attempt. A reset makes it later.
    */
-  attemptScheduledTime?: Timestamp;
-  attempt?: number;
+  attemptScheduledTime: Timestamp;
+  /**
+   * 1 or more.
+   */
+  attempt: number;
 }
 
 function activityEpochFromProto(
   proto: temporal.api.stream.v1.IActivityEpoch,
 ): ActivityEpoch {
   return {
-    attemptScheduledTime:
-      proto.attemptScheduledTime == null
-        ? undefined
-        : timestampFromProto(proto.attemptScheduledTime),
-    attempt: proto.attempt ?? undefined,
+    attemptScheduledTime: timestampFromProto(
+      requiredField(
+        proto.attemptScheduledTime,
+        "ActivityEpoch",
+        "attemptScheduledTime",
+      ),
+    ),
+    attempt: requiredField(proto.attempt ?? 0, "ActivityEpoch", "attempt"),
   };
 }
 
@@ -858,11 +868,14 @@ function activityEpochToProto(
   model: ActivityEpoch,
 ): temporal.api.stream.v1.IActivityEpoch {
   return {
-    attemptScheduledTime:
-      model.attemptScheduledTime == null
-        ? undefined
-        : timestampToProto(model.attemptScheduledTime),
-    attempt: model.attempt,
+    attemptScheduledTime: timestampToProto(
+      requiredField(
+        model.attemptScheduledTime,
+        "ActivityEpoch",
+        "attemptScheduledTime",
+      ),
+    ),
+    attempt: requiredField(model.attempt, "ActivityEpoch", "attempt"),
   };
 }
 
@@ -876,14 +889,14 @@ export const activityEpochTransferTypeConverter = {
   },
 };
 export interface ClientProducer {
-  epoch?: ClientEpoch;
+  epoch: ClientEpoch;
 }
 
 function clientProducerFromProto(
   proto: temporal.api.stream.v1.IClientProducer,
 ): ClientProducer {
   return {
-    epoch: proto.epoch == null ? undefined : clientEpochFromProto(proto.epoch),
+    epoch: clientEpochFromProto(requiredField(proto.epoch, "ClientProducer", "epoch")),
   };
 }
 
@@ -891,7 +904,7 @@ function clientProducerToProto(
   model: ClientProducer,
 ): temporal.api.stream.v1.IClientProducer {
   return {
-    epoch: model.epoch == null ? undefined : clientEpochToProto(model.epoch),
+    epoch: clientEpochToProto(requiredField(model.epoch, "ClientProducer", "epoch")),
   };
 }
 
@@ -905,18 +918,21 @@ export const clientProducerTransferTypeConverter = {
   },
 };
 export interface ClientEpoch {
-  attempt?: number;
+  /**
+   * 1 or more.
+   */
+  attempt: number;
 }
 
 function clientEpochFromProto(proto: temporal.api.stream.v1.IClientEpoch): ClientEpoch {
   return {
-    attempt: proto.attempt ?? undefined,
+    attempt: requiredField(proto.attempt ?? 0, "ClientEpoch", "attempt"),
   };
 }
 
 function clientEpochToProto(model: ClientEpoch): temporal.api.stream.v1.IClientEpoch {
   return {
-    attempt: model.attempt,
+    attempt: requiredField(model.attempt, "ClientEpoch", "attempt"),
   };
 }
 
@@ -958,7 +974,10 @@ export const closeStreamResponseTransferTypeConverter = {
 };
 export interface CloseStreamRequest<BodyT> {
   ref: StreamRef<BodyT>;
-  writer?: StreamWriter;
+  /**
+   * The Producer that closes the Stream. The helper of each context sets it.
+   */
+  producer: Producer;
 }
 
 function closeStreamRequestFromProto<BodyT>(
@@ -971,7 +990,9 @@ function closeStreamRequestFromProto<BodyT>(
     ref: streamRefFromProto(requiredField(proto.ref, "CloseStreamRequest", "ref"), {
       bodyT: typeInfo.bodyT,
     }),
-    writer: proto.writer == null ? undefined : streamWriterFromProto(proto.writer),
+    producer: producerFromProto(
+      requiredField(proto.producer, "sourced field", "producer"),
+    ),
   };
 }
 
@@ -985,7 +1006,7 @@ function closeStreamRequestToProto<BodyT>(
     ref: streamRefToProto(requiredField(model.ref, "CloseStreamRequest", "ref"), {
       bodyT: typeInfo.bodyT,
     }),
-    writer: model.writer == null ? undefined : streamWriterToProto(model.writer),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 
@@ -1103,10 +1124,6 @@ export function createReadRecordsResponseTransferTypeConverter<BodyT>(
 }
 export interface StreamRecord<BodyT> {
   item?: StreamItem<BodyT>;
-  /**
-   * The place of this item in the Stream. Ordered and unique, with gaps.
-   */
-  offset?: Uint8Array;
 }
 
 function streamRecordFromProto<BodyT>(
@@ -1142,7 +1159,6 @@ function streamRecordFromProto<BodyT>(
   }
   return {
     item: result,
-    offset: proto.offset ?? undefined,
   };
 }
 
@@ -1169,7 +1185,6 @@ function streamRecordToProto<BodyT>(
         throw new Error("invalid oneof tag for StreamRecord.item");
     }
   }
-  proto.offset = model.offset;
   return proto;
 }
 
@@ -1210,6 +1225,10 @@ export interface StreamData<BodyT> {
    */
   body: BodyT;
   producer?: Producer;
+  /**
+   * The place of this Record in the Stream. Ordered and unique, with gaps.
+   */
+  offset: Uint8Array;
 }
 
 function streamDataFromProto<BodyT>(
@@ -1224,6 +1243,11 @@ function streamDataFromProto<BodyT>(
       typeInfo.bodyT,
     ),
     producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
+    offset: requiredField(
+      proto.offset == null || proto.offset.length === 0 ? undefined : proto.offset,
+      "StreamData",
+      "offset",
+    ),
   };
 }
 
@@ -1236,6 +1260,7 @@ function streamDataToProto<BodyT>(
   return {
     body: support.valueToPayload(model.body, typeInfo.bodyT),
     producer: model.producer == null ? undefined : producerToProto(model.producer),
+    offset: requiredField(model.offset, "StreamData", "offset"),
   };
 }
 
@@ -1274,6 +1299,10 @@ export interface StreamClose {
    * Why the Stream closed.
    */
   status?: StreamCloseStatus;
+  /**
+   * The offset after the newest Record. A resume from it has nothing to read.
+   */
+  offset: Uint8Array;
 }
 
 function streamCloseFromProto(proto: temporal.api.stream.v1.IStreamClose): StreamClose {
@@ -1283,6 +1312,11 @@ function streamCloseFromProto(proto: temporal.api.stream.v1.IStreamClose): Strea
       proto.status == null
         ? undefined
         : streamCloseStatusFromNumber(proto.status as number),
+    offset: requiredField(
+      proto.offset == null || proto.offset.length === 0 ? undefined : proto.offset,
+      "StreamClose",
+      "offset",
+    ),
   };
 }
 
@@ -1293,6 +1327,7 @@ function streamCloseToProto(model: StreamClose): temporal.api.stream.v1.IStreamC
       model.status == null
         ? undefined
         : (model.status as number as temporal.api.enums.v1.StreamCloseStatus),
+    offset: requiredField(model.offset, "StreamClose", "offset"),
   };
 }
 

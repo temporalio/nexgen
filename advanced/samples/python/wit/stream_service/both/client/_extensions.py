@@ -156,8 +156,8 @@ class StreamServiceClientExtension(abc.ABC):
         """
         Args:
             id: The Stream id, 1 to 4096 bytes.
-            backend: Registered backend name, empty for the default. Only an SDK reads
-                it.
+            backend: Registered backend name. With none, the SDK picks one. Only an SDK
+                reads it.
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """

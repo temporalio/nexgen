@@ -66,9 +66,8 @@ describe("stream-service generated output", () => {
         {
           item: {
             tag: "data",
-            value: { body: "hi" },
+            value: { body: "hi", offset: _offset(1) },
           },
-          offset: _offset(1),
         },
         {
           item: {
@@ -79,9 +78,9 @@ describe("stream-service generated output", () => {
                 kind: { tag: "workflow", value: { runId: "r1" } },
               },
               status: StreamCloseStatus.StreamCloseStatusClosed,
+              offset: _offset(2),
             },
           },
-          offset: _offset(2),
         },
       ],
       lastOffset: _offset(3),
@@ -106,8 +105,10 @@ describe("stream-service generated output", () => {
       records: [
         {
           item: "data",
-          data: { body: common.defaultPayloadConverter.toPayload({ role: "user" }) },
-          offset: _offset(1),
+          data: {
+            body: common.defaultPayloadConverter.toPayload({ role: "user" }),
+            offset: _offset(1),
+          },
         },
       ],
     };
@@ -124,13 +125,12 @@ describe("stream-service generated output", () => {
 
   test("gives no item for a read record whose item kind only a newer server knows", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
-      records: [{ offset: _offset(1) }],
+      records: [{}],
     };
 
     const model = readRecordsResponseTransferTypeConverter.fromTransferType(proto);
 
     expect(model.records?.[0].item).toBeUndefined();
-    expect(model.records?.[0].offset).toEqual(_offset(1));
   });
 
   test("maps every field of a read request through its proto", () => {
@@ -171,7 +171,7 @@ describe("stream-service generated output", () => {
     const proto = appendRecordsRequestTransferTypeConverter.toTransferType({
       ref: { id: "stream-1" },
       records: ["a", "b"],
-      writer: { producer: { id: "client:sample" } },
+      producer: { id: "client:sample" },
     });
 
     // `append-record` flattens, so the model holds the values and the proto holds the records.

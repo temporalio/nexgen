@@ -68,7 +68,7 @@ class Stream(typing.Generic[BodyT]):
         request = AppendRecordsRequest(
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
-            writer=_support.workflow_writer(),
+            producer=_support.workflow_producer(),
         )
         return await _append_records(request)
 
@@ -78,7 +78,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            writer=_support.workflow_writer(),
+            producer=_support.workflow_producer(),
         )
         handle = await _close_stream(request)
         await handle

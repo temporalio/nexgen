@@ -48,7 +48,7 @@ class CreateStreamRequest(_message.Message):
     """
     @_builtins.property
     def stream_ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream to create. Its id is the Stream id, and is never empty."""
+        """Required. The ref of the Stream to create. Its id is the Stream id, and is never empty."""
 
     def __init__(
         self,
@@ -109,7 +109,7 @@ class AppendRecordsRequest(_message.Message):
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    WRITER_FIELD_NUMBER: _builtins.int
+    PRODUCER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
@@ -124,10 +124,14 @@ class AppendRecordsRequest(_message.Message):
     check, not a guard against a stale attempt, which the epoch fences.
     """
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef: ...
+    def ref(self) -> _message_pb2.StreamRef:
+        """Required."""
+
     @_builtins.property
-    def writer(self) -> _message_pb2.StreamWriter:
-        """Required outside a Workflow. In a Workflow the transport sets it."""
+    def producer(self) -> _message_pb2.Producer:
+        """Required. The Producer of the batch. An append and a close of one Producer carry the same
+        Producer, so the Store orders each write the same way.
+        """
 
     @_builtins.property
     def records(self) -> _containers.RepeatedCompositeFieldContainer[_message_pb2.AppendRecord]: ...
@@ -136,14 +140,14 @@ class AppendRecordsRequest(_message.Message):
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        writer: _message_pb2.StreamWriter | None = ...,
+        producer: _message_pb2.Producer | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer", "ref", b"ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "records", b"records", "ref", b"ref", "sequence", b"sequence", "task_token", b"task_token"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -186,28 +190,30 @@ class CloseStreamRequest(_message.Message):
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
     REF_FIELD_NUMBER: _builtins.int
-    WRITER_FIELD_NUMBER: _builtins.int
+    PRODUCER_FIELD_NUMBER: _builtins.int
     TASK_TOKEN_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     task_token: _builtins.bytes
     """Only read by the server. It checks the token as on the append."""
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef: ...
+    def ref(self) -> _message_pb2.StreamRef:
+        """Required."""
+
     @_builtins.property
-    def writer(self) -> _message_pb2.StreamWriter:
-        """The writer that closes the Stream. A Store reads only its Producer."""
+    def producer(self) -> _message_pb2.Producer:
+        """Required. The Producer that closes the Stream."""
 
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
         ref: _message_pb2.StreamRef | None = ...,
-        writer: _message_pb2.StreamWriter | None = ...,
+        producer: _message_pb2.Producer | None = ...,
         task_token: _builtins.bytes = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "writer", b"writer"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer", "ref", b"ref"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "ref", b"ref", "task_token", b"task_token", "writer", b"writer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "ref", b"ref", "task_token", b"task_token"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -287,7 +293,9 @@ class ReadRecordsRequest(_message.Message):
         aip.dev/not-precedent: The floor is the lowest from_offset of the run's reads. --)
     """
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef: ...
+    def ref(self) -> _message_pb2.StreamRef:
+        """Required."""
+
     @_builtins.property
     def wait(self) -> _duration_pb2.Duration:
         """How long the read waits for a new Record before it answers with an empty page. Empty answers
@@ -379,7 +387,9 @@ class DescribeStreamRequest(_message.Message):
     REF_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef: ...
+    def ref(self) -> _message_pb2.StreamRef:
+        """Required."""
+
     def __init__(
         self,
         *,

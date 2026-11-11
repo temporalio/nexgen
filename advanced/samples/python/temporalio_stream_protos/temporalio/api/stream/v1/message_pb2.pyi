@@ -64,10 +64,14 @@ class WorkflowTaskEpoch(_message.Message):
     ATTEMPT_FIELD_NUMBER: _builtins.int
     STARTED_TIME_FIELD_NUMBER: _builtins.int
     started_event_id: _builtins.int
+    """Required."""
     attempt: _builtins.int
+    """Required. 1 or more."""
     @_builtins.property
     def started_time(self) -> _timestamp_pb2.Timestamp:
-        """Tells a reused started event id apart, for example after a dropped speculative task."""
+        """Tells a reused started event id apart, for example after a dropped speculative task. Core
+        leaves it empty when the server gave the task no started time.
+        """
 
     def __init__(
         self,
@@ -97,10 +101,10 @@ class LocalActivityEpoch(_message.Message):
     TASK_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
     attempt: _builtins.int
-    """The Local Activity's own attempt in that Workflow Task."""
+    """Required. The Local Activity's own attempt in that Workflow Task, 1 or more."""
     @_builtins.property
     def task(self) -> Global___WorkflowTaskEpoch:
-        """The Workflow Task attempt that dispatched the Local Activity."""
+        """Required. The Workflow Task attempt that dispatched the Local Activity."""
 
     def __init__(
         self,
@@ -127,10 +131,11 @@ class ActivityEpoch(_message.Message):
     ATTEMPT_SCHEDULED_TIME_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
     attempt: _builtins.int
+    """Required. 1 or more."""
     @_builtins.property
     def attempt_scheduled_time(self) -> _timestamp_pb2.Timestamp:
-        """When the server scheduled this attempt. An Activity reset starts the attempt count again,
-        so only this time orders the attempts across a reset.
+        """Required. When the server scheduled this attempt. An Activity reset starts the attempt count
+        again, so only this time orders the attempts across a reset.
         """
 
     def __init__(
@@ -159,6 +164,7 @@ class ClientEpoch(_message.Message):
 
     ATTEMPT_FIELD_NUMBER: _builtins.int
     attempt: _builtins.int
+    """Required. 1 or more."""
     def __init__(
         self,
         *,
@@ -183,9 +189,11 @@ class WorkflowProducer(_message.Message):
     RUN_ID_FIELD_NUMBER: _builtins.int
     EPOCH_FIELD_NUMBER: _builtins.int
     run_id: _builtins.str
-    """The run id of the Workflow run, not of its chain. Each run is its own Producer."""
+    """Required. The run id of the Workflow run, not of its chain. Each run is its own Producer."""
     @_builtins.property
-    def epoch(self) -> Global___WorkflowTaskEpoch: ...
+    def epoch(self) -> Global___WorkflowTaskEpoch:
+        """A Workflow Producer only closes a Stream, and its close sends no epoch."""
+
     def __init__(
         self,
         *,
@@ -211,9 +219,11 @@ class LocalActivityProducer(_message.Message):
     RUN_ID_FIELD_NUMBER: _builtins.int
     EPOCH_FIELD_NUMBER: _builtins.int
     run_id: _builtins.str
-    """The run id of the Workflow run."""
+    """Required. The run id of the Workflow run."""
     @_builtins.property
-    def epoch(self) -> Global___LocalActivityEpoch: ...
+    def epoch(self) -> Global___LocalActivityEpoch:
+        """Required."""
+
     def __init__(
         self,
         *,
@@ -244,7 +254,9 @@ class ActivityProducer(_message.Message):
     Activity, whose own run id is in the Producer id.
     """
     @_builtins.property
-    def epoch(self) -> Global___ActivityEpoch: ...
+    def epoch(self) -> Global___ActivityEpoch:
+        """Required."""
+
     def __init__(
         self,
         *,
@@ -270,7 +282,9 @@ class ClientProducer(_message.Message):
 
     EPOCH_FIELD_NUMBER: _builtins.int
     @_builtins.property
-    def epoch(self) -> Global___ClientEpoch: ...
+    def epoch(self) -> Global___ClientEpoch:
+        """Required."""
+
     def __init__(
         self,
         *,
@@ -302,8 +316,8 @@ class Producer(_message.Message):
     STANDALONE_ACTIVITY_FIELD_NUMBER: _builtins.int
     CLIENT_FIELD_NUMBER: _builtins.int
     id: _builtins.str
-    """Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run. It is
-    unique in one Stream, and a Stream is in one namespace, so it carries no namespace.
+    """Required. Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run.
+    It is unique in one Stream, so it carries no namespace.
     """
     @_builtins.property
     def workflow(self) -> Global___WorkflowProducer: ...
@@ -342,33 +356,6 @@ class Producer(_message.Message):
 Global___Producer: _TypeAlias = Producer  # noqa: Y015
 
 @_typing.final
-class StreamWriter(_message.Message):
-    """Experimental. Might change in the future.
-    The Producer of a write. An append and a close carry the same writer, so the Store orders each
-    write the same way.
-    """
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    PRODUCER_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def producer(self) -> Global___Producer:
-        """Required on a write."""
-
-    def __init__(
-        self,
-        *,
-        producer: Global___Producer | None = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___StreamWriter: _TypeAlias = StreamWriter  # noqa: Y015
-
-@_typing.final
 class AppendRecord(_message.Message):
     """Experimental. Might change in the future.
     One Record of a batch to append. The Store adds the batch's Producer and an offset.
@@ -402,6 +389,12 @@ class StreamData(_message.Message):
 
     PRODUCER_FIELD_NUMBER: _builtins.int
     BODY_FIELD_NUMBER: _builtins.int
+    OFFSET_FIELD_NUMBER: _builtins.int
+    offset: _builtins.bytes
+    """Required. The Record's offset. An offset is ordered and unique in one Stream, and it is
+    sparse. Offsets have gaps, so they don't count Records. An offset is never empty. A read
+    gives its Stream, so the read checks the offset against that Stream.
+    """
     @_builtins.property
     def producer(self) -> Global___Producer: ...
     @_builtins.property
@@ -411,10 +404,11 @@ class StreamData(_message.Message):
         *,
         producer: Global___Producer | None = ...,
         body: _message_pb2.Payload | None = ...,
+        offset: _builtins.bytes = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["body", b"body", "producer", b"producer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["body", b"body", "producer", b"producer"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["body", b"body", "offset", b"offset", "producer", b"producer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -432,8 +426,13 @@ class StreamClose(_message.Message):
 
     PRODUCER_FIELD_NUMBER: _builtins.int
     STATUS_FIELD_NUMBER: _builtins.int
+    OFFSET_FIELD_NUMBER: _builtins.int
     status: _stream_pb2.StreamCloseStatus.ValueType
     """Why the Stream closed."""
+    offset: _builtins.bytes
+    """Required. The offset after the newest Record, so a reader that resumes from it has nothing
+    left to read.
+    """
     @_builtins.property
     def producer(self) -> Global___Producer:
         """The Producer that closed the Stream."""
@@ -443,10 +442,11 @@ class StreamClose(_message.Message):
         *,
         producer: Global___Producer | None = ...,
         status: _stream_pb2.StreamCloseStatus.ValueType = ...,
+        offset: _builtins.bytes = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer", "status", b"status"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["offset", b"offset", "producer", b"producer", "status", b"status"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -455,17 +455,13 @@ Global___StreamClose: _TypeAlias = StreamClose  # noqa: Y015
 @_typing.final
 class StreamRecord(_message.Message):
     """Experimental. Might change in the future.
-    An offset is ordered and unique in one Stream, and it is sparse. Offsets have gaps, so they
-    don't count Records. An offset is never empty. A read gives its Stream, so the read checks the
-    offset against that Stream.
+    One item that a read gives. Each item carries its own offset.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    OFFSET_FIELD_NUMBER: _builtins.int
     DATA_FIELD_NUMBER: _builtins.int
     CLOSE_FIELD_NUMBER: _builtins.int
-    offset: _builtins.bytes
     @_builtins.property
     def data(self) -> Global___StreamData: ...
     @_builtins.property
@@ -473,13 +469,12 @@ class StreamRecord(_message.Message):
     def __init__(
         self,
         *,
-        offset: _builtins.bytes = ...,
         data: Global___StreamData | None = ...,
         close: Global___StreamClose | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item", "offset", b"offset"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType_item: _TypeAlias = _typing.Literal["data", "close"]  # noqa: Y015
     _WhichOneofArgType_item: _TypeAlias = _typing.Literal["item", b"item"]  # noqa: Y015

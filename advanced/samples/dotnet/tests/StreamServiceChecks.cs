@@ -51,16 +51,15 @@ namespace Nexgen.DotNetExamples.Tests
                 new StreamServiceExample.StreamRecord<Turn>
                 {
                     Item = new StreamServiceExample.StreamItem<Turn>.Close(
-                        new StreamServiceExample.StreamClose
+                        new StreamServiceExample.StreamClose(new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 })
                         {
                             Producer = new StreamServiceExample.Producer("wf:r1")
                             {
                                 Kind = new StreamServiceExample.ProducerKind.Workflow(
-                                    new StreamServiceExample.WorkflowProducer { RunId = "r1" }),
+                                    new StreamServiceExample.WorkflowProducer("r1")),
                             },
                             Status = StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
                         }),
-                    Offset = new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 },
                 },
             });
 
@@ -79,7 +78,7 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(
                 StreamServiceExample.StreamCloseStatus.StreamCloseStatusClosed,
                 close.Value.Status);
-            Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 }, decoded.Records[0].Offset);
+            Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 }, close.Value.Offset);
         }
 
         // The from-offset case of the read position is a proto `bytes` member of a oneof.

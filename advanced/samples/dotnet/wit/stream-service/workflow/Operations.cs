@@ -31,7 +31,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// Registered backend name, empty for the default. Only an SDK reads it.
+        /// Registered backend name. With none, the SDK picks one. Only an SDK reads it.
         /// </summary>
         public string? Backend { get; set; }
         /// <summary>
@@ -173,7 +173,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Writer())
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer())
             {
                 Sequence = options.Sequence,
             };
@@ -193,7 +193,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
         {
-            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Writer());
+            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Producer());
             return CloseStreamAsync(request);
         }
 

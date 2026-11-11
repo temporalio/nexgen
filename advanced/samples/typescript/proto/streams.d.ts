@@ -97,22 +97,20 @@ declare module "@temporalio/proto" {
         | "standaloneActivity"
         | "client";
     }
-    interface IStreamWriter {
-      producer?: temporal.api.stream.v1.IProducer | null;
-    }
     interface IAppendRecord {
       body?: temporal.api.common.v1.IPayload | null;
     }
     interface IStreamData {
       producer?: temporal.api.stream.v1.IProducer | null;
       body?: temporal.api.common.v1.IPayload | null;
+      offset?: Uint8Array | null;
     }
     interface IStreamClose {
       producer?: temporal.api.stream.v1.IProducer | null;
       status?: temporal.api.enums.v1.StreamCloseStatus | null;
+      offset?: Uint8Array | null;
     }
     interface IStreamRecord {
-      offset?: Uint8Array | null;
       data?: temporal.api.stream.v1.IStreamData | null;
       close?: temporal.api.stream.v1.IStreamClose | null;
       item?: "data" | "close";
@@ -137,7 +135,7 @@ declare module "@temporalio/proto" {
     interface IAppendRecordsRequest {
       namespace?: string | null;
       ref?: temporal.api.stream.v1.IStreamRef | null;
-      writer?: temporal.api.stream.v1.IStreamWriter | null;
+      producer?: temporal.api.stream.v1.IProducer | null;
       sequence?: Long | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
       taskToken?: Uint8Array | null;
@@ -149,7 +147,7 @@ declare module "@temporalio/proto" {
     interface ICloseStreamRequest {
       namespace?: string | null;
       ref?: temporal.api.stream.v1.IStreamRef | null;
-      writer?: temporal.api.stream.v1.IStreamWriter | null;
+      producer?: temporal.api.stream.v1.IProducer | null;
       taskToken?: Uint8Array | null;
     }
     interface ICloseStreamResponse {}

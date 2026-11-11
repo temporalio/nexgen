@@ -15,35 +15,41 @@ def _models() -> typing.Any:
     return importlib.import_module("wit.stream_service.both.models")
 
 
-def workflow_writer() -> typing.Any:
+def workflow_producer() -> typing.Any:
     """The run's Workflow Producer."""
     models = _models()
     run_id = temporalio.workflow.info().run_id
-    return models.StreamWriter(
-        producer=models.Producer(
-            id=f"wf:{run_id}",
-            kind=models.ProducerKindWorkflow(models.WorkflowProducer(run_id=run_id)),
-        ),
+    return models.Producer(
+        id=f"wf:{run_id}",
+        kind=models.ProducerKindWorkflow(models.WorkflowProducer(run_id=run_id)),
     )
 
 
-def client_writer() -> typing.Any:
+def client_producer() -> typing.Any:
     """An Activity's attempt, or a client."""
     models = _models()
     if temporalio.activity.in_activity():
         info = temporalio.activity.info()
-        producer = models.Producer(
+        scheduled = info.current_attempt_scheduled_time.timestamp()
+        epoch = models.ActivityEpoch(
+            attempt_scheduled_time=models.Timestamp(
+                seconds=int(scheduled), nanos=round(scheduled % 1 * 1e9)
+            ),
+            attempt=info.attempt,
+        )
+        return models.Producer(
             id=f"act:{info.workflow_run_id}:{info.activity_id}",
             kind=models.ProducerKindWorkflowActivity(
-                models.ActivityProducer(run_id=info.workflow_run_id)
+                models.ActivityProducer(run_id=info.workflow_run_id, epoch=epoch)
             ),
         )
-    else:
-        producer = models.Producer(
-            id="client:sample",
-            kind=models.ProducerKindClient(models.ClientProducer()),
-        )
-    return models.StreamWriter(producer=producer)
+    # The sample client never restarts under the same name, so its first attempt is its only one.
+    return models.Producer(
+        id="client:sample",
+        kind=models.ProducerKindClient(
+            models.ClientProducer(epoch=models.ClientEpoch(attempt=1))
+        ),
+    )
 
 
 def last_offset(response: typing.Any) -> bytes:
