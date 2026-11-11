@@ -22,6 +22,7 @@ of `@nexus` directives.
   - [Resource Declaration](#resource-declaration)
   - [Name-Binding: How Resource Methods Find Operations](#name-binding-how-resource-methods-find-operations)
   - [Resource Return Binding](#resource-return-binding)
+  - [Closing a Resource](#closing-a-resource)
   - [Variadic Items](#variadic-items)
   - [Edge Cases and Error Conditions](#edge-cases-and-error-conditions)
 - [Proto-Backed Models](#proto-backed-models)
@@ -838,6 +839,27 @@ record create-job-result {
 result = await handle  # CreateJobResponse
 return CreateJobResult(job=Job(job_id=result.job_id), created=result.created)
 ```
+
+### Closing a Resource
+
+`@nexus.close` marks the method that ends a resource. In Python, the end of an
+`async with` block calls it with no arguments, so its parameters must be
+optional.
+
+```wit
+/// @nexus.operation "close-stream"
+/// @nexus.close
+close: func();
+```
+
+```python
+async with client.create_stream(id="turns", body_type=Turn) as stream:
+    await stream.publish(records=[AppendRecord(body=Turn(role="user"))])
+```
+
+A call that returns the resource returns a `ResourceCall`, such as
+`ResourceCall[Stream[Turn]]`. Await it for the resource, or enter it with
+`async with`. Only Python closes a resource this way.
 
 ### Variadic Items
 
@@ -1816,6 +1838,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
 | `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
+| `@nexus.close`                          | resource method                                                                               |
 | `@nexus.varargs`                        | resource method                                                                               |
 
 <!-- annotation-placements:end -->
@@ -2599,6 +2622,15 @@ These are Temporal payload headers inside the operation request, not Nexus
 transport headers. The directive does not enable inbound extraction or response
 propagation. Use `go=` in multi-language inputs to keep it inactive for other
 backends.
+
+---
+
+### @nexus.close
+
+**Placement:** Resource method **Syntax:** `@nexus.close` (no arguments)
+
+Marks the method that ends the resource. Its parameters must be optional. See
+[Closing a Resource](#closing-a-resource).
 
 ---
 

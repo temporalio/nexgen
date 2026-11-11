@@ -116,6 +116,7 @@ pub(crate) struct ResolvedResourceSpec {
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -371,6 +372,7 @@ fn resolve_resource_methods(
         type_parameters: Vec::new(),
         fields: resource.fields.clone(),
         methods,
+        close: resource.close.clone(),
     })
 }
 
@@ -460,6 +462,15 @@ fn resolve_resource_method(
     }
 
     let binding = match matching_operations.len() {
+        // A stub close method would fail at the end of each scope.
+        0 if resource.close.as_deref() == Some(method.name.as_str()) => {
+            return Err(Error::InvalidResourceMethod {
+                service: service.name.clone(),
+                resource: resource.name.to_upper_camel_case(),
+                method: method.name.to_string(),
+                reason: "has `@nexus.close`, but binds to no operation".to_string(),
+            });
+        }
         0 => ResolvedResourceMethodBinding::Stub,
         1 => {
             let (operation_name, request_plan) = matching_operations.pop().expect("len checked");

@@ -356,6 +356,18 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "close",
+            sites: &[Method],
+            keys: &[],
+            language_keys: &[],
+            repeatable: false,
+            // The `async with` close is Python-only today. This stays `None` because a language
+            // list makes the generator reject the directive for the other languages in the shared
+            // stream-service WIT, instead of ignoring it.
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "varargs",
             sites: &[Method],
             keys: &["value"],

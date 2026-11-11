@@ -2958,17 +2958,28 @@ fn build_resource(
         None => Vec::new(),
     };
 
-    let methods = interface
-        .functions
-        .values()
-        .filter(|function| {
-            matches!(
-                function.kind,
-                FunctionKind::Method(id) | FunctionKind::AsyncMethod(id) if id == resource_id
-            )
-        })
-        .map(|function| build_resource_method(resolve, function, path, &context, language))
-        .collect::<Result<Vec<_>>>()?;
+    let mut close = None;
+    let mut methods = Vec::new();
+    for function in interface.functions.values().filter(|function| {
+        matches!(
+            function.kind,
+            FunctionKind::Method(id) | FunctionKind::AsyncMethod(id) if id == resource_id
+        )
+    }) {
+        let (method, closes) = build_resource_method(resolve, function, path, &context, language)?;
+        if closes {
+            if close.is_some() {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context,
+                    directive: "@nexus.close".to_string(),
+                    reason: "marks more than one method of the resource".to_string(),
+                });
+            }
+            close = Some(method.name.clone());
+        }
+        methods.push(method);
+    }
 
     for function in interface.functions.values() {
         match function.kind {
@@ -2990,17 +3001,19 @@ fn build_resource(
         doc,
         fields,
         methods,
+        close,
         data: (),
     })
 }
 
+/// The flag says whether this method carries `@nexus.close`. The resource records which one.
 fn build_resource_method(
     resolve: &Resolve,
     function: &Function,
     path: &Path,
     resource_context: &str,
     language: Language,
-) -> Result<ResourceMethodSpec> {
+) -> Result<(ResourceMethodSpec, bool)> {
     let method_name = function
         .name
         .rsplit('.')
@@ -3033,9 +3046,10 @@ fn build_resource_method(
         .as_ref()
         .map(|ty| build_resource_result(resolve, ty, path, &context, language))
         .transpose()?;
+    let close = build_resource_method_close(&params, &directives, path, &context)?;
     let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
 
-    Ok(ResourceMethodSpec {
+    let method = ResourceMethodSpec {
         name: method_name,
         doc: directive(&directives, "doc", path, &context)?
             .map(directive_language_string)
@@ -3044,7 +3058,32 @@ fn build_resource_method(
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
         varargs,
-    })
+    };
+    Ok((method, close))
+}
+
+/// A scope's end calls the close method with no arguments, so its parameters must be optional.
+fn build_resource_method_close(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<bool> {
+    if directive(directives, "close", path, context)?.is_none() {
+        return Ok(false);
+    }
+    if let Some(param) = params.iter().find(|param| !param.optional) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.close".to_string(),
+            reason: format!(
+                "needs optional parameters, but `{}` is required",
+                param.name
+            ),
+        });
+    }
+    Ok(true)
 }
 
 fn build_resource_method_varargs(

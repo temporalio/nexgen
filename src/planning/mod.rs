@@ -171,6 +171,8 @@ pub(crate) struct PlannedResource {
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
+    /// The method the end of an `async with` block calls, from `@nexus.close`.
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
