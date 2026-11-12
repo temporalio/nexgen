@@ -41,7 +41,7 @@ export class Stream<BodyT = unknown> {
   }
 
   public async read(
-    fromOffset?: number[],
+    fromOffset?: Uint8Array,
     maxRecords?: number,
     wait?: common.Duration,
     maxBytes?: number,

@@ -588,7 +588,8 @@ their API fields do not gain implicit constructor defaults.
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
 Write a `bytes` member of a oneof the same way, as the case payload of a variant
-with `@nexus.proto`. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
+with `@nexus.proto`. A resource method parameter of `list<u8>` that fills such a
+field is `bytes` too. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
 Go `[]byte`, or .NET `byte[]`. The .NET converters translate between `byte[]`
 and protobuf `ByteString` at the wire boundary. In other records, `list<u8>` is
 a list of integers, like any other `list<T>`.

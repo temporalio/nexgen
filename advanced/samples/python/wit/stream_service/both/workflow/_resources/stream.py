@@ -84,7 +84,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        from_offset: list[int] | None = None,
+        from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
