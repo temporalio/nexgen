@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use indexmap::IndexMap;
@@ -689,6 +689,10 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub context_propagation_header: F::Text,
     /// The `@nexus.poll` settings. None when the operation has no poll.
     pub poll: Option<OperationPollSpec<F>>,
+    /// Targets whose public top-level operation function `@nexus.api-omit` suppresses. The
+    /// operation stays registered, in the service, and bindable by resource methods. Empty
+    /// keeps the function on every target.
+    pub api_omitted: BTreeSet<GenerationTarget>,
     pub data: F::OperationData,
 }
 
@@ -727,6 +731,7 @@ impl<F: TypeFamily> OperationSpec<F> {
             serialization_context: map.map_text(self.serialization_context),
             context_propagation_header: map.map_text(self.context_propagation_header),
             poll: self.poll.map(|poll| poll.map_names_with(map)),
+            api_omitted: self.api_omitted,
             data,
         }
     }
