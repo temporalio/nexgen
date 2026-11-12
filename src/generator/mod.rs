@@ -1091,11 +1091,8 @@ interface stream-service {
   record read-records-request {
     /// @nexus.omit
     ref: placeholder,
-    /// @nexus.name typescript="offset"
-    /// @nexus.source targets="workflow" typescript="startOffset()"
-    from-offset: option<s64>,
     /// @nexus.omit
-    start: placeholder,
+    position: placeholder,
     max-records: option<s32>,
     /// @nexus.omit
     wait: placeholder,
@@ -1103,8 +1100,9 @@ interface stream-service {
     create-wait: placeholder,
     /// @nexus.omit
     last: placeholder,
-    /// @nexus.omit
-    max-bytes: placeholder,
+    /// @nexus.name typescript="limit"
+    /// @nexus.source targets="workflow" typescript="startLimit()"
+    max-bytes: option<s64>,
     /// @nexus.omit
     namespace: placeholder,
     /// @nexus.omit
@@ -1120,7 +1118,7 @@ interface stream-service {
 "#;
         let typescript = workflow_files(Language::TypeScript, wit);
         let models = &typescript[&PathBuf::from("models.ts")];
-        assert!(models.contains("offset?: Long;"), "{models}");
-        assert!(models.contains("fromOffset: model.offset"), "{models}");
+        assert!(models.contains("limit?: Long;"), "{models}");
+        assert!(models.contains("maxBytes: model.limit"), "{models}");
     }
 }

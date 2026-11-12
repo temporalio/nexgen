@@ -69,6 +69,21 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
+    /// Where a read starts, after an offset, or at the beginning or the end.
+    /// </summary>
+    [GeneratedCode("nexgen", null)]
+    public abstract record ReadPosition
+    {
+        private ReadPosition() { }
+
+        [GeneratedCode("nexgen", null)]
+        public sealed record FromOffset(byte[] Value) : ReadPosition;
+
+        [GeneratedCode("nexgen", null)]
+        public sealed record Start(StreamReadStart Value) : ReadPosition;
+    }
+
+    /// <summary>
     /// A read item: a Record or a Superseded item. A close writes no item.
     /// </summary>
     [GeneratedCode("nexgen", null)]
@@ -275,25 +290,25 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsResponse"/> class.
         /// </summary>
-        public AppendRecordsResponse(long firstOffset, long lastOffset)
+        public AppendRecordsResponse(byte[] firstOffset, byte[] lastOffset)
         {
             FirstOffset = firstOffset;
             LastOffset = lastOffset;
         }
 
-        public long FirstOffset { get; init; }
-        public long LastOffset { get; init; }
+        public byte[] FirstOffset { get; init; }
+        public byte[] LastOffset { get; init; }
 
         internal static AppendRecordsResponse FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsResponse wire)
         {
-            return new AppendRecordsResponse(wire.FirstOffset, wire.LastOffset);
+            return new AppendRecordsResponse(wire.FirstOffset.ToByteArray(), wire.LastOffset.ToByteArray());
         }
 
         internal Temporalio.Api.StreamService.V1.AppendRecordsResponse ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsResponse();
-            proto.FirstOffset = FirstOffset;
-            proto.LastOffset = LastOffset;
+            proto.FirstOffset = Google.Protobuf.ByteString.CopyFrom(FirstOffset);
+            proto.LastOffset = Google.Protobuf.ByteString.CopyFrom(LastOffset);
             return proto;
         }
 
@@ -627,7 +642,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// The newest offset, of a Record or a Superseded item. Empty for none.
         /// </summary>
-        public long? LastOffset { get; init; }
+        public byte[]? LastOffset { get; init; }
         public System.TimeSpan? Retention { get; init; }
 
         internal static DescribeStreamResponse FromTransferType(Temporalio.Api.StreamService.V1.DescribeStreamResponse wire)
@@ -635,7 +650,7 @@ namespace Temporalio.Workflows
             return new DescribeStreamResponse()
             {
                 Status = (int)wire.Status == 0 ? null : (System.Enum.IsDefined(typeof(StreamStatus), (int)wire.Status) ? (StreamStatus)wire.Status : StreamStatus.StreamStatusUnspecified),
-                LastOffset = wire.LastOffset == 0 ? null : wire.LastOffset,
+                LastOffset = wire.LastOffset.ToByteArray(),
                 Retention = wire.Retention == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Retention),
             };
         }
@@ -649,7 +664,7 @@ namespace Temporalio.Workflows
             }
             if (LastOffset is { } lastOffset)
             {
-                proto.LastOffset = lastOffset;
+                proto.LastOffset = Google.Protobuf.ByteString.CopyFrom(lastOffset);
             }
             if (Retention is { } retention)
             {
@@ -944,7 +959,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Read Records from an offset.
+    /// Read Records from a position.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ReadRecordsRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -960,13 +975,9 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// Start offset. Empty uses start. An offset past the newest one + 1 fails.
+        /// Where the read starts. Unset is the beginning. A too high offset fails.
         /// </summary>
-        public long? FromOffset { get; init; }
-        /// <summary>
-        /// Where to start when from-offset is empty. Unspecified is the beginning.
-        /// </summary>
-        public StreamReadStart? Start { get; init; }
+        public ReadPosition? Position { get; init; }
         /// <summary>
         /// About this many items per page, 1 to 1000. A Superseded item stays with its Record.
         /// </summary>
@@ -980,7 +991,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public System.TimeSpan? CreateWait { get; init; }
         /// <summary>
-        /// Read the newest this many Records, oldest first. No from-offset. No wait.
+        /// Read the newest this many Records, oldest first. No position. No wait.
         /// </summary>
         public int? Last { get; init; }
         /// <summary>
@@ -990,10 +1001,23 @@ namespace Temporalio.Workflows
 
         internal static ReadRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsRequest wire)
         {
+            ReadPosition? positionOneof;
+            switch (wire.PositionCase)
+            {
+                case Temporalio.Api.StreamService.V1.ReadRecordsRequest.PositionOneofCase.FromOffset:
+                    positionOneof = new ReadPosition.FromOffset(wire.FromOffset.ToByteArray());
+                    break;
+                case Temporalio.Api.StreamService.V1.ReadRecordsRequest.PositionOneofCase.Start:
+                    positionOneof = new ReadPosition.Start((StreamReadStart)wire.Start);
+                    break;
+                default:
+                    positionOneof = null;
+                    break;
+            }
+
             return new ReadRecordsRequest<TBody>(StreamRef<TBody>.FromTransferType(wire.Ref))
             {
-                FromOffset = wire.FromOffset == 0 ? null : wire.FromOffset,
-                Start = (int)wire.Start == 0 ? null : (StreamReadStart)wire.Start,
+                Position = positionOneof,
                 MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
                 Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
                 CreateWait = wire.CreateWait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.CreateWait),
@@ -1006,13 +1030,14 @@ namespace Temporalio.Workflows
         {
             var proto = new Temporalio.Api.StreamService.V1.ReadRecordsRequest();
             proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)Ref.ToTransferType();
-            if (FromOffset is { } fromOffset)
+            switch (Position)
             {
-                proto.FromOffset = fromOffset;
-            }
-            if (Start is { } start)
-            {
-                proto.Start = (Temporalio.Api.Enums.V1.StreamReadStart)start;
+                case ReadPosition.FromOffset fromOffsetCase:
+                    proto.FromOffset = Google.Protobuf.ByteString.CopyFrom(fromOffsetCase.Value);
+                    break;
+                case ReadPosition.Start startCase:
+                    proto.Start = (Temporalio.Api.Enums.V1.StreamReadStart)startCase.Value;
+                    break;
             }
             if (MaxRecords is { } maxRecords)
             {
@@ -1068,9 +1093,9 @@ namespace Temporalio.Workflows
 
         public IReadOnlyList<StreamRecord<TBody>> Records { get; init; }
         /// <summary>
-        /// The from-offset of the next read, which is the newest offset read + 1.
+        /// The from-offset of the next read, which is the newest offset read.
         /// </summary>
-        public long? NextOffset { get; init; }
+        public byte[]? NextOffset { get; init; }
         /// <summary>
         /// True when the Stream is closed and this read gave its last item.
         /// </summary>
@@ -1080,7 +1105,7 @@ namespace Temporalio.Workflows
         {
             return new ReadRecordsResponse<TBody>(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => StreamRecord<TBody>.FromTransferType(item))))
             {
-                NextOffset = wire.NextOffset == 0 ? null : wire.NextOffset,
+                NextOffset = wire.NextOffset.ToByteArray(),
                 Done = wire.Done == false ? null : wire.Done,
             };
         }
@@ -1091,7 +1116,7 @@ namespace Temporalio.Workflows
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.StreamRecord)item.ToTransferType()));
             if (NextOffset is { } nextOffset)
             {
-                proto.NextOffset = nextOffset;
+                proto.NextOffset = Google.Protobuf.ByteString.CopyFrom(nextOffset);
             }
             if (Done is { } done)
             {
@@ -1190,7 +1215,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// The place of this item in the Stream. Ordered and unique, with gaps.
         /// </summary>
-        public long? Offset { get; init; }
+        public byte[]? Offset { get; init; }
 
         internal static StreamRecord<TBody> FromTransferType(Temporalio.Api.Stream.V1.StreamRecord wire)
         {
@@ -1211,7 +1236,7 @@ namespace Temporalio.Workflows
             return new StreamRecord<TBody>()
             {
                 Item = itemOneof,
-                Offset = wire.Offset == 0 ? null : wire.Offset,
+                Offset = wire.Offset.ToByteArray(),
             };
         }
 
@@ -1229,7 +1254,7 @@ namespace Temporalio.Workflows
             }
             if (Offset is { } offset)
             {
-                proto.Offset = offset;
+                proto.Offset = Google.Protobuf.ByteString.CopyFrom(offset);
             }
             return proto;
         }

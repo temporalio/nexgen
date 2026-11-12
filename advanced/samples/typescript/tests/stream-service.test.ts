@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type CreateStreamRequest,
+  type ReadRecordsRequest,
   type ReadRecordsResponse,
   type StreamRef,
+  StreamReadStart,
   StreamStatus,
   appendRecordsRequestTransferTypeConverter,
   createCreateStreamRequestTransferTypeConverter,
@@ -15,6 +17,12 @@ import {
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
+function _offset(n: number): Uint8Array {
+  // Big-endian bytes, so a bytes compare keeps the int order these tests assert.
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setBigUint64(0, BigInt(n));
+  return bytes;
+}
 
 class Turn {
   constructor(readonly role: string) {}
@@ -61,17 +69,17 @@ describe("stream-service generated output", () => {
             tag: "data",
             value: { body: "hi" },
           },
-          offset: Long.fromNumber(1),
+          offset: _offset(1),
         },
         {
           item: {
             tag: "superseded",
             value: { producerId: "workflow-1", failedTasks: [Long.fromNumber(7)] },
           },
-          offset: Long.fromNumber(2),
+          offset: _offset(2),
         },
       ],
-      nextOffset: Long.fromNumber(3),
+      nextOffset: _offset(3),
       done: true,
     };
 
@@ -92,7 +100,7 @@ describe("stream-service generated output", () => {
         {
           item: "data",
           data: { body: common.defaultPayloadConverter.toPayload({ role: "user" }) },
-          offset: Long.fromNumber(1),
+          offset: _offset(1),
         },
       ],
     };
@@ -109,19 +117,20 @@ describe("stream-service generated output", () => {
 
   test("gives no item for a read record whose item kind only a newer server knows", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
-      records: [{ offset: Long.fromNumber(1) }],
+      records: [{ offset: _offset(1) }],
     };
 
     const model = readRecordsResponseTransferTypeConverter.fromTransferType(proto);
 
     expect(model.records?.[0].item).toBeUndefined();
-    expect(model.records?.[0].offset?.toNumber()).toBe(1);
+    expect(model.records?.[0].offset).toEqual(_offset(1));
   });
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
       ref: { id: "stream-1", owner: { businessId: "workflow-1" } },
-      fromOffset: Long.fromNumber(7),
+      position: "fromOffset",
+      fromOffset: _offset(7),
       maxRecords: 10,
     };
 
@@ -129,11 +138,27 @@ describe("stream-service generated output", () => {
 
     expect(model.ref.id).toBe("stream-1");
     expect(model.ref.owner?.businessId).toBe("workflow-1");
-    expect(model.fromOffset?.toNumber()).toBe(7);
+    expect(model.position).toEqual({ tag: "from-offset", value: _offset(7) });
     expect(model.maxRecords).toBe(10);
-    expect(readRecordsRequestTransferTypeConverter.toTransferType(model).ref?.id).toBe(
-      "stream-1",
-    );
+    const wire = readRecordsRequestTransferTypeConverter.toTransferType(model);
+    expect(wire.ref?.id).toBe("stream-1");
+    expect(wire.position).toBe("fromOffset");
+    expect(wire.fromOffset).toEqual(_offset(7));
+  });
+
+  test("maps the start case of a read position through the proto oneof", () => {
+    const request: ReadRecordsRequest<string> = {
+      ref: { id: "stream-1" },
+      position: { tag: "start", value: StreamReadStart.StreamReadStartEnd },
+    };
+
+    const wire = readRecordsRequestTransferTypeConverter.toTransferType(request);
+
+    expect(wire.position).toBe("start");
+    expect(wire.start).toBe(StreamReadStart.StreamReadStartEnd);
+    expect(
+      readRecordsRequestTransferTypeConverter.fromTransferType(wire).position,
+    ).toEqual(request.position);
   });
 
   test("wraps each value of an append in its record on the wire", () => {

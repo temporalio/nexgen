@@ -101,13 +101,9 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; set; }
         /// <summary>
-        /// Start offset. Empty uses start. An offset past the newest one + 1 fails.
+        /// Where the read starts. Unset is the beginning. A too high offset fails.
         /// </summary>
-        public long? FromOffset { get; set; }
-        /// <summary>
-        /// Where to start when from-offset is empty. Unspecified is the beginning.
-        /// </summary>
-        public StreamReadStart? Start { get; set; }
+        public ReadPosition? Position { get; set; }
         /// <summary>
         /// About this many items per page, 1 to 1000. A Superseded item stays with its Record.
         /// </summary>
@@ -217,7 +213,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
         /// </summary>
-        /// <param name="request">Read Records from an offset.</param>
+        /// <param name="request">Read Records from a position.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsRequest<TBody> request)
         {
@@ -229,14 +225,13 @@ namespace Temporalio.Workflows
         /// <summary>
         /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
         /// </summary>
-        /// <param name="options">Read Records from an offset.</param>
+        /// <param name="options">Read Records from a position.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsOptions<TBody> options)
         {
             var request = new ReadRecordsRequest<TBody>(options.Ref)
             {
-                FromOffset = options.FromOffset,
-                Start = options.Start,
+                Position = options.Position,
                 MaxRecords = options.MaxRecords,
                 Wait = options.Wait,
                 CreateWait = options.CreateWait,

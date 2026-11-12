@@ -99,7 +99,7 @@ declare module "@temporalio/proto" {
       body?: temporal.api.common.v1.IPayload | null;
     }
     interface IStreamRecord {
-      offset?: Long | null;
+      offset?: Uint8Array | null;
       data?: temporal.api.stream.v1.IStreamData | null;
       superseded?: temporal.api.stream.v1.IStreamSuperseded | null;
       item?: "data" | "superseded";
@@ -139,8 +139,8 @@ declare module "@temporalio/proto" {
       taskToken?: Uint8Array | null;
     }
     interface IAppendRecordsResponse {
-      firstOffset?: Long | null;
-      lastOffset?: Long | null;
+      firstOffset?: Uint8Array | null;
+      lastOffset?: Uint8Array | null;
     }
     interface ICloseStreamRequest {
       namespace?: string | null;
@@ -155,20 +155,21 @@ declare module "@temporalio/proto" {
     interface IReadRecordsRequest {
       namespace?: string | null;
       ref?: temporal.api.stream.v1.IStreamRef | null;
-      fromOffset?: Long | null;
+      fromOffset?: Uint8Array | null;
       start?: temporal.api.enums.v1.StreamReadStart | null;
       maxRecords?: number | null;
       wait?: google.protobuf.IDuration | null;
       createWait?: google.protobuf.IDuration | null;
-      toOffset?: Long | null;
+      toOffset?: Uint8Array | null;
       wakeOnly?: boolean | null;
       last?: number | null;
       maxBytes?: Long | null;
-      floorFrom?: Long | null;
+      floorFrom?: Uint8Array | null;
+      position?: "fromOffset" | "start";
     }
     interface IReadRecordsResponse {
       records?: temporal.api.stream.v1.IStreamRecord[] | null;
-      nextOffset?: Long | null;
+      nextOffset?: Uint8Array | null;
       done?: boolean | null;
       continueAsNewSuggested?: boolean | null;
     }
@@ -178,7 +179,7 @@ declare module "@temporalio/proto" {
     }
     interface IDescribeStreamResponse {
       status?: temporal.api.enums.v1.StreamStatus | null;
-      lastOffset?: Long | null;
+      lastOffset?: Uint8Array | null;
       retention?: google.protobuf.IDuration | null;
     }
   }

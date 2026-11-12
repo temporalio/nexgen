@@ -520,7 +520,7 @@ impl<'a> TypePlanningContext<'a> {
         planned_spec
     }
 
-    // `map_names` keeps a oneof case payload as its proto message. Re-plan it as the bound record.
+    // `map_names` keeps a oneof case payload as its proto type. Re-plan a bound record or enum.
     fn resolve_planned_variant_case_types(
         &mut self,
         source_spec: &ApiSpec<OperationLoweredFamily>,
@@ -547,7 +547,9 @@ impl<'a> TypePlanningContext<'a> {
                 else {
                     continue;
                 };
-                if self.spec.record_for_proto(proto_name.as_str()).is_none() {
+                if self.spec.record_for_proto(proto_name.as_str()).is_none()
+                    && self.spec.enum_for_proto(proto_name.as_str()).is_none()
+                {
                     continue;
                 }
                 let record = self.planned_type_from_authored(payload);

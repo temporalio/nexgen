@@ -381,8 +381,8 @@ Global___StreamData: _TypeAlias = StreamData  # noqa: Y015
 class StreamRecord(_message.Message):
     """Experimental. Might change in the future.
     An offset is ordered and unique in one Stream, and it is sparse. Offsets have gaps, so they
-    don't count Records. Zero is never an offset. A read gives its Stream, so the read checks the
-    offset against that Stream.
+    don't count Records. Empty bytes are never an offset. A read gives its Stream, so the read
+    checks the offset against that Stream.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -390,7 +390,7 @@ class StreamRecord(_message.Message):
     OFFSET_FIELD_NUMBER: _builtins.int
     DATA_FIELD_NUMBER: _builtins.int
     SUPERSEDED_FIELD_NUMBER: _builtins.int
-    offset: _builtins.int
+    offset: _builtins.bytes
     @_builtins.property
     def data(self) -> Global___StreamData: ...
     @_builtins.property
@@ -403,7 +403,7 @@ class StreamRecord(_message.Message):
     def __init__(
         self,
         *,
-        offset: _builtins.int = ...,
+        offset: _builtins.bytes = ...,
         data: Global___StreamData | None = ...,
         superseded: Global___StreamSuperseded | None = ...,
     ) -> None: ...

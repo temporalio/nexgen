@@ -7,7 +7,7 @@ use heck::{ToKebabCase, ToUpperCamelCase};
 use prost_types::FieldDescriptorProto;
 use prost_types::field_descriptor_proto::Type;
 
-use crate::descriptors::DescriptorIndex;
+use crate::descriptors::{DescriptorIndex, real_oneof_groups};
 use crate::error::{Error, Result};
 use crate::spec::{
     ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, JsonModelSpec, OperationSpec,
@@ -748,14 +748,39 @@ fn all_message_fields(
         .ok_or_else(|| Error::UnknownTypeOverride {
             type_name: message_name.to_string(),
         })?;
-    message
-        .descriptor
-        .field
-        .iter()
-        .map(|field| {
-            build_message_field_info(field, spec.record_for_proto(message_name), descriptors)
-        })
-        .collect()
+    let record = spec.record_for_proto(message_name);
+    // A record holds a proto oneof as one field named after the oneof, so a method parameter
+    // binds to that field and not to the oneof's members.
+    let mut grouped = BTreeMap::new();
+    if let Some(record) = record {
+        let groups =
+            real_oneof_groups(message).map_err(|reason| Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: "<oneof>".to_string(),
+                property: "oneof",
+                reason,
+            })?;
+        for group in groups {
+            if let Some(field) = record.fields.get(group.name) {
+                for (index, _) in group.fields {
+                    grouped.insert(index, (group.name, field));
+                }
+            }
+        }
+    }
+    let mut emitted = BTreeSet::new();
+    let mut fields = Vec::new();
+    for (index, field) in message.descriptor.field.iter().enumerate() {
+        match grouped.get(&index) {
+            Some((oneof_name, record_field)) => {
+                if emitted.insert(*oneof_name) {
+                    fields.push(build_record_field_info(oneof_name, record_field, spec)?);
+                }
+            }
+            None => fields.push(build_message_field_info(field, record, descriptors)?),
+        }
+    }
+    Ok(fields)
 }
 
 fn all_record_fields(
@@ -1402,6 +1427,81 @@ interface user-service {
             method.binding,
             ResolvedResourceMethodBinding::Stub
         ));
+    }
+
+    #[test]
+    fn binds_a_method_parameter_to_the_record_field_of_a_proto_oneof() {
+        let wit = r#"
+package test:oneof@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  /// @nexus.proto "temporal.api.workflowservice.v1.PauseActivityRequest.activity"
+  variant activity-selection {
+    id(string),
+    %type(string),
+  }
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.PauseActivityRequest"
+  record pause-activity-request {
+    namespace: string,
+    execution: option<workflow-execution>,
+    identity: option<string>,
+    activity: option<activity-selection>,
+    reason: option<string>,
+    request-id: option<string>,
+  }
+
+  resource activities {
+    constructor(namespace: string);
+    pause: func(activity: option<activity-selection>);
+  }
+
+  pause: func(request: pause-activity-request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let resolved = resolve_service_resources(
+            &spec,
+            &spec.services[0],
+            &descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
+
+        let ResolvedResourceMethodBinding::Operation { request_plan, .. } =
+            &resolved.resources[0].methods[0].binding
+        else {
+            panic!("pause should bind to its operation");
+        };
+        let RequestPlan::Construct { fields, .. } = request_plan else {
+            panic!("the request plan should construct the request");
+        };
+        assert_eq!(
+            fields
+                .iter()
+                .map(|field| (field.field_name.as_str(), &field.value))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "namespace",
+                    &RequestPlan::Source(RequestPlanSource::ResourceField("namespace".to_string()))
+                ),
+                (
+                    "activity",
+                    &RequestPlan::Source(RequestPlanSource::MethodParam("activity".to_string()))
+                ),
+            ]
+        );
     }
 
     #[test]
