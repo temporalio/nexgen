@@ -22,7 +22,8 @@ DESCRIPTOR: _descriptor.FileDescriptor
 @_typing.final
 class StreamRef(_message.Message):
     """Experimental. Might change in the future.
-    Identifies one Stream. The id is opaque to callers.
+    Identifies one Stream. The id is opaque to callers. A Stream has no incarnations. A create of a
+    closed or expired Stream fails, and it doesn't make a second Stream with the same id.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -33,8 +34,9 @@ class StreamRef(_message.Message):
     backend: _builtins.str
     """The name of the backend that holds the Stream, as the Worker and client config register
     it, so every process routes a ref it receives. With no name, the SDK picks the backend from
-    its config. Only an SDK reads it. A request carries the whole ref, and the server and a
-    Store ignore this field.
+    its config. Only an SDK sets and reads it, since only the SDK knows the name that its config
+    gives a backend. A request carries the whole ref, and the server and a Store ignore this
+    field.
     """
     def __init__(
         self,
@@ -154,32 +156,6 @@ class ActivityEpoch(_message.Message):
 Global___ActivityEpoch: _TypeAlias = ActivityEpoch  # noqa: Y015
 
 @_typing.final
-class ClientEpoch(_message.Message):
-    """Experimental. Might change in the future.
-    The attempt of a client Producer, which the client picks. A client that runs the same work
-    again under one Producer name stores this number and raises it at each start. A client with no
-    name of its own is a new Producer in each process, so nothing fences or supersedes it.
-    """
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    ATTEMPT_FIELD_NUMBER: _builtins.int
-    attempt: _builtins.int
-    """Required. 1 or more."""
-    def __init__(
-        self,
-        *,
-        attempt: _builtins.int = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___ClientEpoch: _TypeAlias = ClientEpoch  # noqa: Y015
-
-@_typing.final
 class WorkflowProducer(_message.Message):
     """Experimental. Might change in the future.
     A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
@@ -278,24 +254,18 @@ Global___ActivityProducer: _TypeAlias = ActivityProducer  # noqa: Y015
 @_typing.final
 class ClientProducer(_message.Message):
     """Experimental. Might change in the future.
-    A client Producer. A client has no run.
+    A client Producer. A client has no run and no epoch. So nothing fences a client's writes, and a
+    reader never hides them.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    EPOCH_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def epoch(self) -> Global___ClientEpoch:
-        """Required."""
-
     def __init__(
         self,
-        *,
-        epoch: Global___ClientEpoch | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -307,8 +277,9 @@ class Producer(_message.Message):
     The code that wrote a batch, which is one unit of work. Its id stays the same across attempts,
     and an epoch is one attempt. The kind's case orders its epochs. After a write of a higher epoch,
     a write of a lower epoch of the same Producer fails with FENCED, and a reader may hide the
-    Records of the lower epoch. The rule is the same for every kind. The epochs of two Producers
-    never compare. A run-based kind carries its run, so a client can't.
+    Records of the lower epoch. The rule is the same for every kind that has an epoch. A client has
+    none. The epochs of two Producers never compare. A new run has new Producers, so no write
+    fences or supersedes the Records of an earlier run, such as the base run of a reset.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -321,7 +292,8 @@ class Producer(_message.Message):
     CLIENT_FIELD_NUMBER: _builtins.int
     id: _builtins.str
     """Required. Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run.
-    It is unique in one Stream, so it carries no namespace.
+    It is unique in one Stream. The id of a run-based kind has its run id, so it stays unique
+    when Producers of more than one namespace write to one Stream.
     """
     @_builtins.property
     def workflow(self) -> Global___WorkflowProducer: ...
@@ -386,9 +358,10 @@ class AppendRecord(_message.Message):
 Global___AppendRecord: _TypeAlias = AppendRecord  # noqa: Y015
 
 @_typing.final
-class StreamData(_message.Message):
+class StreamRecord(_message.Message):
     """Experimental. Might change in the future.
-    One Record that a Producer appended.
+    One Record that a Producer appended, as a read gives it. A read gives only Records. A close
+    stores no Record, so a read tells of it with the done flag of its response.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -417,72 +390,6 @@ class StreamData(_message.Message):
     _ClearFieldArgType: _TypeAlias = _typing.Literal["body", b"body", "offset", b"offset", "producer", b"producer"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___StreamData: _TypeAlias = StreamData  # noqa: Y015
-
-@_typing.final
-class StreamClose(_message.Message):
-    """Experimental. Might change in the future.
-    The close of a Stream, as a read item. A close is its own call and stores no Record. A read
-    builds this item from the close state of the Stream and returns it last, so a reader learns in
-    order that the Stream ended, who closed it and why.
-    """
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    PRODUCER_FIELD_NUMBER: _builtins.int
-    STATUS_FIELD_NUMBER: _builtins.int
-    OFFSET_FIELD_NUMBER: _builtins.int
-    status: _stream_pb2.StreamCloseStatus.ValueType
-    """Why the Stream closed."""
-    offset: _builtins.bytes
-    """Required. Where the Stream ended."""
-    @_builtins.property
-    def producer(self) -> Global___Producer:
-        """The Producer that closed the Stream."""
-
-    def __init__(
-        self,
-        *,
-        producer: Global___Producer | None = ...,
-        status: _stream_pb2.StreamCloseStatus.ValueType = ...,
-        offset: _builtins.bytes = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["offset", b"offset", "producer", b"producer", "status", b"status"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___StreamClose: _TypeAlias = StreamClose  # noqa: Y015
-
-@_typing.final
-class StreamRecord(_message.Message):
-    """Experimental. Might change in the future.
-    One item that a read gives. Each item carries its own offset.
-    """
-
-    DESCRIPTOR: _descriptor.Descriptor
-
-    DATA_FIELD_NUMBER: _builtins.int
-    CLOSE_FIELD_NUMBER: _builtins.int
-    @_builtins.property
-    def data(self) -> Global___StreamData: ...
-    @_builtins.property
-    def close(self) -> Global___StreamClose: ...
-    def __init__(
-        self,
-        *,
-        data: Global___StreamData | None = ...,
-        close: Global___StreamClose | None = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item"]  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["close", b"close", "data", b"data", "item", b"item"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    _WhichOneofReturnType_item: _TypeAlias = _typing.Literal["data", "close"]  # noqa: Y015
-    _WhichOneofArgType_item: _TypeAlias = _typing.Literal["item", b"item"]  # noqa: Y015
-    def WhichOneof(self, oneof_group: _WhichOneofArgType_item) -> _WhichOneofReturnType_item | None: ...
 
 Global___StreamRecord: _TypeAlias = StreamRecord  # noqa: Y015
 

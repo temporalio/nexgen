@@ -40,47 +40,6 @@ STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
 STREAM_STATUS_EXPIRED: StreamStatus.ValueType  # 3
 Global___StreamStatus: _TypeAlias = StreamStatus  # noqa: Y015
 
-class _StreamCloseStatus:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
-
-class _StreamCloseStatusEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamCloseStatus.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
-    STREAM_CLOSE_STATUS_UNSPECIFIED: _StreamCloseStatus.ValueType  # 0
-    STREAM_CLOSE_STATUS_CLOSED: _StreamCloseStatus.ValueType  # 1
-
-class StreamCloseStatus(_StreamCloseStatus, metaclass=_StreamCloseStatusEnumTypeWrapper):
-    """Experimental. Might change in the future.
-    How a Stream closed. CLOSED comes from a Producer that called close(). Native Streams add their
-    own close statuses later.
-    (-- api-linter: core::0216::synonyms=disabled
-        aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-    """
-
-STREAM_CLOSE_STATUS_UNSPECIFIED: StreamCloseStatus.ValueType  # 0
-STREAM_CLOSE_STATUS_CLOSED: StreamCloseStatus.ValueType  # 1
-Global___StreamCloseStatus: _TypeAlias = StreamCloseStatus  # noqa: Y015
-
-class _StreamReadStart:
-    ValueType = _typing.NewType("ValueType", _builtins.int)
-    V: _TypeAlias = ValueType  # noqa: Y015
-
-class _StreamReadStartEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_StreamReadStart.ValueType], _builtins.type):
-    DESCRIPTOR: _descriptor.EnumDescriptor
-    STREAM_READ_START_UNSPECIFIED: _StreamReadStart.ValueType  # 0
-    STREAM_READ_START_BEGINNING: _StreamReadStart.ValueType  # 1
-    STREAM_READ_START_END: _StreamReadStart.ValueType  # 2
-
-class StreamReadStart(_StreamReadStart, metaclass=_StreamReadStartEnumTypeWrapper):
-    """Experimental. Might change in the future.
-    Where a read starts when it has no from_offset.
-    """
-
-STREAM_READ_START_UNSPECIFIED: StreamReadStart.ValueType  # 0
-STREAM_READ_START_BEGINNING: StreamReadStart.ValueType  # 1
-STREAM_READ_START_END: StreamReadStart.ValueType  # 2
-Global___StreamReadStart: _TypeAlias = StreamReadStart  # noqa: Y015
-
 class _StreamIdConflictPolicy:
     ValueType = _typing.NewType("ValueType", _builtins.int)
     V: _TypeAlias = ValueType  # noqa: Y015

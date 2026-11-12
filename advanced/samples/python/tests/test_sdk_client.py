@@ -41,7 +41,6 @@ from wit.stream_service.both.models import (
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
-    ClientEpoch,
     ClientProducer,
     CloseStreamRequest,
     CloseStreamResponse,
@@ -52,14 +51,8 @@ from wit.stream_service.both.models import (
     Producer,
     ProducerKindClient,
     ProducerKindWorkflowActivity,
-    ReadPosition,
-    ReadPositionFromOffset,
-    ReadPositionStart,
     ReadRecordsRequest,
     ReadRecordsResponse,
-    StreamData,
-    StreamItemData,
-    StreamReadStart,
     StreamRecord,
     StreamRef,
     Timestamp,
@@ -80,7 +73,7 @@ SYSTEM_CONVERTER = temporalio.nexus.system._SystemNexusPayloadConverter(
 # The Producer that the sample's `client_producer()` source gives outside an Activity.
 CLIENT_PRODUCER = Producer(
     id="client:sample",
-    kind=ProducerKindClient(ClientProducer(epoch=ClientEpoch(attempt=1))),
+    kind=ProducerKindClient(ClientProducer()),
 )
 
 
@@ -90,18 +83,7 @@ def _offset(n: int) -> bytes:
 
 
 def _record(n: int) -> StreamRecord[str]:
-    # The offset is on the item, so a test record carries a data item.
-    return StreamRecord[str](
-        item=StreamItemData(StreamData[str](body=f"r{n}", offset=_offset(n)))
-    )
-
-
-def _offset_of(record: StreamRecord[typing.Any]) -> bytes | None:
-    return None if record.item is None else record.item.value.offset
-
-
-def _after(n: int) -> ReadPositionFromOffset:
-    return ReadPositionFromOffset(_offset(n))
+    return StreamRecord[str](body=f"r{n}", offset=_offset(n))
 
 
 @dataclasses.dataclass
@@ -293,13 +275,8 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
             "CreateStream": CreateStreamResult(ref=ref),
             "ReadRecords": SYSTEM_CONVERTER.to_payload(
                 ReadRecordsResponse[Turn](
-                    records=[
-                        StreamRecord(
-                            item=StreamItemData(
-                                StreamData(body=Turn(role="model"), offset=_offset(1))
-                            )
-                        )
-                    ]
+                    records=[StreamRecord(body=Turn(role="model"), offset=_offset(1))],
+                    done=False,
                 )
             ),
         },
@@ -312,9 +289,7 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
 
     page = await stream.read()
 
-    item = page.records[0].item
-    assert isinstance(item, StreamItemData)
-    assert item.value.body == {"role": "model"}
+    assert page.records[0].body == {"role": "model"}
 
 
 async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
@@ -632,18 +607,19 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
                 _record(2),
             ],
             last_offset=_offset(3),
+            done=False,
         ),
-        ReadRecordsResponse[str](records=[], last_offset=_offset(3)),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(3), done=False),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = [page async for page in stream.iter_read(position=_after(1))]
+    read = [page async for page in stream.iter_read(from_offset=_offset(1))]
 
     assert read == pages
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(1)),
-        ReadRecordsRequest(ref=ref, position=_after(3)),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1)),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(3)),
     ]
     # The iteration uses one Nexus client, and each page is a new operation.
     assert len(client.created_clients) == 1
@@ -654,29 +630,33 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
     pages = [
-        ReadRecordsResponse[str](records=[_record(1)], last_offset=_offset(2)),
-        ReadRecordsResponse[str](records=[], last_offset=_offset(2)),
+        ReadRecordsResponse[str](
+            records=[_record(1)], last_offset=_offset(2), done=False
+        ),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(2), done=False),
         ReadRecordsResponse[str](records=[], done=True),
     ]
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = [page async for page in stream.iter_read(position=_after(1), wait=wait)]
+    read = [page async for page in stream.iter_read(from_offset=_offset(1), wait=wait)]
 
     assert read == pages
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(1), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(2), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(2), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(2), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(2), wait=wait),
     ]
 
 
-async def test_a_stream_read_from_the_end_resumes_after_its_first_last_offset() -> None:
+async def test_a_read_from_the_beginning_resumes_after_its_first_last_offset() -> None:
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
     pages = [
-        ReadRecordsResponse[str](records=[], last_offset=_offset(5)),
-        ReadRecordsResponse[str](records=[_record(5)], last_offset=_offset(6)),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(5), done=False),
+        ReadRecordsResponse[str](
+            records=[_record(5)], last_offset=_offset(6), done=False
+        ),
         ReadRecordsResponse[str](records=[], done=True),
     ]
     client, answers = connect(
@@ -685,22 +665,13 @@ async def test_a_stream_read_from_the_end_resumes_after_its_first_last_offset() 
     )
     stream = await client.create_stream(id="s1", body_type=str)
 
-    read = [
-        page
-        async for page in stream.iter_read(
-            position=ReadPositionStart(StreamReadStart.StreamReadStartEnd), wait=wait
-        )
-    ]
+    read = [page async for page in stream.iter_read(wait=wait)]
 
     assert read == pages
     assert [started.arg for started in answers.started[1:]] == [
-        ReadRecordsRequest(
-            ref=ref,
-            position=ReadPositionStart(StreamReadStart.StreamReadStartEnd),
-            wait=wait,
-        ),
-        ReadRecordsRequest(ref=ref, position=_after(5), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(6), wait=wait),
+        ReadRecordsRequest(ref=ref, wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(5), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(6), wait=wait),
     ]
     # The handle reads on the Nexus client of its create.
     assert len(client.created_clients) == 1
@@ -732,8 +703,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
         {
             "ReadRecords": [
                 ReadRecordsResponse[str](
-                    records=[_record(1)],
-                    last_offset=_offset(2),
+                    records=[_record(1)], last_offset=_offset(2), done=False
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
             ]
@@ -741,12 +711,12 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    async for page in stream.iter_read(position=_after(1), wait=wait):
+    async for page in stream.iter_read(from_offset=_offset(1), wait=wait):
         page.last_offset = _offset(9)
 
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(1), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(2), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(2), wait=wait),
     ]
 
 
@@ -763,8 +733,11 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
                         _record(12),
                     ],
                     last_offset=_offset(12),
+                    done=False,
                 ),
-                ReadRecordsResponse[str](records=[], last_offset=_offset(12)),
+                ReadRecordsResponse[str](
+                    records=[], last_offset=_offset(12), done=False
+                ),
                 ReadRecordsResponse[str](
                     records=[_record(20)],
                     last_offset=_offset(20),
@@ -775,25 +748,25 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(position=_after(10), wait=wait)
-    seen: list[tuple[bytes | None, ReadPosition | None]] = []
+    read = stream.iter_read_items(from_offset=_offset(10), wait=wait)
+    seen: list[tuple[bytes, bytes | None]] = []
     async for record in read:
         seen.append(
-            (_offset_of(record), read.next_request and read.next_request.position)
+            (record.offset, read.next_request and read.next_request.from_offset)
         )
 
     # A from-offset is exclusive, so after a Record the read resumes after that Record's own
     # offset. After a page's last Record, it goes on after the page's newest offset.
     assert seen == [
-        (_offset(10), _after(10)),
-        (_offset(12), _after(12)),
+        (_offset(10), _offset(10)),
+        (_offset(12), _offset(12)),
         (_offset(20), None),
     ]
     assert read.next_request is None
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(10), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(12), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(12), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(10), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(12), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(12), wait=wait),
     ]
 
 
@@ -809,6 +782,7 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
                         _record(2),
                     ],
                     last_offset=_offset(2),
+                    done=False,
                 ),
                 ReadRecordsResponse[str](
                     records=[_record(2)],
@@ -820,18 +794,18 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(position=_after(1))
+    read = stream.iter_read_items(from_offset=_offset(1))
     first = await anext(read)
     saved = read.next_request
-    assert _offset_of(first) == _offset(1)
+    assert first.offset == _offset(1)
     assert saved is not None
 
-    resumed = stream.iter_read_items(position=saved.position)
+    resumed = stream.iter_read_items(from_offset=saved.from_offset)
 
-    assert [_offset_of(record) async for record in resumed] == [_offset(2)]
+    assert [record.offset async for record in resumed] == [_offset(2)]
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(1)),
-        ReadRecordsRequest(ref=ref, position=_after(1)),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1)),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1)),
     ]
 
 
@@ -848,6 +822,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
                         _record(2),
                     ],
                     last_offset=_offset(2),
+                    done=False,
                 ),
                 ReadRecordsResponse[str](records=[], done=True),
             ]
@@ -855,17 +830,16 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(position=_after(1), wait=wait)
-    next_positions: list[ReadPosition | None] = []
+    read = stream.iter_read_items(from_offset=_offset(1), wait=wait)
+    next_offsets: list[bytes | None] = []
     async for record in read:
-        assert isinstance(record.item, StreamItemData)
-        record.item.value.offset = _offset(9)
-        next_positions.append(read.next_request and read.next_request.position)
+        record.offset = _offset(9)
+        next_offsets.append(read.next_request and read.next_request.from_offset)
 
-    assert next_positions == [_after(1), _after(2)]
+    assert next_offsets == [_offset(1), _offset(2)]
     assert [started.arg for started in answers.started] == [
-        ReadRecordsRequest(ref=ref, position=_after(1), wait=wait),
-        ReadRecordsRequest(ref=ref, position=_after(2), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(1), wait=wait),
+        ReadRecordsRequest(ref=ref, from_offset=_offset(2), wait=wait),
     ]
 
 
@@ -925,9 +899,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     construction: str,
 ) -> None:
     ref = StreamRef[Turn](id="s1")
-    record = StreamRecord(
-        item=StreamItemData(StreamData(body=Turn(role="model"), offset=_offset(1)))
-    )
+    record = StreamRecord(body=Turn(role="model"), offset=_offset(1))
     client, _ = connect(
         Client,
         {
@@ -961,9 +933,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
 
 
 def turn_pages() -> Payload:
-    record = StreamRecord(
-        item=StreamItemData(StreamData(body=Turn(role="model"), offset=_offset(1)))
-    )
+    record = StreamRecord(body=Turn(role="model"), offset=_offset(1))
     return SYSTEM_CONVERTER.to_payload(
         ReadRecordsResponse[Turn](records=[record], done=True)
     )
@@ -995,9 +965,7 @@ async def test_a_typed_ref_round_trips_into_a_typed_handle() -> None:
     # The ref of a created handle keeps its type argument too.
     assert client.get_stream(created.ref).body_type is Turn
     [record] = (await stream.read()).records
-    assert record.item == StreamItemData(
-        StreamData(body=Turn(role="model"), offset=_offset(1))
-    )
+    assert record == StreamRecord(body=Turn(role="model"), offset=_offset(1))
 
 
 async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
@@ -1017,13 +985,9 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     assert client.get_stream(typed, body_type=Turn).ref is typed
     [typed_record] = (await typed_stream.read()).records
     [plain_record] = (await plain_stream.read()).records
-    assert typed_record.item == StreamItemData(
-        StreamData(body=Turn(role="model"), offset=_offset(1))
-    )
+    assert typed_record == StreamRecord(body=Turn(role="model"), offset=_offset(1))
     # An unknown payload stays a decoded dict.
-    assert plain_record.item == StreamItemData(
-        StreamData(body={"role": "model"}, offset=_offset(1))
-    )
+    assert plain_record == StreamRecord(body={"role": "model"}, offset=_offset(1))
     # An explicit body_type overrides a ref with no type argument, positionally or by keyword.
     override = client.get_stream(plain, body_type=Turn)
     _ = assert_type(override, Stream[Turn])

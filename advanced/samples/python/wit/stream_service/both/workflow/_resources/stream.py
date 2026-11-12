@@ -17,7 +17,6 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRef,
@@ -85,7 +84,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        position: ReadPosition | None = None,
+        from_offset: list[int] | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
@@ -93,7 +92,7 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            position=position,
+            from_offset=from_offset,
             max_records=max_records,
             wait=wait,
             max_bytes=max_bytes,
@@ -104,7 +103,7 @@ class Stream(typing.Generic[BodyT]):
     async def describe(
         self,
     ) -> DescribeStreamResponse:
-        """Describe the Stream's status, newest offset and Retention."""
+        """Describe the Stream's status and newest offset."""
         request = DescribeStreamRequest(
             ref=self.ref,
         )

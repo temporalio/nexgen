@@ -22,25 +22,6 @@ export enum StreamIdConflictPolicy {
   StreamIdConflictPolicyUseExisting = 2,
 }
 
-export enum StreamCloseStatus {
-  StreamCloseStatusUnspecified = 0,
-  StreamCloseStatusClosed = 1,
-}
-
-function streamCloseStatusFromNumber(value: number): StreamCloseStatus {
-  if (value in StreamCloseStatus) {
-    return value as StreamCloseStatus;
-  }
-  // A newer peer can send a case that this enum doesn't know.
-  return StreamCloseStatus.StreamCloseStatusUnspecified;
-}
-
-export enum StreamReadStart {
-  StreamReadStartUnspecified = 0,
-  StreamReadStartBeginning = 1,
-  StreamReadStartEnd = 2,
-}
-
 export enum StreamStatus {
   StreamStatusUnspecified = 0,
   StreamStatusOpen = 1,
@@ -65,20 +46,6 @@ export type ProducerKind =
   | { tag: "workflow-activity"; value: ActivityProducer }
   | { tag: "standalone-activity"; value: ActivityProducer }
   | { tag: "client"; value: ClientProducer };
-
-/**
- * A read item: a Record or the close.
- */
-export type StreamItem<BodyT> =
-  | { tag: "data"; value: StreamData<BodyT> }
-  | { tag: "close"; value: StreamClose };
-
-/**
- * Where a read starts, after an offset, or at the beginning or the end.
- */
-export type ReadPosition =
-  | { tag: "from-offset"; value: Uint8Array }
-  | { tag: "start"; value: StreamReadStart };
 
 export interface CreateStreamResult<BodyT> {
   ref?: StreamRef<BodyT>;
@@ -888,24 +855,18 @@ export const activityEpochTransferTypeConverter = {
     return activityEpochToProto(value);
   },
 };
-export interface ClientProducer {
-  epoch: ClientEpoch;
-}
+export type ClientProducer = Record<string, never>;
 
 function clientProducerFromProto(
   proto: temporal.api.stream.v1.IClientProducer,
 ): ClientProducer {
-  return {
-    epoch: clientEpochFromProto(requiredField(proto.epoch, "ClientProducer", "epoch")),
-  };
+  return {};
 }
 
 function clientProducerToProto(
   model: ClientProducer,
 ): temporal.api.stream.v1.IClientProducer {
-  return {
-    epoch: clientEpochToProto(requiredField(model.epoch, "ClientProducer", "epoch")),
-  };
+  return {};
 }
 
 export const clientProducerTransferTypeConverter = {
@@ -915,34 +876,6 @@ export const clientProducerTransferTypeConverter = {
 
   toTransferType(value: ClientProducer): temporal.api.stream.v1.IClientProducer {
     return clientProducerToProto(value);
-  },
-};
-export interface ClientEpoch {
-  /**
-   * 1 or more.
-   */
-  attempt: number;
-}
-
-function clientEpochFromProto(proto: temporal.api.stream.v1.IClientEpoch): ClientEpoch {
-  return {
-    attempt: requiredField(proto.attempt ?? 0, "ClientEpoch", "attempt"),
-  };
-}
-
-function clientEpochToProto(model: ClientEpoch): temporal.api.stream.v1.IClientEpoch {
-  return {
-    attempt: requiredField(model.attempt, "ClientEpoch", "attempt"),
-  };
-}
-
-export const clientEpochTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IClientEpoch): ClientEpoch {
-    return clientEpochFromProto(value);
-  },
-
-  toTransferType(value: ClientEpoch): temporal.api.stream.v1.IClientEpoch {
-    return clientEpochToProto(value);
   },
 };
 export type CloseStreamResponse = Record<string, never>;
@@ -1048,9 +981,9 @@ export interface ReadRecordsResponse<BodyT> {
    */
   lastOffset?: Uint8Array;
   /**
-   * True when the Stream is closed and this read gave its last item.
+   * True when the Stream is closed and this read gave its last Record.
    */
-  done?: boolean;
+  done: boolean;
 }
 
 function readRecordsResponseFromProto<BodyT>(
@@ -1068,7 +1001,7 @@ function readRecordsResponseFromProto<BodyT>(
       "records",
     ),
     lastOffset: proto.lastOffset ?? undefined,
-    done: proto.done ?? undefined,
+    done: requiredField(proto.done ?? false, "ReadRecordsResponse", "done"),
   };
 }
 
@@ -1087,7 +1020,7 @@ function readRecordsResponseToProto<BodyT>(
       "records",
     ),
     lastOffset: model.lastOffset,
-    done: model.done,
+    done: requiredField(model.done, "ReadRecordsResponse", "done"),
   };
 }
 
@@ -1123,7 +1056,15 @@ export function createReadRecordsResponseTransferTypeConverter<BodyT>(
   };
 }
 export interface StreamRecord<BodyT> {
-  item?: StreamItem<BodyT>;
+  /**
+   * The value.
+   */
+  body: BodyT;
+  producer?: Producer;
+  /**
+   * The place of this Record in the Stream. Ordered and unique, with gaps.
+   */
+  offset: Uint8Array;
 }
 
 function streamRecordFromProto<BodyT>(
@@ -1132,33 +1073,17 @@ function streamRecordFromProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): StreamRecord<BodyT> {
-  let result: StreamItem<BodyT> | undefined;
-  switch (proto.item) {
-    case "data":
-      result = {
-        tag: "data",
-        value: streamDataFromProto(requiredField(proto.data, "StreamRecord", "data"), {
-          bodyT: typeInfo.bodyT,
-        }),
-      };
-      break;
-    case "close":
-      result = {
-        tag: "close",
-        value: streamCloseFromProto(
-          requiredField(proto.close, "StreamRecord", "close"),
-        ),
-      };
-      break;
-    case undefined:
-      result = undefined;
-      break;
-    default:
-      proto.item satisfies never;
-      throw new Error("invalid oneof discriminator for StreamRecord.item");
-  }
   return {
-    item: result,
+    body: support.payloadToValue<BodyT>(
+      requiredField(proto.body, "StreamRecord", "body"),
+      typeInfo.bodyT,
+    ),
+    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
+    offset: requiredField(
+      proto.offset == null || proto.offset.length === 0 ? undefined : proto.offset,
+      "StreamRecord",
+      "offset",
+    ),
   };
 }
 
@@ -1168,24 +1093,11 @@ function streamRecordToProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): temporal.api.stream.v1.IStreamRecord {
-  const proto: temporal.api.stream.v1.IStreamRecord = {};
-  const result = model.item;
-  if (result != null) {
-    switch (result.tag) {
-      case "data":
-        proto.item = "data";
-        proto.data = streamDataToProto(result.value, { bodyT: typeInfo.bodyT });
-        break;
-      case "close":
-        proto.item = "close";
-        proto.close = streamCloseToProto(result.value);
-        break;
-      default:
-        result satisfies never;
-        throw new Error("invalid oneof tag for StreamRecord.item");
-    }
-  }
-  return proto;
+  return {
+    body: support.valueToPayload(model.body, typeInfo.bodyT),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
+    offset: requiredField(model.offset, "StreamRecord", "offset"),
+  };
 }
 
 export const streamRecordTransferTypeConverter = {
@@ -1219,135 +1131,14 @@ export function createStreamRecordTransferTypeConverter<BodyT>(
     },
   };
 }
-export interface StreamData<BodyT> {
-  /**
-   * The value.
-   */
-  body: BodyT;
-  producer?: Producer;
-  /**
-   * The place of this Record in the Stream. Ordered and unique, with gaps.
-   */
-  offset: Uint8Array;
-}
-
-function streamDataFromProto<BodyT>(
-  proto: temporal.api.stream.v1.IStreamData,
-  typeInfo: {
-    bodyT?: common.TypeInfo<BodyT, any>;
-  } = {},
-): StreamData<BodyT> {
-  return {
-    body: support.payloadToValue<BodyT>(
-      requiredField(proto.body, "StreamData", "body"),
-      typeInfo.bodyT,
-    ),
-    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
-    offset: requiredField(
-      proto.offset == null || proto.offset.length === 0 ? undefined : proto.offset,
-      "StreamData",
-      "offset",
-    ),
-  };
-}
-
-function streamDataToProto<BodyT>(
-  model: StreamData<BodyT>,
-  typeInfo: {
-    bodyT?: common.TypeInfo<BodyT, any>;
-  } = {},
-): temporal.api.stream.v1.IStreamData {
-  return {
-    body: support.valueToPayload(model.body, typeInfo.bodyT),
-    producer: model.producer == null ? undefined : producerToProto(model.producer),
-    offset: requiredField(model.offset, "StreamData", "offset"),
-  };
-}
-
-export const streamDataTransferTypeConverter = {
-  fromTransferType<BodyT>(
-    value: temporal.api.stream.v1.IStreamData,
-  ): StreamData<BodyT> {
-    return streamDataFromProto<BodyT>(value);
-  },
-
-  toTransferType<BodyT>(value: StreamData<BodyT>): temporal.api.stream.v1.IStreamData {
-    return streamDataToProto(value);
-  },
-};
-
-export function createStreamDataTransferTypeConverter<BodyT>(
-  typeInfo: {
-    bodyT?: common.TypeInfo<BodyT, any>;
-  } = {},
-): common.TransferTypeConverter<StreamData<BodyT>, temporal.api.stream.v1.IStreamData> {
-  return {
-    fromTransferType(value) {
-      return streamDataFromProto<BodyT>(value, typeInfo);
-    },
-    toTransferType(value) {
-      return streamDataToProto(value, typeInfo);
-    },
-  };
-}
-export interface StreamClose {
-  /**
-   * The Producer that closed the Stream.
-   */
-  producer?: Producer;
-  /**
-   * Why the Stream closed.
-   */
-  status?: StreamCloseStatus;
-  /**
-   * Where the Stream ended.
-   */
-  offset: Uint8Array;
-}
-
-function streamCloseFromProto(proto: temporal.api.stream.v1.IStreamClose): StreamClose {
-  return {
-    producer: proto.producer == null ? undefined : producerFromProto(proto.producer),
-    status:
-      proto.status == null
-        ? undefined
-        : streamCloseStatusFromNumber(proto.status as number),
-    offset: requiredField(
-      proto.offset == null || proto.offset.length === 0 ? undefined : proto.offset,
-      "StreamClose",
-      "offset",
-    ),
-  };
-}
-
-function streamCloseToProto(model: StreamClose): temporal.api.stream.v1.IStreamClose {
-  return {
-    producer: model.producer == null ? undefined : producerToProto(model.producer),
-    status:
-      model.status == null
-        ? undefined
-        : (model.status as number as temporal.api.enums.v1.StreamCloseStatus),
-    offset: requiredField(model.offset, "StreamClose", "offset"),
-  };
-}
-
-export const streamCloseTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IStreamClose): StreamClose {
-    return streamCloseFromProto(value);
-  },
-
-  toTransferType(value: StreamClose): temporal.api.stream.v1.IStreamClose {
-    return streamCloseToProto(value);
-  },
-};
 export interface ReadRecordsRequest<BodyT> {
   ref: StreamRef<BodyT>;
   /**
-   * Where the read starts. Unset is the beginning. A too high offset fails.
+   * Read after this offset. Empty is the beginning. A too high offset fails.
    */
-  position?: ReadPosition;
+  fromOffset?: Uint8Array;
   /**
-   * About this many items per page, 1 to 1000.
+   * About this many Records per page, 1 to 1000.
    */
   maxRecords?: number;
   /**
@@ -1366,36 +1157,11 @@ function readRecordsRequestFromProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): ReadRecordsRequest<BodyT> {
-  let result1: ReadPosition | undefined;
-  switch (proto.position) {
-    case "fromOffset":
-      result1 = {
-        tag: "from-offset",
-        value: requiredField(proto.fromOffset, "ReadRecordsRequest", "fromOffset"),
-      };
-      break;
-    case "start":
-      result1 = {
-        tag: "start",
-        value: requiredField(
-          proto.start,
-          "ReadRecordsRequest",
-          "start",
-        ) as number as StreamReadStart,
-      };
-      break;
-    case undefined:
-      result1 = undefined;
-      break;
-    default:
-      proto.position satisfies never;
-      throw new Error("invalid oneof discriminator for ReadRecordsRequest.position");
-  }
   return {
     ref: streamRefFromProto(requiredField(proto.ref, "ReadRecordsRequest", "ref"), {
       bodyT: typeInfo.bodyT,
     }),
-    position: result1,
+    fromOffset: proto.fromOffset ?? undefined,
     maxRecords: proto.maxRecords ?? undefined,
     wait: proto.wait == null ? undefined : support.durationFromProto(proto.wait),
     maxBytes: proto.maxBytes ?? undefined,
@@ -1408,30 +1174,15 @@ function readRecordsRequestToProto<BodyT>(
     bodyT?: common.TypeInfo<BodyT, any>;
   } = {},
 ): temporal.api.streamservice.v1.IReadRecordsRequest {
-  const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {};
-  proto.ref = streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref"), {
-    bodyT: typeInfo.bodyT,
-  });
-  const result1 = model.position;
-  if (result1 != null) {
-    switch (result1.tag) {
-      case "from-offset":
-        proto.position = "fromOffset";
-        proto.fromOffset = result1.value;
-        break;
-      case "start":
-        proto.position = "start";
-        proto.start = result1.value as number as temporal.api.enums.v1.StreamReadStart;
-        break;
-      default:
-        result1 satisfies never;
-        throw new Error("invalid oneof tag for ReadRecordsRequest.position");
-    }
-  }
-  proto.maxRecords = model.maxRecords;
-  proto.wait = model.wait == null ? undefined : support.durationToProto(model.wait);
-  proto.maxBytes = model.maxBytes;
-  return proto;
+  return {
+    ref: streamRefToProto(requiredField(model.ref, "ReadRecordsRequest", "ref"), {
+      bodyT: typeInfo.bodyT,
+    }),
+    fromOffset: model.fromOffset,
+    maxRecords: model.maxRecords,
+    wait: model.wait == null ? undefined : support.durationToProto(model.wait),
+    maxBytes: model.maxBytes,
+  };
 }
 
 export const readRecordsRequestTransferTypeConverter = {
@@ -1471,7 +1222,6 @@ export interface DescribeStreamResponse {
    * The newest offset, of a Record. Empty for none.
    */
   lastOffset?: Uint8Array;
-  retention?: common.Duration;
 }
 
 function describeStreamResponseFromProto(
@@ -1481,8 +1231,6 @@ function describeStreamResponseFromProto(
     status:
       proto.status == null ? undefined : streamStatusFromNumber(proto.status as number),
     lastOffset: proto.lastOffset ?? undefined,
-    retention:
-      proto.retention == null ? undefined : support.durationFromProto(proto.retention),
   };
 }
 
@@ -1495,8 +1243,6 @@ function describeStreamResponseToProto(
         ? undefined
         : (model.status as number as temporal.api.enums.v1.StreamStatus),
     lastOffset: model.lastOffset,
-    retention:
-      model.retention == null ? undefined : support.durationToProto(model.retention),
   };
 }
 

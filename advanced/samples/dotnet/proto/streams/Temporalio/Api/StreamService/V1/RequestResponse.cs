@@ -34,51 +34,45 @@ namespace Temporalio.Api.StreamService.V1 {
             "KA4yLS50ZW1wb3JhbC5hcGkuZW51bXMudjEuU3RyZWFtSWRDb25mbGljdFBv",
             "bGljeRISCgpyZXF1ZXN0X2lkGAQgASgJIlcKFENyZWF0ZVN0cmVhbVJlc3Bv",
             "bnNlEi4KA3JlZhgBIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuU3Ry",
-            "ZWFtUmVmEg8KB2NyZWF0ZWQYAiABKAgi6gEKFEFwcGVuZFJlY29yZHNSZXF1",
+            "ZWFtUmVmEg8KB2NyZWF0ZWQYAiABKAgi1gEKFEFwcGVuZFJlY29yZHNSZXF1",
             "ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3Jh",
             "bC5hcGkuc3RyZWFtLnYxLlN0cmVhbVJlZhIyCghwcm9kdWNlchgDIAEoCzIg",
             "LnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuUHJvZHVjZXISEAoIc2VxdWVuY2UY",
             "BCABKAMSNQoHcmVjb3JkcxgFIAMoCzIkLnRlbXBvcmFsLmFwaS5zdHJlYW0u",
-            "djEuQXBwZW5kUmVjb3JkEhIKCnRhc2tfdG9rZW4YBiABKAwiQgoVQXBwZW5k",
-            "UmVjb3Jkc1Jlc3BvbnNlEhQKDGZpcnN0X29mZnNldBgBIAEoDBITCgtsYXN0",
-            "X29mZnNldBgCIAEoDCKfAQoSQ2xvc2VTdHJlYW1SZXF1ZXN0EhEKCW5hbWVz",
-            "cGFjZRgBIAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3JhbC5hcGkuc3RyZWFt",
-            "LnYxLlN0cmVhbVJlZhIyCghwcm9kdWNlchgDIAEoCzIgLnRlbXBvcmFsLmFw",
-            "aS5zdHJlYW0udjEuUHJvZHVjZXISEgoKdGFza190b2tlbhgEIAEoDCIVChND",
-            "bG9zZVN0cmVhbVJlc3BvbnNlIr4CChJSZWFkUmVjb3Jkc1JlcXVlc3QSEQoJ",
-            "bmFtZXNwYWNlGAEgASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5z",
-            "dHJlYW0udjEuU3RyZWFtUmVmEhUKC2Zyb21fb2Zmc2V0GAMgASgMSAASNwoF",
-            "c3RhcnQYBCABKA4yJi50ZW1wb3JhbC5hcGkuZW51bXMudjEuU3RyZWFtUmVh",
-            "ZFN0YXJ0SAASEwoLbWF4X3JlY29yZHMYBSABKAUSJwoEd2FpdBgGIAEoCzIZ",
-            "Lmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIRCgl0b19vZmZzZXQYByABKAwS",
-            "EQoJd2FrZV9vbmx5GAggASgIEhEKCW1heF9ieXRlcxgJIAEoAxISCgpmbG9v",
-            "cl9mcm9tGAogASgMQgoKCHBvc2l0aW9uIpIBChNSZWFkUmVjb3Jkc1Jlc3Bv",
-            "bnNlEjUKB3JlY29yZHMYASADKAsyJC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYx",
-            "LlN0cmVhbVJlY29yZBITCgtsYXN0X29mZnNldBgCIAEoDBIMCgRkb25lGAMg",
-            "ASgIEiEKGWNvbnRpbnVlX2FzX25ld19zdWdnZXN0ZWQYBCABKAgiWgoVRGVz",
-            "Y3JpYmVTdHJlYW1SZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYY",
-            "AiABKAsyIS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlN0cmVhbVJlZiKQAQoW",
-            "RGVzY3JpYmVTdHJlYW1SZXNwb25zZRIzCgZzdGF0dXMYASABKA4yIy50ZW1w",
-            "b3JhbC5hcGkuZW51bXMudjEuU3RyZWFtU3RhdHVzEhMKC2xhc3Rfb2Zmc2V0",
-            "GAIgASgMEiwKCXJldGVudGlvbhgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5E",
-            "dXJhdGlvbkK0AQogaW8udGVtcG9yYWwuYXBpLnN0cmVhbXNlcnZpY2UudjFC",
-            "FFJlcXVlc3RSZXNwb25zZVByb3RvUAFaMWdvLnRlbXBvcmFsLmlvL2FwaS9z",
-            "dHJlYW1zZXJ2aWNlL3YxO3N0cmVhbXNlcnZpY2WqAh9UZW1wb3JhbGlvLkFw",
-            "aS5TdHJlYW1TZXJ2aWNlLlYx6gIiVGVtcG9yYWxpbzo6QXBpOjpTdHJlYW1T",
-            "ZXJ2aWNlOjpWMWIGcHJvdG8z"));
+            "djEuQXBwZW5kUmVjb3JkIkIKFUFwcGVuZFJlY29yZHNSZXNwb25zZRIUCgxm",
+            "aXJzdF9vZmZzZXQYASABKAwSEwoLbGFzdF9vZmZzZXQYAiABKAwiiwEKEkNs",
+            "b3NlU3RyZWFtUmVxdWVzdBIRCgluYW1lc3BhY2UYASABKAkSLgoDcmVmGAIg",
+            "ASgLMiEudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSMgoIcHJv",
+            "ZHVjZXIYAyABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlByb2R1Y2Vy",
+            "IhUKE0Nsb3NlU3RyZWFtUmVzcG9uc2UivQEKElJlYWRSZWNvcmRzUmVxdWVz",
+            "dBIRCgluYW1lc3BhY2UYASABKAkSLgoDcmVmGAIgASgLMiEudGVtcG9yYWwu",
+            "YXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSEwoLZnJvbV9vZmZzZXQYAyABKAwS",
+            "EwoLbWF4X3JlY29yZHMYBCABKAUSJwoEd2FpdBgFIAEoCzIZLmdvb2dsZS5w",
+            "cm90b2J1Zi5EdXJhdGlvbhIRCgltYXhfYnl0ZXMYBiABKAMibwoTUmVhZFJl",
+            "Y29yZHNSZXNwb25zZRI1CgdyZWNvcmRzGAEgAygLMiQudGVtcG9yYWwuYXBp",
+            "LnN0cmVhbS52MS5TdHJlYW1SZWNvcmQSEwoLbGFzdF9vZmZzZXQYAiABKAwS",
+            "DAoEZG9uZRgDIAEoCCJaChVEZXNjcmliZVN0cmVhbVJlcXVlc3QSEQoJbmFt",
+            "ZXNwYWNlGAEgASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJl",
+            "YW0udjEuU3RyZWFtUmVmImIKFkRlc2NyaWJlU3RyZWFtUmVzcG9uc2USMwoG",
+            "c3RhdHVzGAEgASgOMiMudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbVN0",
+            "YXR1cxITCgtsYXN0X29mZnNldBgCIAEoDEK0AQogaW8udGVtcG9yYWwuYXBp",
+            "LnN0cmVhbXNlcnZpY2UudjFCFFJlcXVlc3RSZXNwb25zZVByb3RvUAFaMWdv",
+            "LnRlbXBvcmFsLmlvL2FwaS9zdHJlYW1zZXJ2aWNlL3YxO3N0cmVhbXNlcnZp",
+            "Y2WqAh9UZW1wb3JhbGlvLkFwaS5TdHJlYW1TZXJ2aWNlLlYx6gIiVGVtcG9y",
+            "YWxpbzo6QXBpOjpTdHJlYW1TZXJ2aWNlOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamRequest), global::Temporalio.Api.StreamService.V1.CreateStreamRequest.Parser, new[]{ "Namespace", "StreamRef", "IdConflictPolicy", "RequestId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamResponse), global::Temporalio.Api.StreamService.V1.CreateStreamResponse.Parser, new[]{ "Ref", "Created" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "Sequence", "Records", "TaskToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "Sequence", "Records" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsResponse), global::Temporalio.Api.StreamService.V1.AppendRecordsResponse.Parser, new[]{ "FirstOffset", "LastOffset" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "TaskToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Producer" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamResponse), global::Temporalio.Api.StreamService.V1.CloseStreamResponse.Parser, null, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "Start", "MaxRecords", "Wait", "ToOffset", "WakeOnly", "MaxBytes", "FloorFrom" }, new[]{ "Position" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsResponse), global::Temporalio.Api.StreamService.V1.ReadRecordsResponse.Parser, new[]{ "Records", "LastOffset", "Done", "ContinueAsNewSuggested" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "MaxRecords", "Wait", "MaxBytes" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsResponse), global::Temporalio.Api.StreamService.V1.ReadRecordsResponse.Parser, new[]{ "Records", "LastOffset", "Done" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamRequest), global::Temporalio.Api.StreamService.V1.DescribeStreamRequest.Parser, new[]{ "Namespace", "Ref" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamResponse), global::Temporalio.Api.StreamService.V1.DescribeStreamResponse.Parser, new[]{ "Status", "LastOffset", "Retention" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamResponse), global::Temporalio.Api.StreamService.V1.DescribeStreamResponse.Parser, new[]{ "Status", "LastOffset" }, null, null, null, null)
           }));
     }
     #endregion
@@ -481,8 +475,9 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int RefFieldNumber = 1;
     private global::Temporalio.Api.Stream.V1.StreamRef ref_;
     /// <summary>
-    /// The ref of the Stream, with the name of the backend that holds it, also when the request
-    /// left the name empty. The caller passes this ref on as data.
+    /// The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
+    /// backend that it picked, also when the request left the name empty. The server gives the ref
+    /// back as the request had it, since it doesn't know that name.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -727,7 +722,6 @@ namespace Temporalio.Api.StreamService.V1 {
       producer_ = other.producer_ != null ? other.producer_.Clone() : null;
       sequence_ = other.sequence_;
       records_ = other.records_.Clone();
-      taskToken_ = other.taskToken_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -811,23 +805,6 @@ namespace Temporalio.Api.StreamService.V1 {
       get { return records_; }
     }
 
-    /// <summary>Field number for the "task_token" field.</summary>
-    public const int TaskTokenFieldNumber = 6;
-    private pb::ByteString taskToken_ = pb::ByteString.Empty;
-    /// <summary>
-    /// Only read by the server, and opaque to every SDK and Store, which never parse it. It lets
-    /// the server check that the caller is the task that the Producer names. It is an identity
-    /// check, not a guard against a stale attempt, which the epoch fences.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString TaskToken {
-      get { return taskToken_; }
-      set {
-        taskToken_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -848,7 +825,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (!object.Equals(Producer, other.Producer)) return false;
       if (Sequence != other.Sequence) return false;
       if(!records_.Equals(other.records_)) return false;
-      if (TaskToken != other.TaskToken) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -861,7 +837,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (producer_ != null) hash ^= Producer.GetHashCode();
       if (Sequence != 0L) hash ^= Sequence.GetHashCode();
       hash ^= records_.GetHashCode();
-      if (TaskToken.Length != 0) hash ^= TaskToken.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -897,10 +872,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteInt64(Sequence);
       }
       records_.WriteTo(output, _repeated_records_codec);
-      if (TaskToken.Length != 0) {
-        output.WriteRawTag(50);
-        output.WriteBytes(TaskToken);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -928,10 +899,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteInt64(Sequence);
       }
       records_.WriteTo(ref output, _repeated_records_codec);
-      if (TaskToken.Length != 0) {
-        output.WriteRawTag(50);
-        output.WriteBytes(TaskToken);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -955,9 +922,6 @@ namespace Temporalio.Api.StreamService.V1 {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(Sequence);
       }
       size += records_.CalculateSize(_repeated_records_codec);
-      if (TaskToken.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(TaskToken);
-      }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -989,9 +953,6 @@ namespace Temporalio.Api.StreamService.V1 {
         Sequence = other.Sequence;
       }
       records_.Add(other.records_);
-      if (other.TaskToken.Length != 0) {
-        TaskToken = other.TaskToken;
-      }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -1037,10 +998,6 @@ namespace Temporalio.Api.StreamService.V1 {
             records_.AddEntriesFrom(input, _repeated_records_codec);
             break;
           }
-          case 50: {
-            TaskToken = input.ReadBytes();
-            break;
-          }
         }
       }
     #endif
@@ -1084,10 +1041,6 @@ namespace Temporalio.Api.StreamService.V1 {
           }
           case 42: {
             records_.AddEntriesFrom(ref input, _repeated_records_codec);
-            break;
-          }
-          case 50: {
-            TaskToken = input.ReadBytes();
             break;
           }
         }
@@ -1379,7 +1332,6 @@ namespace Temporalio.Api.StreamService.V1 {
       namespace_ = other.namespace_;
       ref_ = other.ref_ != null ? other.ref_.Clone() : null;
       producer_ = other.producer_ != null ? other.producer_.Clone() : null;
-      taskToken_ = other.taskToken_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1435,21 +1387,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "task_token" field.</summary>
-    public const int TaskTokenFieldNumber = 4;
-    private pb::ByteString taskToken_ = pb::ByteString.Empty;
-    /// <summary>
-    /// Only read by the server. It checks the token as on the append.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString TaskToken {
-      get { return taskToken_; }
-      set {
-        taskToken_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1468,7 +1405,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace != other.Namespace) return false;
       if (!object.Equals(Ref, other.Ref)) return false;
       if (!object.Equals(Producer, other.Producer)) return false;
-      if (TaskToken != other.TaskToken) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1479,7 +1415,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
       if (ref_ != null) hash ^= Ref.GetHashCode();
       if (producer_ != null) hash ^= Producer.GetHashCode();
-      if (TaskToken.Length != 0) hash ^= TaskToken.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1510,10 +1445,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(26);
         output.WriteMessage(Producer);
       }
-      if (TaskToken.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteBytes(TaskToken);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1536,10 +1467,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(26);
         output.WriteMessage(Producer);
       }
-      if (TaskToken.Length != 0) {
-        output.WriteRawTag(34);
-        output.WriteBytes(TaskToken);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1558,9 +1485,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (producer_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
-      }
-      if (TaskToken.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(TaskToken);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1588,9 +1512,6 @@ namespace Temporalio.Api.StreamService.V1 {
           Producer = new global::Temporalio.Api.Stream.V1.Producer();
         }
         Producer.MergeFrom(other.Producer);
-      }
-      if (other.TaskToken.Length != 0) {
-        TaskToken = other.TaskToken;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1629,10 +1550,6 @@ namespace Temporalio.Api.StreamService.V1 {
             input.ReadMessage(Producer);
             break;
           }
-          case 34: {
-            TaskToken = input.ReadBytes();
-            break;
-          }
         }
       }
     #endif
@@ -1668,10 +1585,6 @@ namespace Temporalio.Api.StreamService.V1 {
               Producer = new global::Temporalio.Api.Stream.V1.Producer();
             }
             input.ReadMessage(Producer);
-            break;
-          }
-          case 34: {
-            TaskToken = input.ReadBytes();
             break;
           }
         }
@@ -1848,7 +1761,7 @@ namespace Temporalio.Api.StreamService.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Reads one page of items from an offset. At the end of the Stream, the read waits for a new
+  /// Reads one page of Records after an offset. At the end of the Stream, the read waits for a new
   /// Record, so readers long poll.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
@@ -1888,21 +1801,10 @@ namespace Temporalio.Api.StreamService.V1 {
     public ReadRecordsRequest(ReadRecordsRequest other) : this() {
       namespace_ = other.namespace_;
       ref_ = other.ref_ != null ? other.ref_.Clone() : null;
+      fromOffset_ = other.fromOffset_;
       maxRecords_ = other.maxRecords_;
       wait_ = other.wait_ != null ? other.wait_.Clone() : null;
-      toOffset_ = other.toOffset_;
-      wakeOnly_ = other.wakeOnly_;
       maxBytes_ = other.maxBytes_;
-      floorFrom_ = other.floorFrom_;
-      switch (other.PositionCase) {
-        case PositionOneofCase.FromOffset:
-          FromOffset = other.FromOffset;
-          break;
-        case PositionOneofCase.Start:
-          Start = other.Start;
-          break;
-      }
-
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1945,66 +1847,25 @@ namespace Temporalio.Api.StreamService.V1 {
 
     /// <summary>Field number for the "from_offset" field.</summary>
     public const int FromOffsetFieldNumber = 3;
+    private pb::ByteString fromOffset_ = pb::ByteString.Empty;
     /// <summary>
     /// Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
+    /// Leave empty to read from the beginning. To read only new Records, a caller gets last_offset
+    /// from a describe and reads after it.
     /// (-- api-linter: core::0140::prepositions=disabled
-    ///     aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
+    ///     aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public pb::ByteString FromOffset {
-      get { return HasFromOffset ? (pb::ByteString) position_ : pb::ByteString.Empty; }
+      get { return fromOffset_; }
       set {
-        position_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-        positionCase_ = PositionOneofCase.FromOffset;
-      }
-    }
-    /// <summary>Gets whether the "from_offset" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasFromOffset {
-      get { return positionCase_ == PositionOneofCase.FromOffset; }
-    }
-    /// <summary> Clears the value of the oneof if it's currently set to "from_offset" </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearFromOffset() {
-      if (HasFromOffset) {
-        ClearPosition();
-      }
-    }
-
-    /// <summary>Field number for the "start" field.</summary>
-    public const int StartFieldNumber = 4;
-    /// <summary>
-    /// Start at the beginning or at the end of the Stream. Unspecified is the beginning.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Enums.V1.StreamReadStart Start {
-      get { return HasStart ? (global::Temporalio.Api.Enums.V1.StreamReadStart) position_ : global::Temporalio.Api.Enums.V1.StreamReadStart.Unspecified; }
-      set {
-        position_ = value;
-        positionCase_ = PositionOneofCase.Start;
-      }
-    }
-    /// <summary>Gets whether the "start" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasStart {
-      get { return positionCase_ == PositionOneofCase.Start; }
-    }
-    /// <summary> Clears the value of the oneof if it's currently set to "start" </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearStart() {
-      if (HasStart) {
-        ClearPosition();
+        fromOffset_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
     /// <summary>Field number for the "max_records" field.</summary>
-    public const int MaxRecordsFieldNumber = 5;
+    public const int MaxRecordsFieldNumber = 4;
     private int maxRecords_;
     /// <summary>
     /// The most Records in one page. Zero is 1000.
@@ -2019,7 +1880,7 @@ namespace Temporalio.Api.StreamService.V1 {
     }
 
     /// <summary>Field number for the "wait" field.</summary>
-    public const int WaitFieldNumber = 6;
+    public const int WaitFieldNumber = 5;
     private global::Google.Protobuf.WellKnownTypes.Duration wait_;
     /// <summary>
     /// How long the read waits for a new Record before it answers with an empty page. Empty answers
@@ -2034,46 +1895,8 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "to_offset" field.</summary>
-    public const int ToOffsetFieldNumber = 7;
-    private pb::ByteString toOffset_ = pb::ByteString.Empty;
-    /// <summary>
-    /// The exclusive end of the read. The read scans no entry at or after it, so a replay reads the
-    /// same range. Empty means no end. Only the server serves it, and a Store refuses it.
-    /// (-- api-linter: core::0140::prepositions=disabled
-    ///     aip.dev/not-precedent: "from" and "to" mark the ends of a range of offsets. --)
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString ToOffset {
-      get { return toOffset_; }
-      set {
-        toOffset_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "wake_only" field.</summary>
-    public const int WakeOnlyFieldNumber = 8;
-    private bool wakeOnly_;
-    /// <summary>
-    /// Asks only for a wake-up, for a reader that must not get Records in this answer, such as a
-    /// Workflow whose Records stay out of History. The read waits as a normal read does. It then
-    /// answers with no Records and last_offset = from_offset, when a Record after from_offset
-    /// exists, when the Stream closes (done), or when wait ends. The reader then gets the Records
-    /// with a normal read. The wait may be days, since a parked read adds nothing to History.
-    /// Only the server serves it, and a Store refuses it.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool WakeOnly {
-      get { return wakeOnly_; }
-      set {
-        wakeOnly_ = value;
-      }
-    }
-
     /// <summary>Field number for the "max_bytes" field.</summary>
-    public const int MaxBytesFieldNumber = 9;
+    public const int MaxBytesFieldNumber = 6;
     private long maxBytes_;
     /// <summary>
     /// The most Record bytes in one page, so a page fits the caller's limit, such as a History
@@ -2086,46 +1909,6 @@ namespace Temporalio.Api.StreamService.V1 {
       set {
         maxBytes_ = value;
       }
-    }
-
-    /// <summary>Field number for the "floor_from" field.</summary>
-    public const int FloorFromFieldNumber = 10;
-    private pb::ByteString floorFrom_ = pb::ByteString.Empty;
-    /// <summary>
-    /// The lowest offset this run read on replay. A reset run copies the earlier run's reads into
-    /// its History, so its floor must cover them too, not only its first live page. Only read by
-    /// the server.
-    /// (-- api-linter: core::0140::prepositions=disabled
-    ///     aip.dev/not-precedent: The floor is the lowest from_offset of the run's reads. --)
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString FloorFrom {
-      get { return floorFrom_; }
-      set {
-        floorFrom_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    private object position_;
-    /// <summary>Enum of possible cases for the "position" oneof.</summary>
-    public enum PositionOneofCase {
-      None = 0,
-      FromOffset = 3,
-      Start = 4,
-    }
-    private PositionOneofCase positionCase_ = PositionOneofCase.None;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PositionOneofCase PositionCase {
-      get { return positionCase_; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearPosition() {
-      positionCase_ = PositionOneofCase.None;
-      position_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2146,14 +1929,9 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace != other.Namespace) return false;
       if (!object.Equals(Ref, other.Ref)) return false;
       if (FromOffset != other.FromOffset) return false;
-      if (Start != other.Start) return false;
       if (MaxRecords != other.MaxRecords) return false;
       if (!object.Equals(Wait, other.Wait)) return false;
-      if (ToOffset != other.ToOffset) return false;
-      if (WakeOnly != other.WakeOnly) return false;
       if (MaxBytes != other.MaxBytes) return false;
-      if (FloorFrom != other.FloorFrom) return false;
-      if (PositionCase != other.PositionCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2163,15 +1941,10 @@ namespace Temporalio.Api.StreamService.V1 {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
       if (ref_ != null) hash ^= Ref.GetHashCode();
-      if (HasFromOffset) hash ^= FromOffset.GetHashCode();
-      if (HasStart) hash ^= Start.GetHashCode();
+      if (FromOffset.Length != 0) hash ^= FromOffset.GetHashCode();
       if (MaxRecords != 0) hash ^= MaxRecords.GetHashCode();
       if (wait_ != null) hash ^= Wait.GetHashCode();
-      if (ToOffset.Length != 0) hash ^= ToOffset.GetHashCode();
-      if (WakeOnly != false) hash ^= WakeOnly.GetHashCode();
       if (MaxBytes != 0L) hash ^= MaxBytes.GetHashCode();
-      if (FloorFrom.Length != 0) hash ^= FloorFrom.GetHashCode();
-      hash ^= (int) positionCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2198,37 +1971,21 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (HasFromOffset) {
+      if (FromOffset.Length != 0) {
         output.WriteRawTag(26);
         output.WriteBytes(FromOffset);
       }
-      if (HasStart) {
-        output.WriteRawTag(32);
-        output.WriteEnum((int) Start);
-      }
       if (MaxRecords != 0) {
-        output.WriteRawTag(40);
+        output.WriteRawTag(32);
         output.WriteInt32(MaxRecords);
       }
       if (wait_ != null) {
-        output.WriteRawTag(50);
+        output.WriteRawTag(42);
         output.WriteMessage(Wait);
       }
-      if (ToOffset.Length != 0) {
-        output.WriteRawTag(58);
-        output.WriteBytes(ToOffset);
-      }
-      if (WakeOnly != false) {
-        output.WriteRawTag(64);
-        output.WriteBool(WakeOnly);
-      }
       if (MaxBytes != 0L) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(48);
         output.WriteInt64(MaxBytes);
-      }
-      if (FloorFrom.Length != 0) {
-        output.WriteRawTag(82);
-        output.WriteBytes(FloorFrom);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -2248,37 +2005,21 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Ref);
       }
-      if (HasFromOffset) {
+      if (FromOffset.Length != 0) {
         output.WriteRawTag(26);
         output.WriteBytes(FromOffset);
       }
-      if (HasStart) {
-        output.WriteRawTag(32);
-        output.WriteEnum((int) Start);
-      }
       if (MaxRecords != 0) {
-        output.WriteRawTag(40);
+        output.WriteRawTag(32);
         output.WriteInt32(MaxRecords);
       }
       if (wait_ != null) {
-        output.WriteRawTag(50);
+        output.WriteRawTag(42);
         output.WriteMessage(Wait);
       }
-      if (ToOffset.Length != 0) {
-        output.WriteRawTag(58);
-        output.WriteBytes(ToOffset);
-      }
-      if (WakeOnly != false) {
-        output.WriteRawTag(64);
-        output.WriteBool(WakeOnly);
-      }
       if (MaxBytes != 0L) {
-        output.WriteRawTag(72);
+        output.WriteRawTag(48);
         output.WriteInt64(MaxBytes);
-      }
-      if (FloorFrom.Length != 0) {
-        output.WriteRawTag(82);
-        output.WriteBytes(FloorFrom);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -2296,11 +2037,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (ref_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
       }
-      if (HasFromOffset) {
+      if (FromOffset.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(FromOffset);
-      }
-      if (HasStart) {
-        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Start);
       }
       if (MaxRecords != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(MaxRecords);
@@ -2308,17 +2046,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (wait_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Wait);
       }
-      if (ToOffset.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(ToOffset);
-      }
-      if (WakeOnly != false) {
-        size += 1 + 1;
-      }
       if (MaxBytes != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(MaxBytes);
-      }
-      if (FloorFrom.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(FloorFrom);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2341,6 +2070,9 @@ namespace Temporalio.Api.StreamService.V1 {
         }
         Ref.MergeFrom(other.Ref);
       }
+      if (other.FromOffset.Length != 0) {
+        FromOffset = other.FromOffset;
+      }
       if (other.MaxRecords != 0) {
         MaxRecords = other.MaxRecords;
       }
@@ -2350,27 +2082,9 @@ namespace Temporalio.Api.StreamService.V1 {
         }
         Wait.MergeFrom(other.Wait);
       }
-      if (other.ToOffset.Length != 0) {
-        ToOffset = other.ToOffset;
-      }
-      if (other.WakeOnly != false) {
-        WakeOnly = other.WakeOnly;
-      }
       if (other.MaxBytes != 0L) {
         MaxBytes = other.MaxBytes;
       }
-      if (other.FloorFrom.Length != 0) {
-        FloorFrom = other.FloorFrom;
-      }
-      switch (other.PositionCase) {
-        case PositionOneofCase.FromOffset:
-          FromOffset = other.FromOffset;
-          break;
-        case PositionOneofCase.Start:
-          Start = other.Start;
-          break;
-      }
-
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -2406,35 +2120,18 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 32: {
-            position_ = input.ReadEnum();
-            positionCase_ = PositionOneofCase.Start;
-            break;
-          }
-          case 40: {
             MaxRecords = input.ReadInt32();
             break;
           }
-          case 50: {
+          case 42: {
             if (wait_ == null) {
               Wait = new global::Google.Protobuf.WellKnownTypes.Duration();
             }
             input.ReadMessage(Wait);
             break;
           }
-          case 58: {
-            ToOffset = input.ReadBytes();
-            break;
-          }
-          case 64: {
-            WakeOnly = input.ReadBool();
-            break;
-          }
-          case 72: {
+          case 48: {
             MaxBytes = input.ReadInt64();
-            break;
-          }
-          case 82: {
-            FloorFrom = input.ReadBytes();
             break;
           }
         }
@@ -2472,35 +2169,18 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 32: {
-            position_ = input.ReadEnum();
-            positionCase_ = PositionOneofCase.Start;
-            break;
-          }
-          case 40: {
             MaxRecords = input.ReadInt32();
             break;
           }
-          case 50: {
+          case 42: {
             if (wait_ == null) {
               Wait = new global::Google.Protobuf.WellKnownTypes.Duration();
             }
             input.ReadMessage(Wait);
             break;
           }
-          case 58: {
-            ToOffset = input.ReadBytes();
-            break;
-          }
-          case 64: {
-            WakeOnly = input.ReadBool();
-            break;
-          }
-          case 72: {
+          case 48: {
             MaxBytes = input.ReadInt64();
-            break;
-          }
-          case 82: {
-            FloorFrom = input.ReadBytes();
             break;
           }
         }
@@ -2552,7 +2232,6 @@ namespace Temporalio.Api.StreamService.V1 {
       records_ = other.records_.Clone();
       lastOffset_ = other.lastOffset_;
       done_ = other.done_;
-      continueAsNewSuggested_ = other.continueAsNewSuggested_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2595,10 +2274,9 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int DoneFieldNumber = 3;
     private bool done_;
     /// <summary>
-    /// True when the Stream is closed and this read gave its last item. The close item says the
-    /// same on a page that has it. An answer with no item needs this flag, which is a wake_only
-    /// read and a read after the close item. A read of a closed Stream with no item left answers
-    /// at once.
+    /// True when the Stream is closed and this read gave its last Record. It is the only sign of a
+    /// close in a read, since a close stores no Record. A read of a closed Stream with no Record
+    /// left answers at once with done.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2606,25 +2284,6 @@ namespace Temporalio.Api.StreamService.V1 {
       get { return done_; }
       set {
         done_ = value;
-      }
-    }
-
-    /// <summary>Field number for the "continue_as_new_suggested" field.</summary>
-    public const int ContinueAsNewSuggestedFieldNumber = 4;
-    private bool continueAsNewSuggested_;
-    /// <summary>
-    /// Tells a Workflow reader to continue as new. The server keeps every Record from the lowest
-    /// offset that a run read, since a replay of the run reads them again. That floor moves only
-    /// when the run ends. This flag is true when the Records that this reader's floor keeps are
-    /// more than half of the Stream's byte cap. The writer fails when the cap fills, and only the
-    /// reader's continue-as-new frees it. Only set by the server.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool ContinueAsNewSuggested {
-      get { return continueAsNewSuggested_; }
-      set {
-        continueAsNewSuggested_ = value;
       }
     }
 
@@ -2646,7 +2305,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if(!records_.Equals(other.records_)) return false;
       if (LastOffset != other.LastOffset) return false;
       if (Done != other.Done) return false;
-      if (ContinueAsNewSuggested != other.ContinueAsNewSuggested) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2657,7 +2315,6 @@ namespace Temporalio.Api.StreamService.V1 {
       hash ^= records_.GetHashCode();
       if (LastOffset.Length != 0) hash ^= LastOffset.GetHashCode();
       if (Done != false) hash ^= Done.GetHashCode();
-      if (ContinueAsNewSuggested != false) hash ^= ContinueAsNewSuggested.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2685,10 +2342,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(24);
         output.WriteBool(Done);
       }
-      if (ContinueAsNewSuggested != false) {
-        output.WriteRawTag(32);
-        output.WriteBool(ContinueAsNewSuggested);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2708,10 +2361,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(24);
         output.WriteBool(Done);
       }
-      if (ContinueAsNewSuggested != false) {
-        output.WriteRawTag(32);
-        output.WriteBool(ContinueAsNewSuggested);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2727,9 +2376,6 @@ namespace Temporalio.Api.StreamService.V1 {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(LastOffset);
       }
       if (Done != false) {
-        size += 1 + 1;
-      }
-      if (ContinueAsNewSuggested != false) {
         size += 1 + 1;
       }
       if (_unknownFields != null) {
@@ -2750,9 +2396,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (other.Done != false) {
         Done = other.Done;
-      }
-      if (other.ContinueAsNewSuggested != false) {
-        ContinueAsNewSuggested = other.ContinueAsNewSuggested;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2783,10 +2426,6 @@ namespace Temporalio.Api.StreamService.V1 {
           }
           case 24: {
             Done = input.ReadBool();
-            break;
-          }
-          case 32: {
-            ContinueAsNewSuggested = input.ReadBool();
             break;
           }
         }
@@ -2820,10 +2459,6 @@ namespace Temporalio.Api.StreamService.V1 {
             Done = input.ReadBool();
             break;
           }
-          case 32: {
-            ContinueAsNewSuggested = input.ReadBool();
-            break;
-          }
         }
       }
     }
@@ -2833,7 +2468,7 @@ namespace Temporalio.Api.StreamService.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Gets the status, the newest offset and the Retention of a Stream.
+  /// Gets the status and the newest offset of a Stream.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class DescribeStreamRequest : pb::IMessage<DescribeStreamRequest>
@@ -3088,7 +2723,8 @@ namespace Temporalio.Api.StreamService.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// The state of a Stream.
+  /// The state of a Stream. It has no Retention, since the Retention is a setting of the backend and
+  /// not of one Stream.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class DescribeStreamResponse : pb::IMessage<DescribeStreamResponse>
@@ -3127,7 +2763,6 @@ namespace Temporalio.Api.StreamService.V1 {
     public DescribeStreamResponse(DescribeStreamResponse other) : this() {
       status_ = other.status_;
       lastOffset_ = other.lastOffset_;
-      retention_ = other.retention_ != null ? other.retention_.Clone() : null;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -3164,18 +2799,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "retention" field.</summary>
-    public const int RetentionFieldNumber = 3;
-    private global::Google.Protobuf.WellKnownTypes.Duration retention_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Google.Protobuf.WellKnownTypes.Duration Retention {
-      get { return retention_; }
-      set {
-        retention_ = value;
-      }
-    }
-
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -3193,7 +2816,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (Status != other.Status) return false;
       if (LastOffset != other.LastOffset) return false;
-      if (!object.Equals(Retention, other.Retention)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -3203,7 +2825,6 @@ namespace Temporalio.Api.StreamService.V1 {
       int hash = 1;
       if (Status != global::Temporalio.Api.Enums.V1.StreamStatus.Unspecified) hash ^= Status.GetHashCode();
       if (LastOffset.Length != 0) hash ^= LastOffset.GetHashCode();
-      if (retention_ != null) hash ^= Retention.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -3230,10 +2851,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteBytes(LastOffset);
       }
-      if (retention_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Retention);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -3252,10 +2869,6 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(18);
         output.WriteBytes(LastOffset);
       }
-      if (retention_ != null) {
-        output.WriteRawTag(26);
-        output.WriteMessage(Retention);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -3271,9 +2884,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (LastOffset.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(LastOffset);
-      }
-      if (retention_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Retention);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -3292,12 +2902,6 @@ namespace Temporalio.Api.StreamService.V1 {
       }
       if (other.LastOffset.Length != 0) {
         LastOffset = other.LastOffset;
-      }
-      if (other.retention_ != null) {
-        if (retention_ == null) {
-          Retention = new global::Google.Protobuf.WellKnownTypes.Duration();
-        }
-        Retention.MergeFrom(other.Retention);
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -3326,13 +2930,6 @@ namespace Temporalio.Api.StreamService.V1 {
             LastOffset = input.ReadBytes();
             break;
           }
-          case 26: {
-            if (retention_ == null) {
-              Retention = new global::Google.Protobuf.WellKnownTypes.Duration();
-            }
-            input.ReadMessage(Retention);
-            break;
-          }
         }
       }
     #endif
@@ -3358,13 +2955,6 @@ namespace Temporalio.Api.StreamService.V1 {
           }
           case 18: {
             LastOffset = input.ReadBytes();
-            break;
-          }
-          case 26: {
-            if (retention_ == null) {
-              Retention = new global::Google.Protobuf.WellKnownTypes.Duration();
-            }
-            input.ReadMessage(Retention);
             break;
           }
         }

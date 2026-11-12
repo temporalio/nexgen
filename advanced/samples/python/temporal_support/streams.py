@@ -43,12 +43,9 @@ def client_producer() -> typing.Any:
                 models.ActivityProducer(run_id=info.workflow_run_id, epoch=epoch)
             ),
         )
-    # The sample client never restarts under the same name, so its first attempt is its only one.
     return models.Producer(
         id="client:sample",
-        kind=models.ProducerKindClient(
-            models.ClientProducer(epoch=models.ClientEpoch(attempt=1))
-        ),
+        kind=models.ProducerKindClient(models.ClientProducer()),
     )
 
 

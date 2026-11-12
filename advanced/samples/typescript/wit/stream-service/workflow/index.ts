@@ -21,6 +21,5 @@ export { createAppendRecordTransferTypeConverter } from "./models";
 export { createCloseStreamRequestTransferTypeConverter } from "./models";
 export { createReadRecordsResponseTransferTypeConverter } from "./models";
 export { createStreamRecordTransferTypeConverter } from "./models";
-export { createStreamDataTransferTypeConverter } from "./models";
 export { createReadRecordsRequestTransferTypeConverter } from "./models";
 export { createDescribeStreamRequestTransferTypeConverter } from "./models";

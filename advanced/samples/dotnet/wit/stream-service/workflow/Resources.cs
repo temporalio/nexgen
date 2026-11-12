@@ -39,9 +39,9 @@ namespace Temporalio.Workflows
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task<ReadRecordsResponse<TBody>> ReadAsync(ReadPosition? position, int? maxRecords, System.TimeSpan? wait, long? maxBytes)
+        public Task<ReadRecordsResponse<TBody>> ReadAsync(IReadOnlyList<uint>? fromOffset, int? maxRecords, System.TimeSpan? wait, long? maxBytes)
         {
-            var request = new ReadRecordsOptions<TBody>(Ref) { Position = position, MaxRecords = maxRecords, Wait = wait, MaxBytes = maxBytes };
+            var request = new ReadRecordsOptions<TBody>(Ref) { FromOffset = fromOffset, MaxRecords = maxRecords, Wait = wait, MaxBytes = maxBytes };
             return Operations.ReadRecordsAsync<TBody>(request);
         }
 

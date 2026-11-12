@@ -93,11 +93,11 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; set; }
         /// <summary>
-        /// Where the read starts. Unset is the beginning. A too high offset fails.
+        /// Read after this offset. Empty is the beginning. A too high offset fails.
         /// </summary>
-        public ReadPosition? Position { get; set; }
+        public byte[]? FromOffset { get; set; }
         /// <summary>
-        /// About this many items per page, 1 to 1000.
+        /// About this many Records per page, 1 to 1000.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
@@ -200,7 +200,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
         /// </summary>
-        /// <param name="request">Read Records from a position.</param>
+        /// <param name="request">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsRequest<TBody> request)
         {
@@ -212,13 +212,13 @@ namespace Temporalio.Workflows
         /// <summary>
         /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
         /// </summary>
-        /// <param name="options">Read Records from a position.</param>
+        /// <param name="options">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<ReadRecordsResponse<TBody>> ReadRecordsAsync<TBody>(ReadRecordsOptions<TBody> options)
         {
             var request = new ReadRecordsRequest<TBody>(options.Ref)
             {
-                Position = options.Position,
+                FromOffset = options.FromOffset,
                 MaxRecords = options.MaxRecords,
                 Wait = options.Wait,
                 MaxBytes = options.MaxBytes,

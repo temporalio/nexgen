@@ -22,25 +22,6 @@ class StreamIdConflictPolicy(enum.IntEnum):
     StreamIdConflictPolicyUseExisting = 2
 
 
-class StreamReadStart(enum.IntEnum):
-    StreamReadStartUnspecified = 0
-    StreamReadStartBeginning = 1
-    StreamReadStartEnd = 2
-
-
-class StreamCloseStatus(enum.IntEnum):
-    StreamCloseStatusUnspecified = 0
-    StreamCloseStatusClosed = 1
-
-
-def _stream_close_status_from_proto(value: int) -> StreamCloseStatus:
-    try:
-        return StreamCloseStatus(value)
-    except ValueError:
-        # A newer peer can send a case that this enum doesn't know.
-        return StreamCloseStatus.StreamCloseStatusUnspecified
-
-
 class StreamStatus(enum.IntEnum):
     StreamStatusUnspecified = 0
     StreamStatusOpen = 1
@@ -858,9 +839,9 @@ temporalio.converter.transfer_type_convertible(_ActivityEpochTransferTypeConvert
 
 @dataclasses.dataclass(slots=True)
 class ClientProducer:
-    """A client Producer."""
+    """A client Producer. It has no run and no epoch, so nothing fences it."""
 
-    epoch: ClientEpoch
+    pass
 
 
 class _ClientProducerTransferTypeConverter(
@@ -878,14 +859,7 @@ class _ClientProducerTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.ClientProducer,
         type_hint: type[ClientProducer],
     ) -> ClientProducer:
-        if not value.HasField("epoch"):
-            raise ValueError("missing required field ClientProducer.epoch")
-        epoch = _ClientEpochTransferTypeConverter().from_transfer_type(
-            value.epoch, ClientEpoch
-        )
-        return ClientProducer(
-            epoch=epoch,
-        )
+        return ClientProducer()
 
     @typing_extensions.override
     def to_transfer_type(
@@ -893,56 +867,11 @@ class _ClientProducerTransferTypeConverter(
         value: ClientProducer,
     ) -> temporalio.api.stream.v1.message_pb2.ClientProducer:
         message = temporalio.api.stream.v1.message_pb2.ClientProducer()
-        message.epoch.CopyFrom(
-            _ClientEpochTransferTypeConverter().to_transfer_type(value.epoch)
-        )
         return message
 
 
 temporalio.converter.transfer_type_convertible(_ClientProducerTransferTypeConverter)(
     ClientProducer
-)  # pyright: ignore[reportUnusedCallResult]
-
-
-@dataclasses.dataclass(slots=True)
-class ClientEpoch:
-    """A client attempt, which the client picks."""
-
-    attempt: int
-
-
-class _ClientEpochTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[
-        ClientEpoch, temporalio.api.stream.v1.message_pb2.ClientEpoch
-    ]
-):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.ClientEpoch] | None = (
-        temporalio.api.stream.v1.message_pb2.ClientEpoch
-    )
-
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: temporalio.api.stream.v1.message_pb2.ClientEpoch,
-        type_hint: type[ClientEpoch],
-    ) -> ClientEpoch:
-        attempt = value.attempt
-        return ClientEpoch(
-            attempt=attempt,
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: ClientEpoch,
-    ) -> temporalio.api.stream.v1.message_pb2.ClientEpoch:
-        message = temporalio.api.stream.v1.message_pb2.ClientEpoch()
-        message.attempt = value.attempt
-        return message
-
-
-temporalio.converter.transfer_type_convertible(_ClientEpochTransferTypeConverter)(
-    ClientEpoch
 )  # pyright: ignore[reportUnusedCallResult]
 
 
@@ -1102,10 +1031,10 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class ReadRecordsRequest(typing.Generic[BodyT]):
-    """Read Records from a position."""
+    """Read Records after an offset."""
 
     ref: StreamRef[BodyT]
-    position: ReadPosition | None = None
+    from_offset: bytes | None = None
     max_records: int | None = None
     wait: datetime.timedelta | None = None
     max_bytes: int | None = None
@@ -1137,17 +1066,9 @@ class _ReadRecordsRequestTransferTypeConverter(
                 value.ref, StreamRef[body_type]
             ),
         )
-        _oneof_position: ReadPositionFromOffset | ReadPositionStart | None
-        match value.WhichOneof("position"):
-            case "from_offset":
-                _oneof_position = ReadPositionFromOffset(value.from_offset)
-            case "start":
-                _oneof_position = ReadPositionStart(StreamReadStart(value.start))
-            case None:
-                _oneof_position = None
         return ReadRecordsRequest(
             ref=ref,
-            position=_oneof_position,
+            from_offset=value.from_offset if bool(value.from_offset) else None,
             max_records=value.max_records if value.max_records != 0 else None,
             wait=_support.duration_from_proto(value.wait)
             if value.HasField("wait")
@@ -1166,16 +1087,8 @@ class _ReadRecordsRequestTransferTypeConverter(
         message.ref.CopyFrom(
             _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
         )
-        if value.position is not None:
-            match value.position:
-                case ReadPositionFromOffset():
-                    message.from_offset = value.position.value
-                case ReadPositionStart():
-                    message.start = (
-                        temporalio.api.enums.v1.stream_pb2.StreamReadStart.ValueType(
-                            value.position.value
-                        )
-                    )
+        if value.from_offset is not None:
+            message.from_offset = value.from_offset
         if value.max_records is not None:
             message.max_records = value.max_records
         if value.wait is not None:
@@ -1190,11 +1103,11 @@ temporalio.converter.transfer_type_convertible(
 )(ReadRecordsRequest)  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class ReadRecordsResponse(typing.Generic[BodyT]):
     records: list[StreamRecord[BodyT]]
     last_offset: bytes | None = None
-    done: bool | None = None
+    done: bool
 
 
 class _ReadRecordsResponseTransferTypeConverter(
@@ -1224,10 +1137,11 @@ class _ReadRecordsResponseTransferTypeConverter(
             )
             for item in value.records
         ]
+        done = value.done
         return ReadRecordsResponse(
             records=records,
             last_offset=value.last_offset if bool(value.last_offset) else None,
-            done=value.done if bool(value.done) else None,
+            done=done,
         )
 
     @typing_extensions.override
@@ -1245,8 +1159,7 @@ class _ReadRecordsResponseTransferTypeConverter(
             )
         if value.last_offset is not None:
             message.last_offset = value.last_offset
-        if value.done is not None:
-            message.done = value.done
+        message.done = value.done
         return message
 
 
@@ -1255,11 +1168,13 @@ temporalio.converter.transfer_type_convertible(
 )(ReadRecordsResponse)  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class StreamRecord(typing.Generic[BodyT]):
-    """One item that a read gives. Each item carries its own offset."""
+    """One Record that a Producer appended, as a read gives it."""
 
-    item: StreamItem[BodyT] | None = None
+    body: BodyT
+    producer: Producer | None = None
+    offset: bytes
 
 
 class _StreamRecordTransferTypeConverter(
@@ -1278,89 +1193,13 @@ class _StreamRecordTransferTypeConverter(
         type_hint: type[StreamRecord[BodyT]],
     ) -> StreamRecord[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        _oneof_item: StreamItemData[BodyT] | StreamItemClose | None
-        match value.WhichOneof("item"):
-            case "data":
-                _oneof_item = StreamItemData(
-                    typing.cast(
-                        StreamData[BodyT],
-                        _StreamDataTransferTypeConverter().from_transfer_type(
-                            value.data, StreamData[body_type]
-                        ),
-                    )
-                )
-            case "close":
-                _oneof_item = StreamItemClose(
-                    _StreamCloseTransferTypeConverter().from_transfer_type(
-                        value.close, StreamClose
-                    )
-                )
-            case None:
-                _oneof_item = None
-        return StreamRecord(
-            item=_oneof_item,
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: StreamRecord[BodyT],
-    ) -> temporalio.api.stream.v1.message_pb2.StreamRecord:
-        message = temporalio.api.stream.v1.message_pb2.StreamRecord()
-        if value.item is not None:
-            match value.item:
-                case StreamItemData():
-                    message.data.CopyFrom(
-                        _StreamDataTransferTypeConverter().to_transfer_type(
-                            value.item.value
-                        )
-                    )
-                case StreamItemClose():
-                    message.close.CopyFrom(
-                        _StreamCloseTransferTypeConverter().to_transfer_type(
-                            value.item.value
-                        )
-                    )
-        return message
-
-
-temporalio.converter.transfer_type_convertible(
-    _StreamRecordTransferTypeConverter[typing.Any]
-)(StreamRecord)  # pyright: ignore[reportUnusedCallResult]
-
-
-@dataclasses.dataclass(slots=True, kw_only=True)
-class StreamData(typing.Generic[BodyT]):
-    """One Record that a Producer appended."""
-
-    body: BodyT
-    producer: Producer | None = None
-    offset: bytes
-
-
-class _StreamDataTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[
-        StreamData[BodyT], temporalio.api.stream.v1.message_pb2.StreamData
-    ]
-):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamData] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamData
-    )
-
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: temporalio.api.stream.v1.message_pb2.StreamData,
-        type_hint: type[StreamData[BodyT]],
-    ) -> StreamData[BodyT]:
-        (body_type,) = typing.get_args(type_hint) or (typing.Any,)
         if not value.HasField("body"):
-            raise ValueError("missing required field StreamData.body")
+            raise ValueError("missing required field StreamRecord.body")
         body = typing.cast(BodyT, _support.payload_from_proto(value.body, body_type))
         if not value.offset:
-            raise ValueError("missing required field StreamData.offset")
+            raise ValueError("missing required field StreamRecord.offset")
         offset = value.offset
-        return StreamData(
+        return StreamRecord(
             body=body,
             producer=_ProducerTransferTypeConverter().from_transfer_type(
                 value.producer, Producer
@@ -1373,9 +1212,9 @@ class _StreamDataTransferTypeConverter(
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: StreamData[BodyT],
-    ) -> temporalio.api.stream.v1.message_pb2.StreamData:
-        message = temporalio.api.stream.v1.message_pb2.StreamData()
+        value: StreamRecord[BodyT],
+    ) -> temporalio.api.stream.v1.message_pb2.StreamRecord:
+        message = temporalio.api.stream.v1.message_pb2.StreamRecord()
         message.body.CopyFrom(_support.payload_to_proto(value.body))
         if value.producer is not None:
             message.producer.CopyFrom(
@@ -1386,72 +1225,8 @@ class _StreamDataTransferTypeConverter(
 
 
 temporalio.converter.transfer_type_convertible(
-    _StreamDataTransferTypeConverter[typing.Any]
-)(StreamData)  # pyright: ignore[reportUnusedCallResult]
-
-
-@dataclasses.dataclass(slots=True, kw_only=True)
-class StreamClose:
-    """The close of a Stream, as a read item. A close stores no Record."""
-
-    producer: Producer | None = None
-    status: StreamCloseStatus | None = None
-    offset: bytes
-
-
-class _StreamCloseTransferTypeConverter(
-    temporalio.converter.TransferTypeConverter[
-        StreamClose, temporalio.api.stream.v1.message_pb2.StreamClose
-    ]
-):
-    transfer_type: type[temporalio.api.stream.v1.message_pb2.StreamClose] | None = (
-        temporalio.api.stream.v1.message_pb2.StreamClose
-    )
-
-    @typing_extensions.override
-    def from_transfer_type(
-        self,
-        value: temporalio.api.stream.v1.message_pb2.StreamClose,
-        type_hint: type[StreamClose],
-    ) -> StreamClose:
-        if not value.offset:
-            raise ValueError("missing required field StreamClose.offset")
-        offset = value.offset
-        return StreamClose(
-            producer=_ProducerTransferTypeConverter().from_transfer_type(
-                value.producer, Producer
-            )
-            if value.HasField("producer")
-            else None,
-            status=_stream_close_status_from_proto(value.status)
-            if value.status != 0
-            else None,
-            offset=offset,
-        )
-
-    @typing_extensions.override
-    def to_transfer_type(
-        self,
-        value: StreamClose,
-    ) -> temporalio.api.stream.v1.message_pb2.StreamClose:
-        message = temporalio.api.stream.v1.message_pb2.StreamClose()
-        if value.producer is not None:
-            message.producer.CopyFrom(
-                _ProducerTransferTypeConverter().to_transfer_type(value.producer)
-            )
-        if value.status is not None:
-            message.status = (
-                temporalio.api.enums.v1.stream_pb2.StreamCloseStatus.ValueType(
-                    value.status
-                )
-            )
-        message.offset = value.offset
-        return message
-
-
-temporalio.converter.transfer_type_convertible(_StreamCloseTransferTypeConverter)(
-    StreamClose
-)  # pyright: ignore[reportUnusedCallResult]
+    _StreamRecordTransferTypeConverter[typing.Any]
+)(StreamRecord)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -1512,7 +1287,6 @@ temporalio.converter.transfer_type_convertible(
 class DescribeStreamResponse:
     status: StreamStatus | None = None
     last_offset: bytes | None = None
-    retention: datetime.timedelta | None = None
 
 
 class _DescribeStreamResponseTransferTypeConverter(
@@ -1539,9 +1313,6 @@ class _DescribeStreamResponseTransferTypeConverter(
             if value.status != 0
             else None,
             last_offset=value.last_offset if bool(value.last_offset) else None,
-            retention=_support.duration_from_proto(value.retention)
-            if value.HasField("retention")
-            else None,
         )
 
     @typing_extensions.override
@@ -1556,8 +1327,6 @@ class _DescribeStreamResponseTransferTypeConverter(
             )
         if value.last_offset is not None:
             message.last_offset = value.last_offset
-        if value.retention is not None:
-            message.retention.CopyFrom(_support.duration_to_proto(value.retention))
         return message
 
 
@@ -1599,31 +1368,3 @@ ProducerKind = (
     | ProducerKindClient
 )
 """The kind of a Producer, with its run and epoch."""
-
-
-@dataclasses.dataclass(slots=True)
-class ReadPositionFromOffset:
-    value: bytes
-
-
-@dataclasses.dataclass(slots=True)
-class ReadPositionStart:
-    value: StreamReadStart
-
-
-ReadPosition = ReadPositionFromOffset | ReadPositionStart
-"""Where a read starts, after an offset, or at the beginning or the end."""
-
-
-@dataclasses.dataclass(slots=True)
-class StreamItemData(typing.Generic[BodyT]):
-    value: StreamData[BodyT]
-
-
-@dataclasses.dataclass(slots=True)
-class StreamItemClose:
-    value: StreamClose
-
-
-StreamItem = StreamItemData[BodyT] | StreamItemClose
-"""A read item: a Record or the close."""

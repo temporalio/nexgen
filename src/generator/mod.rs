@@ -1092,7 +1092,7 @@ interface stream-service {
     /// @nexus.omit
     ref: placeholder,
     /// @nexus.omit
-    position: placeholder,
+    from-offset: placeholder,
     max-records: option<s32>,
     /// @nexus.omit
     wait: placeholder,
@@ -1101,12 +1101,6 @@ interface stream-service {
     max-bytes: option<s64>,
     /// @nexus.omit
     namespace: placeholder,
-    /// @nexus.omit
-    to-offset: placeholder,
-    /// @nexus.omit
-    wake-only: placeholder,
-    /// @nexus.omit
-    floor-from: placeholder,
   }
 
   read-records: func(request: read-records-request);

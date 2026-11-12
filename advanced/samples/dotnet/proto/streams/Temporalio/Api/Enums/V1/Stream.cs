@@ -28,34 +28,30 @@ namespace Temporalio.Api.Enums.V1 {
             "bC5hcGkuZW51bXMudjEqegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
             "VVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIYChRT",
             "VFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQSVJF",
-            "RBADKlgKEVN0cmVhbUNsb3NlU3RhdHVzEiMKH1NUUkVBTV9DTE9TRV9TVEFU",
-            "VVNfVU5TUEVDSUZJRUQQABIeChpTVFJFQU1fQ0xPU0VfU1RBVFVTX0NMT1NF",
-            "RBABKnAKD1N0cmVhbVJlYWRTdGFydBIhCh1TVFJFQU1fUkVBRF9TVEFSVF9V",
-            "TlNQRUNJRklFRBAAEh8KG1NUUkVBTV9SRUFEX1NUQVJUX0JFR0lOTklORxAB",
-            "EhkKFVNUUkVBTV9SRUFEX1NUQVJUX0VORBACKpMBChZTdHJlYW1JZENvbmZs",
-            "aWN0UG9saWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVD",
-            "SUZJRUQQABIiCh5TVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX0ZBSUwQARIq",
-            "CiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKugE",
-            "ChFTdHJlYW1FcnJvclJlYXNvbhIjCh9TVFJFQU1fRVJST1JfUkVBU09OX1VO",
-            "U1BFQ0lGSUVEEAASIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfRk9VTkQQ",
-            "ARIfChtTVFJFQU1fRVJST1JfUkVBU09OX0VYUElSRUQQAhIeChpTVFJFQU1f",
-            "RVJST1JfUkVBU09OX0NMT1NFRBADEh4KGlNUUkVBTV9FUlJPUl9SRUFTT05f",
-            "RkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFVRU5DRV9UT09f",
-            "TE9XEAUSJQohU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFfRElWRVJHRU5UEAYS",
-            "IQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfT1dORVIQBxImCiJTVFJFQU1f",
-            "RVJST1JfUkVBU09OX0ZPUk1BVF9UT09fTkVXEAgSJwojU1RSRUFNX0VSUk9S",
-            "X1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQCRIhCh1TVFJFQU1fRVJST1JfUkVB",
-            "U09OX1RPT19MQVJHRRAKEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fSU5WQUxJ",
-            "RBALEisKJ1NUUkVBTV9FUlJPUl9SRUFTT05fU1RPUkFHRV9VTkFWQUlMQUJM",
-            "RRAMEiMKH1NUUkVBTV9FUlJPUl9SRUFTT05fVU5TVVBQT1JURUQQDRImCiJT",
-            "VFJFQU1fRVJST1JfUkVBU09OX0FMUkVBRFlfRVhJU1RTEA4SJwojU1RSRUFN",
-            "X0VSUk9SX1JFQVNPTl9TVE9SQUdFX0NPUlJVUFQQD0KDAQoYaW8udGVtcG9y",
-            "YWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Qcm90b1ABWiFnby50ZW1wb3JhbC5p",
-            "by9hcGkvZW51bXMvdjE7ZW51bXOqAhdUZW1wb3JhbGlvLkFwaS5FbnVtcy5W",
-            "MeoCGlRlbXBvcmFsaW86OkFwaTo6RW51bXM6OlYxYgZwcm90bzM="));
+            "RBADKpMBChZTdHJlYW1JZENvbmZsaWN0UG9saWN5EikKJVNUUkVBTV9JRF9D",
+            "T05GTElDVF9QT0xJQ1lfVU5TUEVDSUZJRUQQABIiCh5TVFJFQU1fSURfQ09O",
+            "RkxJQ1RfUE9MSUNZX0ZBSUwQARIqCiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9M",
+            "SUNZX1VTRV9FWElTVElORxACKugEChFTdHJlYW1FcnJvclJlYXNvbhIjCh9T",
+            "VFJFQU1fRVJST1JfUkVBU09OX1VOU1BFQ0lGSUVEEAASIQodU1RSRUFNX0VS",
+            "Uk9SX1JFQVNPTl9OT1RfRk9VTkQQARIfChtTVFJFQU1fRVJST1JfUkVBU09O",
+            "X0VYUElSRUQQAhIeChpTVFJFQU1fRVJST1JfUkVBU09OX0NMT1NFRBADEh4K",
+            "GlNUUkVBTV9FUlJPUl9SRUFTT05fRkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9S",
+            "X1JFQVNPTl9TRVFVRU5DRV9UT09fTE9XEAUSJQohU1RSRUFNX0VSUk9SX1JF",
+            "QVNPTl9TRVFfRElWRVJHRU5UEAYSIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9O",
+            "T1RfT1dORVIQBxImCiJTVFJFQU1fRVJST1JfUkVBU09OX0ZPUk1BVF9UT09f",
+            "TkVXEAgSJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQ",
+            "CRIhCh1TVFJFQU1fRVJST1JfUkVBU09OX1RPT19MQVJHRRAKEh8KG1NUUkVB",
+            "TV9FUlJPUl9SRUFTT05fSU5WQUxJRBALEisKJ1NUUkVBTV9FUlJPUl9SRUFT",
+            "T05fU1RPUkFHRV9VTkFWQUlMQUJMRRAMEiMKH1NUUkVBTV9FUlJPUl9SRUFT",
+            "T05fVU5TVVBQT1JURUQQDRImCiJTVFJFQU1fRVJST1JfUkVBU09OX0FMUkVB",
+            "RFlfRVhJU1RTEA4SJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9TVE9SQUdFX0NP",
+            "UlJVUFQQD0KDAQoYaW8udGVtcG9yYWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Q",
+            "cm90b1ABWiFnby50ZW1wb3JhbC5pby9hcGkvZW51bXMvdjE7ZW51bXOqAhdU",
+            "ZW1wb3JhbGlvLkFwaS5FbnVtcy5WMeoCGlRlbXBvcmFsaW86OkFwaTo6RW51",
+            "bXM6OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamCloseStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
     }
     #endregion
 
@@ -72,28 +68,6 @@ namespace Temporalio.Api.Enums.V1 {
     [pbr::OriginalName("STREAM_STATUS_OPEN")] Open = 1,
     [pbr::OriginalName("STREAM_STATUS_CLOSED")] Closed = 2,
     [pbr::OriginalName("STREAM_STATUS_EXPIRED")] Expired = 3,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
-  /// How a Stream closed. CLOSED comes from a Producer that called close(). Native Streams add their
-  /// own close statuses later.
-  /// (-- api-linter: core::0216::synonyms=disabled
-  ///     aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
-  /// </summary>
-  public enum StreamCloseStatus {
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_CLOSE_STATUS_CLOSED")] Closed = 1,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
-  /// Where a read starts when it has no from_offset.
-  /// </summary>
-  public enum StreamReadStart {
-    [pbr::OriginalName("STREAM_READ_START_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_READ_START_BEGINNING")] Beginning = 1,
-    [pbr::OriginalName("STREAM_READ_START_END")] End = 2,
   }
 
   /// <summary>
