@@ -10,10 +10,10 @@ use prost_types::field_descriptor_proto::Type;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, JsonModelSpec, OperationSpec,
-    RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
-    ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
-    TypeFamily, TypeSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, IntSpec, JsonModelSpec,
+    OperationSpec, RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec,
+    ResourceResultSpec, ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec,
+    ServiceSpec, Symbol, TypeFamily, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -432,7 +432,7 @@ fn resolve_resource_method(
         return Ok(ResolvedResourceMethodSpec {
             name: method.name.clone(),
             doc: method.doc.clone(),
-            params: method.params.clone(),
+            params: bytes_bound_params(spec, &method.params, &request_plan),
             result: method.result.clone(),
             varargs: method.varargs.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
@@ -494,14 +494,97 @@ fn resolve_resource_method(
         }
     };
 
+    let params = match &binding {
+        ResolvedResourceMethodBinding::Operation { request_plan, .. } => {
+            bytes_bound_params(spec, &method.params, request_plan)
+        }
+        ResolvedResourceMethodBinding::Stub => method.params.clone(),
+    };
     Ok(ResolvedResourceMethodSpec {
         name: method.name.clone(),
         doc: method.doc.clone(),
-        params: method.params.clone(),
+        params,
         result: method.result.clone(),
         varargs: method.varargs.clone(),
         binding,
     })
+}
+
+/// A proto-backed record reads a `list<u8>` field as the proto `bytes`. A method parameter that
+/// fills such a field takes `bytes` too, or the method could not pass its value to the request.
+fn bytes_bound_params(
+    spec: &ApiSpec<SelectedFamily>,
+    params: &[ResourceFieldSpec<SelectedFamily>],
+    request_plan: &RequestPlan,
+) -> Vec<ResourceFieldSpec<SelectedFamily>> {
+    let mut bytes_params = BTreeSet::new();
+    collect_bytes_params(spec, request_plan, &mut bytes_params);
+    params
+        .iter()
+        .cloned()
+        .map(|mut param| {
+            if bytes_params.contains(param.name.as_str())
+                && let Some(field_type) = list_as_bytes(&param.field_type)
+            {
+                param.field_type = field_type;
+            }
+            param
+        })
+        .collect()
+}
+
+fn collect_bytes_params<'a>(
+    spec: &ApiSpec<SelectedFamily>,
+    plan: &'a RequestPlan,
+    bytes_params: &mut BTreeSet<&'a str>,
+) {
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = plan
+    else {
+        return;
+    };
+    let record = spec
+        .record(message_name)
+        .or_else(|| spec.record_for_proto(message_name));
+    for field in fields {
+        match &field.value {
+            RequestPlan::Source(RequestPlanSource::MethodParam(param_name)) => {
+                let is_bytes = record
+                    .and_then(|record| {
+                        record
+                            .fields
+                            .values()
+                            .find(|record_field| record_field.name == field.field_name)
+                    })
+                    .is_some_and(|record_field| {
+                        matches!(record_field.field_type.without_option(), TypeSpec::Bytes)
+                    });
+                if is_bytes {
+                    bytes_params.insert(param_name.as_str());
+                }
+            }
+            RequestPlan::Source(RequestPlanSource::ResourceField(_)) => {}
+            child @ RequestPlan::Construct { .. } => {
+                collect_bytes_params(spec, child, bytes_params);
+            }
+        }
+    }
+}
+
+/// A WIT `u8` reads as a `u32` integer, so this matches the list of integers that a `list<u8>`
+/// parameter reads as.
+fn list_as_bytes(param_type: &TypeSpec<SelectedFamily>) -> Option<TypeSpec<SelectedFamily>> {
+    match param_type {
+        TypeSpec::List(item) if matches!(**item, TypeSpec::Int(IntSpec::U32)) => {
+            Some(TypeSpec::Bytes)
+        }
+        TypeSpec::Option(inner) => {
+            list_as_bytes(inner).map(|bytes| TypeSpec::Option(Box::new(bytes)))
+        }
+        _ => None,
+    }
 }
 
 fn resource_method_result_matches_operation(
@@ -1099,7 +1182,7 @@ mod tests {
     use crate::descriptors::DescriptorIndex;
     use crate::language::Language;
     use crate::spec::{
-        ApiSpec, ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass, SelectedFamily,
+        ApiSpec, ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass, SelectedFamily, TypeSpec,
     };
 
     use super::{
@@ -1402,6 +1485,49 @@ interface user-service {
             method.binding,
             ResolvedResourceMethodBinding::Stub
         ));
+    }
+
+    #[test]
+    fn a_list_u8_parameter_that_fills_a_proto_bytes_field_is_bytes() {
+        let wit = r#"
+package test:bytes@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  /// @nexus.proto "temporal.api.common.v1.Callback.Internal"
+  record callback-internal {
+    data: option<list<u8>>,
+  }
+
+  resource callback {
+    constructor();
+    send: func(data: option<list<u8>>);
+  }
+
+  send: func(request: callback-internal);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let resolved = resolve_service_resources(
+            &spec,
+            &spec.services[0],
+            &descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
+
+        let method = &resolved.resources[0].methods[0];
+        assert!(matches!(
+            method.binding,
+            ResolvedResourceMethodBinding::Operation { .. }
+        ));
+        assert_eq!(
+            method.params[0].field_type,
+            TypeSpec::Option(Box::new(TypeSpec::Bytes))
+        );
     }
 
     #[test]

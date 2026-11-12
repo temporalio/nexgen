@@ -586,7 +586,8 @@ in proto-backed records. Protobuf repeated and map fields have no presence
 information, so decoding their wire values produces collections even when empty;
 their API fields do not gain implicit constructor defaults.
 
-In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
+In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`. A
+resource method parameter of `list<u8>` that fills such a field is `bytes` too.
 nexgen generates Python `bytes`, TypeScript `Uint8Array`, Go `[]byte`, or .NET
 `byte[]`. The .NET converters translate between `byte[]` and protobuf
 `ByteString` at the wire boundary. In other records, `list<u8>` is a list of
