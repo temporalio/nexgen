@@ -1,13 +1,14 @@
 extern alias Streams;
 
+using System;
 using System.Linq;
+using System.Reflection;
 using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using StreamServiceExample = Streams::Temporalio.Workflows;
 using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
-using WireReadRecordsResponse = Streams::Temporalio.Api.StreamService.V1.ReadRecordsResponse;
-using WireStreamRecord = Streams::Temporalio.Api.Stream.V1.StreamRecord;
+using WireReadRecordsRequest = Streams::Temporalio.Api.StreamService.V1.ReadRecordsRequest;
 
 namespace Nexgen.DotNetExamples.Tests
 {
@@ -32,41 +33,30 @@ namespace Nexgen.DotNetExamples.Tests
         public void DeclaredRefParametersPropagateThroughRequests()
         {
             var reference = new StreamServiceExample.StreamRef<Turn>("stream-1");
-            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null, null);
+            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null);
             var decoded = FromPayload<StreamServiceExample.CreateStreamRequest<Turn>>(ToPayload(request));
             Assert.Equal(reference, decoded.StreamRef);
             Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.StreamRef);
         }
 
-        // A data item's body goes through the payload converter of the sample assembly, which a
-        // test can't set. The TypeScript test covers data items.
         [Fact]
-        public void ReadItemsRoundTripAsTheirRecords()
+        public void AReadFromOffsetRoundTripsAsBytes()
         {
-            var model = new StreamServiceExample.ReadRecordsResponse<Turn>(new[]
+            var offset = new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 };
+            var model = new StreamServiceExample.ReadRecordsRequest<Turn>(
+                new StreamServiceExample.StreamRef<Turn>("stream-1"))
             {
-                new StreamServiceExample.StreamRecord<Turn>
-                {
-                    Item = new StreamServiceExample.StreamItem<Turn>.Superseded(
-                        new StreamServiceExample.StreamSuperseded("workflow-1", new long[] { 7 })),
-                    Offset = 2,
-                },
-            });
+                FromOffset = offset,
+            };
 
-            var wire = Assert.IsType<WireReadRecordsResponse>(
-                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsResponse<Turn>))
+            var wire = Assert.IsType<WireReadRecordsRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.ReadRecordsRequest<Turn>))
                     .ToTransferType(model));
-            Assert.Equal(
-                new[] { WireStreamRecord.ItemOneofCase.Superseded },
-                wire.Records.Select(record => record.ItemCase));
+            Assert.Equal(offset, wire.FromOffset.ToByteArray());
 
-            var decoded = FromPayload<StreamServiceExample.ReadRecordsResponse<Turn>>(
+            var decoded = FromPayload<StreamServiceExample.ReadRecordsRequest<Turn>>(
                 ToPayload(model));
-            var superseded = Assert.IsType<StreamServiceExample.StreamItem<Turn>.Superseded>(
-                decoded.Records[0].Item);
-            Assert.Equal("workflow-1", superseded.Value.ProducerId);
-            Assert.Equal(new long[] { 7 }, superseded.Value.FailedTasks);
-            Assert.Equal(2, decoded.Records[0].Offset);
+            Assert.Equal(offset, decoded.FromOffset);
         }
 
         // A newer server can send a Stream status that this code doesn't know.
@@ -84,12 +74,37 @@ namespace Nexgen.DotNetExamples.Tests
             Assert.Equal(StreamServiceExample.StreamStatus.StreamStatusUnspecified, decoded.Status);
         }
 
-        // Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
+        // Four operations are api-omitted, so only the create keeps a public convenience method.
         [Fact]
-        public void AWorkflowReadTakesNoLast()
+        public void ApiOmitHidesTheOperationConvenienceMethods()
         {
-            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions<Turn>).GetProperty("Last"));
-            Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest<Turn>).GetProperty("Last"));
+            var assembly = typeof(StreamServiceExample.Stream<Turn>).Assembly;
+            foreach (var name in new[]
+            {
+                "AppendRecordsOptions`1",
+                "CloseStreamOptions`1",
+                "ReadRecordsOptions`1",
+                "DescribeStreamOptions`1",
+            })
+            {
+                var type = assembly.GetType("Temporalio.Workflows." + name);
+                Assert.NotNull(type);
+                Assert.False(type!.IsPublic);
+            }
+            Assert.True(typeof(StreamServiceExample.CreateStreamOptions<Turn>).IsPublic);
+
+            var publicOperationMethods = typeof(StreamServiceExample.Operations)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => method.Name.EndsWith("Async", StringComparison.Ordinal))
+                .Select(method => method.Name)
+                .Distinct();
+            Assert.Equal(new[] { "CreateStreamAsync" }, publicOperationMethods);
+
+            // The Stream resource still binds every operation.
+            foreach (var method in new[] { "AppendAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
+            {
+                Assert.NotNull(typeof(StreamServiceExample.Stream<Turn>).GetMethod(method));
+            }
         }
     }
 }

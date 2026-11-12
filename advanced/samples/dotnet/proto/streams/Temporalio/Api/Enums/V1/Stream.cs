@@ -28,33 +28,30 @@ namespace Temporalio.Api.Enums.V1 {
             "bC5hcGkuZW51bXMudjEqegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
             "VVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIYChRT",
             "VFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQSVJF",
-            "RBADKnAKD1N0cmVhbVJlYWRTdGFydBIhCh1TVFJFQU1fUkVBRF9TVEFSVF9V",
-            "TlNQRUNJRklFRBAAEh8KG1NUUkVBTV9SRUFEX1NUQVJUX0JFR0lOTklORxAB",
-            "EhkKFVNUUkVBTV9SRUFEX1NUQVJUX0VORBACKpMBChZTdHJlYW1JZENvbmZs",
-            "aWN0UG9saWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVD",
-            "SUZJRUQQABIiCh5TVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX0ZBSUwQARIq",
-            "CiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKpAF",
-            "ChFTdHJlYW1FcnJvclJlYXNvbhIjCh9TVFJFQU1fRVJST1JfUkVBU09OX1VO",
-            "U1BFQ0lGSUVEEAASIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfRk9VTkQQ",
-            "ARIfChtTVFJFQU1fRVJST1JfUkVBU09OX0VYUElSRUQQAhIeChpTVFJFQU1f",
-            "RVJST1JfUkVBU09OX0NMT1NFRBADEh4KGlNUUkVBTV9FUlJPUl9SRUFTT05f",
-            "RkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFVRU5DRV9UT09f",
-            "TE9XEAUSJQohU1RSRUFNX0VSUk9SX1JFQVNPTl9TRVFfRElWRVJHRU5UEAYS",
-            "IQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfT1dORVIQBxImCiJTVFJFQU1f",
-            "RVJST1JfUkVBU09OX0ZPUk1BVF9UT09fTkVXEAgSJwojU1RSRUFNX0VSUk9S",
-            "X1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQCRIhCh1TVFJFQU1fRVJST1JfUkVB",
-            "U09OX1RPT19MQVJHRRAKEh8KG1NUUkVBTV9FUlJPUl9SRUFTT05fSU5WQUxJ",
-            "RBALEisKJ1NUUkVBTV9FUlJPUl9SRUFTT05fU1RPUkFHRV9VTkFWQUlMQUJM",
-            "RRAMEiYKIlNUUkVBTV9FUlJPUl9SRUFTT05fVU5LTk9XTl9XUklURVIQDRIj",
-            "Ch9TVFJFQU1fRVJST1JfUkVBU09OX1VOU1VQUE9SVEVEEA4SJgoiU1RSRUFN",
-            "X0VSUk9SX1JFQVNPTl9BTFJFQURZX0VYSVNUUxAPEicKI1NUUkVBTV9FUlJP",
-            "Ul9SRUFTT05fU1RPUkFHRV9DT1JSVVBUEBBCgwEKGGlvLnRlbXBvcmFsLmFw",
-            "aS5lbnVtcy52MUILU3RyZWFtUHJvdG9QAVohZ28udGVtcG9yYWwuaW8vYXBp",
-            "L2VudW1zL3YxO2VudW1zqgIXVGVtcG9yYWxpby5BcGkuRW51bXMuVjHqAhpU",
-            "ZW1wb3JhbGlvOjpBcGk6OkVudW1zOjpWMWIGcHJvdG8z"));
+            "RBADKpMBChZTdHJlYW1JZENvbmZsaWN0UG9saWN5EikKJVNUUkVBTV9JRF9D",
+            "T05GTElDVF9QT0xJQ1lfVU5TUEVDSUZJRUQQABIiCh5TVFJFQU1fSURfQ09O",
+            "RkxJQ1RfUE9MSUNZX0ZBSUwQARIqCiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9M",
+            "SUNZX1VTRV9FWElTVElORxACKugEChFTdHJlYW1FcnJvclJlYXNvbhIjCh9T",
+            "VFJFQU1fRVJST1JfUkVBU09OX1VOU1BFQ0lGSUVEEAASIQodU1RSRUFNX0VS",
+            "Uk9SX1JFQVNPTl9OT1RfRk9VTkQQARIfChtTVFJFQU1fRVJST1JfUkVBU09O",
+            "X0VYUElSRUQQAhIeChpTVFJFQU1fRVJST1JfUkVBU09OX0NMT1NFRBADEh4K",
+            "GlNUUkVBTV9FUlJPUl9SRUFTT05fRkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9S",
+            "X1JFQVNPTl9TRVFVRU5DRV9UT09fTE9XEAUSJQohU1RSRUFNX0VSUk9SX1JF",
+            "QVNPTl9TRVFfRElWRVJHRU5UEAYSIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9O",
+            "T1RfT1dORVIQBxImCiJTVFJFQU1fRVJST1JfUkVBU09OX0ZPUk1BVF9UT09f",
+            "TkVXEAgSJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQ",
+            "CRIhCh1TVFJFQU1fRVJST1JfUkVBU09OX1RPT19MQVJHRRAKEh8KG1NUUkVB",
+            "TV9FUlJPUl9SRUFTT05fSU5WQUxJRBALEisKJ1NUUkVBTV9FUlJPUl9SRUFT",
+            "T05fU1RPUkFHRV9VTkFWQUlMQUJMRRAMEiMKH1NUUkVBTV9FUlJPUl9SRUFT",
+            "T05fVU5TVVBQT1JURUQQDRImCiJTVFJFQU1fRVJST1JfUkVBU09OX0FMUkVB",
+            "RFlfRVhJU1RTEA4SJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9TVE9SQUdFX0NP",
+            "UlJVUFQQD0KDAQoYaW8udGVtcG9yYWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Q",
+            "cm90b1ABWiFnby50ZW1wb3JhbC5pby9hcGkvZW51bXMvdjE7ZW51bXOqAhdU",
+            "ZW1wb3JhbGlvLkFwaS5FbnVtcy5WMeoCGlRlbXBvcmFsaW86OkFwaTo6RW51",
+            "bXM6OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamReadStart), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
     }
     #endregion
 
@@ -75,16 +72,6 @@ namespace Temporalio.Api.Enums.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Where a read starts when it has no from_offset.
-  /// </summary>
-  public enum StreamReadStart {
-    [pbr::OriginalName("STREAM_READ_START_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("STREAM_READ_START_BEGINNING")] Beginning = 1,
-    [pbr::OriginalName("STREAM_READ_START_END")] End = 2,
-  }
-
-  /// <summary>
-  /// Experimental. Might change in the future.
   /// What a create does when its Stream exists. Unspecified is FAIL, as for a Workflow start.
   /// </summary>
   public enum StreamIdConflictPolicy {
@@ -101,26 +88,26 @@ namespace Temporalio.Api.Enums.V1 {
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Why a Stream call failed. Each reason has one gRPC status code. An SDK raises its own error
-  /// class for each reason that code can act on, and a base class for the others.
+  /// Why a Stream call failed. Each reason has one gRPC status code, and several reasons share a
+  /// code. So code matches on the reason, and not on the status code. An SDK raises one error type
+  /// that carries the reason.
   /// </summary>
   public enum StreamErrorReason {
     [pbr::OriginalName("STREAM_ERROR_REASON_UNSPECIFIED")] Unspecified = 0,
     /// <summary>
-    /// Nobody created the Stream, even after `create_wait`. NOT_FOUND.
+    /// Nobody created the Stream. NOT_FOUND.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_FOUND")] NotFound = 1,
     /// <summary>
-    /// The Stream's Retention or safety TTL passed. NOT_FOUND.
+    /// The Stream's Retention or its last-write TTL passed. NOT_FOUND.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_EXPIRED")] Expired = 2,
     /// <summary>
-    /// The Stream is closed. FAILED_PRECONDITION.
+    /// The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_CLOSED")] Closed = 3,
     /// <summary>
-    /// The Producer's epoch is lower than the newest one, its Workflow Task was withdrawn, or a
-    /// Workflow retry withdrew its run. FAILED_PRECONDITION.
+    /// The Producer's epoch is lower than the newest one. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_FENCED")] Fenced = 4,
     /// <summary>
@@ -133,8 +120,7 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_SEQ_DIVERGENT")] SeqDivergent = 6,
     /// <summary>
-    /// A create gives another owner than the Stream has, or the owner doesn't allow this close.
-    /// FAILED_PRECONDITION.
+    /// The caller may not create or close this Stream. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_OWNER")] NotOwner = 7,
     /// <summary>
@@ -142,8 +128,8 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_FORMAT_TOO_NEW")] FormatTooNew = 8,
     /// <summary>
-    /// The offset is past the newest offset + 1, for example after a failover lost the newest
-    /// Records. A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+    /// The offset is past the newest offset, for example after a failover lost the newest Records.
+    /// A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_OFFSET_TOO_HIGH")] OffsetTooHigh = 9,
     /// <summary>
@@ -159,22 +145,18 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_UNAVAILABLE")] StorageUnavailable = 12,
     /// <summary>
-    /// No writer has the id. The SDK's in-process writer only. NOT_FOUND.
-    /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_UNKNOWN_WRITER")] UnknownWriter = 13,
-    /// <summary>
     /// The Store lacks a capability that the call needs. UNIMPLEMENTED.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 14,
+    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 13,
     /// <summary>
     /// A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 15,
+    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 14,
     /// <summary>
     /// The Store gave back data that isn't valid, such as a stored value with the wrong length. A
     /// retry reads the same data. DATA_LOSS.
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 16,
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 15,
   }
 
   #endregion

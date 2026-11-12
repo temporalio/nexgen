@@ -662,6 +662,7 @@ impl<'a> ApiPlanner<'a> {
                 .map(support_reference),
             runtime_type_parameters,
             output_record_type_parameters,
+            api_omitted: &operation.api_omitted,
         })
     }
 
@@ -3176,9 +3177,17 @@ struct RenderedOperation<'a> {
     serialization_context_expr: Option<String>,
     runtime_type_parameters: Vec<String>,
     output_record_type_parameters: Vec<String>,
+    /// Targets whose public top-level function `@nexus.api-omit` suppresses.
+    api_omitted: &'a BTreeSet<GenerationTarget>,
 }
 
 impl RenderedOperation<'_> {
+    /// Whether `@nexus.api-omit` drops this operation's barrel export for the target. The
+    /// operation module, the service, and resource binding stay.
+    fn api_omitted_for(&self, target: GenerationTarget) -> bool {
+        self.api_omitted.contains(&target)
+    }
+
     fn function_type_parameters(&self) -> Vec<RenderedTypeParameter> {
         let mut parameters = self
             .input
@@ -4151,6 +4160,11 @@ fn render_index_module(
     for service in services {
         if service.endpoint.is_some() {
             for operation in &service.operations {
+                // An api-omitted operation keeps its module, which resource methods import, but
+                // the package barrel no longer re-exports its function.
+                if operation.api_omitted_for(GenerationTarget::Workflow) {
+                    continue;
+                }
                 body.push_str("export { ");
                 body.push_str(&operation.attr_name);
                 body.push_str(" } from './operations/");

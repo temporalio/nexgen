@@ -839,6 +839,7 @@ fn build_wit_variant_spec(
     let doc = directive(&directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let proto_backed = directive(&directives, "proto", path, &context)?.is_some();
     let cases = variant
         .cases
         .iter()
@@ -852,7 +853,7 @@ fn build_wit_variant_spec(
                 .ty
                 .as_ref()
                 .map(|ty| {
-                    resolve_authored_field_type_spec(resolve, ty, path, &case_context)
+                    resolve_field_type_spec(resolve, ty, proto_backed, path, &case_context)
                         .map(|field_type| authored_field_type_for_language(field_type, language))
                 })
                 .transpose()?;
@@ -1221,13 +1222,7 @@ fn build_fields_from_record(
             }
 
             let field_type = authored_field_type_for_language(
-                resolve_record_field_type_spec(
-                    resolve,
-                    &field.ty,
-                    proto_backed,
-                    path,
-                    &field_context,
-                )?,
+                resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
                 language,
             );
             fields.insert(
@@ -1258,7 +1253,7 @@ fn build_fields_from_record(
             .map(directive_language_string)
             .filter(|doc| !doc.is_empty());
         let field_type = authored_field_type_for_language(
-            resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
+            resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
         let api_omit_targets = api_omit_directive
@@ -1435,9 +1430,10 @@ fn build_type_replacement(
     }))
 }
 
-/// Resolves the type of a record field. A proto-backed record spells a proto `bytes` field as
-/// `list<u8>`, so the field is bytes there. A record without a proto keeps a list of integers.
-fn resolve_record_field_type_spec(
+/// Resolves the type of a record field or a variant case. A proto-backed record or oneof variant
+/// spells a proto `bytes` member as `list<u8>`, so the type is bytes there. Without a proto it
+/// stays a list of integers.
+fn resolve_field_type_spec(
     resolve: &Resolve,
     ty: &Type,
     proto_backed: bool,
@@ -3234,6 +3230,27 @@ fn build_operation(
     let context_propagation_header =
         build_operation_context_propagation(resolve, function, &directives, path, &context)?;
     let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
+    // On a free func, `@nexus.api-omit` hides the operation's public top-level function for its
+    // targets while keeping the operation registered and bindable by resource methods. Only the
+    // workflow target has a top-level function, so a workflow-excluding `targets` does nothing and
+    // is rejected rather than silently ignored.
+    let api_omitted = match directive(&directives, "api-omit", path, &context)? {
+        Some(api_omit) => {
+            let targets = build_origin_targets(api_omit, path, &context, "api-omit")?;
+            if !targets.contains(&GenerationTarget::Workflow) {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.clone(),
+                    directive: "@nexus.api-omit".to_string(),
+                    reason: "on a function, `@nexus.api-omit` omits the workflow top-level \
+                             function, so `targets` must include `workflow`"
+                        .to_string(),
+                });
+            }
+            targets.into_iter().collect()
+        }
+        None => BTreeSet::new(),
+    };
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3275,6 +3292,7 @@ fn build_operation(
         serialization_context,
         context_propagation_header,
         poll,
+        api_omitted,
         data: (),
     })
 }

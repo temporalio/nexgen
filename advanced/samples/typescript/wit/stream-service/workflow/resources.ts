@@ -2,7 +2,6 @@
 
 import type * as common from "@temporalio/common";
 import type {
-  StreamReadStart,
   StreamRef,
   AppendRecordsResponse,
   ReadRecordsResponse,
@@ -29,7 +28,7 @@ export class Stream<BodyT = unknown> {
     return this.#bodyType;
   }
 
-  public async publish(records: BodyT[]): Promise<AppendRecordsResponse> {
+  public async append(records: BodyT[]): Promise<AppendRecordsResponse> {
     const request = { ref: this.ref, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
@@ -42,20 +41,16 @@ export class Stream<BodyT = unknown> {
   }
 
   public async read(
-    fromOffset?: number,
-    start?: StreamReadStart,
+    fromOffset?: number[],
     maxRecords?: number,
     wait?: common.Duration,
-    createWait?: common.Duration,
     maxBytes?: number,
   ): Promise<ReadRecordsResponse<BodyT>> {
     const request = {
       ref: this.ref,
       fromOffset: fromOffset,
-      start: start,
       maxRecords: maxRecords,
       wait: wait,
-      createWait: createWait,
       maxBytes: maxBytes,
     };
     const handle = await readRecords(request, this.bodyType);
