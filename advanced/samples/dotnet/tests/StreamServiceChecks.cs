@@ -1,6 +1,8 @@
 extern alias Streams;
 
+using System;
 using System.Linq;
+using System.Reflection;
 using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
@@ -135,8 +137,47 @@ namespace Nexgen.DotNetExamples.Tests
         [Fact]
         public void AWorkflowReadTakesNoLast()
         {
-            Assert.Null(typeof(StreamServiceExample.ReadRecordsOptions<Turn>).GetProperty("Last"));
+            var assembly = typeof(StreamServiceExample.Stream<Turn>).Assembly;
+            // `read-records` is api-omitted, so its options type is no longer part of the public API.
+            var options = assembly.GetType("Temporalio.Workflows.ReadRecordsOptions`1");
+            Assert.NotNull(options);
+            Assert.False(options!.IsPublic);
+            Assert.Null(options.GetProperty("Last"));
+            // The wire request keeps `Last`, since the field-level api-omit only hides the convenience.
             Assert.NotNull(typeof(StreamServiceExample.ReadRecordsRequest<Turn>).GetProperty("Last"));
+        }
+
+        // Four operations are api-omitted, so only the create keeps a public convenience method.
+        [Fact]
+        public void ApiOmitHidesTheOperationConvenienceMethods()
+        {
+            var assembly = typeof(StreamServiceExample.Stream<Turn>).Assembly;
+            foreach (var name in new[]
+            {
+                "AppendRecordsOptions`1",
+                "CloseStreamOptions`1",
+                "ReadRecordsOptions`1",
+                "DescribeStreamOptions`1",
+            })
+            {
+                var type = assembly.GetType("Temporalio.Workflows." + name);
+                Assert.NotNull(type);
+                Assert.False(type!.IsPublic);
+            }
+            Assert.True(typeof(StreamServiceExample.CreateStreamOptions<Turn>).IsPublic);
+
+            var publicOperationMethods = typeof(StreamServiceExample.Operations)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => method.Name.EndsWith("Async", StringComparison.Ordinal))
+                .Select(method => method.Name)
+                .Distinct();
+            Assert.Equal(new[] { "CreateStreamAsync" }, publicOperationMethods);
+
+            // The Stream resource still binds every operation.
+            foreach (var method in new[] { "PublishAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
+            {
+                Assert.NotNull(typeof(StreamServiceExample.Stream<Turn>).GetMethod(method));
+            }
         }
     }
 }

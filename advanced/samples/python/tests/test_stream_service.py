@@ -187,8 +187,10 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 def test_a_workflow_read_takes_no_last(
     api: types.ModuleType, model_types: types.ModuleType
 ) -> None:
-    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only.
-    assert "last" not in inspect.signature(api.read_records).parameters
+    # Replay needs a fixed range, so the WIT omits `last` from the Workflow API only. The read is
+    # reached through the Stream resource, since `@nexus.api-omit` drops the top-level function.
+    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
+    assert "last" not in inspect.signature(stream.read).parameters
     request = model_types.ReadRecordsRequest(
         ref=model_types.StreamRef(id="s-1"), last=3
     )
@@ -243,9 +245,6 @@ async def test_workflow_apis_call_the_stream_service(
     stream = await api.create_stream(id=ref.id, body_type=str)
     response = await stream.publish("a", "b")
     assert response.last_offset == _offset(3)
-    # The free function hands back a Nexus handle, so the caller awaits it for the batch.
-    handle = await api.append_records(ref=ref, records=["a", "b"])
-    assert (await handle).last_offset == _offset(3)
     # The Workflow API fills the request id and the producer from its sources.
     run = model_types.Producer(id="wf:r2", run_id="r2")
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
@@ -253,10 +252,6 @@ async def test_workflow_apis_call_the_stream_service(
         (
             "CreateStream",
             model_types.CreateStreamRequest(stream_ref=ref, request_id=str(request_id)),
-        ),
-        (
-            "AppendRecords",
-            model_types.AppendRecordsRequest(ref=ref, records=records, producer=run),
         ),
         (
             "AppendRecords",
@@ -400,7 +395,7 @@ async def test_a_decoded_ref_builds_a_typed_workflow_handle(
     "construction",
     ["typed", "matching", "none", "unknown", "override", "explicit-unknown"],
 )
-async def test_public_read_records_uses_the_refs_payload_type(
+async def test_a_workflow_handle_reads_with_its_refs_payload_type(
     monkeypatch: pytest.MonkeyPatch, construction: str
 ) -> None:
     payload = SYSTEM_CONVERTER.to_payload(
@@ -435,72 +430,48 @@ async def test_public_read_records_uses_the_refs_payload_type(
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     typed = workflow_models.StreamRef[Turn](id="s1")
     unknown = workflow_models.StreamRef(id="s1")
+    # The operations are api-omitted, so a read goes through the Stream resource.
     if construction == "typed":
-        handle = await workflow_only.read_records(ref=typed)
-        _ = assert_type(
-            handle,
-            temporalio.workflow.NexusOperationHandle[
-                workflow_models.ReadRecordsResponse[Turn]
-            ],
-        )
+        stream = workflow_only.get_stream(ref=typed)
     elif construction == "matching":
-        handle = await workflow_only.read_records(ref=typed, body_type=Turn)
+        stream = workflow_only.get_stream(ref=typed, body_type=Turn)
     elif construction == "none":
-        handle = await workflow_only.read_records(ref=typed, body_type=None)
+        stream = workflow_only.get_stream(ref=typed, body_type=None)
     elif construction == "override":
-        handle = await workflow_only.read_records(ref=unknown, body_type=Turn)
+        stream = workflow_only.get_stream(ref=unknown, body_type=Turn)
     elif construction == "explicit-unknown":
-        handle = await workflow_only.read_records(
+        stream = workflow_only.get_stream(
             ref=workflow_models.StreamRef[object](id="s1"), body_type=Turn
         )
     else:
-        unknown_handle = await workflow_only.read_records(ref=unknown)
-        _ = assert_type(
-            unknown_handle,
-            temporalio.workflow.NexusOperationHandle[
-                workflow_models.ReadRecordsResponse[object]
-            ],
-        )
-        [record] = (await unknown_handle).records
+        unknown_stream = workflow_only.get_stream(ref=unknown)
+        _ = assert_type(unknown_stream, WorkflowStream[object])
+        [record] = (await unknown_stream.read()).records
         assert record.item == workflow_models.StreamItemData(
             workflow_models.StreamData(body={"role": "model"})
         )
         return
 
-    _ = assert_type(
-        handle,
-        temporalio.workflow.NexusOperationHandle[
-            workflow_models.ReadRecordsResponse[Turn]
-        ],
-    )
-    [record] = (await handle).records
+    _ = assert_type(stream, WorkflowStream[Turn])
+    [record] = (await stream.read()).records
     assert record.item == workflow_models.StreamItemData(
         workflow_models.StreamData(body=Turn(role="model"))
     )
-    # The combined package exposes the same operation contract.
-    both_handle = await both_workflow.read_records(
-        ref=both_models.StreamRef[Turn](id="s1")
-    )
-    _ = assert_type(
-        both_handle,
-        temporalio.workflow.NexusOperationHandle[both_models.ReadRecordsResponse[Turn]],
-    )
-    assert (await both_handle).records[0].item == both_models.StreamItemData(
+    # The combined package reads with the same payload type.
+    both_stream = both_workflow.get_stream(ref=both_models.StreamRef[Turn](id="s1"))
+    assert (await both_stream.read()).records[0].item == both_models.StreamItemData(
         both_models.StreamData(body=Turn(role="model"))
     )
     with pytest.raises(TypeError, match="decoding type must match"):
-        _ = await workflow_only.read_records(
-            ref=typing.cast(typing.Any, typed), body_type=str
-        )
+        _ = workflow_only.get_stream(ref=typing.cast(typing.Any, typed), body_type=str)
 
     if typing.TYPE_CHECKING:
-        _ = await workflow_only.read_records(ref=typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
+        _ = workflow_only.get_stream(ref=typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
         records = [Turn(role="model")]
-        _ = await workflow_only.append_records(ref=typed, records=records)
-        _ = await workflow_only.append_records(
-            ref=workflow_models.StreamRef[str](id="s1"),
-            records=records,  # pyright: ignore[reportArgumentType]
-        )
+        _ = await workflow_only.get_stream(ref=typed).publish(*records)
+        _ = await workflow_only.get_stream(
+            ref=workflow_models.StreamRef[str](id="s1")
+        ).publish(*records)  # pyright: ignore[reportArgumentType]
 
 
 def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
@@ -653,6 +624,46 @@ def test_a_workflow_factory_builds_a_handle_with_no_call(
     assert stream.ref == ref
     assert stream.created is None
     assert stream.body_type is str
+
+
+@pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+def test_api_omit_hides_the_public_operation_functions(
+    api: types.ModuleType, model_types: types.ModuleType
+) -> None:
+    hidden = (
+        "append_records",
+        "close_stream",
+        "describe_stream",
+        "read_records",
+    )
+    for name in hidden:
+        assert not hasattr(api, name)
+        assert name not in api.__all__
+    # No resource method creates a Stream, so the create function stays public.
+    assert "create_stream" in api.__all__
+    # The resource factory and its methods still reach the operations.
+    assert "get_stream" in api.__all__
+    stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
+    assert all(
+        callable(getattr(stream, method))
+        for method in ("publish", "close", "read", "describe")
+    )
+    # Every operation stays registered, so the service still serves all five.
+    assert len(api.__nexus_operation_registry__) == 5
+    # The private helpers that the resource methods call stay in the resource module.
+    resources = importlib.import_module(api.__name__ + "._resources.stream")
+    for helper in (
+        "_append_records",
+        "_close_stream",
+        "_read_records",
+        "_describe_stream",
+    ):
+        assert hasattr(resources, helper)
+    assert not hasattr(resources, "append_records")
 
 
 @pytest.mark.parametrize(

@@ -825,7 +825,9 @@ async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -
 
 
 def test_only_the_client_target_has_the_read_poll() -> None:
-    assert hasattr(workflow_stream_module, "read_records")
+    # `read-records` is api-omitted, so only its private helper stays in the workflow module.
+    assert not hasattr(workflow_stream_module, "read_records")
+    assert hasattr(workflow_stream_module, "_read_records")
     assert not hasattr(workflow_stream_module, "iter_read_records")
     assert not hasattr(workflow_package, "iter_read_records")
     assert not hasattr(workflow_stream_module.Stream, "iter_read")
