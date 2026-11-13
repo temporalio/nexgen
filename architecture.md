@@ -196,6 +196,12 @@ records the omitted targets on `OperationSpec`, and each backend gates its own
 public surface (the Python `__all__` entry and function, the TypeScript barrel
 export, the .NET public options type and method, and the Go exported wrapper).
 
+On a resource method, the parser records the omitted targets on
+`ResourceMethodSpec`, and planning keeps them on `PlannedResourceMethod`.
+`PlannedResource::methods_for` and `close_for` give each target its methods and
+its close. Each backend renders a target's resource class from them, and the
+shared request checks skip a method that the target omits.
+
 Python emits shared models and service contracts at the package root, regardless
 of API targets. Contracts describe wire data rather than callable resource
 handles. Each API owns its operation wrappers and handles. The client API lives

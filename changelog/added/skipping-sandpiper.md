@@ -1,0 +1,1 @@
+`@nexus.api-omit targets="workflow"` or `targets="client"` on a resource method leaves the method out of the resource class of that target, in Python. The operation stays in the service and in the other target. Without its `@nexus.close` method, the Python resource of that target is not a context manager. nexgen refuses the directive on a method without one target.

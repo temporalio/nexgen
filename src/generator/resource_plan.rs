@@ -96,8 +96,8 @@ pub(crate) fn request_plan_fills_source(
     })
 }
 
-/// Whether a resource method of the service binds the operation with a plan that fills one of
-/// the operation's sourced fields.
+/// Whether a resource method of the service's `target` binds the operation with a plan that
+/// fills one of the operation's sourced fields.
 pub(crate) fn resource_method_fills_source(
     api_plan: &PlannedSpec,
     service_name: &str,
@@ -109,7 +109,7 @@ pub(crate) fn resource_method_fills_source(
         .iter()
         .filter(|service| service.name == service_name)
         .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
-        .flat_map(|resource| &resource.methods)
+        .flat_map(|resource| resource.methods_for(target))
         .any(|method| {
             matches!(
                 &method.binding,
@@ -130,7 +130,7 @@ pub(crate) fn validate_resource_origins(
 ) -> Result<()> {
     for service in &api_plan.services {
         for resource in service.resources.iter().map(|resource| &resource.data) {
-            for method in &resource.methods {
+            for method in resource.methods_for(target) {
                 let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } =
                     &method.binding
                 else {

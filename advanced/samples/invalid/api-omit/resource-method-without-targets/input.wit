@@ -1,0 +1,18 @@
+package temporal:api-omit-resource-method@1.0.0;
+
+world service { export example; }
+
+/// @nexus.endpoint "example"
+interface example {
+  resource item {
+    constructor(id: string);
+
+    /// @nexus.api-omit
+    rename: func(name: option<string>);
+  }
+
+  record rename-request { id: string, name: option<string> }
+  record rename-response { ok: option<bool> }
+
+  rename: func(request: rename-request) -> rename-response;
+}

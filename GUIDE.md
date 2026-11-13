@@ -1833,7 +1833,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
 | `@nexus.omit`                           | record field                                                                                  |
-| `@nexus.api-omit`                       | record field, freestanding function                                                           |
+| `@nexus.api-omit`                       | record field, resource method, freestanding function                                          |
 | `@nexus.source`                         | record field                                                                                  |
 | `@nexus.default`                        | record field                                                                                  |
 | `@nexus.fallback`                       | enum case                                                                                     |
@@ -2374,8 +2374,8 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.api-omit
 
-**Placement:** Record field or freestanding function **Syntax:**
-`@nexus.api-omit [targets="workflow,client"]`
+**Placement:** Record field, resource method, or freestanding function
+**Syntax:** `@nexus.api-omit [targets="workflow,client"]`
 
 On a record field, keeps the field on generated models and in proto conversion,
 but excludes it from generated convenience operation APIs. `targets` limits the
@@ -2392,6 +2392,19 @@ remains, so the operation is still reached through its resource.
 
 On a field, it cannot be combined with `@nexus.omit`, `@nexus.default`, or a
 `@nexus.source` for the same target.
+
+On a resource method, `targets="workflow"` or `targets="client"` leaves the
+method out of the resource class of that target, with the helpers that only it
+used. The operation stays in the service and in the other target. Without its
+`@nexus.close` method, the resource of that target is not a context manager.
+nexgen refuses a method omission without one target, since no target would keep
+the method. Remove such a method instead.
+
+```wit
+/// @nexus.operation "append-records"
+/// @nexus.api-omit targets="workflow"
+append: func(records: list<append-record>) -> append-records-response;
+```
 
 ---
 

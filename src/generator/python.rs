@@ -870,18 +870,19 @@ impl<'a> ApiPlanner<'a> {
                 ),
             },
         )?;
-        let returns_closable_resource = !targets.is_empty()
-            && services.iter().any(|service| {
-                service
-                    .operations
+        let returns_closable_resource = targets.iter().any(|&target| {
+            services.iter().any(|service| {
+                service.operations.iter().any(|operation| {
+                    operation_returns_closable_resource(service, operation, target)
+                }) || service
+                    .resources
                     .iter()
-                    .any(|operation| operation_returns_closable_resource(service, operation))
-                    || service
-                        .resources
-                        .iter()
-                        .flat_map(|resource| &resource.methods)
-                        .any(|method| resource_method_returns_closable_resource(service, method))
-            });
+                    .flat_map(|resource| resource.methods_for(target))
+                    .any(|method| {
+                        resource_method_returns_closable_resource(service, method, target)
+                    })
+            })
+        });
         if returns_closable_resource {
             if let Some(operation) = services
                 .iter()
@@ -972,7 +973,8 @@ impl<'a> ApiPlanner<'a> {
         }
         for service in services {
             for resource in &service.resources {
-                let bound_operations = resource_bound_operations(service, resource);
+                let bound_operations =
+                    resource_bound_operations(service, resource, GenerationTarget::Workflow);
                 files.insert(
                     format!("_resources/{}.py", resource_module_name(resource)),
                     self.render_resource_module_file(
@@ -1052,7 +1054,12 @@ impl<'a> ApiPlanner<'a> {
         files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
         if let Some(operation) = services
             .iter()
-            .flat_map(|service| &service.operations)
+            .flat_map(|service| {
+                service
+                    .operations
+                    .iter()
+                    .filter(|operation| client_reaches_operation(service, operation))
+            })
             .find(|operation| {
                 operation.poll_items.is_some()
                     && operation.poll_next(GenerationTarget::Client).is_some()
@@ -1090,7 +1097,7 @@ impl<'a> ApiPlanner<'a> {
                         GenerationTarget::Client,
                         service,
                         resource,
-                        &resource_bound_operations(service, resource),
+                        &resource_bound_operations(service, resource, GenerationTarget::Client),
                         model_names,
                         resource_names,
                     ),
@@ -2014,7 +2021,9 @@ impl<'a> ApiPlanner<'a> {
                 &type_variables,
                 self.rendered_resource_ref(resource).as_ref(),
             );
-            render_resource_async_with(output, resource);
+        }
+        if let Some(target) = target {
+            render_resource_async_with(output, resource, target);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -2030,7 +2039,7 @@ impl<'a> ApiPlanner<'a> {
             return;
         }
 
-        for method in &resource.methods {
+        for method in resource.methods_for(target) {
             output.push_str("\n");
             self.render_resource_class_method(
                 output,
@@ -2147,7 +2156,7 @@ impl<'a> ApiPlanner<'a> {
         render_resource_context_manager_decorator(
             output,
             "    ",
-            resource_method_returns_closable_resource(service, method),
+            resource_method_returns_closable_resource(service, method, target),
         );
         let param_exprs = self.resource_method_param_exprs(method);
         let optional_params = resource_method_optional_params(method);
@@ -5486,6 +5495,27 @@ fn resource_operation_owners(services: &[RenderedService<'_>]) -> BTreeMap<Strin
     owners
 }
 
+/// The client reaches a standalone operation through its extension, and a bound one through the
+/// methods of its resource that the client target keeps.
+fn client_reaches_operation(
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> bool {
+    let mut methods = service
+        .resources
+        .iter()
+        .flat_map(|resource| &resource.methods)
+        .filter(|method| {
+            matches!(
+                &method.binding,
+                PlannedResourceMethodBindingSpec::Operation { operation_name, .. }
+                    if operation_name == operation.name
+            )
+        })
+        .peekable();
+    methods.peek().is_none() || methods.any(|method| !method.omitted_for(GenerationTarget::Client))
+}
+
 fn standalone_operations<'a, 'spec>(
     service: &'a RenderedService<'spec>,
 ) -> impl Iterator<Item = &'a RenderedOperation<'spec>> {
@@ -6186,24 +6216,32 @@ fn render_resources_package_init(
     output
 }
 
+/// The operations that the target's resource module calls. The Workflow module also holds the
+/// public function of each operation that its resource binds, so that function and its helper
+/// stay when the target omits the method.
 fn resource_bound_operations<'a>(
     service: &'a RenderedService<'a>,
     resource: &'a PlannedResource,
+    target: GenerationTarget,
 ) -> Vec<ResourceBoundOperation<'a>> {
     resource
         .methods
         .iter()
-        .filter_map(|method| match &method.binding {
-            PlannedResourceMethodBindingSpec::Operation { operation_name, .. } => {
-                Some(ResourceBoundOperation {
-                    operation: service
-                        .operations
-                        .iter()
-                        .find(|operation| operation.name == operation_name)
-                        .expect("bound resource operation should exist on the service"),
-                })
-            }
-            PlannedResourceMethodBindingSpec::Stub => None,
+        .filter_map(|method| {
+            let PlannedResourceMethodBindingSpec::Operation { operation_name, .. } =
+                &method.binding
+            else {
+                return None;
+            };
+            let operation = service
+                .operations
+                .iter()
+                .find(|operation| operation.name == operation_name)
+                .expect("bound resource operation should exist on the service");
+            let public_function = target == GenerationTarget::Workflow
+                && !operation.api_omitted_for(GenerationTarget::Workflow);
+            (!method.omitted_for(target) || public_function)
+                .then_some(ResourceBoundOperation { operation })
         })
         .collect()
 }
@@ -7154,7 +7192,7 @@ fn render_endpoint_service_object_operation_method(
     render_resource_context_manager_decorator(
         output,
         "    ",
-        operation_returns_closable_resource(service, operation),
+        operation_returns_closable_resource(service, operation, GenerationTarget::Workflow),
     );
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
@@ -7192,7 +7230,7 @@ fn render_endpoint_service_object_unpacked_method(
     render_resource_context_manager_decorator(
         output,
         "    ",
-        operation_returns_closable_resource(service, operation),
+        operation_returns_closable_resource(service, operation, GenerationTarget::Workflow),
     );
     output.push_str("    async def ");
     output.push_str(&operation.attr_name);
@@ -10278,8 +10316,12 @@ fn render_resource_context_manager_import(output: &mut String, body: &str, modul
 }
 
 /// The end of an `async with` block calls the `@nexus.close` method.
-fn render_resource_async_with(output: &mut String, resource: &PlannedResource) {
-    let Some(name) = &resource.close else {
+fn render_resource_async_with(
+    output: &mut String,
+    resource: &PlannedResource,
+    target: GenerationTarget,
+) {
+    let Some(name) = resource.close_for(target) else {
         return;
     };
     output.push_str("\n    async def __aenter__(self) -> typing_extensions.Self:\n");
@@ -10300,15 +10342,16 @@ fn render_resource_async_with(output: &mut String, resource: &PlannedResource) {
 fn operation_returns_closable_resource(
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
+    target: GenerationTarget,
 ) -> bool {
     match &operation.output_resource_return {
         Some(resource_return) if resource_return.holder.is_none() => {
-            closable_resource(service, &resource_return.resource_type_name)
+            closable_resource(service, &resource_return.resource_type_name, target)
         }
         Some(_) => false,
         None => {
             operation.output_direct_result
-                && closable_resource(service, &operation.output_annotation)
+                && closable_resource(service, &operation.output_annotation, target)
         }
     }
 }
@@ -10316,21 +10359,26 @@ fn operation_returns_closable_resource(
 fn resource_method_returns_closable_resource(
     service: &RenderedService<'_>,
     method: &PlannedResourceMethod,
+    target: GenerationTarget,
 ) -> bool {
     match &method.result {
         Some(PlannedResourceMethodResult {
             kind: PlannedResourceMethodResultKind::Resource { type_name, .. },
             optional: false,
-        }) => closable_resource(service, type_name),
+        }) => closable_resource(service, type_name, target),
         _ => false,
     }
 }
 
-fn closable_resource(service: &RenderedService<'_>, type_name: &str) -> bool {
+fn closable_resource(
+    service: &RenderedService<'_>,
+    type_name: &str,
+    target: GenerationTarget,
+) -> bool {
     service
         .resources
         .iter()
-        .any(|resource| resource.type_name == type_name && resource.close.is_some())
+        .any(|resource| resource.type_name == type_name && resource.close_for(target).is_some())
 }
 
 /// The decorated call returns a `ResourceContextManager`, so a caller can also enter it with `async with`.
@@ -10350,7 +10398,7 @@ fn render_public_operation_signature_start(
     render_resource_context_manager_decorator(
         output,
         target_indent(target),
-        operation_returns_closable_resource(service, operation),
+        operation_returns_closable_resource(service, operation, target),
     );
     render_operation_signature_start(output, target, &operation.attr_name);
 }
@@ -10618,7 +10666,7 @@ fn render_request_only_operation_function(
         render_resource_context_manager_decorator(
             output,
             "",
-            operation_returns_closable_resource(service, operation),
+            operation_returns_closable_resource(service, operation, GenerationTarget::Workflow),
         );
     }
     output.push_str("async def ");
