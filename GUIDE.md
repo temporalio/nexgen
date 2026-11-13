@@ -1135,10 +1135,10 @@ request = StartWorkflowRequest(
 )
 ```
 
-In Python, an optional method parameter (`option<T>`) takes precedence only when
-the caller passes a value. Otherwise the source fills the field. The source is
-not evaluated when the caller passes a value. Other languages pass an optional
-parameter as it is.
+In Python and TypeScript, an optional method parameter (`option<T>`) takes
+precedence only when the caller passes a value. Otherwise the source fills the
+field. The source is not evaluated when the caller passes a value. Other
+languages pass an optional parameter as it is.
 
 ```python
 producer=producer if producer is not None else _support.client_producer()

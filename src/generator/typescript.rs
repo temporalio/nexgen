@@ -6420,6 +6420,12 @@ fn render_resource(
                     .expect("bound operation should exist on the resource service");
                 let branchable_params =
                     branchable_request_method_params(method, request_plan, operation, api_plan);
+                let optional_params = method
+                    .params
+                    .iter()
+                    .filter(|param| param.optional)
+                    .map(|param| param.name.clone())
+                    .collect::<BTreeSet<_>>();
                 let endpoint_expr = None;
                 let client_expr = service
                     .endpoint
@@ -6441,6 +6447,7 @@ fn render_resource(
                         &result_annotation,
                         request_plan,
                         &branchable_params,
+                        &optional_params,
                         true,
                         fills_source,
                     ));
@@ -6455,6 +6462,7 @@ fn render_resource(
                         &result_annotation,
                         request_plan,
                         &branchable_params,
+                        &optional_params,
                         false,
                         fills_source,
                     ));
@@ -6771,6 +6779,7 @@ fn render_resource_method_operation_body(
     result_annotation: &str,
     request_plan: &RequestPlan,
     branchable_params: &[String],
+    optional_params: &BTreeSet<String>,
     direct_return: bool,
     fills_source: bool,
 ) -> String {
@@ -6792,6 +6801,7 @@ fn render_resource_method_operation_body(
             result_annotation,
             request_plan,
             remaining,
+            optional_params,
             direct_return,
             fills_source,
         ));
@@ -6807,6 +6817,7 @@ fn render_resource_method_operation_body(
             result_annotation,
             request_plan,
             remaining,
+            optional_params,
             direct_return,
             fills_source,
         ));
@@ -6834,7 +6845,7 @@ fn render_resource_method_operation_body(
                 .all(|source| source.name != name)
         });
     }
-    let unfilled_sources = match (&operation.input, &caller_plan) {
+    let mut unfilled_sources = match (&operation.input, &caller_plan) {
         (Some(input), RequestPlan::Construct { fields, .. }) if complete_request => input
             .sourced_fields
             .iter()
@@ -6853,6 +6864,29 @@ fn render_resource_method_operation_body(
             .collect(),
         _ => Vec::new(),
     };
+    // A caller that passes no value for an optional parameter gets the source of the field.
+    if let (Some(input), RequestPlan::Construct { fields, .. }) =
+        (&operation.input, &mut caller_plan)
+        && complete_request
+    {
+        fields.retain(|field| {
+            let RequestPlan::Source(RequestPlanSource::MethodParam(param)) = &field.value else {
+                return true;
+            };
+            let name = typescript_generated_field_name(&field.field_name);
+            let source = input
+                .sourced_fields
+                .iter()
+                .find(|source| source.name == name)
+                .and_then(|source| source.source_expressions.get(&GenerationTarget::Workflow));
+            let Some(source) = source.filter(|_| optional_params.contains(param)) else {
+                return true;
+            };
+            let param = typescript_generated_field_name(param);
+            unfilled_sources.push(format!("{name}: {param} ?? {source}"));
+            false
+        });
+    }
     let request_expr = render_request_plan_typescript(&caller_plan, &unfilled_sources);
     let mut output = String::new();
     if complete_request
