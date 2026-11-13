@@ -5,10 +5,12 @@ from __future__ import annotations
 import collections.abc
 import typing
 import typing_extensions
-import temporalio.client
 import uuid as _uuid
 import datetime
 import types
+
+if typing.TYPE_CHECKING:
+    import temporalio.client
 
 from ...services import StreamService
 from ...models import (
