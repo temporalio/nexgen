@@ -196,11 +196,13 @@ records the omitted targets on `OperationSpec`, and each backend gates its own
 public surface (the Python `__all__` entry and function, the TypeScript barrel
 export, the .NET public options type and method, and the Go exported wrapper).
 
-On a resource method, the parser records the omitted targets on
-`ResourceMethodSpec`, and planning keeps them on `PlannedResourceMethod`.
-`PlannedResource::methods_for` and `close_for` give each target its methods and
-its close. Each backend renders a target's resource class from them, and the
-shared request checks skip a method that the target omits.
+`@nexus.api-omit` on a resource method leaves that method out of the resource
+class of the named targets. Its operation stays in the service, and the other
+targets keep the method. Planning decides this. It gives each target the methods
+and the close of its resource class, and a backend renders the class from that
+list. A target that omits the close method has a resource class with no close,
+so the class is not a context manager there. The Go backend refuses a method
+that is omitted for the Workflow target.
 
 Python emits shared models and service contracts at the package root, regardless
 of API targets. Contracts describe wire data rather than callable resource
