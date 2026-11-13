@@ -71,6 +71,7 @@ class Stream(typing.Generic[BodyT]):
         self,
         *records: BodyT,
         producer: Producer | None = None,
+        sequence: int | None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
@@ -78,6 +79,7 @@ class Stream(typing.Generic[BodyT]):
         request = AppendRecordsRequest(
             ref=self.ref,
             producer=producer if producer is not None else _support.default_producer(),
+            sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
         )
         handle = await self._nexus_client.start_operation(

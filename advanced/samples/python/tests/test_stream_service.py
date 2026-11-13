@@ -202,7 +202,7 @@ async def test_workflow_apis_call_the_stream_service(
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    assert await stream.append("a", "b") == replies["AppendRecords"]
+    assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
     # The Workflow API fills the request id and the producer from its sources.
     producer = model_types.Producer(
         id="wf:r2",
@@ -219,7 +219,7 @@ async def test_workflow_apis_call_the_stream_service(
         (
             "AppendRecords",
             model_types.AppendRecordsRequest(
-                ref=ref, records=records, producer=producer
+                ref=ref, records=records, producer=producer, sequence=3
             ),
         ),
     ]
@@ -233,6 +233,7 @@ async def test_workflow_apis_call_the_stream_service(
     assert [
         PayloadConverter.default.from_payload(record.body) for record in wire.records
     ] == ["a", "b"]
+    assert wire.sequence == 3
 
 
 @pytest.mark.parametrize("construction", ["create", "direct"])
