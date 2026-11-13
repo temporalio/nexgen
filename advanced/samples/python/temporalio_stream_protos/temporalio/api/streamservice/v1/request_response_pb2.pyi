@@ -27,7 +27,7 @@ class CreateStreamRequest(_message.Message):
     Creates the Stream. When the Stream exists, FAIL fails with ALREADY_EXISTS, and USE_EXISTING
     gets it with created false. A retry of the create that made the Stream, with the same
     request_id, gets created true. Each policy fails with CLOSED on a closed Stream and EXPIRED on
-    an expired one. A create takes no Retention. The backend config holds it, as a namespace holds
+    an expired one. A create takes no Retention. The Store config holds it, as a namespace holds
     the Retention of its Workflows.
     (-- api-linter: core::0133=disabled
         aip.dev/not-precedent: The request identifies a Stream by namespace and ref. --)
@@ -84,7 +84,7 @@ class CreateStreamResponse(_message.Message):
     @_builtins.property
     def ref(self) -> _message_pb2.StreamRef:
         """The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
-        backend that it picked, also when the request left the name empty. The server gives the ref
+        Store that it picked, also when the request left the name empty. The server gives the ref
         back as the request had it, since it doesn't know that name.
         """
 
@@ -371,7 +371,7 @@ Global___DescribeStreamRequest: _TypeAlias = DescribeStreamRequest  # noqa: Y015
 @_typing.final
 class DescribeStreamResponse(_message.Message):
     """Experimental. Might change in the future.
-    The state of a Stream. It has no Retention, since the Retention is a setting of the backend and
+    The state of a Stream. It has no Retention, since the Retention is a setting of the Store and
     not of one Stream.
     """
 

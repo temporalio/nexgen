@@ -40,7 +40,7 @@ declare module "@temporalio/proto" {
   namespace temporal.api.stream.v1 {
     interface IStreamRef {
       id?: string | null;
-      backend?: string | null;
+      store?: string | null;
     }
     interface IWorkflowTaskEpoch {
       startedEventId?: Long | null;

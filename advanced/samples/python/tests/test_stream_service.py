@@ -202,7 +202,7 @@ async def test_workflow_apis_call_the_stream_service(
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    assert await stream.append("a", "b") == _offset(3)
+    assert await stream.append("a", "b") == replies["AppendRecords"]
     # The Workflow API fills the request id and the producer from its sources.
     producer = model_types.Producer(
         id="wf:r2",
@@ -560,7 +560,7 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
 def test_a_workflow_factory_builds_a_handle_with_no_call(
     api: types.ModuleType, model_types: types.ModuleType
 ) -> None:
-    ref = model_types.StreamRef(id="turns", backend="redis")
+    ref = model_types.StreamRef(id="turns", store="redis")
     stream = api.get_stream(ref=ref, body_type=str)
 
     assert stream.ref == ref

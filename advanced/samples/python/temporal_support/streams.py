@@ -49,11 +49,6 @@ def default_producer() -> typing.Any:
     )
 
 
-def last_offset(response: typing.Any) -> bytes:
-    """The offset of the last Record that an append wrote, or empty for none."""
-    return response.last_offset or b""
-
-
 def request_id() -> str:
     """A new id for each create call. A Workflow's replay gives the same id."""
     if temporalio.workflow.in_workflow():

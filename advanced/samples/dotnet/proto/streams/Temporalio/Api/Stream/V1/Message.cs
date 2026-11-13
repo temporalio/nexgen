@@ -27,43 +27,43 @@ namespace Temporalio.Api.Stream.V1 {
             "CiR0ZW1wb3JhbC9hcGkvc3RyZWFtL3YxL21lc3NhZ2UucHJvdG8SFnRlbXBv",
             "cmFsLmFwaS5zdHJlYW0udjEaH2dvb2dsZS9wcm90b2J1Zi90aW1lc3RhbXAu",
             "cHJvdG8aJHRlbXBvcmFsL2FwaS9jb21tb24vdjEvbWVzc2FnZS5wcm90bxoi",
-            "dGVtcG9yYWwvYXBpL2VudW1zL3YxL3N0cmVhbS5wcm90byIoCglTdHJlYW1S",
-            "ZWYSCgoCaWQYASABKAkSDwoHYmFja2VuZBgDIAEoCSJwChFXb3JrZmxvd1Rh",
-            "c2tFcG9jaBIYChBzdGFydGVkX2V2ZW50X2lkGAEgASgDEg8KB2F0dGVtcHQY",
-            "AiABKAUSMAoMc3RhcnRlZF90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVm",
-            "LlRpbWVzdGFtcCJeChJMb2NhbEFjdGl2aXR5RXBvY2gSNwoEdGFzaxgBIAEo",
-            "CzIpLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuV29ya2Zsb3dUYXNrRXBvY2gS",
-            "DwoHYXR0ZW1wdBgCIAEoBSJcCg1BY3Rpdml0eUVwb2NoEjoKFmF0dGVtcHRf",
-            "c2NoZWR1bGVkX3RpbWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0",
-            "YW1wEg8KB2F0dGVtcHQYAiABKAUiXAoQV29ya2Zsb3dQcm9kdWNlchIOCgZy",
-            "dW5faWQYASABKAkSOAoFZXBvY2gYAiABKAsyKS50ZW1wb3JhbC5hcGkuc3Ry",
-            "ZWFtLnYxLldvcmtmbG93VGFza0Vwb2NoImIKFUxvY2FsQWN0aXZpdHlQcm9k",
-            "dWNlchIOCgZydW5faWQYASABKAkSOQoFZXBvY2gYAiABKAsyKi50ZW1wb3Jh",
-            "bC5hcGkuc3RyZWFtLnYxLkxvY2FsQWN0aXZpdHlFcG9jaCJYChBBY3Rpdml0",
-            "eVByb2R1Y2VyEg4KBnJ1bl9pZBgBIAEoCRI0CgVlcG9jaBgCIAEoCzIlLnRl",
-            "bXBvcmFsLmFwaS5zdHJlYW0udjEuQWN0aXZpdHlFcG9jaCIQCg5DbGllbnRQ",
-            "cm9kdWNlciLvAgoIUHJvZHVjZXISCgoCaWQYASABKAkSPAoId29ya2Zsb3cY",
-            "AiABKAsyKC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLldvcmtmbG93UHJvZHVj",
-            "ZXJIABJHCg5sb2NhbF9hY3Rpdml0eRgDIAEoCzItLnRlbXBvcmFsLmFwaS5z",
-            "dHJlYW0udjEuTG9jYWxBY3Rpdml0eVByb2R1Y2VySAASRQoRd29ya2Zsb3df",
-            "YWN0aXZpdHkYBCABKAsyKC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkFjdGl2",
-            "aXR5UHJvZHVjZXJIABJHChNzdGFuZGFsb25lX2FjdGl2aXR5GAUgASgLMigu",
-            "dGVtcG9yYWwuYXBpLnN0cmVhbS52MS5BY3Rpdml0eVByb2R1Y2VySAASOAoG",
-            "Y2xpZW50GAYgASgLMiYudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5DbGllbnRQ",
-            "cm9kdWNlckgAQgYKBGtpbmQiPQoMQXBwZW5kUmVjb3JkEi0KBGJvZHkYASAB",
-            "KAsyHy50ZW1wb3JhbC5hcGkuY29tbW9uLnYxLlBheWxvYWQigQEKDFN0cmVh",
-            "bVJlY29yZBIyCghwcm9kdWNlchgBIAEoCzIgLnRlbXBvcmFsLmFwaS5zdHJl",
-            "YW0udjEuUHJvZHVjZXISLQoEYm9keRgCIAEoCzIfLnRlbXBvcmFsLmFwaS5j",
-            "b21tb24udjEuUGF5bG9hZBIOCgZvZmZzZXQYAyABKAwiTgoSU3RyZWFtRXJy",
-            "b3JEZXRhaWxzEjgKBnJlYXNvbhgBIAEoDjIoLnRlbXBvcmFsLmFwaS5lbnVt",
-            "cy52MS5TdHJlYW1FcnJvclJlYXNvbkKJAQoZaW8udGVtcG9yYWwuYXBpLnN0",
-            "cmVhbS52MUIMTWVzc2FnZVByb3RvUAFaI2dvLnRlbXBvcmFsLmlvL2FwaS9z",
-            "dHJlYW0vdjE7c3RyZWFtqgIYVGVtcG9yYWxpby5BcGkuU3RyZWFtLlYx6gIb",
-            "VGVtcG9yYWxpbzo6QXBpOjpTdHJlYW06OlYxYgZwcm90bzM="));
+            "dGVtcG9yYWwvYXBpL2VudW1zL3YxL3N0cmVhbS5wcm90byImCglTdHJlYW1S",
+            "ZWYSCgoCaWQYASABKAkSDQoFc3RvcmUYAyABKAkicAoRV29ya2Zsb3dUYXNr",
+            "RXBvY2gSGAoQc3RhcnRlZF9ldmVudF9pZBgBIAEoAxIPCgdhdHRlbXB0GAIg",
+            "ASgFEjAKDHN0YXJ0ZWRfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5U",
+            "aW1lc3RhbXAiXgoSTG9jYWxBY3Rpdml0eUVwb2NoEjcKBHRhc2sYASABKAsy",
+            "KS50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLldvcmtmbG93VGFza0Vwb2NoEg8K",
+            "B2F0dGVtcHQYAiABKAUiXAoNQWN0aXZpdHlFcG9jaBI6ChZhdHRlbXB0X3Nj",
+            "aGVkdWxlZF90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFt",
+            "cBIPCgdhdHRlbXB0GAIgASgFIlwKEFdvcmtmbG93UHJvZHVjZXISDgoGcnVu",
+            "X2lkGAEgASgJEjgKBWVwb2NoGAIgASgLMikudGVtcG9yYWwuYXBpLnN0cmVh",
+            "bS52MS5Xb3JrZmxvd1Rhc2tFcG9jaCJiChVMb2NhbEFjdGl2aXR5UHJvZHVj",
+            "ZXISDgoGcnVuX2lkGAEgASgJEjkKBWVwb2NoGAIgASgLMioudGVtcG9yYWwu",
+            "YXBpLnN0cmVhbS52MS5Mb2NhbEFjdGl2aXR5RXBvY2giWAoQQWN0aXZpdHlQ",
+            "cm9kdWNlchIOCgZydW5faWQYASABKAkSNAoFZXBvY2gYAiABKAsyJS50ZW1w",
+            "b3JhbC5hcGkuc3RyZWFtLnYxLkFjdGl2aXR5RXBvY2giEAoOQ2xpZW50UHJv",
+            "ZHVjZXIi7wIKCFByb2R1Y2VyEgoKAmlkGAEgASgJEjwKCHdvcmtmbG93GAIg",
+            "ASgLMigudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Xb3JrZmxvd1Byb2R1Y2Vy",
+            "SAASRwoObG9jYWxfYWN0aXZpdHkYAyABKAsyLS50ZW1wb3JhbC5hcGkuc3Ry",
+            "ZWFtLnYxLkxvY2FsQWN0aXZpdHlQcm9kdWNlckgAEkUKEXdvcmtmbG93X2Fj",
+            "dGl2aXR5GAQgASgLMigudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5BY3Rpdml0",
+            "eVByb2R1Y2VySAASRwoTc3RhbmRhbG9uZV9hY3Rpdml0eRgFIAEoCzIoLnRl",
+            "bXBvcmFsLmFwaS5zdHJlYW0udjEuQWN0aXZpdHlQcm9kdWNlckgAEjgKBmNs",
+            "aWVudBgGIAEoCzImLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuQ2xpZW50UHJv",
+            "ZHVjZXJIAEIGCgRraW5kIj0KDEFwcGVuZFJlY29yZBItCgRib2R5GAEgASgL",
+            "Mh8udGVtcG9yYWwuYXBpLmNvbW1vbi52MS5QYXlsb2FkIoEBCgxTdHJlYW1S",
+            "ZWNvcmQSMgoIcHJvZHVjZXIYASABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFt",
+            "LnYxLlByb2R1Y2VyEi0KBGJvZHkYAiABKAsyHy50ZW1wb3JhbC5hcGkuY29t",
+            "bW9uLnYxLlBheWxvYWQSDgoGb2Zmc2V0GAMgASgMIk4KElN0cmVhbUVycm9y",
+            "RGV0YWlscxI4CgZyZWFzb24YASABKA4yKC50ZW1wb3JhbC5hcGkuZW51bXMu",
+            "djEuU3RyZWFtRXJyb3JSZWFzb25CiQEKGWlvLnRlbXBvcmFsLmFwaS5zdHJl",
+            "YW0udjFCDE1lc3NhZ2VQcm90b1ABWiNnby50ZW1wb3JhbC5pby9hcGkvc3Ry",
+            "ZWFtL3YxO3N0cmVhbaoCGFRlbXBvcmFsaW8uQXBpLlN0cmVhbS5WMeoCG1Rl",
+            "bXBvcmFsaW86OkFwaTo6U3RyZWFtOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Temporalio.Api.Common.V1.MessageReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRef), global::Temporalio.Api.Stream.V1.StreamRef.Parser, new[]{ "Id", "Backend" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.StreamRef), global::Temporalio.Api.Stream.V1.StreamRef.Parser, new[]{ "Id", "Store" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch), global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch.Parser, new[]{ "StartedEventId", "Attempt", "StartedTime" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.LocalActivityEpoch), global::Temporalio.Api.Stream.V1.LocalActivityEpoch.Parser, new[]{ "Task", "Attempt" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.Stream.V1.ActivityEpoch), global::Temporalio.Api.Stream.V1.ActivityEpoch.Parser, new[]{ "AttemptScheduledTime", "Attempt" }, null, null, null, null),
@@ -122,7 +122,7 @@ namespace Temporalio.Api.Stream.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public StreamRef(StreamRef other) : this() {
       id_ = other.id_;
-      backend_ = other.backend_;
+      store_ = other.store_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -144,22 +144,22 @@ namespace Temporalio.Api.Stream.V1 {
       }
     }
 
-    /// <summary>Field number for the "backend" field.</summary>
-    public const int BackendFieldNumber = 3;
-    private string backend_ = "";
+    /// <summary>Field number for the "store" field.</summary>
+    public const int StoreFieldNumber = 3;
+    private string store_ = "";
     /// <summary>
-    /// The name of the backend that holds the Stream, as the Worker and client config register
-    /// it, so every process routes a ref it receives. With no name, the SDK picks the backend from
-    /// its config. Only an SDK sets and reads it, since only the SDK knows the name that its config
-    /// gives a backend. A request carries the whole ref, and the server and a Store ignore this
+    /// The name of the Store that holds the Stream, as the Worker and client config register it,
+    /// so every process routes a ref it receives. With no name, the SDK picks the Store from its
+    /// config. Only an SDK sets and reads it, since only the SDK knows the name that its config
+    /// gives a Store. A request carries the whole ref, and the server and a Store ignore this
     /// field.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Backend {
-      get { return backend_; }
+    public string Store {
+      get { return store_; }
       set {
-        backend_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        store_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -179,7 +179,7 @@ namespace Temporalio.Api.Stream.V1 {
         return true;
       }
       if (Id != other.Id) return false;
-      if (Backend != other.Backend) return false;
+      if (Store != other.Store) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -188,7 +188,7 @@ namespace Temporalio.Api.Stream.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Id.Length != 0) hash ^= Id.GetHashCode();
-      if (Backend.Length != 0) hash ^= Backend.GetHashCode();
+      if (Store.Length != 0) hash ^= Store.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -211,9 +211,9 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (Backend.Length != 0) {
+      if (Store.Length != 0) {
         output.WriteRawTag(26);
-        output.WriteString(Backend);
+        output.WriteString(Store);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -229,9 +229,9 @@ namespace Temporalio.Api.Stream.V1 {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (Backend.Length != 0) {
+      if (Store.Length != 0) {
         output.WriteRawTag(26);
-        output.WriteString(Backend);
+        output.WriteString(Store);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -246,8 +246,8 @@ namespace Temporalio.Api.Stream.V1 {
       if (Id.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Id);
       }
-      if (Backend.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Backend);
+      if (Store.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Store);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -264,8 +264,8 @@ namespace Temporalio.Api.Stream.V1 {
       if (other.Id.Length != 0) {
         Id = other.Id;
       }
-      if (other.Backend.Length != 0) {
-        Backend = other.Backend;
+      if (other.Store.Length != 0) {
+        Store = other.Store;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -291,7 +291,7 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 26: {
-            Backend = input.ReadString();
+            Store = input.ReadString();
             break;
           }
         }
@@ -318,7 +318,7 @@ namespace Temporalio.Api.Stream.V1 {
             break;
           }
           case 26: {
-            Backend = input.ReadString();
+            Store = input.ReadString();
             break;
           }
         }

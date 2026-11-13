@@ -27,7 +27,7 @@ from temporalio.api.common.v1 import message_pb2 as temporal_dot_api_dot_common_
 from temporalio.api.enums.v1 import stream_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_stream__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n$temporal/api/stream/v1/message.proto\x12\x16temporal.api.stream.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\"temporal/api/enums/v1/stream.proto\"(\n\tStreamRef\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x62\x61\x63kend\x18\x03 \x01(\t\"p\n\x11WorkflowTaskEpoch\x12\x18\n\x10started_event_id\x18\x01 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\x12\x30\n\x0cstarted_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"^\n\x12LocalActivityEpoch\x12\x37\n\x04task\x18\x01 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\"\\\n\rActivityEpoch\x12:\n\x16\x61ttempt_scheduled_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\"\\\n\x10WorkflowProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x38\n\x05\x65poch\x18\x02 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\"b\n\x15LocalActivityProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x39\n\x05\x65poch\x18\x02 \x01(\x0b\x32*.temporal.api.stream.v1.LocalActivityEpoch\"X\n\x10\x41\x63tivityProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x34\n\x05\x65poch\x18\x02 \x01(\x0b\x32%.temporal.api.stream.v1.ActivityEpoch\"\x10\n\x0e\x43lientProducer\"\xef\x02\n\x08Producer\x12\n\n\x02id\x18\x01 \x01(\t\x12<\n\x08workflow\x18\x02 \x01(\x0b\x32(.temporal.api.stream.v1.WorkflowProducerH\x00\x12G\n\x0elocal_activity\x18\x03 \x01(\x0b\x32-.temporal.api.stream.v1.LocalActivityProducerH\x00\x12\x45\n\x11workflow_activity\x18\x04 \x01(\x0b\x32(.temporal.api.stream.v1.ActivityProducerH\x00\x12G\n\x13standalone_activity\x18\x05 \x01(\x0b\x32(.temporal.api.stream.v1.ActivityProducerH\x00\x12\x38\n\x06\x63lient\x18\x06 \x01(\x0b\x32&.temporal.api.stream.v1.ClientProducerH\x00\x42\x06\n\x04kind\"=\n\x0c\x41ppendRecord\x12-\n\x04\x62ody\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\"\x81\x01\n\x0cStreamRecord\x12\x32\n\x08producer\x18\x01 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12-\n\x04\x62ody\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x0e\n\x06offset\x18\x03 \x01(\x0c\"N\n\x12StreamErrorDetails\x12\x38\n\x06reason\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.StreamErrorReasonB\x89\x01\n\x19io.temporal.api.stream.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/stream/v1;stream\xaa\x02\x18Temporalio.Api.Stream.V1\xea\x02\x1bTemporalio::Api::Stream::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n$temporal/api/stream/v1/message.proto\x12\x16temporal.api.stream.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\"temporal/api/enums/v1/stream.proto\"&\n\tStreamRef\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t\"p\n\x11WorkflowTaskEpoch\x12\x18\n\x10started_event_id\x18\x01 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\x12\x30\n\x0cstarted_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"^\n\x12LocalActivityEpoch\x12\x37\n\x04task\x18\x01 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\"\\\n\rActivityEpoch\x12:\n\x16\x61ttempt_scheduled_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\x05\"\\\n\x10WorkflowProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x38\n\x05\x65poch\x18\x02 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\"b\n\x15LocalActivityProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x39\n\x05\x65poch\x18\x02 \x01(\x0b\x32*.temporal.api.stream.v1.LocalActivityEpoch\"X\n\x10\x41\x63tivityProducer\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x34\n\x05\x65poch\x18\x02 \x01(\x0b\x32%.temporal.api.stream.v1.ActivityEpoch\"\x10\n\x0e\x43lientProducer\"\xef\x02\n\x08Producer\x12\n\n\x02id\x18\x01 \x01(\t\x12<\n\x08workflow\x18\x02 \x01(\x0b\x32(.temporal.api.stream.v1.WorkflowProducerH\x00\x12G\n\x0elocal_activity\x18\x03 \x01(\x0b\x32-.temporal.api.stream.v1.LocalActivityProducerH\x00\x12\x45\n\x11workflow_activity\x18\x04 \x01(\x0b\x32(.temporal.api.stream.v1.ActivityProducerH\x00\x12G\n\x13standalone_activity\x18\x05 \x01(\x0b\x32(.temporal.api.stream.v1.ActivityProducerH\x00\x12\x38\n\x06\x63lient\x18\x06 \x01(\x0b\x32&.temporal.api.stream.v1.ClientProducerH\x00\x42\x06\n\x04kind\"=\n\x0c\x41ppendRecord\x12-\n\x04\x62ody\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\"\x81\x01\n\x0cStreamRecord\x12\x32\n\x08producer\x18\x01 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12-\n\x04\x62ody\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x0e\n\x06offset\x18\x03 \x01(\x0c\"N\n\x12StreamErrorDetails\x12\x38\n\x06reason\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.StreamErrorReasonB\x89\x01\n\x19io.temporal.api.stream.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/stream/v1;stream\xaa\x02\x18Temporalio.Api.Stream.V1\xea\x02\x1bTemporalio::Api::Stream::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,27 +36,27 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\031io.temporal.api.stream.v1B\014MessageProtoP\001Z#go.temporal.io/api/stream/v1;stream\252\002\030Temporalio.Api.Stream.V1\352\002\033Temporalio::Api::Stream::V1'
   _globals['_STREAMREF']._serialized_start=171
-  _globals['_STREAMREF']._serialized_end=211
-  _globals['_WORKFLOWTASKEPOCH']._serialized_start=213
-  _globals['_WORKFLOWTASKEPOCH']._serialized_end=325
-  _globals['_LOCALACTIVITYEPOCH']._serialized_start=327
-  _globals['_LOCALACTIVITYEPOCH']._serialized_end=421
-  _globals['_ACTIVITYEPOCH']._serialized_start=423
-  _globals['_ACTIVITYEPOCH']._serialized_end=515
-  _globals['_WORKFLOWPRODUCER']._serialized_start=517
-  _globals['_WORKFLOWPRODUCER']._serialized_end=609
-  _globals['_LOCALACTIVITYPRODUCER']._serialized_start=611
-  _globals['_LOCALACTIVITYPRODUCER']._serialized_end=709
-  _globals['_ACTIVITYPRODUCER']._serialized_start=711
-  _globals['_ACTIVITYPRODUCER']._serialized_end=799
-  _globals['_CLIENTPRODUCER']._serialized_start=801
-  _globals['_CLIENTPRODUCER']._serialized_end=817
-  _globals['_PRODUCER']._serialized_start=820
-  _globals['_PRODUCER']._serialized_end=1187
-  _globals['_APPENDRECORD']._serialized_start=1189
-  _globals['_APPENDRECORD']._serialized_end=1250
-  _globals['_STREAMRECORD']._serialized_start=1253
-  _globals['_STREAMRECORD']._serialized_end=1382
-  _globals['_STREAMERRORDETAILS']._serialized_start=1384
-  _globals['_STREAMERRORDETAILS']._serialized_end=1462
+  _globals['_STREAMREF']._serialized_end=209
+  _globals['_WORKFLOWTASKEPOCH']._serialized_start=211
+  _globals['_WORKFLOWTASKEPOCH']._serialized_end=323
+  _globals['_LOCALACTIVITYEPOCH']._serialized_start=325
+  _globals['_LOCALACTIVITYEPOCH']._serialized_end=419
+  _globals['_ACTIVITYEPOCH']._serialized_start=421
+  _globals['_ACTIVITYEPOCH']._serialized_end=513
+  _globals['_WORKFLOWPRODUCER']._serialized_start=515
+  _globals['_WORKFLOWPRODUCER']._serialized_end=607
+  _globals['_LOCALACTIVITYPRODUCER']._serialized_start=609
+  _globals['_LOCALACTIVITYPRODUCER']._serialized_end=707
+  _globals['_ACTIVITYPRODUCER']._serialized_start=709
+  _globals['_ACTIVITYPRODUCER']._serialized_end=797
+  _globals['_CLIENTPRODUCER']._serialized_start=799
+  _globals['_CLIENTPRODUCER']._serialized_end=815
+  _globals['_PRODUCER']._serialized_start=818
+  _globals['_PRODUCER']._serialized_end=1185
+  _globals['_APPENDRECORD']._serialized_start=1187
+  _globals['_APPENDRECORD']._serialized_end=1248
+  _globals['_STREAMRECORD']._serialized_start=1251
+  _globals['_STREAMRECORD']._serialized_end=1380
+  _globals['_STREAMERRORDETAILS']._serialized_start=1382
+  _globals['_STREAMERRORDETAILS']._serialized_end=1460
 # @@protoc_insertion_point(module_scope)

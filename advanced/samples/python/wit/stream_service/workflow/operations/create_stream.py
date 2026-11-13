@@ -47,7 +47,7 @@ async def _create_stream(
 async def create_stream(
     *,
     id: str,
-    backend: str | None = None,
+    store: str | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: type[BodyT],
 ) -> Stream[BodyT]: ...
@@ -58,7 +58,7 @@ async def create_stream(
 async def create_stream(
     *,
     id: str,
-    backend: str | None = None,
+    store: str | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: None = None,
 ) -> Stream[object]: ...
@@ -68,15 +68,15 @@ async def create_stream(
 async def create_stream(
     *,
     id: str,
-    backend: str | None = None,
+    store: str | None = None,
     id_conflict_policy: StreamIdConflictPolicy | None = None,
     body_type: typing.Any = None,
 ) -> Stream[typing.Any]:
     """
     Args:
         id: The Stream id, 1 to 4096 bytes.
-        backend: Registered backend name. With none, the SDK picks one. Only an SDK
-            reads it.
+        store: Registered Store name. With none, the SDK picks one. Only an SDK reads
+            it.
         id_conflict_policy: What the create does when the Stream exists. Unspecified is
             fail.
     """
@@ -84,7 +84,7 @@ async def create_stream(
         body_type = typing.Any
     stream_ref = StreamRef(
         id=id,
-        backend=backend,
+        store=store,
     )
     request = CreateStreamRequest(
         stream_ref=stream_ref,
