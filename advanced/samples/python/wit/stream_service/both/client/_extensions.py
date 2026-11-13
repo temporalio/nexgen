@@ -14,7 +14,6 @@ from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
-    Execution,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -77,7 +76,7 @@ class StreamServiceClientExtension(abc.ABC):
         elif arguments and arguments[0] is not object and arguments[0] != body_type:
             raise TypeError("The decoding type must match the typed ref")
         if arguments != (body_type,):
-            ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+            ref = StreamRef[body_type](id=ref.id, store=ref.store)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
@@ -123,9 +122,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        owner: Execution | None = None,
-        backend: str | None = None,
-        retention: datetime.timedelta | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: type[BodyT],
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -138,9 +135,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        owner: Execution | None = None,
-        backend: str | None = None,
-        retention: datetime.timedelta | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -152,9 +147,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        owner: Execution | None = None,
-        backend: str | None = None,
-        retention: datetime.timedelta | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: typing.Any = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -163,12 +156,8 @@ class StreamServiceClientExtension(abc.ABC):
         """
         Args:
             id: The Stream id, 1 to 4096 bytes.
-            owner: The run chain or Standalone Activity of a bound Stream. Empty if
-                standalone.
-            backend: Registered backend name, empty for the default. The Store never
+            store: Registered Store name. With none, the SDK picks one. Only an SDK
                 reads it.
-            retention: The age after which a Record is dropped. Empty is the Store
-                default.
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
@@ -176,13 +165,10 @@ class StreamServiceClientExtension(abc.ABC):
             body_type = typing.Any
         stream_ref = StreamRef(
             id=id,
-            owner=owner,
-            backend=backend,
+            store=store,
         )
         request = CreateStreamRequest(
             stream_ref=stream_ref,
-            retention=retention,
-            withdraw_run=_support.withdraw_run(),
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )

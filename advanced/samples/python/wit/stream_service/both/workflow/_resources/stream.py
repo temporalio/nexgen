@@ -17,7 +17,6 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRef,
@@ -60,16 +59,17 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
+        sequence: int | None = None,
     ) -> AppendRecordsResponse:
-        """Publish values, and return the first and the last offset of the batch."""
+        """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
+            sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
             producer=_support.workflow_producer(),
-            withdraw_run=_support.withdraw_run(),
         )
         handle = await _append_records(request)
         return await handle
@@ -87,19 +87,17 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        position: ReadPosition | None = None,
+        from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            position=position,
+            from_offset=from_offset,
             max_records=max_records,
             wait=wait,
-            create_wait=create_wait,
             max_bytes=max_bytes,
         )
         handle = await _read_records(request, self.body_type)
@@ -108,7 +106,7 @@ class Stream(typing.Generic[BodyT]):
     async def describe(
         self,
     ) -> DescribeStreamResponse:
-        """Describe the Stream's status, newest offset and Retention."""
+        """Describe the Stream's status and newest offset."""
         request = DescribeStreamRequest(
             ref=self.ref,
         )
@@ -148,7 +146,7 @@ def get_stream(
     elif arguments and arguments[0] is not object and arguments[0] != body_type:
         raise TypeError("The decoding type must match the typed ref")
     if arguments != (body_type,):
-        ref = StreamRef[body_type](id=ref.id, owner=ref.owner, backend=ref.backend)
+        ref = StreamRef[body_type](id=ref.id, store=ref.store)
     return Stream[body_type](
         ref=ref,
         created=created,

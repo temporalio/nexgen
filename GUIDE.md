@@ -588,7 +588,8 @@ their API fields do not gain implicit constructor defaults.
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
 Write a `bytes` member of a oneof the same way, as the case payload of a variant
-with `@nexus.proto`. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
+with `@nexus.proto`. A resource method parameter of `list<u8>` that fills such a
+field is `bytes` too. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
 Go `[]byte`, or .NET `byte[]`. The .NET converters translate between `byte[]`
 and protobuf `ByteString` at the wire boundary. In other records, `list<u8>` is
 a list of integers, like any other `list<T>`.
@@ -1226,7 +1227,7 @@ record create-stream-request {
 ```
 
 ```python
-stream = await client.create_stream(id="s1", backend="redis")
+stream = await client.create_stream(id="s1", store="redis")
 ```
 
 A resource method can't bind an operation whose request flattens a field.
@@ -1777,7 +1778,7 @@ function of the package. The factory returns the handle from its ref, with no
 call.
 
 ```python
-stream = get_stream(ref=StreamRef(id="chat-1:turns", backend="redis"), body_type=Turn)
+stream = get_stream(ref=StreamRef(id="chat-1:turns", store="redis"), body_type=Turn)
 ```
 
 Sources work in the client target as well. Restrict workflow-only helpers with

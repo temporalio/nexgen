@@ -18,7 +18,6 @@ from ...models import (
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    ReadPosition,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRecord,
@@ -67,18 +66,19 @@ class Stream(typing.Generic[BodyT]):
     ) -> None:
         await self.close()
 
-    async def publish(
+    async def append(
         self,
         *records: BodyT,
+        sequence: int | None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
-        """Publish values, and return the first and the last offset of the batch."""
+        """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
+            sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.client_producer(),
-            withdraw_run=_support.withdraw_run(),
+            producer=_support.default_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -98,7 +98,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.client_producer(),
+            producer=_support.default_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,
@@ -111,10 +111,9 @@ class Stream(typing.Generic[BodyT]):
 
     async def read(
         self,
-        position: ReadPosition | None = None,
+        from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -123,10 +122,9 @@ class Stream(typing.Generic[BodyT]):
         """Read one page of Records. The poll iterator reads them all."""
         request = ReadRecordsRequest(
             ref=self.ref,
-            position=position,
+            from_offset=from_offset,
             max_records=max_records,
             wait=wait,
-            create_wait=create_wait,
             max_bytes=max_bytes,
         )
         handle = await self._nexus_client.start_operation(
@@ -141,10 +139,9 @@ class Stream(typing.Generic[BodyT]):
 
     async def iter_read(
         self,
-        position: ReadPosition | None = None,
+        from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -155,23 +152,19 @@ class Stream(typing.Generic[BodyT]):
         Read one page of Records. The poll iterator reads them all.
 
         Args:
-            position: Where the read starts. Unset is the beginning. A too high offset
-                fails.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
+            from_offset: Read after this offset. Empty is the beginning. A too high
+                offset fails.
+            max_records: About this many Records per page, 1 to 1000.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
-            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
-                At most 60 s.
             max_bytes: The maximum Record bytes in a page. A larger Record is still
                 returned alone.
         """
         request = ReadRecordsRequest(
             ref=self.ref,
-            position=position,
+            from_offset=from_offset,
             max_records=max_records,
             wait=wait,
-            create_wait=create_wait,
             max_bytes=max_bytes,
         )
         nexus_client = self._nexus_client
@@ -193,10 +186,9 @@ class Stream(typing.Generic[BodyT]):
 
     def iter_read_items(
         self,
-        position: ReadPosition | None = None,
+        from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
-        create_wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -210,32 +202,27 @@ class Stream(typing.Generic[BodyT]):
         Read one page of Records. The poll iterator reads them all.
 
         Args:
-            position: Where the read starts. Unset is the beginning. A too high offset
-                fails.
-            max_records: About this many items per page, 1 to 1000. A Superseded item
-                stays with its Record.
+            from_offset: Read after this offset. Empty is the beginning. A too high
+                offset fails.
+            max_records: About this many Records per page, 1 to 1000.
             wait: How long to wait for a new Record before an empty answer. At most 60
                 s.
-            create_wait: How long to wait for an uncreated Stream. Empty fails at once.
-                At most 60 s.
             max_bytes: The maximum Record bytes in a page. A larger Record is still
                 returned alone.
         """
         request = ReadRecordsRequest(
             ref=self.ref,
-            position=position,
+            from_offset=from_offset,
             max_records=max_records,
             wait=wait,
-            create_wait=create_wait,
             max_bytes=max_bytes,
         )
         return PollIterator(
             request,
             self.iter_read(
-                position=position,
+                from_offset=from_offset,
                 max_records=max_records,
                 wait=wait,
-                create_wait=create_wait,
                 max_bytes=max_bytes,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -251,7 +238,7 @@ class Stream(typing.Generic[BodyT]):
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> DescribeStreamResponse:
-        """Describe the Stream's status, newest offset and Retention."""
+        """Describe the Stream's status and newest offset."""
         request = DescribeStreamRequest(
             ref=self.ref,
         )

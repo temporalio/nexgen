@@ -1,14 +1,11 @@
 import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
-import Long from "long";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type CreateStreamRequest,
-  type ReadRecordsRequest,
   type ReadRecordsResponse,
   type StreamRef,
-  StreamReadStart,
   StreamStatus,
   appendRecordsRequestTransferTypeConverter,
   createCreateStreamRequestTransferTypeConverter,
@@ -49,7 +46,6 @@ describe("stream-service generated output", () => {
     const ref: StreamRef<Turn> = { id: "typed-stream" };
     const request: CreateStreamRequest<Turn> = {
       streamRef: ref,
-      withdrawRun: "run-1",
       requestId: "request-1",
     };
     const converter = createCreateStreamRequestTransferTypeConverter<Turn>();
@@ -61,33 +57,23 @@ describe("stream-service generated output", () => {
 
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
   // compile when those declarations drift from what they read and write.
-  test("maps each read item kind through the proto oneof", () => {
+  test("maps the records of a read through their proto", () => {
     const model: ReadRecordsResponse<string> = {
       records: [
         {
-          item: {
-            tag: "data",
-            value: { body: "hi" },
-          },
+          body: "hi",
+          producer: { id: "wf:r1", kind: { tag: "workflow", value: { runId: "r1" } } },
           offset: _offset(1),
         },
-        {
-          item: {
-            tag: "superseded",
-            value: { producerId: "workflow-1", failedTasks: [Long.fromNumber(7)] },
-          },
-          offset: _offset(2),
-        },
       ],
-      nextOffset: _offset(3),
+      lastOffset: _offset(1),
       done: true,
     };
 
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse =
       readRecordsResponseTransferTypeConverter.toTransferType(model);
 
-    expect(proto.records?.map((record) => record.item)).toEqual(["data", "superseded"]);
-    expect(proto.records?.[1].superseded?.failedTasks?.[0].toNumber()).toBe(7);
+    expect(proto.records?.[0].producer?.kind).toBe("workflow");
     expect(readRecordsResponseTransferTypeConverter.fromTransferType(proto)).toEqual(
       model,
     );
@@ -98,8 +84,7 @@ describe("stream-service generated output", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
       records: [
         {
-          item: "data",
-          data: { body: common.defaultPayloadConverter.toPayload({ role: "user" }) },
+          body: common.defaultPayloadConverter.toPayload({ role: "user" }),
           offset: _offset(1),
         },
       ],
@@ -109,27 +94,12 @@ describe("stream-service generated output", () => {
       bodyT: turnType,
     }).fromTransferType(proto);
 
-    const item = model.records?.[0].item;
-    expect(item?.tag === "data" ? item.value.body : undefined).toStrictEqual(
-      new Turn("user"),
-    );
-  });
-
-  test("gives no item for a read record whose item kind only a newer server knows", () => {
-    const proto: temporal.api.streamservice.v1.IReadRecordsResponse = {
-      records: [{ offset: _offset(1) }],
-    };
-
-    const model = readRecordsResponseTransferTypeConverter.fromTransferType(proto);
-
-    expect(model.records?.[0].item).toBeUndefined();
-    expect(model.records?.[0].offset).toEqual(_offset(1));
+    expect(model.records?.[0].body).toStrictEqual(new Turn("user"));
   });
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
-      ref: { id: "stream-1", owner: { businessId: "workflow-1" } },
-      position: "fromOffset",
+      ref: { id: "stream-1" },
       fromOffset: _offset(7),
       maxRecords: 10,
     };
@@ -137,28 +107,11 @@ describe("stream-service generated output", () => {
     const model = readRecordsRequestTransferTypeConverter.fromTransferType(proto);
 
     expect(model.ref.id).toBe("stream-1");
-    expect(model.ref.owner?.businessId).toBe("workflow-1");
-    expect(model.position).toEqual({ tag: "from-offset", value: _offset(7) });
+    expect(model.fromOffset).toEqual(_offset(7));
     expect(model.maxRecords).toBe(10);
     const wire = readRecordsRequestTransferTypeConverter.toTransferType(model);
     expect(wire.ref?.id).toBe("stream-1");
-    expect(wire.position).toBe("fromOffset");
     expect(wire.fromOffset).toEqual(_offset(7));
-  });
-
-  test("maps the start case of a read position through the proto oneof", () => {
-    const request: ReadRecordsRequest<string> = {
-      ref: { id: "stream-1" },
-      position: { tag: "start", value: StreamReadStart.StreamReadStartEnd },
-    };
-
-    const wire = readRecordsRequestTransferTypeConverter.toTransferType(request);
-
-    expect(wire.position).toBe("start");
-    expect(wire.start).toBe(StreamReadStart.StreamReadStartEnd);
-    expect(
-      readRecordsRequestTransferTypeConverter.fromTransferType(wire).position,
-    ).toEqual(request.position);
   });
 
   test("wraps each value of an append in its record on the wire", () => {
@@ -166,7 +119,6 @@ describe("stream-service generated output", () => {
       ref: { id: "stream-1" },
       records: ["a", "b"],
       producer: { id: "client:sample" },
-      withdrawRun: "r1",
     });
 
     // `append-record` flattens, so the model holds the values and the proto holds the records.
