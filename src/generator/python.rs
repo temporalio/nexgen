@@ -5691,9 +5691,14 @@ fn render_optional_python_imports_with_skipped_language_modules(
         ("import uuid as _uuid\n", "_uuid"),
     ];
 
+    // The SDK's client inherits a generated extension, so its module imports this one. Only
+    // annotations use it here, so a run-time import would make the two import each other.
+    let uses_client = body_uses_python_module_path(body, "temporalio.client");
     let mut wrote_any = false;
     for (import_line, module_path) in simple_imports {
-        if body_uses_python_module_path(body, module_path) {
+        let used = body_uses_python_module_path(body, module_path)
+            || (module_path == "typing" && uses_client);
+        if used && module_path != "temporalio.client" {
             output.push_str(import_line);
             wrote_any = true;
         }
@@ -5714,6 +5719,10 @@ fn render_optional_python_imports_with_skipped_language_modules(
 
     if !used_module_imports.is_empty() {
         render_python_module_imports(output, &used_module_imports);
+        wrote_any = true;
+    }
+    if uses_client {
+        output.push_str("\nif typing.TYPE_CHECKING:\n    import temporalio.client\n");
         wrote_any = true;
     }
 

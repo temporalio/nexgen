@@ -651,6 +651,29 @@ assert resources.Stream
 
 @pytest.mark.parametrize(
     "package",
+    ["wit.stream_service.both.client", "wit.stream_service.client.client"],
+)
+def test_a_client_package_loads_before_the_sdk_client_module(package: str) -> None:
+    # The SDK's `Client` inherits the generated extension, so `temporalio.client` imports this
+    # package while it loads. A package that imported it back would be a circular import.
+    script = """
+import importlib
+import sys
+
+importlib.import_module(sys.argv[1])
+assert "temporalio.client" not in sys.modules
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, package],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "package",
     [
         "wit.stream_service.models",
         "wit.stream_service.client",
