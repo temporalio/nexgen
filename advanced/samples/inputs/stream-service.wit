@@ -21,8 +21,11 @@ interface stream-service {
   /// @nexus.type-parameter
   type body-t = placeholder;
 
-  // An offset is an opaque, ordered position of a Record in one Stream. It is proto `bytes`, and
-  // two offsets of one Stream compare bytewise in the order of their Records.
+  // The WIT has no named offset type yet, so this comment tells what each `list<u8>` offset holds.
+  // An offset is the opaque position of a Record in one Stream, and it is proto `bytes`. A caller
+  // never parses it. It only gives it back to a read, or compares two offsets of one Stream. They
+  // compare bytewise in the order of their Records, so a caller can tell which one is newer
+  // without a call to the Store.
   // TODO: use `type stream-offset = list<u8>` once nexgen reads a named `list<u8>` as `bytes`.
 
   /// @nexus.proto "google.protobuf.Timestamp"
