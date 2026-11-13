@@ -1140,8 +1140,8 @@ namespace Temporalio.Api.Stream.V1 {
   /// <summary>
   /// Experimental. Might change in the future.
   /// A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
-  /// Workflow Task. On a Store, a Workflow appends as a Local Activity Producer, and this Producer
-  /// only closes the Stream.
+  /// Workflow Task. On a Store, Workflow code writes through a Local Activity, so its writes carry a
+  /// Local Activity Producer.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class WorkflowProducer : pb::IMessage<WorkflowProducer>
@@ -1208,8 +1208,7 @@ namespace Temporalio.Api.Stream.V1 {
     public const int EpochFieldNumber = 2;
     private global::Temporalio.Api.Stream.V1.WorkflowTaskEpoch epoch_;
     /// <summary>
-    /// The Workflow Task of the write. A close on a Store runs after the Workflow Task and sends
-    /// no epoch.
+    /// The Workflow Task of the write.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2875,8 +2874,10 @@ namespace Temporalio.Api.Stream.V1 {
     private pb::ByteString offset_ = pb::ByteString.Empty;
     /// <summary>
     /// Required. The Record's offset. An offset is ordered and unique in one Stream, and it is
-    /// sparse. Offsets have gaps, so they don't count Records. An offset is never empty. A read
-    /// gives its Stream, so the read checks the offset against that Stream.
+    /// sparse. Offsets have gaps, so they don't count Records. Two offsets of one Stream compare
+    /// bytewise, as unsigned bytes, in the order of their Records. So a reader, a Store and the
+    /// server order them without decoding them. An offset is never empty. A read gives its
+    /// Stream, so the read checks the offset against that Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
