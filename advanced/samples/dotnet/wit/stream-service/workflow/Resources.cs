@@ -25,16 +25,16 @@ namespace Temporalio.Workflows
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records)
+        public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records, Producer? producer)
         {
-            var request = new AppendRecordsOptions<TBody>(Ref, records);
+            var request = new AppendRecordsRequest<TBody>(Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(records, value => new AppendRecord<TBody>(value))), producer ?? Nexgen.Support.StreamWorkflowContext.Producer());
             return Operations.AppendRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task CloseAsync()
+        public Task CloseAsync(Producer? producer)
         {
-            var request = new CloseStreamOptions<TBody>(Ref);
+            var request = new CloseStreamRequest<TBody>(Ref, producer ?? Nexgen.Support.StreamWorkflowContext.Producer());
             return Operations.CloseStreamAsync(request);
         }
 

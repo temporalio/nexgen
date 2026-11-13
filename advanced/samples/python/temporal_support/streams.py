@@ -25,7 +25,7 @@ def workflow_producer() -> typing.Any:
     )
 
 
-def client_producer() -> typing.Any:
+def default_producer() -> typing.Any:
     """An Activity's attempt, or a client."""
     models = _models()
     if temporalio.activity.in_activity():

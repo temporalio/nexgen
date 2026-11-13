@@ -1141,7 +1141,7 @@ field. The source is not evaluated when the caller passes a value. Other
 languages pass an optional parameter as it is.
 
 ```python
-producer=producer if producer is not None else _support.client_producer()
+producer=producer if producer is not None else _support.default_producer()
 ```
 
 Nexgen prefixes the helper call, but it does not add arguments. The configured

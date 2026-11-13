@@ -17,6 +17,7 @@ from ...models import (
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRecord,
@@ -68,14 +69,15 @@ class Stream(typing.Generic[BodyT]):
     async def append(
         self,
         *records: BodyT,
+        producer: Producer | None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> bytes:
         """Append values, and return the offset of the last one."""
         request = AppendRecordsRequest(
             ref=self.ref,
+            producer=producer if producer is not None else _support.default_producer(),
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.client_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -89,6 +91,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def close(
         self,
+        producer: Producer | None = None,
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
@@ -96,7 +99,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.client_producer(),
+            producer=producer if producer is not None else _support.default_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,

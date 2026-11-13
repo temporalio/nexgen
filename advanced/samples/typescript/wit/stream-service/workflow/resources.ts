@@ -4,11 +4,13 @@ import type * as common from "@temporalio/common";
 import type {
   StreamRef,
   AppendRecordsResponse,
+  Producer,
   ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";
-import { appendRecords } from "./operations/append-records";
-import { closeStream } from "./operations/close-stream";
+import * as support from "../../../support/temporal_model_converters";
+import { _appendRecords } from "./operations/append-records";
+import { _closeStream } from "./operations/close-stream";
 import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
@@ -28,15 +30,22 @@ export class Stream<BodyT = unknown> {
     return this.#bodyType;
   }
 
-  public async append(records: BodyT[]): Promise<AppendRecordsResponse> {
-    const request = { ref: this.ref, records: records };
-    const handle = await appendRecords(request);
+  public async append(
+    records: BodyT[],
+    producer?: Producer,
+  ): Promise<AppendRecordsResponse> {
+    const request = {
+      ref: this.ref,
+      records: records,
+      producer: producer ?? support.workflowProducer(),
+    };
+    const handle = await _appendRecords(request);
     return await handle.result();
   }
 
-  public async close(): Promise<void> {
-    const request = { ref: this.ref };
-    const handle = await closeStream(request);
+  public async close(producer?: Producer): Promise<void> {
+    const request = { ref: this.ref, producer: producer ?? support.workflowProducer() };
+    const handle = await _closeStream(request);
     await handle.result();
   }
 

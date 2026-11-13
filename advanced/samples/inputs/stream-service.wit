@@ -185,12 +185,12 @@ interface stream-service {
   record append-records-request {
     ref: stream-ref,
     records: list<append-record>,
-    // Only the context helper sets the Producer right, so it is never a parameter. The helper of
-    // each context fills the Producer that applies where it runs.
+    // A call can pass its own Producer. With none, the helper of each context fills the Producer
+    // that applies where it runs.
     /// @nexus.doc "The Producer of the batch. The helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
     ///   dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // A call with no writer state, such as append, sends no sequence. The Store then numbers the
@@ -217,7 +217,7 @@ interface stream-service {
     /// @nexus.doc "The Producer that closes the Stream. The helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
     ///   dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // Native only. The SDK sets it, and the SDK Stores don't read it.
@@ -281,12 +281,15 @@ interface stream-service {
     /// @nexus.doc "Append values, and return the offset of the last one."
     /// @nexus.operation "append-records"
     /// @nexus.varargs "records"
-    append: func(records: list<append-record>) -> append-records-response;
+    append: func(
+      records: list<append-record>,
+      producer: option<producer>,
+    ) -> append-records-response;
 
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
     /// @nexus.operation "close-stream"
     /// @nexus.close
-    close: func();
+    close: func(producer: option<producer>);
 
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."
     /// @nexus.operation "read-records"
