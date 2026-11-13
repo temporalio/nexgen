@@ -1135,15 +1135,6 @@ request = StartWorkflowRequest(
 )
 ```
 
-In Python, TypeScript and .NET, an optional method parameter (`option<T>`) takes
-precedence only when the caller passes a value. Otherwise the source fills the
-field. The source is not evaluated when the caller passes a value. Other
-languages pass an optional parameter as it is.
-
-```python
-producer=producer if producer is not None else _support.default_producer()
-```
-
 Nexgen prefixes the helper call, but it does not add arguments. The configured
 package supplies the helper. The `@nexus.output-transform` directive is
 different: its value remains a raw expression.
@@ -2478,6 +2469,16 @@ Defaults apply only to exposed operation arguments, including flattened
 arguments. Supplied nested records must be complete and pass through unchanged;
 defaults are not applied to their fields or to records inside lists or maps.
 Constructors and encoding/decoding do not evaluate defaults.
+
+In a resource method, an optional parameter (`option<T>`) can share its name
+with a defaulted request field. The method then sends the caller's value when
+there is one, and the default otherwise. The default is evaluated only when the
+caller passes no value. Go and Java pass an optional parameter as it is, and so
+does a .NET resource method that builds the request itself.
+
+```python
+producer=((_support.default_producer()) if producer is None else producer)
+```
 
 A default cannot be combined with `@nexus.source` for the same language.
 

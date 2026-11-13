@@ -8,9 +8,8 @@ import type {
   ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";
-import * as support from "../../../support/temporal_model_converters";
-import { _appendRecords } from "./operations/append-records";
-import { _closeStream } from "./operations/close-stream";
+import { appendRecords } from "./operations/append-records";
+import { closeStream } from "./operations/close-stream";
 import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
@@ -37,17 +36,17 @@ export class Stream<BodyT = unknown> {
   ): Promise<AppendRecordsResponse> {
     const request = {
       ref: this.ref,
+      producer: producer,
       sequence: sequence,
       records: records,
-      producer: producer ?? support.workflowProducer(),
     };
-    const handle = await _appendRecords(request);
+    const handle = await appendRecords(request);
     return await handle.result();
   }
 
   public async close(producer?: Producer): Promise<void> {
-    const request = { ref: this.ref, producer: producer ?? support.workflowProducer() };
-    const handle = await _closeStream(request);
+    const request = { ref: this.ref, producer: producer };
+    const handle = await closeStream(request);
     await handle.result();
   }
 

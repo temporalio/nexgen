@@ -237,13 +237,13 @@ namespace Temporalio.Workflows
         public StreamRef<TBody> Ref { get; init; }
         public IReadOnlyList<AppendRecord<TBody>> Records { get; init; }
         /// <summary>
+        /// The Producer of the batch. Defaults to the Producer of the calling context.
+        /// </summary>
+        public Producer Producer { get; init; }
+        /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
         public long? Sequence { get; init; }
-        /// <summary>
-        /// The Producer of the batch. With none, the helper of each context sets it.
-        /// </summary>
-        public Producer Producer { get; init; }
 
         internal static AppendRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsRequest wire)
         {
@@ -256,9 +256,9 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
-            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)Ref.ToTransferType();
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
+            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             if (Sequence is { } sequence)
             {
                 proto.Sequence = sequence;
@@ -383,7 +383,7 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// The Producer that closes the Stream. With none, the helper of each context sets it.
+        /// The Producer that closes the Stream. Defaults to the Producer of the calling context.
         /// </summary>
         public Producer Producer { get; init; }
 
@@ -395,8 +395,8 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.CloseStreamRequest();
-            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             proto.Ref = (Temporalio.Api.Stream.V1.StreamRef)Ref.ToTransferType();
+            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             return proto;
         }
 

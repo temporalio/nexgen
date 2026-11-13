@@ -2,13 +2,15 @@
 
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
-import type { AppendRecordsResponse, AppendRecordsRequest } from "../models";
+import type { AppendRecordsResponse, AppendRecordsRequest, Producer } from "../models";
 import * as support from "../../../../support/temporal_model_converters";
 
 type AppendRecordsInput<BodyT> =
   AppendRecordsRequest<BodyT> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "producer"> & { producer?: never }
+      ? Omit<Input, "producer"> & {
+          producer?: Producer;
+        }
       : never
     : never;
 
@@ -22,14 +24,10 @@ export async function appendRecords<BodyT>(
 ): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const request = {
     ...requestInput,
-    producer: support.workflowProducer(),
+    producer: (requestInput.producer !== undefined
+      ? requestInput.producer
+      : support.workflowProducer()) satisfies Producer,
   } as AppendRecordsRequest<BodyT>;
-  return await _appendRecords(request);
-}
-
-export async function _appendRecords<BodyT>(
-  request: AppendRecordsRequest<BodyT>,
-): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",

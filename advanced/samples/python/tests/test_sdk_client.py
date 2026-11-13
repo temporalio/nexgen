@@ -443,7 +443,7 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
         _ = stream.append(1)  # pyright: ignore[reportArgumentType]
 
 
-async def test_an_optional_producer_parameter_replaces_its_source(
+async def test_an_optional_producer_parameter_replaces_its_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     evaluated: list[Producer] = []
@@ -465,7 +465,7 @@ async def test_an_optional_producer_parameter_replaces_its_source(
 
     _ = await stream.append("a", producer=given)
     await stream.close(given)
-    # A call that passes a producer never evaluates the source.
+    # A call that passes a producer never evaluates the default.
     assert evaluated == []
 
     _ = await stream.append("b")

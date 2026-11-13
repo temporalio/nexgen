@@ -58,6 +58,10 @@ namespace Temporalio.Workflows
         public StreamRef<TBody> Ref { get; set; }
         public IReadOnlyList<TBody> Records { get; set; }
         /// <summary>
+        /// The Producer of the batch. Defaults to the Producer of the calling context.
+        /// </summary>
+        public Producer? Producer { get; set; }
+        /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
         public long? Sequence { get; set; }
@@ -75,6 +79,10 @@ namespace Temporalio.Workflows
         }
 
         public StreamRef<TBody> Ref { get; set; }
+        /// <summary>
+        /// The Producer that closes the Stream. Defaults to the Producer of the calling context.
+        /// </summary>
+        public Producer? Producer { get; set; }
     }
 
     /// <summary>
@@ -159,7 +167,7 @@ namespace Temporalio.Workflows
         /// </summary>
         /// <param name="request">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
         [GeneratedCode("nexgen", null)]
-        internal static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
+        private static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
         {
             var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<AppendRecordsResponse>("AppendRecords", request).ConfigureAwait(true);
@@ -173,7 +181,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer())
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), ((options.Producer) ?? (StreamWorkflowContext.Producer())))
             {
                 Sequence = options.Sequence,
             };
@@ -182,7 +190,7 @@ namespace Temporalio.Workflows
 
         /// <param name="request">Close a Stream. Readers drain what is left, then end. Later appends are refused.</param>
         [GeneratedCode("nexgen", null)]
-        internal static async Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamRequest<TBody> request)
+        private static async Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamRequest<TBody> request)
         {
             var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
             var result = await client.ExecuteNexusOperationAsync<CloseStreamResponse>("CloseStream", request).ConfigureAwait(true);
@@ -193,7 +201,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
         {
-            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Producer());
+            var request = new CloseStreamRequest<TBody>(options.Ref, ((options.Producer) ?? (StreamWorkflowContext.Producer())));
             return CloseStreamAsync(request);
         }
 

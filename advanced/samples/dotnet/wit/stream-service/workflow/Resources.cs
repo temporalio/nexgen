@@ -27,14 +27,14 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records, Producer? producer, long? sequence)
         {
-            var request = new AppendRecordsRequest<TBody>(Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(records, value => new AppendRecord<TBody>(value))), producer ?? Nexgen.Support.StreamWorkflowContext.Producer()) { Sequence = sequence };
+            var request = new AppendRecordsOptions<TBody>(Ref, records) { Producer = producer, Sequence = sequence };
             return Operations.AppendRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
         public Task CloseAsync(Producer? producer)
         {
-            var request = new CloseStreamRequest<TBody>(Ref, producer ?? Nexgen.Support.StreamWorkflowContext.Producer());
+            var request = new CloseStreamOptions<TBody>(Ref) { Producer = producer };
             return Operations.CloseStreamAsync(request);
         }
 
