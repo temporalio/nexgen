@@ -188,13 +188,13 @@ interface stream-service {
   record append-records-request {
     ref: stream-ref,
     records: list<append-record>,
-    // Only the context helper sets the Producer right, so it is never a parameter. The helper of
-    // each context fills the Producer that applies where it runs.
-    /// @nexus.doc "The Producer of the batch. The helper of each context sets it."
-    /// @nexus.source targets="workflow" python="workflow_producer()"
-    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
-    ///   dotnet="StreamActivityContext.Producer()"
+    // A call can pass its own Producer. A call that passes none gets the default, which the
+    // helper of each context picks for where it runs.
+    /// @nexus.doc "The Producer of the batch. Defaults to the Producer of the calling context."
+    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
+    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.default targets="client" python="_support.default_producer()"
+    ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // A call that passes no sequence sends none. The Store then numbers the batch, so nothing
     // dedupes it.
@@ -217,11 +217,12 @@ interface stream-service {
   /// @nexus.proto "temporal.api.streamservice.v1.CloseStreamRequest"
   record close-stream-request {
     ref: stream-ref,
-    /// @nexus.doc "The Producer that closes the Stream. The helper of each context sets it."
-    /// @nexus.source targets="workflow" python="workflow_producer()"
-    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
-    ///   dotnet="StreamActivityContext.Producer()"
+    /// @nexus.doc
+    ///   "The Producer that closes the Stream. Defaults to the Producer of the calling context."
+    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
+    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.default targets="client" python="_support.default_producer()"
+    ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // Native only. The SDK sets it, and the SDK Stores don't read it.
     /// @nexus.omit
@@ -286,13 +287,14 @@ interface stream-service {
     /// @nexus.varargs "records"
     append: func(
       records: list<append-record>,
+      producer: option<producer>,
       sequence: option<s64>,
     ) -> append-records-response;
 
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
     /// @nexus.operation "close-stream"
     /// @nexus.close
-    close: func();
+    close: func(producer: option<producer>);
 
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."
     /// @nexus.operation "read-records"

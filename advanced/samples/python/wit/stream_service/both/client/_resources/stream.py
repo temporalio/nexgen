@@ -5,10 +5,12 @@ from __future__ import annotations
 import collections.abc
 import typing
 import typing_extensions
-import temporalio.client
 import uuid as _uuid
 import datetime
 import types
+
+if typing.TYPE_CHECKING:
+    import temporalio.client
 
 from ...services import StreamService
 from ...models import (
@@ -18,6 +20,7 @@ from ...models import (
     CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRecord,
@@ -69,6 +72,7 @@ class Stream(typing.Generic[BodyT]):
     async def append(
         self,
         *records: BodyT,
+        producer: Producer | None = None,
         sequence: int | None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
@@ -76,9 +80,9 @@ class Stream(typing.Generic[BodyT]):
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
+            producer=((_support.default_producer()) if producer is None else producer),
             sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
-            producer=_support.default_producer(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,
@@ -91,6 +95,7 @@ class Stream(typing.Generic[BodyT]):
 
     async def close(
         self,
+        producer: Producer | None = None,
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
@@ -98,7 +103,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=_support.default_producer(),
+            producer=((_support.default_producer()) if producer is None else producer),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.close_stream,

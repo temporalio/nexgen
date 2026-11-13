@@ -25,16 +25,16 @@ namespace Temporalio.Workflows
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records, long? sequence)
+        public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records, Producer? producer, long? sequence)
         {
-            var request = new AppendRecordsOptions<TBody>(Ref, records) { Sequence = sequence };
+            var request = new AppendRecordsOptions<TBody>(Ref, records) { Producer = producer, Sequence = sequence };
             return Operations.AppendRecordsAsync(request);
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task CloseAsync()
+        public Task CloseAsync(Producer? producer)
         {
-            var request = new CloseStreamOptions<TBody>(Ref);
+            var request = new CloseStreamOptions<TBody>(Ref) { Producer = producer };
             return Operations.CloseStreamAsync(request);
         }
 

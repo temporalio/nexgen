@@ -2470,6 +2470,16 @@ arguments. Supplied nested records must be complete and pass through unchanged;
 defaults are not applied to their fields or to records inside lists or maps.
 Constructors and encoding/decoding do not evaluate defaults.
 
+In a resource method, an optional parameter (`option<T>`) can share its name
+with a defaulted request field. The method then sends the caller's value when
+there is one, and the default otherwise. The default is evaluated only when the
+caller passes no value. Go and Java pass an optional parameter as it is, and so
+does a .NET resource method that builds the request itself.
+
+```python
+producer=((_support.default_producer()) if producer is None else producer)
+```
+
 A default cannot be combined with `@nexus.source` for the same language.
 
 ---

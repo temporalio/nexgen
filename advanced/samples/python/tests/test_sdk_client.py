@@ -14,6 +14,7 @@ import typing
 import uuid
 
 import pytest
+import temporal_support
 import temporalio.activity
 import temporalio.client
 import temporalio.converter
@@ -440,6 +441,43 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.append(1)  # pyright: ignore[reportArgumentType]
+
+
+async def test_an_optional_producer_parameter_replaces_its_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evaluated: list[Producer] = []
+
+    def default_producer() -> Producer:
+        evaluated.append(CLIENT_PRODUCER)
+        return CLIENT_PRODUCER
+
+    monkeypatch.setattr(temporal_support, "default_producer", default_producer)
+    given = Producer(id="given", kind=ProducerKindClient(ClientProducer()))
+    client, answers = connect(
+        Client,
+        {
+            "AppendRecords": AppendRecordsResponse(),
+            "CloseStream": CloseStreamResponse(),
+        },
+    )
+    stream = client.get_stream(ref=StreamRef(id="s1"), body_type=str)
+
+    _ = await stream.append("a", producer=given)
+    await stream.close(given)
+    # A call that passes a producer never evaluates the default.
+    assert evaluated == []
+
+    _ = await stream.append("b")
+    await stream.close()
+
+    assert len(evaluated) == 2
+    assert [call.arg.producer for call in answers.started] == [
+        given,
+        given,
+        CLIENT_PRODUCER,
+        CLIENT_PRODUCER,
+    ]
 
 
 @pytest.mark.parametrize(

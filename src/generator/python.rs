@@ -2150,6 +2150,7 @@ impl<'a> ApiPlanner<'a> {
             resource_method_returns_closable_resource(service, method),
         );
         let param_exprs = self.resource_method_param_exprs(method);
+        let optional_params = resource_method_optional_params(method);
         output.push_str("    async def ");
         output.push_str(&python_field_name(&method.name));
         output.push_str("(\n");
@@ -2172,6 +2173,7 @@ impl<'a> ApiPlanner<'a> {
                     .expect("bound resource operation should be rendered in the same module");
                 let request_expr = render_resource_method_request_expr(
                     &param_exprs,
+                    &optional_params,
                     request_plan,
                     self.api_plan,
                     target,
@@ -2407,6 +2409,7 @@ impl<'a> ApiPlanner<'a> {
         );
         let request_expr = render_resource_method_request_expr(
             &self.resource_method_param_exprs(method),
+            &resource_method_optional_params(method),
             request_plan,
             self.api_plan,
             GenerationTarget::Client,
@@ -5688,9 +5691,14 @@ fn render_optional_python_imports_with_skipped_language_modules(
         ("import uuid as _uuid\n", "_uuid"),
     ];
 
+    // The SDK's client inherits a generated extension, so its module imports this one. Only
+    // annotations use it here, so a run-time import would make the two import each other.
+    let uses_client = body_uses_python_module_path(body, "temporalio.client");
     let mut wrote_any = false;
     for (import_line, module_path) in simple_imports {
-        if body_uses_python_module_path(body, module_path) {
+        let used = body_uses_python_module_path(body, module_path)
+            || (module_path == "typing" && uses_client);
+        if used && module_path != "temporalio.client" {
             output.push_str(import_line);
             wrote_any = true;
         }
@@ -5711,6 +5719,10 @@ fn render_optional_python_imports_with_skipped_language_modules(
 
     if !used_module_imports.is_empty() {
         render_python_module_imports(output, &used_module_imports);
+        wrote_any = true;
+    }
+    if uses_client {
+        output.push_str("\nif typing.TYPE_CHECKING:\n    import temporalio.client\n");
         wrote_any = true;
     }
 
@@ -8596,6 +8608,17 @@ fn resource_method_list_param(param: &PlannedResourceField) -> Option<&PlannedTy
     }
 }
 
+/// A call that gives no value for an optional parameter takes the default of the request field of
+/// the same name, if the target has one.
+fn resource_method_optional_params(method: &PlannedResourceMethod) -> BTreeSet<String> {
+    method
+        .params
+        .iter()
+        .filter(|param| param.optional)
+        .map(|param| param.name.clone())
+        .collect()
+}
+
 fn python_missing_request_defaults<'a>(
     spec: &'a PlannedSpec,
     name: &str,
@@ -8634,6 +8657,7 @@ fn python_missing_request_defaults<'a>(
 /// The request of a resource method, with one argument per line, as `ruff format` keeps it.
 fn render_resource_method_request_expr(
     param_exprs: &BTreeMap<String, String>,
+    optional_params: &BTreeSet<String>,
     plan: &RequestPlan,
     api_plan: &PlannedSpec,
     target: GenerationTarget,
@@ -8643,10 +8667,17 @@ fn render_resource_method_request_expr(
         fields,
     } = plan
     else {
-        return render_request_plan_python(param_exprs, plan, api_plan, target);
+        return render_request_plan_python(param_exprs, optional_params, plan, api_plan, target);
     };
     let model_name = python_request_model_name(api_plan, message_name);
-    let arguments = python_request_arguments(param_exprs, message_name, fields, api_plan, target);
+    let arguments = python_request_arguments(
+        param_exprs,
+        optional_params,
+        message_name,
+        fields,
+        api_plan,
+        target,
+    );
     if arguments.is_empty() {
         return format!("{model_name}()");
     }
@@ -8662,6 +8693,7 @@ fn render_resource_method_request_expr(
 
 fn render_request_plan_python(
     param_exprs: &BTreeMap<String, String>,
+    optional_params: &BTreeSet<String>,
     plan: &RequestPlan,
     api_plan: &PlannedSpec,
     target: GenerationTarget,
@@ -8680,8 +8712,15 @@ fn render_request_plan_python(
         } => format!(
             "{}({})",
             python_request_model_name(api_plan, message_name),
-            python_request_arguments(param_exprs, message_name, fields, api_plan, target)
-                .join(", ")
+            python_request_arguments(
+                param_exprs,
+                optional_params,
+                message_name,
+                fields,
+                api_plan,
+                target
+            )
+            .join(", ")
         ),
     }
 }
@@ -8690,24 +8729,44 @@ fn render_request_plan_python(
 /// the plan doesn't fill.
 fn python_request_arguments(
     param_exprs: &BTreeMap<String, String>,
+    optional_params: &BTreeSet<String>,
     message_name: &str,
     fields: &[RequestPlanField],
     api_plan: &PlannedSpec,
     target: GenerationTarget,
 ) -> Vec<String> {
+    let record = crate::generator::resource_plan::record_for_request_name(api_plan, message_name);
     let mut arguments = fields
         .iter()
         .map(|field| {
-            format!(
-                "{}={}",
-                python_field_name(&field.field_name),
-                render_request_plan_python(param_exprs, &field.value, api_plan, target)
-            )
+            let value = render_request_plan_python(
+                param_exprs,
+                optional_params,
+                &field.value,
+                api_plan,
+                target,
+            );
+            let defaulted = match &field.value {
+                RequestPlan::Source(RequestPlanSource::MethodParam(name))
+                    if optional_params.contains(name) =>
+                {
+                    record.and_then(|record| {
+                        record
+                            .fields
+                            .values()
+                            .find(|candidate| candidate.name == field.field_name)
+                    })
+                }
+                _ => None,
+            };
+            let value = match defaulted {
+                Some(model_field) => python_input_default_expr(model_field, &value, target),
+                None => value,
+            };
+            format!("{}={value}", python_field_name(&field.field_name))
         })
         .collect::<Vec<_>>();
-    if let Some(record) =
-        crate::generator::resource_plan::record_for_request_name(api_plan, message_name)
-    {
+    if let Some(record) = record {
         arguments.extend(
             record
                 .sources_for(target)
