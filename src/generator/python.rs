@@ -8646,7 +8646,7 @@ fn resource_method_list_param(param: &PlannedResourceField) -> Option<&PlannedTy
     }
 }
 
-/// A call that gives no value for an optional parameter takes the source of the request field of
+/// A call that gives no value for an optional parameter takes the default of the request field of
 /// the same name, if the target has one.
 fn resource_method_optional_params(method: &PlannedResourceMethod) -> BTreeSet<String> {
     method
@@ -8784,26 +8784,21 @@ fn python_request_arguments(
                 api_plan,
                 target,
             );
-            let fallback = match &field.value {
+            let defaulted = match &field.value {
                 RequestPlan::Source(RequestPlanSource::MethodParam(name))
                     if optional_params.contains(name) =>
                 {
-                    record
-                        .and_then(|record| {
-                            record
-                                .fields
-                                .values()
-                                .find(|candidate| candidate.name == field.field_name)
-                        })
-                        .and_then(|candidate| candidate.source_for(target))
+                    record.and_then(|record| {
+                        record
+                            .fields
+                            .values()
+                            .find(|candidate| candidate.name == field.field_name)
+                    })
                 }
                 _ => None,
             };
-            let value = match fallback {
-                Some(source) => format!(
-                    "{value} if {value} is not None else {}",
-                    python_source_call(source)
-                ),
+            let value = match defaulted {
+                Some(model_field) => python_input_default_expr(model_field, &value, target),
                 None => value,
             };
             format!("{}={value}", python_field_name(&field.field_name))
