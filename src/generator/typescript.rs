@@ -6362,12 +6362,14 @@ fn render_resource(
         output.push_str("  ) {}\n");
     }
 
-    if resource.methods.is_empty() {
+    // A TypeScript resource method calls the Workflow API, so the Workflow omissions apply.
+    let mut methods = resource.methods_for(GenerationTarget::Workflow).peekable();
+    if methods.peek().is_none() {
         output.push_str("}\n");
         return;
     }
 
-    for method in &resource.methods {
+    for method in methods {
         let result_annotation = typescript_resource_method_result_annotation(method, api_plan);
         output.push('\n');
         output.push_str("  public async ");
