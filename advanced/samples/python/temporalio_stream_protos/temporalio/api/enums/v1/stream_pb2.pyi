@@ -76,7 +76,7 @@ class _StreamErrorReasonEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Str
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
     """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
-    """The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION."""
+    """The Stream is closed. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
     """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
@@ -121,7 +121,7 @@ STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
 """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
-"""The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION."""
+"""The Stream is closed. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
 """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5

@@ -103,7 +103,7 @@ namespace Temporalio.Api.Enums.V1 {
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_EXPIRED")] Expired = 2,
     /// <summary>
-    /// The Stream is closed, or the SDK's writer is closed. FAILED_PRECONDITION.
+    /// The Stream is closed. FAILED_PRECONDITION.
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_CLOSED")] Closed = 3,
     /// <summary>

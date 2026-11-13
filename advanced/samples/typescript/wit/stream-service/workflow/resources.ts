@@ -33,9 +33,11 @@ export class Stream<BodyT = unknown> {
   public async append(
     records: BodyT[],
     producer?: Producer,
+    sequence?: number,
   ): Promise<AppendRecordsResponse> {
     const request = {
       ref: this.ref,
+      sequence: sequence,
       records: records,
       producer: producer ?? support.workflowProducer(),
     };
