@@ -29,24 +29,24 @@ class StreamRef(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     ID_FIELD_NUMBER: _builtins.int
-    BACKEND_FIELD_NUMBER: _builtins.int
+    STORE_FIELD_NUMBER: _builtins.int
     id: _builtins.str
-    backend: _builtins.str
-    """The name of the backend that holds the Stream, as the Worker and client config register
-    it, so every process routes a ref it receives. With no name, the SDK picks the backend from
-    its config. Only an SDK sets and reads it, since only the SDK knows the name that its config
-    gives a backend. A request carries the whole ref, and the server and a Store ignore this
+    store: _builtins.str
+    """The name of the Store that holds the Stream, as the Worker and client config register it,
+    so every process routes a ref it receives. With no name, the SDK picks the Store from its
+    config. Only an SDK sets and reads it, since only the SDK knows the name that its config
+    gives a Store. A request carries the whole ref, and the server and a Store ignore this
     field.
     """
     def __init__(
         self,
         *,
         id: _builtins.str = ...,
-        backend: _builtins.str = ...,
+        store: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["backend", b"backend", "id", b"id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["id", b"id", "store", b"store"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

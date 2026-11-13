@@ -119,9 +119,9 @@ export interface StreamRef<BodyT> {
    */
   id: string;
   /**
-   * Registered backend name. With none, the SDK picks one. Only an SDK reads it.
+   * Registered Store name. With none, the SDK picks one. Only an SDK reads it.
    */
-  backend?: string;
+  store?: string;
 }
 
 function streamRefFromProto<BodyT>(
@@ -132,7 +132,7 @@ function streamRefFromProto<BodyT>(
 ): StreamRef<BodyT> {
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "StreamRef", "id"),
-    backend: proto.backend ?? undefined,
+    store: proto.store ?? undefined,
   };
 }
 
@@ -144,7 +144,7 @@ function streamRefToProto<BodyT>(
 ): temporal.api.stream.v1.IStreamRef {
   return {
     id: requiredField(model.id, "StreamRef", "id"),
-    backend: model.backend,
+    store: model.store,
   };
 }
 

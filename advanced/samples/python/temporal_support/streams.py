@@ -25,7 +25,7 @@ def workflow_producer() -> typing.Any:
     )
 
 
-def client_producer() -> typing.Any:
+def default_producer() -> typing.Any:
     """An Activity's attempt, or a client."""
     models = _models()
     if temporalio.activity.in_activity():
@@ -47,11 +47,6 @@ def client_producer() -> typing.Any:
         id="client:sample",
         kind=models.ProducerKindClient(models.ClientProducer()),
     )
-
-
-def last_offset(response: typing.Any) -> bytes:
-    """The offset of the last Record that an append wrote, or empty for none."""
-    return response.last_offset or b""
 
 
 def request_id() -> str:

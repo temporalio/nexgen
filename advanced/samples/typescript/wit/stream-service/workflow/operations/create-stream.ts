@@ -24,7 +24,7 @@ type CreateStreamInput<BodyT> =
       ? Omit<Input, "request_id" | "streamRef"> & {
           request_id?: never;
           streamRef?: never;
-        } & { id: string; backend?: string }
+        } & { id: string; store?: string }
       : never
     : never;
 
@@ -35,11 +35,11 @@ export async function createStream<BodyT>(
   requestInput: CreateStreamInput<BodyT>,
   bodyType?: common.TypeInfo<BodyT>,
 ): Promise<Stream<BodyT>> {
-  const { id, backend, ...requestFields } = requestInput;
+  const { id, store, ...requestFields } = requestInput;
   const request = {
     ...requestFields,
     requestId: support.requestId(),
-    streamRef: { id, backend },
+    streamRef: { id, store },
   } as CreateStreamRequest<BodyT>;
   const client = nexus.createNexusServiceClient({
     service: streamService,

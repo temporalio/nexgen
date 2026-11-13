@@ -36,8 +36,8 @@ interface stream-service {
   record stream-ref {
     /// @nexus.doc "The Stream id, 1 to 4096 bytes."
     id: string,
-    /// @nexus.doc "Registered backend name. With none, the SDK picks one. Only an SDK reads it."
-    backend: option<string>,
+    /// @nexus.doc "Registered Store name. With none, the SDK picks one. Only an SDK reads it."
+    store: option<string>,
   }
 
   /// @nexus.doc "A Workflow Task attempt of the run."
@@ -190,7 +190,7 @@ interface stream-service {
     /// @nexus.doc "The Producer of the batch. The helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
     ///   dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // A call with no writer state, such as append, sends no sequence. The Store then numbers the
@@ -217,7 +217,7 @@ interface stream-service {
     /// @nexus.doc "The Producer that closes the Stream. The helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.source targets="client" python="client_producer()" typescript="clientProducer()"
+    /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
     ///   dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // Native only. The SDK sets it, and the SDK Stores don't read it.
@@ -278,7 +278,7 @@ interface stream-service {
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);
 
-    /// @nexus.doc "Append values, and return the offset of the last one."
+    /// @nexus.doc "Append values, and return the offsets of the batch."
     /// @nexus.operation "append-records"
     /// @nexus.varargs "records"
     append: func(records: list<append-record>) -> append-records-response;
@@ -311,7 +311,6 @@ interface stream-service {
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
   /// @nexus.doc "Append one batch. Workflow code makes the call from a Local Activity."
-  /// @nexus.output-transform python-type="bytes" python="_support.last_offset(result)"
   /// @nexus.operation name="AppendRecords"
   /// @nexus.api-omit
   append-records: func(request: append-records-request) -> append-records-response;

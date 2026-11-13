@@ -116,7 +116,7 @@ class StreamRef(typing.Generic[_BodyT]):
     """Identifies one Stream. The id is opaque to callers."""
 
     id: str
-    backend: str | None = None
+    store: str | None = None
 
 
 class _StreamRefTransferTypeConverter(
@@ -140,7 +140,7 @@ class _StreamRefTransferTypeConverter(
         id = value.id
         return type_hint(
             id=id,
-            backend=value.backend if bool(value.backend) else None,
+            store=value.store if bool(value.store) else None,
         )
 
     @typing_extensions.override
@@ -150,8 +150,8 @@ class _StreamRefTransferTypeConverter(
     ) -> temporalio.api.stream.v1.message_pb2.StreamRef:
         message = temporalio.api.stream.v1.message_pb2.StreamRef()
         message.id = value.id
-        if value.backend is not None:
-            message.backend = value.backend
+        if value.store is not None:
+            message.store = value.store
         return message
 
 
