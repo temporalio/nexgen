@@ -42,12 +42,6 @@ def _offset(n: int) -> bytes:
 
 
 @dataclasses.dataclass
-class FakeWorkflowInfo:
-    run_id: str
-    attempt: int = 1
-
-
-@dataclasses.dataclass
 class Turn:
     role: str
 
@@ -169,9 +163,7 @@ async def test_workflow_apis_call_the_stream_service(
     ref = model_types.StreamRef(id="workflow-stream")
     replies = {
         "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
-        "AppendRecords": model_types.AppendRecordsResponse(
-            first_offset=_offset(2), last_offset=_offset(3)
-        ),
+        "DescribeStream": model_types.DescribeStreamResponse(last_offset=_offset(3)),
     }
     calls: list[tuple[str, typing.Any]] = []
 
@@ -197,43 +189,23 @@ async def test_workflow_apis_call_the_stream_service(
         return NexusClient()
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
-    monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
-    # The Workflow API fills the request id and the producer from its sources.
-    producer = model_types.Producer(
-        id="wf:r2",
-        kind=model_types.ProducerKindWorkflow(
-            model_types.WorkflowProducer(run_id="r2")
-        ),
-    )
-    records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
+    assert await stream.describe() == replies["DescribeStream"]
+    # The Workflow API fills the request id from its source.
     expected = [
         (
             "CreateStream",
             model_types.CreateStreamRequest(stream_ref=ref, request_id=str(request_id)),
         ),
-        (
-            "AppendRecords",
-            model_types.AppendRecordsRequest(
-                ref=ref, records=records, producer=producer, sequence=3
-            ),
-        ),
+        ("DescribeStream", model_types.DescribeStreamRequest(ref=ref)),
     ]
     # The sources build the models of one package, so the calls compare as data.
     assert [(name, dataclasses.asdict(arg)) for name, arg in calls] == [
         (name, dataclasses.asdict(arg)) for name, arg in expected
     ]
-    wire = model_types._AppendRecordsRequestTransferTypeConverter().to_transfer_type(
-        calls[-1][1]
-    )
-    assert [
-        PayloadConverter.default.from_payload(record.body) for record in wire.records
-    ] == ["a", "b"]
-    assert wire.sequence == 3
 
 
 @pytest.mark.parametrize("construction", ["create", "direct"])
@@ -415,11 +387,6 @@ async def test_a_workflow_handle_reads_with_its_refs_payload_type(
 
     if typing.TYPE_CHECKING:
         _ = workflow_only.get_stream(ref=typed, body_type=str)  # pyright: ignore[reportArgumentType, reportCallIssue, reportUnknownVariableType]
-        records = [Turn(role="model")]
-        _ = await workflow_only.get_stream(ref=typed).append(*records)
-        _ = await workflow_only.get_stream(
-            ref=workflow_models.StreamRef[str](id="s1")
-        ).append(*records)  # pyright: ignore[reportArgumentType]
 
 
 def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
@@ -591,22 +558,65 @@ def test_api_omit_hides_the_public_operation_functions(
     # The resource factory and its methods still reach the operations.
     assert "get_stream" in api.__all__
     stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
-    assert all(
-        callable(getattr(stream, method))
-        for method in ("append", "close", "read", "describe")
-    )
+    assert all(callable(getattr(stream, method)) for method in ("read", "describe"))
     # Every operation stays registered, so the service still serves all five.
     assert len(api.__nexus_operation_registry__) == 5
     # The private helpers that the resource methods call stay in the resource module.
     resources = importlib.import_module(api.__name__ + "._resources.stream")
-    for helper in (
-        "_append_records",
-        "_close_stream",
-        "_read_records",
-        "_describe_stream",
-    ):
+    for helper in ("_read_records", "_describe_stream"):
         assert hasattr(resources, helper)
     assert not hasattr(resources, "append_records")
+
+
+@pytest.mark.parametrize(
+    ("api", "model_types"),
+    [(workflow_only, workflow_models), (both_workflow, both_models)],
+    ids=["workflow", "both"],
+)
+async def test_a_workflow_stream_can_not_append_or_close(
+    monkeypatch: pytest.MonkeyPatch,
+    api: types.ModuleType,
+    model_types: types.ModuleType,
+) -> None:
+    ref = model_types.StreamRef(id="s-1")
+    stream = api.get_stream(ref=ref, body_type=str)
+    # `append` and `close` are api-omitted for the Workflow target, with their helpers.
+    for name in ("append", "close", "__aenter__", "__aexit__"):
+        assert not hasattr(stream, name)
+    resources = importlib.import_module(api.__name__ + "._resources.stream")
+    for helper in ("_append_records", "_close_stream"):
+        assert not hasattr(resources, helper)
+
+    class NexusClient:
+        async def start_operation(
+            self,
+            operation: str,
+            input: typing.Any,
+            *,
+            output_type: type[typing.Any] | None = None,
+        ) -> collections.abc.Awaitable[typing.Any]:
+            del operation, input, output_type
+            future: asyncio.Future[typing.Any] = (
+                asyncio.get_running_loop().create_future()
+            )
+            future.set_result(model_types.CreateStreamResult(ref=ref))
+            return future
+
+    def create_client(*, service: str, endpoint: str) -> NexusClient:
+        del service, endpoint
+        return NexusClient()
+
+    monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
+    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+    # With nothing to close, a create is a plain call and not a context manager.
+    call = api.create_stream(id=ref.id, body_type=str)
+    assert not hasattr(call, "__aenter__")
+    assert (await call).ref == ref
+
+    if typing.TYPE_CHECKING:
+        typed = workflow_only.get_stream(ref=workflow_models.StreamRef[str](id="s-1"))
+        _ = typed.append  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
+        _ = typed.close  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
 
 
 @pytest.mark.parametrize(

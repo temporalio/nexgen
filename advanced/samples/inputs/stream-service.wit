@@ -279,9 +279,12 @@ interface stream-service {
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);
 
+    // In this release Workflow code can't append to a Stream or close it. So the Workflow target
+    // omits `append` and `close`, and the client target keeps both.
     /// @nexus.doc "Append values, and return the offsets of the batch."
     /// @nexus.operation "append-records"
     /// @nexus.varargs "records"
+    /// @nexus.api-omit targets="workflow"
     append: func(
       records: list<append-record>,
       producer: option<producer>,
@@ -291,6 +294,7 @@ interface stream-service {
     /// @nexus.doc "Close the Stream. Readers drain what is left, then end."
     /// @nexus.operation "close-stream"
     /// @nexus.close
+    /// @nexus.api-omit targets="workflow"
     close: func(producer: option<producer>);
 
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."

@@ -22,12 +22,6 @@ export async function closeStream<BodyT>(
     ...requestInput,
     producer: support.workflowProducer(),
   } as CloseStreamRequest<BodyT>;
-  return await _closeStream(request);
-}
-
-export async function _closeStream<BodyT>(
-  request: CloseStreamRequest<BodyT>,
-): Promise<nexus.NexusOperationHandle<CloseStreamResponse>> {
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",

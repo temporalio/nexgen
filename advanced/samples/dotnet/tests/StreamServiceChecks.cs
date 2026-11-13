@@ -100,11 +100,21 @@ namespace Nexgen.DotNetExamples.Tests
                 .Distinct();
             Assert.Equal(new[] { "CreateStreamAsync" }, publicOperationMethods);
 
-            // The Stream resource still binds every operation.
-            foreach (var method in new[] { "AppendAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
+            // The Stream resource still binds the reads.
+            foreach (var method in new[] { "ReadAsync", "DescribeAsync" })
             {
                 Assert.NotNull(typeof(StreamServiceExample.Stream<Turn>).GetMethod(method));
             }
+        }
+
+        // `append` and `close` are api-omitted for the Workflow target, so Workflow code can't
+        // append to a Stream or close it.
+        [Fact]
+        public void WorkflowStreamHasNoAppendAndNoClose()
+        {
+            var stream = typeof(StreamServiceExample.Stream<Turn>);
+            Assert.Null(stream.GetMethod("AppendAsync"));
+            Assert.Null(stream.GetMethod("CloseAsync"));
         }
     }
 }

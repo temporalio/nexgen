@@ -24,12 +24,6 @@ export async function appendRecords<BodyT>(
     ...requestInput,
     producer: support.workflowProducer(),
   } as AppendRecordsRequest<BodyT>;
-  return await _appendRecords(request);
-}
-
-export async function _appendRecords<BodyT>(
-  request: AppendRecordsRequest<BodyT>,
-): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",
