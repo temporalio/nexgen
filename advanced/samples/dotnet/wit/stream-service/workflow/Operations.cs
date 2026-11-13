@@ -31,9 +31,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// Registered backend name. With none, the SDK picks one. Only an SDK reads it.
+        /// Registered Store name. With none, the SDK picks one. Only an SDK reads it.
         /// </summary>
-        public string? Backend { get; set; }
+        public string? Store { get; set; }
         /// <summary>
         /// What the create does when the Stream exists. Unspecified is fail.
         /// </summary>
@@ -147,7 +147,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         public static Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamOptions<TBody> options)
         {
-            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Backend = options.Backend }, Nexgen.Support.StreamWorkflowContext.RequestId())
+            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Store = options.Store }, Nexgen.Support.StreamWorkflowContext.RequestId())
             {
                 IdConflictPolicy = options.IdConflictPolicy,
             };

@@ -119,9 +119,9 @@ export interface StreamRef<BodyT> {
    */
   id: string;
   /**
-   * Registered backend name. With none, the SDK picks one. Only an SDK reads it.
+   * Registered Store name. With none, the SDK picks one. Only an SDK reads it.
    */
-  backend?: string;
+  store?: string;
 }
 
 function streamRefFromProto<BodyT>(
@@ -132,7 +132,7 @@ function streamRefFromProto<BodyT>(
 ): StreamRef<BodyT> {
   return {
     id: requiredField(proto.id === "" ? undefined : proto.id, "StreamRef", "id"),
-    backend: proto.backend ?? undefined,
+    store: proto.store ?? undefined,
   };
 }
 
@@ -144,7 +144,7 @@ function streamRefToProto<BodyT>(
 ): temporal.api.stream.v1.IStreamRef {
   return {
     id: requiredField(model.id, "StreamRef", "id"),
-    backend: model.backend,
+    store: model.store,
   };
 }
 
@@ -301,7 +301,7 @@ export interface AppendRecordsRequest<BodyT> {
    */
   sequence?: Long;
   /**
-   * The Producer of the batch. The helper of each context sets it.
+   * The Producer of the batch. With none, the helper of each context sets it.
    */
   producer: Producer;
 }
@@ -908,7 +908,7 @@ export const closeStreamResponseTransferTypeConverter = {
 export interface CloseStreamRequest<BodyT> {
   ref: StreamRef<BodyT>;
   /**
-   * The Producer that closes the Stream. The helper of each context sets it.
+   * The Producer that closes the Stream. With none, the helper of each context sets it.
    */
   producer: Producer;
 }

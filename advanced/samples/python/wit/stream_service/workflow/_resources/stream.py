@@ -64,14 +64,15 @@ class Stream(typing.Generic[BodyT]):
         self,
         *records: BodyT,
         producer: Producer | None = None,
-    ) -> bytes:
-        """Append values, and return the offset of the last one."""
+    ) -> AppendRecordsResponse:
+        """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
             producer=producer if producer is not None else _support.workflow_producer(),
             records=[AppendRecord(body=value) for value in records],
         )
-        return await _append_records(request)
+        handle = await _append_records(request)
+        return await handle
 
     async def close(
         self,
@@ -146,7 +147,7 @@ def get_stream(
     elif arguments and arguments[0] is not object and arguments[0] != body_type:
         raise TypeError("The decoding type must match the typed ref")
     if arguments != (body_type,):
-        ref = StreamRef[body_type](id=ref.id, backend=ref.backend)
+        ref = StreamRef[body_type](id=ref.id, store=ref.store)
     return Stream[body_type](
         ref=ref,
         created=created,
@@ -155,18 +156,16 @@ def get_stream(
 
 async def _append_records(
     request: AppendRecordsRequest[BodyT],
-) -> bytes:
+) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
     nexus_client = temporalio.workflow.create_nexus_client(
         service="temporal.api.streamservice.v1.StreamService",
         endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
     )
-    handle = await nexus_client.start_operation(
+    return await nexus_client.start_operation(
         operation="AppendRecords",
         input=request,
         output_type=AppendRecordsResponse,
     )
-    result = await handle
-    return _support.last_offset(result)
 
 
 async def _close_stream(

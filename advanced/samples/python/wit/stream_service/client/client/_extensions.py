@@ -78,7 +78,7 @@ class StreamServiceClientExtension(abc.ABC):
         elif arguments and arguments[0] is not object and arguments[0] != body_type:
             raise TypeError("The decoding type must match the typed ref")
         if arguments != (body_type,):
-            ref = StreamRef[body_type](id=ref.id, backend=ref.backend)
+            ref = StreamRef[body_type](id=ref.id, store=ref.store)
         return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
@@ -124,7 +124,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        backend: str | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: type[BodyT],
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -137,7 +137,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        backend: str | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -149,7 +149,7 @@ class StreamServiceClientExtension(abc.ABC):
         self,
         *,
         id: str,
-        backend: str | None = None,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
         body_type: typing.Any = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
@@ -158,7 +158,7 @@ class StreamServiceClientExtension(abc.ABC):
         """
         Args:
             id: The Stream id, 1 to 4096 bytes.
-            backend: Registered backend name. With none, the SDK picks one. Only an SDK
+            store: Registered Store name. With none, the SDK picks one. Only an SDK
                 reads it.
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
@@ -167,7 +167,7 @@ class StreamServiceClientExtension(abc.ABC):
             body_type = typing.Any
         stream_ref = StreamRef(
             id=id,
-            backend=backend,
+            store=store,
         )
         request = CreateStreamRequest(
             stream_ref=stream_ref,

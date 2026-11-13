@@ -310,11 +310,13 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         assert not hasattr(client, f"_stream_service_{name}")
 
     stream = await client.create_stream(id="s1", body_type=str)
-    last_offset = await stream.append("a")
+    response = await stream.append("a")
     await stream.close()
 
     assert stream.ref.id == "s1"
-    assert last_offset == _offset(7)
+    assert response == AppendRecordsResponse(
+        first_offset=_offset(7), last_offset=_offset(7)
+    )
     assert len(client.created_clients) == 1
     create, append, close = answers.started
     assert (create.service, create.endpoint, create.operation) == (
@@ -400,7 +402,7 @@ async def test_a_canceled_block_closes_its_stream() -> None:
     assert len(closes(answers)) == 1
 
 
-async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
+async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
     ref = StreamRef(id="s1")
     client, answers = connect(
         Client,
@@ -413,18 +415,20 @@ async def test_an_append_wraps_each_value_and_returns_the_last_offset() -> None:
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    last_offset = await stream.append("a", "b")
+    response = await stream.append("a", "b")
     empty = await stream.append()
 
-    _ = assert_type(last_offset, bytes)
-    assert last_offset == _offset(5)
+    _ = assert_type(response, AppendRecordsResponse)
+    assert response == AppendRecordsResponse(
+        first_offset=_offset(4), last_offset=_offset(5)
+    )
     assert answers.started[0].arg == AppendRecordsRequest(
         ref=ref,
         records=[AppendRecord(body="a"), AppendRecord(body="b")],
         producer=CLIENT_PRODUCER,
     )
-    # An append that wrote no Record has no last offset, so it answers empty bytes.
-    assert empty == b""
+    # An append that wrote no Record has no offsets.
+    assert empty == AppendRecordsResponse()
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.append(1)  # pyright: ignore[reportArgumentType]
@@ -471,7 +475,7 @@ async def test_an_optional_producer_parameter_replaces_its_source(
     ("fields", "ref"),
     [
         ({}, StreamRef(id="s1")),
-        ({"backend": "redis"}, StreamRef(id="s1", backend="redis")),
+        ({"store": "redis"}, StreamRef(id="s1", store="redis")),
     ],
 )
 async def test_a_create_takes_the_fields_of_the_ref(
@@ -485,7 +489,7 @@ async def test_a_create_takes_the_fields_of_the_ref(
     assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
     wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
     assert wire.stream_ref.id == "s1"
-    assert wire.stream_ref.backend == fields.get("backend", "")
+    assert wire.stream_ref.store == fields.get("store", "")
 
 
 @dataclasses.dataclass

@@ -241,7 +241,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? Sequence { get; init; }
         /// <summary>
-        /// The Producer of the batch. The helper of each context sets it.
+        /// The Producer of the batch. With none, the helper of each context sets it.
         /// </summary>
         public Producer Producer { get; init; }
 
@@ -383,7 +383,7 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// The Producer that closes the Stream. The helper of each context sets it.
+        /// The Producer that closes the Stream. With none, the helper of each context sets it.
         /// </summary>
         public Producer Producer { get; init; }
 
@@ -1091,15 +1091,15 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; init; }
         /// <summary>
-        /// Registered backend name. With none, the SDK picks one. Only an SDK reads it.
+        /// Registered Store name. With none, the SDK picks one. Only an SDK reads it.
         /// </summary>
-        public string? Backend { get; init; }
+        public string? Store { get; init; }
 
         internal static StreamRef<TBody> FromTransferType(Temporalio.Api.Stream.V1.StreamRef wire)
         {
             return new StreamRef<TBody>(wire.Id)
             {
-                Backend = string.IsNullOrEmpty(wire.Backend) ? null : wire.Backend,
+                Store = string.IsNullOrEmpty(wire.Store) ? null : wire.Store,
             };
         }
 
@@ -1107,9 +1107,9 @@ namespace Temporalio.Workflows
         {
             var proto = new Temporalio.Api.Stream.V1.StreamRef();
             proto.Id = Id;
-            if (Backend is { } backend)
+            if (Store is { } store)
             {
-                proto.Backend = backend;
+                proto.Store = store;
             }
             return proto;
         }
