@@ -187,7 +187,7 @@ interface stream-service {
     records: list<append-record>,
     // A call can pass its own Producer. With none, the helper of each context fills the Producer
     // that applies where it runs.
-    /// @nexus.doc "The Producer of the batch. The helper of each context sets it."
+    /// @nexus.doc "The Producer of the batch. With none, the helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"
@@ -214,7 +214,8 @@ interface stream-service {
   /// @nexus.proto "temporal.api.streamservice.v1.CloseStreamRequest"
   record close-stream-request {
     ref: stream-ref,
-    /// @nexus.doc "The Producer that closes the Stream. The helper of each context sets it."
+    /// @nexus.doc
+    ///   "The Producer that closes the Stream. With none, the helper of each context sets it."
     /// @nexus.source targets="workflow" python="workflow_producer()"
     ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.source targets="client" python="default_producer()" typescript="defaultProducer()"

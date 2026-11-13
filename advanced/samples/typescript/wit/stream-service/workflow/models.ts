@@ -301,7 +301,7 @@ export interface AppendRecordsRequest<BodyT> {
    */
   sequence?: Long;
   /**
-   * The Producer of the batch. The helper of each context sets it.
+   * The Producer of the batch. With none, the helper of each context sets it.
    */
   producer: Producer;
 }
@@ -908,7 +908,7 @@ export const closeStreamResponseTransferTypeConverter = {
 export interface CloseStreamRequest<BodyT> {
   ref: StreamRef<BodyT>;
   /**
-   * The Producer that closes the Stream. The helper of each context sets it.
+   * The Producer that closes the Stream. With none, the helper of each context sets it.
    */
   producer: Producer;
 }

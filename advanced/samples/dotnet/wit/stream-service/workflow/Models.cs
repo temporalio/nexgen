@@ -241,7 +241,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? Sequence { get; init; }
         /// <summary>
-        /// The Producer of the batch. The helper of each context sets it.
+        /// The Producer of the batch. With none, the helper of each context sets it.
         /// </summary>
         public Producer Producer { get; init; }
 
@@ -383,7 +383,7 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// The Producer that closes the Stream. The helper of each context sets it.
+        /// The Producer that closes the Stream. With none, the helper of each context sets it.
         /// </summary>
         public Producer Producer { get; init; }
 
