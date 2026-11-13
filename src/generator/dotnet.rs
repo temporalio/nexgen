@@ -572,10 +572,14 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(" methods require a service endpoint.\");\n");
             output.push_str("    }\n");
         }
-        if !resource.fields.is_empty() && !resource.methods.is_empty() {
+        // A .NET resource method calls the Workflow API, so the Workflow omissions apply.
+        let methods = resource
+            .methods_for(GenerationTarget::Workflow)
+            .collect::<Vec<_>>();
+        if !resource.fields.is_empty() && !methods.is_empty() {
             output.push('\n');
         }
-        for method in &resource.methods {
+        for method in methods {
             self.render_resource_method(output, service, &type_name, method);
         }
         output.push_str("}\n\n");
