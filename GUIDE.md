@@ -2398,7 +2398,8 @@ method out of the resource class of that target, with the helpers that only it
 used. The operation stays in the service and in the other target. Without its
 `@nexus.close` method, the resource of that target is not a context manager.
 nexgen refuses a method omission without one target, since no target would keep
-the method. Remove such a method instead.
+the method. Remove such a method instead. Go refuses a method omitted for
+`workflow`.
 
 ```wit
 /// @nexus.operation "append-records"

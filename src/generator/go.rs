@@ -1055,6 +1055,25 @@ fn generate_in_tree(
             reason: "Go doesn't support `@nexus.varargs`".to_string(),
         });
     }
+    if let Some((resource, method)) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find_map(|resource| {
+            resource
+                .methods
+                .iter()
+                .find(|method| method.api_omitted.contains(&GenerationTarget::Workflow))
+                .map(|method| (resource, method))
+        })
+    {
+        return Err(Error::UnsupportedGoType {
+            context: format!("resource method `{}.{}`", resource.name, method.name),
+            reason: "Go doesn't support `@nexus.api-omit targets=\"workflow\"` on a resource \
+                     method"
+                .to_string(),
+        });
+    }
     if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
         record
             .fields
