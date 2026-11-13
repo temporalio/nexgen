@@ -1135,7 +1135,7 @@ request = StartWorkflowRequest(
 )
 ```
 
-In Python and TypeScript, an optional method parameter (`option<T>`) takes
+In Python, TypeScript and .NET, an optional method parameter (`option<T>`) takes
 precedence only when the caller passes a value. Otherwise the source fills the
 field. The source is not evaluated when the caller passes a value. Other
 languages pass an optional parameter as it is.
