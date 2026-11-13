@@ -25,20 +25,6 @@ namespace Temporalio.Workflows
         public bool? Created { get; }
 
         [GeneratedCode("nexgen", null)]
-        public Task<AppendRecordsResponse> AppendAsync(IReadOnlyList<TBody> records, Producer? producer, long? sequence)
-        {
-            var request = new AppendRecordsOptions<TBody>(Ref, records) { Producer = producer, Sequence = sequence };
-            return Operations.AppendRecordsAsync(request);
-        }
-
-        [GeneratedCode("nexgen", null)]
-        public Task CloseAsync(Producer? producer)
-        {
-            var request = new CloseStreamOptions<TBody>(Ref) { Producer = producer };
-            return Operations.CloseStreamAsync(request);
-        }
-
-        [GeneratedCode("nexgen", null)]
         public Task<ReadRecordsResponse<TBody>> ReadAsync(byte[]? fromOffset, int? maxRecords, System.TimeSpan? wait, long? maxBytes)
         {
             var request = new ReadRecordsOptions<TBody>(Ref) { FromOffset = fromOffset, MaxRecords = maxRecords, Wait = wait, MaxBytes = maxBytes };

@@ -6,6 +6,7 @@ use prost_types::FileOptions;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
     ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
@@ -190,7 +191,36 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
     pub(crate) varargs: Option<String>,
+    /// Targets whose resource class leaves this method out, from `@nexus.api-omit`.
+    pub(crate) api_omitted: BTreeSet<GenerationTarget>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
+}
+
+impl PlannedResource {
+    /// The methods of the resource class of `target`.
+    pub(crate) fn methods_for(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = &PlannedResourceMethod> {
+        self.methods
+            .iter()
+            .filter(move |method| !method.omitted_for(target))
+    }
+
+    /// A target without the close method has nothing to call at the end of a scope, so its
+    /// resource is not a context manager.
+    pub(crate) fn close_for(&self, target: GenerationTarget) -> Option<&str> {
+        let close = self.close.as_deref()?;
+        self.methods_for(target)
+            .any(|method| method.name == close)
+            .then_some(close)
+    }
+}
+
+impl PlannedResourceMethod {
+    pub(crate) fn omitted_for(&self, target: GenerationTarget) -> bool {
+        self.api_omitted.contains(&target)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -369,5 +399,57 @@ impl PlannedProtoType {
             PlannedProtoType::Message(message) => &message.proto.full_name,
             PlannedProtoType::Enum(enumeration) => &enumeration.proto.full_name,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn method(name: &str, api_omitted: &[GenerationTarget]) -> PlannedResourceMethod {
+        PlannedResourceMethod {
+            name: name.to_string(),
+            doc: None,
+            params: Vec::new(),
+            result: None,
+            varargs: None,
+            api_omitted: api_omitted.iter().copied().collect(),
+            binding: PlannedResourceMethodBindingSpec::Stub,
+        }
+    }
+
+    fn method_names(resource: &PlannedResource, target: GenerationTarget) -> Vec<&str> {
+        resource
+            .methods_for(target)
+            .map(|method| method.name.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn a_target_drops_the_methods_and_the_close_that_it_omits() {
+        let resource = PlannedResource {
+            name: "stream".to_string(),
+            doc: None,
+            type_name: "Stream".to_string(),
+            type_parameters: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![
+                method("append", &[GenerationTarget::Workflow]),
+                method("close", &[GenerationTarget::Workflow]),
+                method("read", &[]),
+            ],
+            close: Some("close".to_string()),
+        };
+
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Workflow),
+            ["read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Client),
+            ["append", "close", "read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Client), Some("close"));
     }
 }

@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.api-omit` on interface `example` resource `Item` method `Rename` in `",
+  "input.wit`: a resource method needs `targets=\"workflow\"` or `targets=\"client\"`. To leave the method out of every target, remove the method instead",
+]

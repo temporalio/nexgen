@@ -196,6 +196,9 @@ records the omitted targets on `OperationSpec`, and each backend gates its own
 public surface (the Python `__all__` entry and function, the TypeScript barrel
 export, the .NET public options type and method, and the Go exported wrapper).
 
+`@nexus.api-omit` on a resource method does the same for a resource class. The
+plan gives each target its own methods, and a backend renders only those.
+
 Python emits shared models and service contracts at the package root, regardless
 of API targets. Contracts describe wire data rather than callable resource
 handles. Each API owns its operation wrappers and handles. The client API lives

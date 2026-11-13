@@ -3044,6 +3044,7 @@ fn build_resource_method(
         .transpose()?;
     let close = build_resource_method_close(&params, &directives, path, &context)?;
     let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
+    let api_omitted = build_resource_method_api_omit(&directives, path, &context)?;
 
     let method = ResourceMethodSpec {
         name: method_name,
@@ -3054,8 +3055,35 @@ fn build_resource_method(
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
         varargs,
+        api_omitted,
     };
     Ok((method, close))
+}
+
+/// A method that no target keeps has no use, so the directive must leave one target its method.
+fn build_resource_method_api_omit(
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<BTreeSet<GenerationTarget>> {
+    let Some(api_omit) = directive(directives, "api-omit", path, context)? else {
+        return Ok(BTreeSet::new());
+    };
+    let targets = build_origin_targets(api_omit, path, context, "api-omit")?
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    if targets.contains(&GenerationTarget::Workflow) && targets.contains(&GenerationTarget::Client)
+    {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.api-omit".to_string(),
+            reason: "a resource method needs `targets=\"workflow\"` or `targets=\"client\"`. To \
+                     leave the method out of every target, remove the method instead"
+                .to_string(),
+        });
+    }
+    Ok(targets)
 }
 
 /// A scope's end calls the close method with no arguments, so its parameters must be optional.

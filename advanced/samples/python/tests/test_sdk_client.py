@@ -924,6 +924,13 @@ def test_only_the_client_target_has_the_read_poll() -> None:
     assert hasattr(Stream, "iter_read_items")
 
 
+def test_only_the_client_stream_appends_and_closes() -> None:
+    # `append` and `close` are api-omitted for the Workflow target only.
+    for name in ("append", "close", "__aenter__", "__aexit__"):
+        assert hasattr(Stream, name)
+        assert not hasattr(workflow_stream_module.Stream, name)
+
+
 async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
     client, answers = connect(
         Client,

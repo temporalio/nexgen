@@ -14,6 +14,11 @@ import {
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
+
+// The operation modules import the SDK's Nexus module, which this sample doesn't have.
+vi.mock("../wit/stream-service/workflow/operations/read-records.ts", () => ({}));
+vi.mock("../wit/stream-service/workflow/operations/describe-stream.ts", () => ({}));
+
 function _offset(n: number): Uint8Array {
   // Big-endian bytes, so a bytes compare keeps the int order these tests assert.
   const bytes = new Uint8Array(8);
@@ -39,7 +44,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("stream-service generated output", () => {
   test("carries a declared ref parameter through a create request", () => {
@@ -130,6 +138,19 @@ describe("stream-service generated output", () => {
     expect(
       appendRecordsRequestTransferTypeConverter.fromTransferType(proto).records,
     ).toEqual(["a", "b"]);
+  });
+
+  test("gives the Workflow Stream no append and no close", async () => {
+    // The tsconfig excludes the stream output, which doesn't typecheck here, so a test loads it
+    // at run time.
+    const resources = "../wit/stream-service/workflow/resources.ts";
+    const { Stream } = (await import(resources)) as { Stream: { prototype: object } };
+
+    // `append` and `close` are api-omitted for the Workflow target, so only the reads stay.
+    expect("append" in Stream.prototype).toBe(false);
+    expect("close" in Stream.prototype).toBe(false);
+    expect("read" in Stream.prototype).toBe(true);
+    expect("describe" in Stream.prototype).toBe(true);
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {

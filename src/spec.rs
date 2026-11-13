@@ -766,6 +766,9 @@ pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub operation_name: Option<String>,
     /// Set by `@nexus.varargs` to the name of its list parameter.
     pub varargs: Option<String>,
+    /// Targets whose resource class leaves this method out, from `@nexus.api-omit`. The bound
+    /// operation stays in the service and in every other target.
+    pub api_omitted: BTreeSet<GenerationTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -831,6 +834,7 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
             result: self.result.map(|result| result.map_names_with(map)),
             operation_name: self.operation_name,
             varargs: self.varargs,
+            api_omitted: self.api_omitted,
         }
     }
 }

@@ -9,6 +9,7 @@ use prost_types::field_descriptor_proto::Type;
 
 use crate::descriptors::{DescriptorIndex, real_oneof_groups};
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, IntSpec, JsonModelSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec,
@@ -126,6 +127,7 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
     pub(crate) varargs: Option<String>,
+    pub(crate) api_omitted: BTreeSet<GenerationTarget>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -435,6 +437,7 @@ fn resolve_resource_method(
             params: bytes_bound_params(spec, &method.params, &request_plan),
             result: method.result.clone(),
             varargs: method.varargs.clone(),
+            api_omitted: method.api_omitted.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
@@ -506,6 +509,7 @@ fn resolve_resource_method(
         params,
         result: method.result.clone(),
         varargs: method.varargs.clone(),
+        api_omitted: method.api_omitted.clone(),
         binding,
     })
 }
