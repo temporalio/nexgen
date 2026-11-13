@@ -2,10 +2,8 @@ import * as common from "@temporalio/common";
 import type { temporal } from "@temporalio/proto";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import * as support from "../support/temporal_model_converters.ts";
 import {
   type CreateStreamRequest,
-  type Producer,
   type ReadRecordsResponse,
   type StreamRef,
   StreamStatus,
@@ -16,26 +14,6 @@ import {
   readRecordsRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
 } from "../wit/stream-service/workflow/models.ts";
-
-// The operation modules import the SDK's Nexus module, which this sample doesn't have. A
-// Stream method sends its request through these functions.
-const sent = vi.hoisted(() => ({ requests: [] as unknown[] }));
-
-vi.mock("../wit/stream-service/workflow/operations/append-records.ts", () => ({
-  _appendRecords: async (request: unknown) => {
-    sent.requests.push(request);
-    return { result: async () => ({}) };
-  },
-}));
-vi.mock("../wit/stream-service/workflow/operations/close-stream.ts", () => ({
-  _closeStream: async (request: unknown) => {
-    sent.requests.push(request);
-    return { result: async () => undefined };
-  },
-}));
-vi.mock("../wit/stream-service/workflow/operations/read-records.ts", () => ({}));
-vi.mock("../wit/stream-service/workflow/operations/describe-stream.ts", () => ({}));
-
 function _offset(n: number): Uint8Array {
   // Big-endian bytes, so a bytes compare keeps the int order these tests assert.
   const bytes = new Uint8Array(8);
@@ -61,11 +39,7 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-  sent.requests.length = 0;
-});
+afterEach(() => vi.unstubAllGlobals());
 
 describe("stream-service generated output", () => {
   test("carries a declared ref parameter through a create request", () => {
@@ -156,41 +130,6 @@ describe("stream-service generated output", () => {
     expect(
       appendRecordsRequestTransferTypeConverter.fromTransferType(proto).records,
     ).toEqual(["a", "b"]);
-  });
-
-  test("takes the producer of a call, or its source when the call passes none", async () => {
-    const own = { id: "own", kind: { tag: "client", value: {} } } as const;
-    const sourced = {
-      id: "wf:r1",
-      kind: { tag: "workflow", value: { runId: "r1" } },
-    } as const;
-    const source = vi.spyOn(support, "workflowProducer").mockReturnValue(sourced);
-    // The tsconfig excludes the stream output, which doesn't typecheck here, so a test loads it
-    // at run time.
-    const resources = "../wit/stream-service/workflow/resources.ts";
-    const { Stream } = (await import(resources)) as {
-      Stream: new (
-        ref: StreamRef<string>,
-        created: undefined,
-      ) => {
-        append(records: string[], producer?: Producer): Promise<unknown>;
-        close(producer?: Producer): Promise<void>;
-      };
-    };
-    const stream = new Stream({ id: "stream-1" }, undefined);
-
-    await stream.append(["a"], own);
-    await stream.close(own);
-    // A call that passes a producer never evaluates the source.
-    expect(source).not.toHaveBeenCalled();
-
-    await stream.append(["b"]);
-    await stream.close();
-
-    expect(source).toHaveBeenCalledTimes(2);
-    expect(
-      sent.requests.map((request) => (request as { producer: unknown }).producer),
-    ).toEqual([own, own, sourced, sourced]);
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {

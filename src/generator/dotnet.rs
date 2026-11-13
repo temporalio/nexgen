@@ -631,19 +631,12 @@ impl<'a> ApiPlanner<'a> {
                 let operation =
                     operation.expect("bound resource operation should exist on the service");
                 let request_plan = &with_resource_property_names(request_plan, type_name);
-                let optional_params = method
-                    .params
-                    .iter()
-                    .filter(|param| param.optional)
-                    .map(|param| param.name.clone())
-                    .collect::<BTreeSet<_>>();
                 output.push_str("\n    {\n");
                 if service.endpoint.is_none() {
                     self.render_resource_method_inline_operation_body(
                         output,
                         operation,
                         request_plan,
-                        &optional_params,
                     );
                 } else {
                     render_resource_method_operation_body(
@@ -651,7 +644,6 @@ impl<'a> ApiPlanner<'a> {
                         service,
                         operation,
                         request_plan,
-                        &optional_params,
                         self.api_plan,
                         self.support_namespace,
                         None,
@@ -1325,14 +1317,12 @@ impl<'a> ApiPlanner<'a> {
         output: &mut String,
         operation: &PlannedOperation,
         request_plan: &RequestPlan,
-        optional_params: &BTreeSet<String>,
     ) {
         let raw_return = self.operation_raw_return_type(operation);
         let has_input = self.operation_has_input(operation);
         if has_input {
             let request_expr = resource_method_request_model_init_expr(
                 request_plan,
-                optional_params,
                 self.api_plan,
                 self.support_namespace,
                 None,
@@ -1342,7 +1332,6 @@ impl<'a> ApiPlanner<'a> {
                 resource_method_operation_call_args(
                     operation,
                     request_plan,
-                    optional_params,
                     self.api_plan,
                     self.support_namespace,
                 )
@@ -4014,27 +4003,20 @@ fn render_flags(output: &mut String, flag_set: &PlannedFlags) {
     output.push_str("}\n\n");
 }
 
-#[allow(clippy::too_many_arguments)]
 fn render_resource_method_operation_body(
     output: &mut String,
     service: &PlannedService,
     operation: &PlannedOperation,
     request_plan: &RequestPlan,
-    optional_params: &BTreeSet<String>,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
     endpoint_expr: Option<&str>,
 ) {
     let operation_method_name = format!("{}Async", csharp_operation_ident(operation));
     let operation_class_name = dotnet_operations_class_name(service);
-    let args = resource_method_operation_call_args(
-        operation,
-        request_plan,
-        optional_params,
-        api_plan,
-        support_namespace,
-    )
-    .expect("bound resource operation should have a renderable request plan");
+    let args =
+        resource_method_operation_call_args(operation, request_plan, api_plan, support_namespace)
+            .expect("bound resource operation should have a renderable request plan");
     if args.len() == 1 {
         output.push_str("        var request = ");
         output.push_str(&args[0]);
@@ -4081,7 +4063,6 @@ fn render_resource_method_operation_body(
 fn resource_method_operation_call_args(
     operation: &PlannedOperation,
     request_plan: &RequestPlan,
-    optional_params: &BTreeSet<String>,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
 ) -> Option<Vec<String>> {
@@ -4097,7 +4078,6 @@ fn resource_method_operation_call_args(
     if request_plan_fills_source(api_plan, request_plan, GenerationTarget::Workflow) {
         return resource_method_request_model_init_expr(
             request_plan,
-            optional_params,
             api_plan,
             support_namespace,
             None,
@@ -4113,7 +4093,6 @@ fn resource_method_operation_call_args(
             return resource_method_flattened_operation_call_args(
                 operation,
                 request_plan,
-                optional_params,
                 model,
                 api_plan,
                 support_namespace,
@@ -4122,7 +4101,6 @@ fn resource_method_operation_call_args(
         if model_has_options_fields(model, api_plan)
             && let Some(expr) = resource_method_request_model_init_expr(
                 request_plan,
-                optional_params,
                 api_plan,
                 support_namespace,
                 Some(&operation_options_type_name(operation)),
@@ -4135,7 +4113,6 @@ fn resource_method_operation_call_args(
 
     resource_method_request_model_init_expr(
         request_plan,
-        optional_params,
         api_plan,
         support_namespace,
         None,
@@ -4147,7 +4124,6 @@ fn resource_method_operation_call_args(
 fn resource_method_flattened_operation_call_args(
     operation: &PlannedOperation,
     request_plan: &RequestPlan,
-    optional_params: &BTreeSet<String>,
     model: &PlannedModel,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
@@ -4187,7 +4163,6 @@ fn resource_method_flattened_operation_call_args(
     if model_has_options_fields(model, api_plan) {
         args.push(resource_method_request_model_init_expr(
             request_plan,
-            optional_params,
             api_plan,
             support_namespace,
             Some(&operation_options_type_name(operation)),
@@ -4205,7 +4180,6 @@ enum ResourceMethodRequestInitKind {
 
 fn resource_method_request_model_init_expr(
     request_plan: &RequestPlan,
-    optional_params: &BTreeSet<String>,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
     type_name_override: Option<&str>,
@@ -4231,25 +4205,10 @@ fn resource_method_request_model_init_expr(
         {
             continue;
         }
-        let mut expr =
-            resource_method_request_value_expr(&field.value, api_plan, support_namespace)?;
-        if let RequestPlan::Source(RequestPlanSource::MethodParam(param)) = &field.value
-            && matches!(init_kind, ResourceMethodRequestInitKind::AllFields)
-        {
-            // The model holds the records that a flattened list parameter wraps.
-            if let Some(wrapped) = flattened_list_expr(model_field, &expr, api_plan) {
-                expr = wrapped;
-            } else if optional_params.contains(param)
-                && let Some(source) = model_field.source_for(GenerationTarget::Workflow)
-            {
-                // A caller that passes no value gets the source.
-                expr = format!(
-                    "{expr} ?? {}",
-                    dotnet_source_expr(source, support_namespace)
-                );
-            }
-        }
-        field_exprs.push((model_field, expr));
+        field_exprs.push((
+            model_field,
+            resource_method_request_value_expr(&field.value, api_plan, support_namespace)?,
+        ));
     }
     let options_surface = matches!(init_kind, ResourceMethodRequestInitKind::OptionsFields);
     if !options_surface {
@@ -4359,7 +4318,6 @@ fn resource_method_request_value_expr(
         }
         RequestPlan::Construct { .. } => resource_method_request_model_init_expr(
             request_plan,
-            &BTreeSet::new(),
             api_plan,
             support_namespace,
             None,

@@ -69,7 +69,7 @@ class Stream(typing.Generic[BodyT]):
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            producer=producer if producer is not None else _support.workflow_producer(),
+            producer=((_support.workflow_producer()) if producer is None else producer),
             sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
         )
@@ -83,7 +83,7 @@ class Stream(typing.Generic[BodyT]):
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=producer if producer is not None else _support.workflow_producer(),
+            producer=((_support.workflow_producer()) if producer is None else producer),
         )
         handle = await _close_stream(request)
         await handle
