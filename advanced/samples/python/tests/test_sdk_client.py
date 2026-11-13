@@ -409,6 +409,7 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
             "AppendRecords": [
                 AppendRecordsResponse(first_offset=_offset(4), last_offset=_offset(5)),
                 AppendRecordsResponse(),
+                AppendRecordsResponse(first_offset=_offset(6), last_offset=_offset(6)),
             ]
         },
     )
@@ -416,6 +417,7 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
 
     response = await stream.append("a", "b")
     empty = await stream.append()
+    _ = await stream.append("c", sequence=3)
 
     _ = assert_type(response, AppendRecordsResponse)
     assert response == AppendRecordsResponse(
@@ -428,6 +430,13 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
     )
     # An append that wrote no Record has no offsets.
     assert empty == AppendRecordsResponse()
+    # A sequence goes on the request, so the Store can dedupe a resent batch.
+    assert answers.started[2].arg == AppendRecordsRequest(
+        ref=ref,
+        records=[AppendRecord(body="c")],
+        producer=CLIENT_PRODUCER,
+        sequence=3,
+    )
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.append(1)  # pyright: ignore[reportArgumentType]

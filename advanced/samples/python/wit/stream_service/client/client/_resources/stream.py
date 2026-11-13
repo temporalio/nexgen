@@ -69,12 +69,14 @@ class Stream(typing.Generic[BodyT]):
     async def append(
         self,
         *records: BodyT,
+        sequence: int | None = None,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
+            sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
             producer=_support.default_producer(),
         )
