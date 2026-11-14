@@ -14,6 +14,7 @@ from ..models import (
 )
 from .._resources import Stream
 import temporal_support as _support
+from .._resource_context_manager import resource_context_manager
 
 
 BodyT = typing.TypeVar("BodyT")
@@ -42,6 +43,7 @@ async def _create_stream(
 
 
 @typing.overload
+@resource_context_manager
 async def create_stream(
     *,
     id: str,
@@ -52,6 +54,7 @@ async def create_stream(
 
 
 @typing.overload
+@resource_context_manager
 async def create_stream(
     *,
     id: str,
@@ -61,6 +64,7 @@ async def create_stream(
 ) -> Stream[object]: ...
 
 
+@resource_context_manager
 async def create_stream(
     *,
     id: str,
