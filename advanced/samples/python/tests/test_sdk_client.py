@@ -913,9 +913,9 @@ async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -
 
 
 def test_only_the_client_target_has_the_read_poll() -> None:
-    # `read-records` is api-omitted, so only its private helper stays in the workflow module.
+    # The Workflow `Stream` omits `read`, so the workflow module has no read helper at all.
     assert not hasattr(workflow_stream_module, "read_records")
-    assert hasattr(workflow_stream_module, "_read_records")
+    assert not hasattr(workflow_stream_module, "_read_records")
     assert not hasattr(workflow_stream_module, "iter_read_records")
     assert not hasattr(workflow_package, "iter_read_records")
     assert not hasattr(workflow_stream_module.Stream, "iter_read")
@@ -924,11 +924,13 @@ def test_only_the_client_target_has_the_read_poll() -> None:
     assert hasattr(Stream, "iter_read_items")
 
 
-def test_only_the_client_stream_appends_and_closes() -> None:
-    # `append` and `close` are api-omitted for the Workflow target only.
+def test_only_the_client_stream_reads() -> None:
+    # `read` is api-omitted for the Workflow target only. Both targets append and close.
+    assert hasattr(Stream, "read")
+    assert not hasattr(workflow_stream_module.Stream, "read")
     for name in ("append", "close", "__aenter__", "__aexit__"):
         assert hasattr(Stream, name)
-        assert not hasattr(workflow_stream_module.Stream, name)
+        assert hasattr(workflow_stream_module.Stream, name)
 
 
 async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
