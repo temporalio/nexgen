@@ -3054,11 +3054,11 @@ only the shared helpers and value types these bindings use. Bindings requiring
 none do not include a runtime class. Protobuf conversion uses generated Java
 getters/setters directly, without a field-reflection helper layer.
 
-The advanced Java samples depend on a temporary tag of the SDK prerequisite
-commit, selected in their `build.gradle`. Gradle's Git source dependencies check
-out and build that revision and its SDK project dependencies. The first build
-needs Git and network access; no separately built SDK, directory environment
-variable, or published snapshot is required.
+The advanced Java samples follow the SDK prerequisite branch selected in their
+`build.gradle`. Gradle's Git source dependencies check out and build its HEAD
+and its SDK project dependencies, so updates to that branch can change the SDK
+used by the samples. The first build needs Git and network access; no separately
+built SDK, directory environment variable, or published snapshot is required.
 
 Generic Java operation results accept a `java.lang.reflect.Type` argument so the
 runtime can preserve their type arguments. Use a Jackson `TypeReference` or an

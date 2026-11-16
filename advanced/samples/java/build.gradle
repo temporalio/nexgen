@@ -12,18 +12,22 @@ java {
     }
 }
 
-// Temporary source pin for temporalio/sdk-java#3213, until a released SDK includes it.
-def temporalSdkRevision = 'nexgen-sdk-prereq-52758b5cab1e'
+// Follow temporalio/sdk-java#3213 until a released SDK includes the prerequisites.
+def temporalSdkBranch = 'system-nexus-prerequisites'
 
 dependencies {
-    implementation "io.temporal:temporal-sdk:${temporalSdkRevision}"
+    implementation('io.temporal:temporal-sdk') {
+        version { branch = temporalSdkBranch }
+    }
     implementation 'io.nexusrpc:nexus-sdk:0.6.0-alpha'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.4'
 
     compileOnly 'org.jspecify:jspecify:1.0.0'
     testCompileOnly 'org.jspecify:jspecify:1.0.0'
 
-    testImplementation "io.temporal:temporal-testing:${temporalSdkRevision}"
+    testImplementation('io.temporal:temporal-testing') {
+        version { branch = temporalSdkBranch }
+    }
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
