@@ -1,1 +1,9 @@
 rootProject.name = 'nexgen-advanced-examples'
+
+sourceControl {
+    gitRepository(uri('https://github.com/temporalio/sdk-java.git')) {
+        ['temporal-sdk', 'temporal-serviceclient', 'temporal-testing', 'temporal-test-server'].each { name ->
+            producesModule("io.temporal:${name}")
+        }
+    }
+}

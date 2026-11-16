@@ -102,30 +102,26 @@ class OperationDefaultsTest {
           super.init(
               new WorkflowOutboundCallsInterceptorBase(outbound) {
                 @Override
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                public ExecuteNexusOperationOutput<SignalWithStartWorkflowResponse>
-                    executeSignalWithStartWorkflow(
-                        ExecuteNexusOperationInput<SignalWithStartWorkflowResponse> input) {
-                  wit.workflowservice.SignalWithStartWorkflowRequest request =
-                      (wit.workflowservice.SignalWithStartWorkflowRequest) input.getArg();
-                  assertEquals(
-                      request.getId().equals("explicit-target")
-                          ? "explicit"
-                          : Workflow.getInfo().getTaskQueue(),
-                      request.getTaskQueue());
-                  return (ExecuteNexusOperationOutput)
-                      new ExecuteNexusOperationOutput<>(
-                          Workflow.newPromise(
-                              wit.workflowservice.SignalWithStartWorkflowResponse.newBuilder()
-                                  .setRunId("run")
-                                  .build()),
-                          Workflow.newPromise(Optional::empty));
-                }
-
-                @Override
                 @SuppressWarnings("unchecked")
                 public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
                     ExecuteNexusOperationInput<R> input) {
+                  if (input.getArg()
+                      instanceof wit.workflowservice.SignalWithStartWorkflowRequest) {
+                    wit.workflowservice.SignalWithStartWorkflowRequest request =
+                        (wit.workflowservice.SignalWithStartWorkflowRequest) input.getArg();
+                    assertEquals(
+                        request.getId().equals("explicit-target")
+                            ? "explicit"
+                            : Workflow.getInfo().getTaskQueue(),
+                        request.getTaskQueue());
+                    return new ExecuteNexusOperationOutput<>(
+                        Workflow.newPromise(
+                            (R)
+                                wit.workflowservice.SignalWithStartWorkflowResponse.newBuilder()
+                                    .setRunId("run")
+                                    .build()),
+                        Workflow.newPromise(Optional::empty));
+                  }
                   Request request = (Request) input.getArg();
                   if ("SubmitFromSender".equals(input.getOperation())) {
                     assertEquals(Integer.valueOf(3), request.getAttempts());

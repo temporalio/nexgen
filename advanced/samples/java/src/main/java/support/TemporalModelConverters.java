@@ -9,7 +9,7 @@ import io.temporal.common.VersioningOverride;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.metadata.WorkflowMethodType;
 import io.temporal.internal.common.*;
-import io.temporal.internal.nexus.system.SystemNexusDataConverter;
+import io.temporal.internal.nexus.system.SystemNexusConverterContext;
 import io.temporal.internal.sync.ExternalWorkflowInvocationHandler;
 import io.temporal.payload.context.WorkflowSerializationContext;
 import io.temporal.workflow.Functions;
@@ -26,7 +26,7 @@ public final class TemporalModelConverters {
 
   /** Returns the user converter active during system Nexus transfer conversion. */
   public static DataConverter currentDataConverter() {
-    return SystemNexusDataConverter.currentDataConverter();
+    return SystemNexusConverterContext.currentDataConverter();
   }
 
   public static String workflowNamespace() {

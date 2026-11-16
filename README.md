@@ -70,9 +70,8 @@ Generated C# targets .NET 7 or later (`net7.0`, C# 11). Older platforms need
 workarounds; see
 [Using generated C# on older .NET platforms](docs/dotnet-compat.md).
 
-Java WIT generation additionally requires the SDK transfer-converter API, which
-is currently available on the Java SDK main branch. See the Java WIT section in
-[the guide](GUIDE.md#java-wit-generation) for local SDK integration.
+Java WIT samples use a tagged SDK prerequisite commit through Gradle source
+dependencies. See [the guide](GUIDE.md#java-wit-generation) for details.
 
 Generated Java JSON Schema source uses JSpecify's `@NullMarked` and `@Nullable`
 annotations. Add JSpecify 1.0.0 to the compile classpath; it is not needed at
