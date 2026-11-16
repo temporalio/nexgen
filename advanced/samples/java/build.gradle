@@ -56,7 +56,12 @@ tasks.register('generateProtoFixtures', Exec) {
     outputs.dir(fixtureProtoDir)
     doFirst {
         fixtureProtoDir.get().asFile.mkdirs()
-        commandLine configurations.protoCompiler.singleFile, '--descriptor_set_in=../descriptors/temporal_api.bin',
+        def protoc = configurations.protoCompiler.singleFile
+        // Maven artifacts do not retain executable permissions on a fresh download.
+        if (!protoc.canExecute() && !protoc.setExecutable(true)) {
+            throw new GradleException("Cannot make protoc executable: ${protoc}")
+        }
+        commandLine protoc, '--descriptor_set_in=../descriptors/temporal_api.bin',
             "--java_out=${fixtureProtoDir.get().asFile}", 'temporal/api/notificationservice/v1/request_response.proto'
     }
 }
