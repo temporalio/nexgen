@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import dataclasses
+import inspect
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 import uuid
 
+import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 from nexusrpc import Operation
 from temporalio import workflow
@@ -13,6 +18,7 @@ import wit.type_showcase as type_showcase
 import wit.type_showcase.models as type_showcase_models
 import wit.type_showcase.services as type_showcase_services
 from wit.type_showcase._resources import User
+from wit.type_showcase._resources._resource_data import UserData
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "type_showcase"
@@ -60,6 +66,9 @@ def sync_report() -> type_showcase_models.SyncReport:
             "us-west": ("ok", "healthy"),
             "eu-central": ("err", "degraded"),
         },
+        item_count=3,
+        byte_count=5_000_000_000,
+        clock_skew_ms=-5_000_000_000,
     )
 
 
@@ -67,8 +76,8 @@ def user_resource(
     *,
     email: str,
     display_name: str,
-) -> User:
-    return User(
+) -> UserData:
+    return UserData(
         user_id="user-123",
         email=email,
         display_name=display_name,
@@ -87,7 +96,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.GetUserRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("GetUser", input))
         assert input.user_id == "user-123"
         assert input.consistency_token == "read-123"
@@ -98,7 +107,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.UpdateEmailRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("UpdateEmail", input))
         assert input.user_id == "user-123"
         assert input.email == "new@example.com"
@@ -109,7 +118,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.RenameRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("Rename", input))
         assert input.user_id == "user-123"
         assert input.display_name == "New Name"
@@ -120,7 +129,7 @@ class TypeShowcaseHandler:
         self,
         _ctx: StartOperationContext,
         input: type_showcase_models.SetProfileRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("SetProfile", input))
         return user_resource(email="old@example.com", display_name="Old Name")
 
@@ -144,11 +153,35 @@ class TypeShowcaseHandler:
         assert input.user_id == "user-123"
         assert input.reason == "requested"
 
+    @sync_operation
+    async def update_labels(
+        self,
+        _ctx: StartOperationContext,
+        input: type_showcase_models.UpdateLabelsRequest,
+    ) -> None:
+        self.calls.append(("UpdateLabels", input))
+
+    @sync_operation
+    async def update_notification_settings(
+        self,
+        _ctx: StartOperationContext,
+        _input: type_showcase_models.UpdateNotificationSettingsRequest,
+    ) -> None:
+        pass
+
+    @sync_operation
+    async def get_sync_settings(
+        self,
+        _ctx: StartOperationContext,
+        input: type_showcase_models.GetSyncSettingsRequest,
+    ) -> type_showcase_models.SyncSettings:
+        return input.settings or type_showcase_models.SyncSettings()
+
 
 @workflow.defn
 class TypeShowcaseCallerWorkflow:
     @workflow.run
-    async def run(self) -> User:
+    async def run(self) -> UserData:
         user = await type_showcase.get_user(
             user_id="user-123",
             consistency_token="read-123",
@@ -161,7 +194,15 @@ class TypeShowcaseCallerWorkflow:
             report=sync_report(),
         )
         await record_sync_handle
-        return renamed_user
+        assert isinstance(renamed_user, User)
+        # A handle isn't data, so the Workflow returns its identity fields.
+        return UserData(
+            user_id=renamed_user.user_id,
+            email=renamed_user.email,
+            display_name=renamed_user.display_name,
+            status=renamed_user.status,
+            profile=renamed_user.profile,
+        )
 
 
 def test_generated_metadata() -> None:
@@ -216,6 +257,77 @@ def test_generated_wit_native_models_cover_common_wit_shapes() -> None:
     assert profile.tags == ["admin", "beta"]
 
 
+@pytest.mark.parametrize("field_name", ["tags", "metadata"])
+def test_native_collection_constructor_arguments_are_required(field_name: str) -> None:
+    profile = user_profile()
+    fields = {field.name: field for field in dataclasses.fields(profile)}
+    assert fields[field_name].default is dataclasses.MISSING
+    assert fields[field_name].default_factory is dataclasses.MISSING
+    supplied = {
+        field.name: getattr(profile, field.name)
+        for field in dataclasses.fields(profile)
+        if field.name != field_name
+    }
+    with pytest.raises(TypeError, match=field_name):
+        _ = inspect.signature(type_showcase_models.UserProfile).bind(**supplied)
+    empty = dataclasses.replace(profile, tags=[], metadata={})
+    assert empty.tags == []
+    assert empty.metadata == {}
+
+    collections: dict[str, list[str] | dict[str, str]] = {"tags": [], "metadata": {}}
+    with pytest.raises(TypeError, match=field_name):
+        _ = inspect.signature(User.update_labels).bind(
+            user_resource(email="user@example.test", display_name="User"),
+            **{
+                name: value for name, value in collections.items() if name != field_name
+            },
+        )
+
+
+@pytest.mark.parametrize("mode", ["omitted", "none", "empty", "populated"])
+async def test_resource_collection_arguments_preserve_absence(mode: str) -> None:
+    handle: asyncio.Future[None] = asyncio.Future()
+    handle.set_result(None)
+    start_operation = AsyncMock(return_value=handle)
+    client = Mock(start_operation=start_operation)
+    tags: list[str] = []
+    metadata: dict[str, str] = {}
+    extra_tags: list[str] | None = None
+    extra_metadata: dict[str, str] | None = None
+    if mode == "empty":
+        extra_tags, extra_metadata = [], {}
+    elif mode == "populated":
+        extra_tags, extra_metadata = ["extra"], {"tier": "enterprise"}
+    user = User(
+        user_id="user-123",
+        email="user@example.test",
+        display_name="User",
+        status=type_showcase_models.UserStatus.Active,
+        profile=user_profile(),
+    )
+
+    with patch("temporalio.workflow.create_nexus_client", return_value=client):
+        if mode == "omitted":
+            await user.update_labels(tags=tags, metadata=metadata)
+        else:
+            await user.update_labels(
+                tags=tags,
+                metadata=metadata,
+                extra_tags=extra_tags,
+                extra_metadata=extra_metadata,
+            )
+
+    start_operation.assert_awaited_once()
+    assert start_operation.await_args is not None
+    request = start_operation.await_args.kwargs["input"]
+    assert isinstance(request, type_showcase_models.UpdateLabelsRequest)
+    assert request.user_id == user.user_id
+    assert request.tags is tags
+    assert request.metadata is metadata
+    assert request.extra_tags is extra_tags
+    assert request.extra_metadata is extra_metadata
+
+
 async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
     env: WorkflowEnvironment,
 ) -> None:
@@ -239,7 +351,7 @@ async def test_get_user_returns_wit_user_resource_through_real_nexus_client(
         finally:
             await env.delete_nexus_endpoint(endpoint)
 
-    assert isinstance(user, User)
+    assert isinstance(user, UserData)
     assert user.user_id == "user-123"
     assert user.email == "new@example.com"
     assert user.display_name == "New Name"

@@ -3,63 +3,96 @@
 package multioperationservice
 
 import (
+	"github.com/nexus-rpc/sdk-go/nexus"
 	"go.temporal.io/sdk/internal"
-	"go.temporal.io/sdk/workflow"
 )
 
 // --- Datatypes ---
 
-type request struct {
+type systemnexus_request struct {
 	ID string
 }
 
-func (m request) GetID() string {
+func (m systemnexus_request) GetID() string {
 	return m.ID
-}
-
-// --- Operations (internal) ---
-
-func firstOperation(ctx workflow.Context, request request) workflow.Future {
-	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "FirstOperation", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func secondOperation(ctx workflow.Context, request request) workflow.Future {
-	c := internal.NewSystemNexusClient("InterceptorService")
-	fut := c.ExecuteOperation(ctx, "SecondOperation", request, workflow.NexusOperationOptions{})
-	return fut
 }
 
 // --- Operations (public API) ---
 
-type Response struct {
+type SystemNexus_Response struct {
 	// Value - Required.
 	Value string
 }
 
-func (m Response) GetValue() string {
+func (m SystemNexus_Response) GetValue() string {
 	return m.Value
 }
 
-type FirstOperationOptions struct {
-	// ID - Required.
-	ID string
+// SystemNexus_FirstOperationOptions - Options for SystemNexus_FirstOperation.
+type SystemNexus_FirstOperationOptions struct {
 }
 
-func FirstOperation(ctx workflow.Context, opts FirstOperationOptions) workflow.Future {
-	return firstOperation(ctx, request{
-		ID: opts.ID,
+// SystemNexus_FirstOperation.
+func SystemNexus_FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
+	return SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation(func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
+		return input.Client.ExecuteOperation(ctx, input.Operation, input.Input, input.Options)
+	}, ctx, opts, id)
+}
+
+// SystemNexus_SecondOperationOptions - Options for SystemNexus_SecondOperation.
+type SystemNexus_SecondOperationOptions struct {
+}
+
+// SystemNexus_SecondOperation.
+func SystemNexus_SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
+	return SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation(func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture {
+		return input.Client.ExecuteOperation(ctx, input.Operation, input.Input, input.Options)
+	}, ctx, opts, id)
+}
+
+// --- Workflow outbound interceptors ---
+
+type systemnexus_workflowOutboundInterceptor interface {
+	// FirstOperation intercepts workflow.FirstOperation.
+	FirstOperation(ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future
+	// SecondOperation intercepts workflow.SecondOperation.
+	SecondOperation(ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future
+}
+
+// SystemNexus_WorkflowOutboundInterceptorBase_FirstOperation forwards to the next interceptor.
+func SystemNexus_WorkflowOutboundInterceptorBase_FirstOperation(next systemnexus_workflowOutboundInterceptor, ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
+	return next.FirstOperation(ctx, opts, id)
+}
+
+// SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation constructs and schedules the intercepted request.
+func SystemNexus_WorkflowEnvironmentInterceptor_FirstOperation(executeNexusOperation func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture, ctx internal.Context, opts SystemNexus_FirstOperationOptions, id string) internal.Future {
+	request := systemnexus_request{
+		ID: id,
+	}
+	fut := executeNexusOperation(ctx, internal.ExecuteNexusOperationInput{
+		Client:      internal.NewSystemNexusClient("InterceptorService"),
+		Operation:   "FirstOperation",
+		Input:       request,
+		NexusHeader: nexus.Header{},
 	})
+	return fut
 }
 
-type SecondOperationOptions struct {
-	// ID - Required.
-	ID string
+// SystemNexus_WorkflowOutboundInterceptorBase_SecondOperation forwards to the next interceptor.
+func SystemNexus_WorkflowOutboundInterceptorBase_SecondOperation(next systemnexus_workflowOutboundInterceptor, ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
+	return next.SecondOperation(ctx, opts, id)
 }
 
-func SecondOperation(ctx workflow.Context, opts SecondOperationOptions) workflow.Future {
-	return secondOperation(ctx, request{
-		ID: opts.ID,
+// SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation constructs and schedules the intercepted request.
+func SystemNexus_WorkflowEnvironmentInterceptor_SecondOperation(executeNexusOperation func(ctx internal.Context, input internal.ExecuteNexusOperationInput) internal.NexusOperationFuture, ctx internal.Context, opts SystemNexus_SecondOperationOptions, id string) internal.Future {
+	request := systemnexus_request{
+		ID: id,
+	}
+	fut := executeNexusOperation(ctx, internal.ExecuteNexusOperationInput{
+		Client:      internal.NewSystemNexusClient("InterceptorService"),
+		Operation:   "SecondOperation",
+		Input:       request,
+		NexusHeader: nexus.Header{},
 	})
+	return fut
 }

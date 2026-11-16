@@ -1,0 +1,5 @@
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource"
+contains = ["operation `Place` returns a resource declared in another service; resources must be returned by their declaring service"]

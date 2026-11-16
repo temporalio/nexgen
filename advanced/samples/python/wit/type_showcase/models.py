@@ -21,6 +21,11 @@ UserCapabilityDeactivate = 1 << 2
 
 @dataclasses.dataclass(slots=True)
 class GetUserRequest:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     user_id: str
     consistency_token: str | None = None
 
@@ -43,14 +48,16 @@ class SetProfileRequest:
     profile: UserProfile
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class UserProfile:
-    tags: list[str] | None = dataclasses.field(default_factory=list)
-    metadata: dict[str, str] | None = dataclasses.field(default_factory=dict)
+    tags: list[str]
+    metadata: dict[str, str]
     capabilities: UserCapability
     sync_state: tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
     notification_target: NotificationTarget
     address: PostalAddress | None = None
+    single_target: SingleTarget | None = None
+    experimental_target: ExperimentalTarget | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -69,15 +76,19 @@ class RecordSyncRequest:
 
 @dataclasses.dataclass(slots=True)
 class SyncReport:
-    route: list[tuple[float, float]] | None = dataclasses.field(default_factory=list)
-    attempts: (
-        list[tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
-        | None
-    ) = dataclasses.field(default_factory=list)
-    region_status: (
-        dict[str, tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
-        | None
-    ) = dataclasses.field(default_factory=dict)
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    route: list[tuple[float, float]]
+    attempts: list[tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]]
+    region_status: dict[
+        str, tuple[typing.Literal["ok"], str] | tuple[typing.Literal["err"], str]
+    ]
+    item_count: int
+    byte_count: int
+    clock_skew_ms: int
 
 
 @dataclasses.dataclass(slots=True)
@@ -86,8 +97,64 @@ class DeactivateRequest:
     reason: str | None = None
 
 
+@dataclasses.dataclass(slots=True)
+class UpdateLabelsRequest:
+    user_id: str
+    tags: list[str]
+    metadata: dict[str, str]
+    extra_tags: list[str] | None = None
+    extra_metadata: dict[str, str] | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class UpdateNotificationSettingsRequest:
+    user_id: str
+    settings: NotificationSettings
+
+
+@dataclasses.dataclass(slots=True)
+class NotificationSettings:
+    email_enabled: bool
+    sms_enabled: bool
+
+
+@dataclasses.dataclass(slots=True)
+class GetSyncSettingsRequest:
+    user_id: str
+    settings: SyncSettings | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class SyncSettings:
+    region: str | None = None
+    checkpoint: str | None = None
+
+
 NotificationTarget = (
+    # Python payload.
     tuple[typing.Literal["email"], str]
+    # XML characters remain valid in docs: <tag attr="value"> & 'quoted'.
     | tuple[typing.Literal["sms"], str]
+    # Default empty case.
     | tuple[typing.Literal["none"]]
+    | tuple[typing.Literal["undocumented"]]
 )
+"""Python notification target.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+
+SingleTarget = (
+    # Only case.
+    tuple[typing.Literal["only"]]
+)
+"""Default-only documentation on a single-case variant."""
+
+
+ExperimentalTarget = tuple[typing.Literal["second"]]
+"""
+.. warning::
+    This API is experimental and subject to change.
+"""

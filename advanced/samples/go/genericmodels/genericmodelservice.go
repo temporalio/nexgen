@@ -3,16 +3,20 @@
 package genericmodels
 
 import (
+	"time"
+
 	"go.temporal.io/sdk/workflow"
 )
 
 // --- Datatypes ---
 
 type genericRequest[ContextT any] struct {
-	Context  ContextT
-	Contexts []ContextT
-	ByName   map[string]ContextT
-	Nested   Inner[ContextT]
+	Context   ContextT
+	Contexts  []ContextT
+	ByName    map[string]ContextT
+	Nested    Inner[ContextT]
+	Probe     *GetterProbe[ContextT]
+	Reference *ContextRef[ContextT]
 }
 
 func (m genericRequest[ContextT]) GetContext() ContextT {
@@ -31,12 +35,25 @@ func (m genericRequest[ContextT]) GetNested() Inner[ContextT] {
 	return m.Nested
 }
 
-// --- Operations (internal) ---
+func (m genericRequest[ContextT]) GetProbe() *GetterProbe[ContextT] {
+	return m.Probe
+}
 
-func complete[ContextT any](ctx workflow.Context, request genericRequest[ContextT]) workflow.Future {
-	c := workflow.NewNexusClient("generic-models", "GenericModelService")
-	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
-	return fut
+func (m genericRequest[ContextT]) GetReference() *ContextRef[ContextT] {
+	return m.Reference
+}
+
+type result[T, E any] struct {
+	Result T
+	Error  E
+}
+
+func (m result[T, E]) GetResult() T {
+	return m.Result
+}
+
+func (m result[T, E]) GetError() E {
+	return m.Error
 }
 
 // --- Operations (public API) ---
@@ -66,6 +83,85 @@ func (m Inner[ContextT]) GetValue() ContextT {
 	return m.Value
 }
 
+type GetterProbe[ContextT any] struct {
+	// Value - Required.
+	Value ContextT
+	// Other - Optional.
+	Other *ContextT
+	// History - Required.
+	History []ContextT
+	// TupleValue - Required.
+	TupleValue Tuple2[ContextT, ContextT]
+	// ResultValue - Required.
+	ResultValue result[ContextT, ContextT]
+	// Lookup - Required.
+	Lookup map[string]int32
+	// Elapsed - Required.
+	Elapsed   time.Duration
+	Namespace string
+	Type      string
+}
+
+func (m GetterProbe[ContextT]) GetValue() ContextT {
+	return m.Value
+}
+
+func (m GetterProbe[ContextT]) GetOther() *ContextT {
+	return m.Other
+}
+
+func (m GetterProbe[ContextT]) GetHistory() []ContextT {
+	return m.History
+}
+
+func (m GetterProbe[ContextT]) GetTupleValue() Tuple2[ContextT, ContextT] {
+	return m.TupleValue
+}
+
+func (m GetterProbe[ContextT]) GetResultValue() result[ContextT, ContextT] {
+	return m.ResultValue
+}
+
+func (m GetterProbe[ContextT]) GetLookup() map[string]int32 {
+	return m.Lookup
+}
+
+func (m GetterProbe[ContextT]) GetElapsed() time.Duration {
+	return m.Elapsed
+}
+
+func (m GetterProbe[ContextT]) GetNamespace() string {
+	return m.Namespace
+}
+
+func (m GetterProbe[ContextT]) GetType() string {
+	return m.Type
+}
+
+type Tuple2[T1, T2 any] struct {
+	// First - Required.
+	First T1
+	// Second - Required.
+	Second T2
+}
+
+func (m Tuple2[T1, T2]) GetFirst() T1 {
+	return m.First
+}
+
+func (m Tuple2[T1, T2]) GetSecond() T2 {
+	return m.Second
+}
+
+type ContextRef[ContextT any] struct {
+	// ID - Required.
+	ID string
+}
+
+func (m ContextRef[ContextT]) GetID() string {
+	return m.ID
+}
+
 type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	// Context - Required.
 	Context ContextT
@@ -73,6 +169,8 @@ type GenericResponse[ContextT any, OutputT any, MetadataT any] struct {
 	Completion OperationCompletionResult[OutputT]
 	// Metadata - Optional.
 	Metadata *MetadataT
+	// Pair - Optional.
+	Pair *GetterPair[ContextT, OutputT]
 }
 
 func (m GenericResponse[ContextT, OutputT, MetadataT]) GetContext() ContextT {
@@ -85,6 +183,10 @@ func (m GenericResponse[ContextT, OutputT, MetadataT]) GetCompletion() Operation
 
 func (m GenericResponse[ContextT, OutputT, MetadataT]) GetMetadata() *MetadataT {
 	return m.Metadata
+}
+
+func (m GenericResponse[ContextT, OutputT, MetadataT]) GetPair() *GetterPair[ContextT, OutputT] {
+	return m.Pair
 }
 
 type OperationCompletionSuccess[OutputT any] struct {
@@ -105,22 +207,65 @@ func (m OperationCompletionFailure) GetMessage() string {
 	return m.Message
 }
 
-type CompleteOptions[ContextT any] struct {
-	// Context - Required.
-	Context ContextT
-	// Contexts - Required.
-	Contexts []ContextT
-	// ByName - Required.
-	ByName map[string]ContextT
-	// Nested - Required.
-	Nested Inner[ContextT]
+type GetterPair[ContextT any, OutputT any] struct {
+	// Value - Required.
+	Value ContextT
+	// Other - Optional.
+	Other *OutputT
+	// History - Required.
+	History []ContextT
+	// TupleValue - Required.
+	TupleValue Tuple2[ContextT, OutputT]
+	// ResultValue - Required.
+	ResultValue result[ContextT, OutputT]
 }
 
-func Complete[ContextT any](ctx workflow.Context, opts CompleteOptions[ContextT]) workflow.Future {
-	return complete(ctx, genericRequest[ContextT]{
-		Context:  opts.Context,
-		Contexts: opts.Contexts,
-		ByName:   opts.ByName,
-		Nested:   opts.Nested,
-	})
+func (m GetterPair[ContextT, OutputT]) GetValue() ContextT {
+	return m.Value
+}
+
+func (m GetterPair[ContextT, OutputT]) GetOther() *OutputT {
+	return m.Other
+}
+
+func (m GetterPair[ContextT, OutputT]) GetHistory() []ContextT {
+	return m.History
+}
+
+func (m GetterPair[ContextT, OutputT]) GetTupleValue() Tuple2[ContextT, OutputT] {
+	return m.TupleValue
+}
+
+func (m GetterPair[ContextT, OutputT]) GetResultValue() result[ContextT, OutputT] {
+	return m.ResultValue
+}
+
+// CompleteOptions - Options for Complete.
+type CompleteOptions[ContextT any] struct {
+	// Probe - Optional.
+	Probe *GetterProbe[ContextT]
+	// Reference - Optional.
+	Reference *ContextRef[ContextT]
+}
+
+// Complete.
+func Complete[ContextT any](
+	ctx workflow.Context,
+	opts CompleteOptions[ContextT],
+	context ContextT,
+	contexts []ContextT,
+	byName map[string]ContextT,
+	nested Inner[ContextT],
+) workflow.Future {
+	request := genericRequest[ContextT]{
+		Context:   context,
+		Contexts:  contexts,
+		ByName:    byName,
+		Nested:    nested,
+		Probe:     opts.Probe,
+		Reference: opts.Reference,
+	}
+	c := workflow.NewNexusClient("generic-models", "GenericModelService")
+	fut := c.ExecuteOperation(ctx, "Complete", request, workflow.NexusOperationOptions{})
+	return fut
 }

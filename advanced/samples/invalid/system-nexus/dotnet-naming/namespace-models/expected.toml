@@ -1,0 +1,7 @@
+languages = ["dotnet"]
+
+[error]
+kind = "system-nexus-required"
+contains = [
+  ".NET namespace overrides on model scope `Models` requires System Nexus mode (--system-nexus)",
+]

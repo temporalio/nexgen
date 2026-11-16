@@ -14,4 +14,8 @@ public interface StartWorkflowService {
   @io.nexusrpc.Operation(name = "CancelWorkflow")
   wit.startworkflow.CancelWorkflowResponse cancelWorkflow(
       wit.startworkflow.CancelWorkflowRequest request);
+
+  @io.nexusrpc.Operation(name = "SignalWithStart")
+  wit.startworkflow.SignalResultResponse signalWithStart(
+      wit.startworkflow.CancelWorkflowRequest request);
 }

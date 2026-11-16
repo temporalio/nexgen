@@ -74,7 +74,7 @@ public final class ExecuteCountedFunctionRequest {
       return this;
     }
 
-    private Integer count = 0;
+    private Integer count = null;
 
     public Builder setCount(Integer value) {
       this.count = value;

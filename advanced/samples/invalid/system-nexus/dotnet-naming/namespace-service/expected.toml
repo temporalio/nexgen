@@ -1,0 +1,7 @@
+languages = ["dotnet"]
+
+[error]
+kind = "system-nexus-required"
+contains = [
+  ".NET namespace overrides on service `Api` requires System Nexus mode (--system-nexus)",
+]

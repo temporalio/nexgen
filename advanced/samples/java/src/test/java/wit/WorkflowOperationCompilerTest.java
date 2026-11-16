@@ -38,6 +38,11 @@ class WorkflowOperationCompilerTest {
     tests.add(check("void workflow arity seven", call(7, true, true), false));
     tests.add(
         check(
+            "SDK facade inherits named operations",
+            "signalWithStartWorkflow(\"type\", new Object[0], \"signal\", new Object[0], options);",
+            true));
+    tests.add(
+        check(
             "signal arity two",
             "Target1 t=null; WorkflowOperations.signalWithStartWorkflow(t::run, \"input\","
                 + " t::signalTwo, \"a\", \"b\", options);",
@@ -219,7 +224,7 @@ class WorkflowOperationCompilerTest {
         new StringBuilder(
             "import io.temporal.workflow.*; import wit.workflowservice.WorkflowOperations; import"
                 + " wit.workflowservice.SignalWithStartWorkflowOptions; import java.util.*; public"
-                + " class CompilerCase {");
+                + " class CompilerCase extends WorkflowOperations {");
     for (int arity = 0; arity <= 7; arity++) {
       for (boolean procedure : new boolean[] {false, true}) {
         source

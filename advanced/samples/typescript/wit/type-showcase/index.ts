@@ -6,11 +6,17 @@ export { rename } from "./operations/rename";
 export { setProfile } from "./operations/set-profile";
 export { recordSync } from "./operations/record-sync";
 export { deactivate } from "./operations/deactivate";
+export { updateLabels } from "./operations/update-labels";
+export { updateNotificationSettings } from "./operations/update-notification-settings";
+export { getSyncSettings } from "./operations/get-sync-settings";
 export type {
   DeactivateRequest,
+  GetSyncSettingsRequest,
   GetUserRequest,
   RecordSyncRequest,
   RenameRequest,
   SetProfileRequest,
   UpdateEmailRequest,
+  UpdateLabelsRequest,
+  UpdateNotificationSettingsRequest,
 } from "./models";

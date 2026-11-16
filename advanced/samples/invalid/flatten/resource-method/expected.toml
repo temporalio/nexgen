@@ -1,0 +1,6 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-wit"
+contains = ["resource method `history` binds operation `GetHistory`, whose request flattens a field"]

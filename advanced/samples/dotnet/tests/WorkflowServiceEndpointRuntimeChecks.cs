@@ -24,12 +24,12 @@ namespace Nexgen.DotNetExamples.Tests
             [WorkflowRun]
             public async Task<WorkflowHandleResult> RunAsync(string taskQueue)
             {
-                var handle = await Operations.SignalWithStartWorkflowAsync(
+                var handle = await SystemNexusWorkflowOperations.SignalWithStartWorkflowAsync(
                     "StartedWorkflow",
                     new object?[] { "workflow-input" },
                     "WakeUp",
                     new object?[] { "signal-input" },
-                    new SignalWithStartWorkflowOptions("started-workflow-id", taskQueue)
+                    new SignalWithStartWorkflowOptions("started-workflow-id")
                     {
                         ExecutionTimeout = TimeSpan.FromSeconds(30),
                         RetryPolicy = new RetryPolicy
@@ -135,11 +135,7 @@ namespace Nexgen.DotNetExamples.Tests
                         (_ctx, input) =>
                         {
                             calls.Add(input);
-                            return new SignalWithStartWorkflowResponse
-                            {
-                                RunId = "run-123",
-                                Started = true,
-                            };
+                            return new SignalWithStartWorkflowResponse("run-123", true);
                         })),
             };
             return new ServiceHandlerInstance(definition, handlers);

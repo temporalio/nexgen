@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import typing_extensions
 
 
 ContextT = typing.TypeVar("ContextT")
 MetadataT = typing.TypeVar("MetadataT")
 OutputT = typing.TypeVar("OutputT")
+_ContextT = typing_extensions.TypeVar("_ContextT", default=object)
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
+@dataclasses.dataclass(slots=True)
 class GenericRequest(typing.Generic[ContextT]):
     context: ContextT
-    contexts: list[ContextT] | None = dataclasses.field(default_factory=list)
-    by_name: dict[str, ContextT] | None = dataclasses.field(default_factory=dict)
+    contexts: list[ContextT]
+    by_name: dict[str, ContextT]
     nested: Inner[ContextT]
+    probe: GetterProbe[ContextT] | None = None
+    reference: ContextRef[ContextT] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -24,11 +28,32 @@ class Inner(typing.Generic[ContextT]):
     value: ContextT
 
 
+@dataclasses.dataclass(slots=True, kw_only=True)
+class GetterProbe(typing.Generic[ContextT]):
+    value: ContextT
+    other: ContextT | None = None
+    history: list[ContextT]
+    tuple_value: tuple[ContextT, ContextT]
+    result_value: (
+        tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], ContextT]
+    )
+    lookup: list[tuple[str, int]]
+    elapsed: int
+    namespace: str
+    type: str
+
+
+@dataclasses.dataclass
+class ContextRef(typing.Generic[_ContextT]):
+    id: str
+
+
 @dataclasses.dataclass(slots=True)
 class GenericResponse(typing.Generic[ContextT, OutputT, MetadataT]):
     context: ContextT
     completion: OperationCompletionResult[OutputT]
     metadata: MetadataT | None = None
+    pair: GetterPair[ContextT, OutputT] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -39,6 +64,17 @@ class OperationCompletionSuccess(typing.Generic[OutputT]):
 @dataclasses.dataclass(slots=True)
 class OperationCompletionFailure:
     message: str
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class GetterPair(typing.Generic[ContextT, OutputT]):
+    value: ContextT
+    other: OutputT | None = None
+    history: list[ContextT]
+    tuple_value: tuple[ContextT, OutputT]
+    result_value: (
+        tuple[typing.Literal["ok"], ContextT] | tuple[typing.Literal["err"], OutputT]
+    )
 
 
 OperationCompletionResult = (

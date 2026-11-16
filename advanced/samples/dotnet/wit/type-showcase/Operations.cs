@@ -15,6 +15,10 @@ using Nexgen.Support;
 namespace Nexgen.TypeShowcase
 {
 
+    /// <summary>
+    /// Get a user.
+    /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public class GetUserOptions
     {
@@ -109,15 +113,75 @@ namespace Nexgen.TypeShowcase
         public string? Reason { get; set; }
     }
 
+    [GeneratedCode("nexgen", null)]
+    public class UpdateLabelsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateLabelsOptions"/> class.
+        /// </summary>
+        public UpdateLabelsOptions(string userId, IReadOnlyList<string> tags, IReadOnlyDictionary<string, string> metadata)
+        {
+            UserId = userId;
+            Tags = tags;
+            Metadata = metadata;
+        }
+
+        public string UserId { get; set; }
+        public IReadOnlyList<string> Tags { get; set; }
+        public IReadOnlyDictionary<string, string> Metadata { get; set; }
+        public IReadOnlyList<string>? ExtraTags { get; set; }
+        public IReadOnlyDictionary<string, string>? ExtraMetadata { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class UpdateNotificationSettingsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateNotificationSettingsOptions"/> class.
+        /// </summary>
+        public UpdateNotificationSettingsOptions(string userId, bool emailEnabled, bool smsEnabled)
+        {
+            UserId = userId;
+            EmailEnabled = emailEnabled;
+            SmsEnabled = smsEnabled;
+        }
+
+        public string UserId { get; set; }
+        public bool EmailEnabled { get; set; }
+        public bool SmsEnabled { get; set; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public class GetSyncSettingsOptions
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetSyncSettingsOptions"/> class.
+        /// </summary>
+        public GetSyncSettingsOptions(string userId)
+        {
+            UserId = userId;
+        }
+
+        public string UserId { get; set; }
+        public string? Region { get; set; }
+        public string? Checkpoint { get; set; }
+    }
+
     /// <summary>
     /// Provides generated workflow operation helpers.
     /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public static class Operations
     {
         [GeneratedCode("nexgen", null)]
         private const string TypeShowcaseEndpoint = "type-showcase";
 
+        /// <summary>
+        /// Get a user.
+        /// </summary>
+        /// <returns>The matching user.</returns>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         private static async Task<User> GetUserAsync(GetUserRequest request)
         {
@@ -126,7 +190,12 @@ namespace Nexgen.TypeShowcase
             return result;
         }
 
+        /// <summary>
+        /// Get a user.
+        /// </summary>
         /// <param name="options">Options for the operation.</param>
+        /// <returns>The matching user.</returns>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public static Task<User> GetUserAsync(GetUserOptions options)
         {
@@ -216,6 +285,59 @@ namespace Nexgen.TypeShowcase
                 Reason = options.Reason,
             };
             return DeactivateAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task UpdateLabelsAsync(UpdateLabelsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.UpdateLabels(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task UpdateLabelsAsync(UpdateLabelsOptions options)
+        {
+            var request = new UpdateLabelsRequest(options.UserId, options.Tags, options.Metadata)
+            {
+                ExtraTags = options.ExtraTags,
+                ExtraMetadata = options.ExtraMetadata,
+            };
+            return UpdateLabelsAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task UpdateNotificationSettingsAsync(UpdateNotificationSettingsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            await client.ExecuteNexusOperationAsync(svc => svc.UpdateNotificationSettings(request)).ConfigureAwait(true);
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task UpdateNotificationSettingsAsync(UpdateNotificationSettingsOptions options)
+        {
+            var request = new UpdateNotificationSettingsRequest(options.UserId, new NotificationSettings(options.EmailEnabled, options.SmsEnabled));
+            return UpdateNotificationSettingsAsync(request);
+        }
+
+        [GeneratedCode("nexgen", null)]
+        private static async Task<SyncSettings> GetSyncSettingsAsync(GetSyncSettingsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<ITypeShowcase>(TypeShowcaseEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<SyncSettings>(svc => svc.GetSyncSettings(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        /// <param name="options">Options for the operation.</param>
+        [GeneratedCode("nexgen", null)]
+        public static Task<SyncSettings> GetSyncSettingsAsync(GetSyncSettingsOptions options)
+        {
+            var request = new GetSyncSettingsRequest(options.UserId)
+            {
+                Settings = options.Region != null || options.Checkpoint != null ? new SyncSettings() { Region = options.Region, Checkpoint = options.Checkpoint } : null,
+            };
+            return GetSyncSettingsAsync(request);
         }
 
     }

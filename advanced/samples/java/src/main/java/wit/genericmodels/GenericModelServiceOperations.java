@@ -15,6 +15,8 @@ public final class GenericModelServiceOperations {
     requestBuilder.setContexts(options.getContexts());
     requestBuilder.setByName(options.getByName());
     requestBuilder.setNested(options.getNested());
+    if (options.getProbe() != null) requestBuilder.setProbe(options.getProbe());
+    if (options.getReference() != null) requestBuilder.setReference(options.getReference());
     java.lang.reflect.Type resultType = options.getResultType();
     wit.genericmodels.GenericRequest<ContextT> request = requestBuilder.build();
     return executeComplete(request, resultType);

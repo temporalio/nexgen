@@ -8,14 +8,33 @@ import type {
   SetProfileRequest,
   RecordSyncRequest,
   DeactivateRequest,
+  UpdateLabelsRequest,
+  UpdateNotificationSettingsRequest,
+  SyncSettings,
+  GetSyncSettingsRequest,
 } from "./models";
 import type { User } from "./resources";
 
+/**
+ * @experimental This API is experimental and subject to change.
+ */
 export const typeShowcase = nexus.service("TypeShowcase", {
+  /**
+   * Get a user.
+   *
+   * @experimental This API is experimental and subject to change.
+   */
   getUser: nexus.operation<GetUserRequest, User>({ name: "GetUser" }),
   updateEmail: nexus.operation<UpdateEmailRequest, User>({ name: "UpdateEmail" }),
   rename: nexus.operation<RenameRequest, User>({ name: "Rename" }),
   setProfile: nexus.operation<SetProfileRequest, User>({ name: "SetProfile" }),
   recordSync: nexus.operation<RecordSyncRequest, void>({ name: "RecordSync" }),
   deactivate: nexus.operation<DeactivateRequest, void>({ name: "Deactivate" }),
+  updateLabels: nexus.operation<UpdateLabelsRequest, void>({ name: "UpdateLabels" }),
+  updateNotificationSettings: nexus.operation<UpdateNotificationSettingsRequest, void>({
+    name: "UpdateNotificationSettings",
+  }),
+  getSyncSettings: nexus.operation<GetSyncSettingsRequest, SyncSettings>({
+    name: "GetSyncSettings",
+  }),
 });

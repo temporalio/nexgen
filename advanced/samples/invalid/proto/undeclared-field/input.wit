@@ -1,0 +1,16 @@
+package temporal:nexus@1.0.0;
+
+world system { export workflow-service; }
+
+/// @nexus.endpoint "__temporal_system"
+interface workflow-service {
+  use nexus:temporal-types/model@1.0.0.{retry-policy, task-queue};
+
+  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
+  record activity-options {
+    task-queue: option<task-queue>,
+    retry-policy: retry-policy,
+  }
+
+  activity-options-operation: func(request: activity-options) -> activity-options;
+}

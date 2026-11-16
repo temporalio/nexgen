@@ -1,0 +1,29 @@
+package test:variant-parameter-conflict;
+
+world system { export generic-service; }
+
+interface left {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  record payload { value: value-t }
+}
+
+interface right {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  record payload { value: value-t }
+}
+
+interface generic-service {
+  use left.{payload as left-payload};
+  use right.{payload as right-payload};
+  variant collision {
+    left(left-payload),
+    right(right-payload),
+  }
+  record request { value: left-payload }
+  record response { value: right-payload }
+  execute: func(request: request) -> response;
+}

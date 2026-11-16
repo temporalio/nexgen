@@ -29,6 +29,10 @@ namespace Nexgen.StartWorkflowService
         [NexusOperation("CancelWorkflow")]
         CancelWorkflowResponse CancelWorkflow(CancelWorkflowRequest request);
 
+        [GeneratedCode("nexgen", null)]
+        [NexusOperation("SignalWithStart")]
+        SignalResultResponse SignalWithStart(CancelWorkflowRequest request);
+
     }
 
     internal interface INexgenOperationInfo
@@ -69,6 +73,8 @@ namespace Nexgen.StartWorkflowService
                 StartWorkflowServiceServiceDefinition.Operations["RestartWorkflow"]),
             [("StartWorkflowService", "CancelWorkflow")] = new NexgenOperationInfo<CancelWorkflowRequest, CancelWorkflowResponse>(
                 StartWorkflowServiceServiceDefinition.Operations["CancelWorkflow"]),
+            [("StartWorkflowService", "SignalWithStart")] = new NexgenOperationInfo<CancelWorkflowRequest, SignalResultResponse>(
+                StartWorkflowServiceServiceDefinition.Operations["SignalWithStart"]),
         };
     }
 

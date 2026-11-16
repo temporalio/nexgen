@@ -71,6 +71,7 @@ in both directions (shared `Validate`, **P12**). Same per-language strategy as
 | TypeScript | ``if (v < min) push(Violation{path, reason: `must be >= ${min}, got ${v}`})``, throw one `PayloadValidationError` application failure.                                                                                                                                                                                       |
 | Python     | `if v < min: violations.append(Violation(path=…, reason=f"must be >= {min}, got {v}"))` in the transfer type converter, run after `_parse_spec_integer` normalizes an integer field's wire value (`0.0`→`0`, see [[type]]); aggregates into the single generated `PayloadValidationError` application failure.               |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the node via the [[type]] `SpecNumbers` helper and checks `v < min` (`long`/`double`), pushing a `Violation{path, "must be >= " + min + ", got " + v}` into the single `PayloadValidationError` application failure. Not bean-validation `@Min`.             |
+| C#         | `Converter.Parse` reads the value via `SpecJson.SpecLong`/`SpecDouble` and checks `v < min` (`long`/`double`), recording `Violation{path, "must be >= " + min + ", got " + v}` into the single `PayloadValidationError` application failure; `Validate` repeats the check before writing.                                    |
 
 Reason strings name the concrete bound and offending value
 (`must be >= 0, got -1`), per the [[maximum]] convention.

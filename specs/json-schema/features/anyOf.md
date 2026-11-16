@@ -50,7 +50,7 @@ Distilled:
   to a single branch without guessing. `anyOf` gives up both halves: branches
   **may overlap**, so even a brute-force "first branch that validates" is
   order-dependent and arbitrary, and there is no closed, disjoint selector to
-  key on. There is no static type across the four targets for "a value that
+  key on. There is no static type across the five targets for "a value that
   matches one *or more* of these possibly-overlapping shapes" — the only
   lowerings are to forfeit typing (a bare `any`/`interface{}`/`Object`) or to
   synthesize a union that silently changes meaning (turning inclusive-or into

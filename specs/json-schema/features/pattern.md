@@ -5,12 +5,12 @@ for Strings → pattern".
 
 Asserts that a string instance **matches a regular expression**. A pure runtime
 assertion — no type impact. The string keyword with the richest cross-language
-hazard: the four targets ship **different regex engines** whose dialect,
+hazard: the five targets ship **different regex engines** whose dialect,
 anchoring, and character-class semantics diverge, so the supported form is
 narrowed to the **portable (RE2-safe) subset** matched with
 **unanchored search** and **ASCII** class semantics. That configuration was
 validated against the **conformance corpus** of `(pattern, instance)` pairs run
-through all four runtime engines plus the Rust gate
+through all five runtime engines plus the Rust gate
 (`json-schema/corpora/pattern_conformance/`), which proved the compile gate +
 pinned flags alone is *not* enough: constructs that compile everywhere still
 match differently, and constructs the gate's own engine compiles still fail to
@@ -58,7 +58,7 @@ and Go's `regexp` both implement — not a dependency on Go.
 
 Rationale (citing [[PRINCIPLES.md]]):
 - **P1 (identical cross-language validation).** The same `(pattern, instance)`
-  must produce the same accept/reject in Go, TS, Python, and Java. The four
+  must produce the same accept/reject in C#, Go, TS, Python, and Java. The five
   engines diverge on the axes below; each is pinned to the portable choice, and
   the conformance corpus then caught three more
   (**Conformance-verified gate rules**, further below):
@@ -80,7 +80,7 @@ Rationale (citing [[PRINCIPLES.md]]):
      **Java `Matcher.matches()`**, which anchors the *whole* input (`"cat"`
      fails to match `"the cat sat"` — verified) and Python `re.match`, which
      anchors the *start*; using either would silently diverge from the spec and
-     the other three.
+     the other four.
   3. **Character classes & the dot.** `\d`/`\w`/`\s` must be **ASCII**
      (ECMA-262: `\d` ≡ `[0-9]`), and `.` must match one **code point**. Verified
      divergences, each pinned: Python `re` makes `\d`
@@ -104,10 +104,10 @@ Rationale (citing [[PRINCIPLES.md]]):
   diagnostic naming the offending construct.
 
 **Conformance-verified gate rules (beyond no-backtracking).** The
-`(pattern, instance)` corpus run through all four runtime engines + the Rust
+`(pattern, instance)` corpus run through all five runtime engines + the Rust
 gate (`json-schema/corpora/pattern_conformance/`) showed the compile gate +
 pinned flags is **not** sufficient. Each rule below was established by measuring
-the construct in all four engines — the corpus pins the ones whose divergence a
+the construct in all five engines — the corpus pins the ones whose divergence a
 `(pattern, instance)` pair can express — so the gate applies:
 1. **Inline flag groups `(?i)` / `(?flags:…)` → reject.** JS `RegExp` cannot
    compile them (they are not ECMA-262 syntax); Rust/Go/Python/Java all do — a
@@ -130,7 +130,7 @@ the construct in all four engines — the corpus pins the ones whose divergence 
    one: standalone `\s`/`\S`; `\s` inside a class (`[\s.]`→`[\t\n\x0B\f\r .]`,
    `[^\s]`→`[^\t\n\x0B\f\r ]`); sole-member `[\S]`→`[^…]` and the
    double-negation `[^\S]`→`[…]`. **`\d`/`\w` are untouched** (identical ASCII
-   across all four already). *One narrow reject remains:*
+   across all five already). *One narrow reject remains:*
    **`\S` inside a multi-member class** (`[\S.]`, `[\S\d]`) — "not-whitespace OR
    something" is an open-ended complement RE2/JS/Python cannot spell as a
    positive member list (no nested negation / class subtraction), so it is
@@ -144,9 +144,9 @@ the construct in all four engines — the corpus pins the ones whose divergence 
    `$` (already exception-free). Provably semantics-aligning (multiline is never
    enabled), so it *eliminates* the divergence rather than hiding it; `^` needs
    no change. **Watch the `\Z` vs `\z` letter flip:** Python's strict
-   end-of-string anchor is `\Z`, whereas Java's (and .NET's / Ruby's — see
-   Prospective targets) is `\z`, with `\Z` being the *lenient* one there. The
-   generator emits the right letter per target.
+   end-of-string anchor is `\Z`, whereas Java's (and C#'s and Ruby's — see
+   below) is `\z`, with `\Z` being the *lenient* one there. The generator emits
+   the right letter per target.
 4. **`.` → `[^\n]`.** Runtime dot semantics disagree on which line terminators
    are excluded. The explicit class pins the project's one-code-point,
    not-newline rule and is the spelling used in diagnostics.
@@ -241,7 +241,7 @@ Loader behavior:
   set. Matching with an engine's Unicode-by-default classes instead does both
   harms at once: `{pattern:"^\\w+$", default:"café"}` loads and emits a constant
   every target's own validator rejects, and `{pattern:"^\\W+$", default:"é"}` is
-  refused though all four accept it. On a materialized node the literal is
+  refused though all five accept it. On a materialized node the literal is
   **canonicalized before it is matched** (see Serialize-side).
 
 **Deferred, not excluded.** The rejects are the conservative v1 line, not a
@@ -278,6 +278,7 @@ already rejected — so no runtime row has to cope with them.
 | TypeScript | Module-level ``const PAT_RE = /<pattern>/u;`` (or `new RegExp(<pattern>, "u")` when the literal can't be spelled). **The `u` flag is mandatory** (code-point `.`; verified). ``if (!PAT_RE.test(v)) push(Violation{path, reason: `must match pattern ${PAT_RE}, got ${JSON.stringify(v)}`})``. `test` is unanchored and — with no `g` flag — stateless. Throw one `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                            |
 | Python     | A module-level `_PATTERN_<HEX> = re.compile(<pattern>, re.ASCII)` (with the `$`→`\Z` normalization applied), keyed by the pattern text so identical patterns share one compiled instance per module. Both directions of the model's `_<Model>TransferTypeConverter` inline the check — `if _PATTERN_<HEX>.search(value) is None: violations.append(Violation(path=…, reason=f"must match pattern <pattern>, got {_quote(value)}"))` — collected into the single `PayloadValidationError` application failure (**PRINCIPLES Python §2/§3**). The comparison is emitted inline rather than behind a runtime helper, the same way TypeScript emits it. **`re.search` (unanchored — never `re.match`, which anchors the start, or `fullmatch`), `re.ASCII` (ASCII `\d\w\s`).** |
 | Java       | Static `private static final Pattern PAT_RE = Pattern.compile(<pattern>);` (**default flags** — ASCII `\d\w\s`, code-point `.`; with the `$`→`\z` normalization applied). The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the `String` and checks `if (!PAT_RE.matcher(v).find())`, pushing a `Violation{path, "must match pattern " + <pattern> + ", got " + v}` into the single `PayloadValidationError` application failure. **`Matcher.find` (unanchored), never `matches()`** (which anchors the whole input — verified footgun). Not bean-validation `@Pattern`.                                                                                                                                                                                     |
+| C#         | A `private static readonly Regex` per pattern on the model's converter (`RegexOptions.CultureInvariant`), compiled from the normalized pattern after the `$`→`\z` rewrite and the UTF-16 code-unit rewrite (`rewrite_for_utf16_code_units`, so an astral code point matches as one character). `Converter.Parse` checks `if (!Pattern.IsMatch(v))` — **`IsMatch` is unanchored** — recording `Violation{path, "must match pattern " + <pattern> + ", got " + v}`; `Validate` repeats the check before writing.                                                                                                                                                                                                                                                             |
 
 The compiled identifiers are also part of **P15**. Go derives
 `<model><position>Pattern` (and the parallel `Format` / `ContentEncoding`
@@ -314,7 +315,7 @@ violation sets (**P11.1**).
 
 **Why compile-once.** Recompiling a regex per (de)serialize call is a needless
 cost (P2 favors ergonomics/idiom, and a package-level compiled pattern *is* the
-idiom in all four); the load-time gate is what lets the emitted
+idiom in all five); the load-time gate is what lets the emitted
 `MustCompile`/`Pattern.compile` be unguarded — its job is to turn any runtime
 compile failure into a load-time reject. An admitted pattern that a target's
 engine then refuses is therefore a **gate defect**, never a licensed exception.
@@ -328,7 +329,7 @@ the decoded value — a model constructed with a non-matching string (a Go
 `string` / Java `String` / Python `str` set to an off-pattern value in memory)
 fails serialize with the same aggregated primitive rather than emitting an
 invalid value. Real teeth in every target, since constructing a value in memory
-is unchecked in all four — a Go struct literal, a TS object literal, a Java
+is unchecked in all five — a Go struct literal, a TS object literal, a Java
 setter, and an inert Python dataclass alike bypass the parse adapter, so the
 only place the match can be re-asserted is before emit. No parse-adapter-only or
 encode-adapter-only logic: the match is pure and direction-agnostic.
@@ -455,30 +456,29 @@ Fixtures outside the corpus (validator integration, not pure matching):
 The cross-engine divergences enumerated in the gate rules are handled: the
 compile gate + `regex-syntax` AST checks **reject** the non-portable constructs
 and **normalize** `\s`/`\S` (→ explicit ASCII class), `.` (→ `[^\n]`) and `$` (→
-per-target end-anchor), which is what makes the four runtimes agree
+per-target end-anchor), which is what makes the five runtimes agree
 value-for-value on every corpus pair. Beyond those rules, the open edges are
 **lone-surrogate wire strings** and any divergence that appears only past the
 corpus's length ceiling — short runtime examples alone cannot prove a repeated
 pattern safe. Word-boundary patterns are therefore gate-rejected, including the
 Unicode-adjacent witness; the `.`-newline corner is normalized and
-runtime-covered. Every accepted row the corpus contains is executed in all four
+runtime-covered. Every accepted row the corpus contains is executed in all five
 current runtimes; every rejected row is rechecked by the loader gate. New
 acceptance edges belong in that corpus before the gate is widened.
 
-### Prospective targets (.NET, Ruby)
+### C# and the prospective Ruby target
 
-Not current targets, but both are planned. Conformance was verified against the
-same corpus (`json-schema/corpora/pattern_conformance/`), and both are feasible
-with **per-target emission transforms only — no new gate rules**. The findings
-(record them here so the recipe survives to implementation time):
+C# is a current target; Ruby is planned. Both hold the corpus
+(`json-schema/corpora/pattern_conformance/`) with
+**per-target emission transforms only — no new gate rules**:
 
-| Target   | Engine                           | Runtime config + transforms to match the pinned semantics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **.NET** | `System.Text.RegularExpressions` | `Regex.IsMatch(v, p, RegexOptions.ECMAScript)` — `IsMatch` is unanchored; **`ECMAScript`** makes `\d\w\s` ASCII (Unicode by default otherwise). `$`→**`\z`** (its `\Z` is the *lenient* one, reverse of Java). **Astral `.` is a divergence:** .NET `.` matches one UTF-16 unit and there is **no `u`-flag equivalent**, so `^a.b$` misses `"a😀b"` — the emitter must rewrite each `.`→`(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)` (verified 70/72 → 72/72 with the rewrite). This is the same problem JS has, solved by an explicit rewrite instead of a flag. |
-| **Ruby** | Onigmo (`Regexp`)                | `re.match?(v)` — unanchored. `\d`/`\w`/`\s` are ASCII by default (good), and `.` is a code point (good). But `^`/`$` are **always line anchors** (no non-multiline mode), so normalize **`^`→`\A`, `$`→`\z`** (never `\Z` — that is the lenient one). Word boundaries are already outside the accepted subset. `\s`/`\S` normalization and the `$`/`\S`-class rules carry over unchanged.                                                                                                                                                                   |
+| Target   | Engine                           | Runtime config + transforms to match the pinned semantics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C#**   | `System.Text.RegularExpressions` | a static `Regex` with `RegexOptions.CultureInvariant`, matched with `IsMatch` (unanchored). The gate already spells `\d\w\s` and `.` as explicit ASCII classes, so .NET's Unicode-aware shorthand never runs and `ECMAScript` mode is unnecessary. `$`→**`\z`** (its `\Z` is the *lenient* one, reverse of Java). **Astral code points:** .NET matches one UTF-16 unit at a time and has **no `u`-flag equivalent**, so `rewrite_for_utf16_code_units` makes every negated class (and any astral class member or quantified astral literal) consume a whole surrogate pair, with guards so backtracking cannot split one. Every corpus row holds. |
+| **Ruby** | Onigmo (`Regexp`)                | `re.match?(v)` — unanchored. `\d`/`\w`/`\s` are ASCII by default (good), and `.` is a code point (good). But `^`/`$` are **always line anchors** (no non-multiline mode), so normalize **`^`→`\A`, `$`→`\z`** (never `\Z` — that is the lenient one). Word boundaries are already outside the accepted subset. `\s`/`\S` normalization and the `$`/`\S`-class rules carry over unchanged.                                                                                                                                                                                                                                                         |
 
 Neither needs a new *gate* rule — the existing rejects already cover them, and
-both accept the normalized output. The `.NET` astral rewrite and the Ruby
+both accept the normalized output. The C# astral rewrite and the Ruby
 `^`/`$`→`\A`/`\z` rewrite are additions to those targets' *emitters*, mirroring
 how each current target already applies its own per-engine flag/anchor
 treatment. Note the astral rewrite must target the **negated class** the gate
@@ -496,7 +496,7 @@ would never fire.
    punctuation character or a POSIX class → its explicit spelling at emit time —
    each gated on the conformance corpus
    (`json-schema/corpora/pattern_conformance/`) still agreeing across all
-   targets (incl. the prospective .NET/Ruby). Revisit on demand (mirrors
+   targets (incl. the prospective Ruby). Revisit on demand (mirrors
    [[multipleOf]]'s fractional-divisor and [[patternProperties]]' single-pattern
    carve-outs). `\s`/`\S`, `.` and `$` were on this list and are now
    **resolved** by normalization.

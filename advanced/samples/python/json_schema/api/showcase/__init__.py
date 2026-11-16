@@ -8,7 +8,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import ShowcaseServicePyClient
+from ._clients import ShowcaseServicePyClient
 from . import services as _services
 
 __all__ = [
@@ -39,7 +39,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "example.showcase.v1.ShowcaseService",
         "GetShowcase",

@@ -1,0 +1,13 @@
+package test:parameter-type-override;
+
+world system { export models; }
+
+interface models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  /// @nexus.type typescript="string"
+  type context-t = placeholder;
+
+  record request { context: context-t }
+}

@@ -68,7 +68,7 @@ the deserialize scan reads the wire elements and the serialize scan the decoded
 collection, with the same predicate, the same tally and the same reason). No
 effect on emitted types. The scalar restriction is the **P1** line: a scalar
 matcher is the same value/range comparison [[enum]] / [[minimum]] / [[pattern]]
-already specify across all four targets, whereas a portable composite deep-match
+already specify across all five targets, whereas a portable composite deep-match
 is extra surface we don't yet commit to.
 
 Loader behavior:
@@ -155,6 +155,7 @@ nothing, in every target and in both directions.
 | TypeScript | After the `Array.isArray` guard ([[items]]), deserialize scans the raw array and serialize scans the typed array with the same scalar matcher predicates. A miss pushes one violation.                                                                                      |
 | Python     | The transfer converter calls `_check_contains` with the raw list on deserialize and the typed list on serialize. The matcher uses the same scalar predicates in either direction, including for typed-map members and [[oneOf]] branches.                                   |
 | Java       | The per-POJO collecting deserializer scans the original `JsonNode` elements with the matcher type guard and predicates; serialize scans the typed `List<T>`. A miss pushes one violation into the single `PayloadValidationError` application failure. Not bean-validation. |
+| C#         | `Converter.Parse` scans the original `JsonElement` array with the matcher's type guard and predicates; `Validate` scans the in-memory `IReadOnlyList<T>`. A miss records one `Violation` in the single `PayloadValidationError` application failure.                        |
 
 Reason strings name **what was required**, not a bare keyword — the matcher is
 described by its own constraint (`no element equals "admin"` for a `const`

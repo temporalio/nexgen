@@ -125,6 +125,12 @@ struct EmittedNameMapper<'a> {
 }
 
 impl ApiSpecTransform<PlannedFamily, PlannedFamily> for EmittedNameMapper<'_> {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
+        origin
+    }
     fn map_spec_data(&mut self, data: PlannedSpecData) -> PlannedSpecData {
         PlannedSpecData {
             module_imports: data

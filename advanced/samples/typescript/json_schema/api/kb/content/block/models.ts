@@ -6,17 +6,6 @@ import * as __nexgenDefinitions from "../../definitions";
 import { pageTransferTypeConverter } from "../page/models";
 import type { Page } from "../page/models";
 
-export function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 /**
  * A content block. The other half of the Page <-> Block cross-file cycle. The `page`
  * back-reference is optional + nullable, which terminates the cycle so it is

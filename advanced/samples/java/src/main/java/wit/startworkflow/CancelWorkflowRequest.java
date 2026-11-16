@@ -53,7 +53,7 @@ public final class CancelWorkflowRequest {
       this.reason = value.reason;
     }
 
-    private String namespace = null;
+    private String namespace = "";
 
     public Builder setNamespace(String value) {
       this.namespace = value;
@@ -75,10 +75,7 @@ public final class CancelWorkflowRequest {
     }
 
     public CancelWorkflowRequest build() {
-      return new CancelWorkflowRequest(
-          namespace == null ? support.TemporalModelConverters.workflowNamespace() : namespace,
-          workflowExecution,
-          reason);
+      return new CancelWorkflowRequest(namespace, workflowExecution, reason);
     }
   }
 

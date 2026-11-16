@@ -49,7 +49,7 @@ Rationale (citing [[PRINCIPLES.md]]):
 
 Loader behavior:
 - The keyword requires `type: "object"`; a missing or different type rejects at
-  load time under **P7.1**, on the diagnostic shared with the other three
+  load time under **P7.1**, on the diagnostic shared with the other four
   object-constraint keywords.
 - Value not an object → reject.
 - Any value not an array of unique strings → reject.
@@ -88,6 +88,7 @@ dependent is also present.
 | TypeScript | the same predicate over the wire object's own keys inbound and the outbound key set on the way out; a missing dependent → push ``Violation{path, reason: `property "${dependent}" is required when "${trigger}" is present`}``, throw one `PayloadValidationError` application failure.                                                                                                                                       |
 | Python     | `from_transfer_type` reads the raw wire dict: for each present trigger, append `Violation(path=dependent, reason=f'property "{dependent}" is required when "{trigger}" is present')` per absent dependent, into the single generated `PayloadValidationError` application failure. The dependency map is a module-level private constant, alongside `_<MODEL>_DECLARED`.                                                      |
 | Java       | in the per-POJO collecting deserializer (PRINCIPLES Java §5): over the parsed tree's present-key set, for each present trigger push a `Violation{path:dependent, "property \"" + dependent + "\" is required when \"" + trigger + "\" is present"}` per missing dependent into the single `PayloadValidationError` application failure.                                                                                       |
+| C#         | `Converter.Parse` checks the present wire keys and records `Violation{path:dependent, "property \"<dependent>\" is required when \"<trigger>\" is present"}` per missing dependent; `Validate` makes the same check over the members it will write. Both join the single `PayloadValidationError` application failure.                                                                                                        |
 
 ### Serialize-side (P12)
 

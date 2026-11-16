@@ -17,7 +17,7 @@ public final class SignalWithStartWorkflowRequest {
    */
   private final String id;
 
-  /** Task queue to run the workflow on. */
+  /** Task queue to run the workflow on. Defaults to the calling workflow's task queue. */
   private final String taskQueue;
 
   private final String signal;
@@ -319,8 +319,7 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private io.temporal.api.enums.v1.WorkflowIdReusePolicy idReusePolicy =
-        io.temporal.api.enums.v1.WorkflowIdReusePolicy.forNumber(1);
+    private io.temporal.api.enums.v1.WorkflowIdReusePolicy idReusePolicy = null;
 
     public Builder setIdReusePolicy(io.temporal.api.enums.v1.WorkflowIdReusePolicy value) {
       this.idReusePolicy = value;
@@ -390,7 +389,7 @@ public final class SignalWithStartWorkflowRequest {
       return this;
     }
 
-    private String namespace = null;
+    private String namespace = "";
 
     public Builder setNamespace(String value) {
       this.namespace = value;
@@ -441,7 +440,7 @@ public final class SignalWithStartWorkflowRequest {
           versioningOverride,
           startDelay,
           userMetadata,
-          namespace == null ? support.TemporalModelConverters.workflowNamespace() : namespace,
+          namespace,
           headers);
     }
   }

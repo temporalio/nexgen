@@ -94,6 +94,7 @@ in both directions (**P12**).
 | TypeScript | The transfer converters tally the raw array inbound and the typed array outbound after the `Array.isArray` guard. `max` is an emitted numeric constant.                |
 | Python     | `_check_contains` receives the raw list inbound and the typed list outbound, appending the same bound/count violation.                                                 |
 | Java       | The collecting deserializer tallies the original Jackson array node; serialize tallies the typed `List<T>`. Not bean-validation.                                       |
+| C#         | `Converter.Parse` tallies the original `JsonElement` array; `Validate` tallies the in-memory `IReadOnlyList<T>`.                                                       |
 
 **Informative `reason` strings.** The `reason` names the
 **concrete bound and the offending match count** —

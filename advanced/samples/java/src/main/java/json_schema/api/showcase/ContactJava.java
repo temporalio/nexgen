@@ -24,8 +24,8 @@ import org.jspecify.annotations.Nullable;
  * (minProperties/maxProperties on a declared-property object). Also exercises the type-level
  * `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted type is renamed to the
  * derived name plus a per-language suffix (Go `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java
- * `ContactJava`) at its declaration and at every `$ref`, while the wire `$ref` name stays
- * `Contact`.
+ * `ContactJava`, C# `ContactCs`) at its declaration and at every `$ref`, while the wire `$ref` name
+ * stays `Contact`.
  */
 @JsonSerialize(using = ContactJava.Serializer.class)
 @JsonDeserialize(using = ContactJava.Deserializer.class)

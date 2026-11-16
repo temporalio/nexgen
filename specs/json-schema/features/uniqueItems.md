@@ -56,7 +56,7 @@ array's complete element sequence — applied at both boundaries with the same
 equality and the same reason). No effect on emitted types. The scalar
 restriction is the **P1** line: element-vs-element equality over a scalar type
 is the same value comparison [[enum]] already specifies value-for-value across
-all four targets, whereas a portable composite deep-equal is extra surface we
+all five targets, whereas a portable composite deep-equal is extra surface we
 don't yet commit to.
 
 A scalar element carrying a **temporal [[format]]** is also **deferred**, for a
@@ -110,12 +110,13 @@ primitive; Python uses a JSON-aware equality walk over a list so `true` remains
 distinct from `1`, and so raw composite values from elements that fail `items`
 conversion remain comparable.
 
-| Language   | Strategy                                                                                                                                                                                                                                                                                                                                              |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Go         | Deserialize normalizes each original `json.RawMessage` to a JSON value key and tracks the first raw index; serialize performs the equivalent typed-slice walk in shared `Validate`. Both collect duplicate-index violations into one `PayloadValidationError` application failure.                                                                    |
-| TypeScript | After the `Array.isArray` guard ([[items]]), deserialize walks the raw array with a `Map` before returning the typed result; serialize walks the typed array. `Map` uses value equality for the supported scalar elements.                                                                                                                            |
-| Python     | The runtime's `_check_unique_items(value, path, violations)` is called with the raw list on deserialize and the typed list on serialize. It uses a JSON-aware equality walk, **not** a `set`/`dict`, so booleans stay distinct from numbers and composite raw values compare structurally. Arrays are small and correctness beats the O(n²) (**P2**). |
-| Java       | The per-POJO collecting deserializer walks the original `JsonNode` array using `SpecNumbers.valueKey` for JSON numeric equality; serialize walks the typed `List<T>`. Both report the colliding indexes in the single `PayloadValidationError` application failure. Not bean-validation.                                                              |
+| Language   | Strategy                                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Go         | Deserialize normalizes each original `json.RawMessage` to a JSON value key and tracks the first raw index; serialize performs the equivalent typed-slice walk in shared `Validate`. Both collect duplicate-index violations into one `PayloadValidationError` application failure.                                                                        |
+| TypeScript | After the `Array.isArray` guard ([[items]]), deserialize walks the raw array with a `Map` before returning the typed result; serialize walks the typed array. `Map` uses value equality for the supported scalar elements.                                                                                                                                |
+| Python     | The runtime's `_check_unique_items(value, path, violations)` is called with the raw list on deserialize and the typed list on serialize. It uses a JSON-aware equality walk, **not** a `set`/`dict`, so booleans stay distinct from numbers and composite raw values compare structurally. Arrays are small and correctness beats the O(n²) (**P2**).     |
+| Java       | The per-POJO collecting deserializer walks the original `JsonNode` array using `SpecNumbers.valueKey` for JSON numeric equality; serialize walks the typed `List<T>`. Both report the colliding indexes in the single `PayloadValidationError` application failure. Not bean-validation.                                                                  |
+| C#         | `Converter.Parse` walks the original `JsonElement` array keyed by `SpecJson.ValueKey` (numbers mathematical, signed zero folded); `Validate` walks the in-memory list through `ValueEquality.Comparer` (a materialized value by its canonical wire string). Both report the colliding indexes in the single `PayloadValidationError` application failure. |
 
 Reason strings name the **colliding positions**
 (`duplicate items: element at index 3 equals index 1`) per the count-family
@@ -138,7 +139,7 @@ elements. `-0.0` equals `0.0`; `NaN`/`±Infinity` cannot appear.
 Identical to the count pair: the predicate **re-runs before emit** over the
 decoded value, so an in-memory slice/list holding duplicates fails serialize
 with the same aggregated primitive rather than being written. Real teeth in
-every target: building the collection in memory is unchecked in all four (same
+every target: building the collection in memory is unchecked in all five (same
 rationale as the [[maxItems]] bound re-check). Both directions walk the array's
 complete element sequence and compare the same values — for a
 [[contentEncoding]] element the byte value and its one canonical spelling

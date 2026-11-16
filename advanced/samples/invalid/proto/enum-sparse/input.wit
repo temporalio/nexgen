@@ -1,0 +1,30 @@
+package test:sparse-enum;
+
+world system {
+  export models;
+}
+
+interface models {
+  // All cases are present in descriptor order, but protobuf reserves 15.
+  /// @nexus.proto "temporal.api.enums.v1.CommandType"
+  enum command-type {
+    command-type-unspecified,
+    command-type-schedule-activity-task,
+    command-type-request-cancel-activity-task,
+    command-type-start-timer,
+    command-type-complete-workflow-execution,
+    command-type-fail-workflow-execution,
+    command-type-cancel-timer,
+    command-type-cancel-workflow-execution,
+    command-type-request-cancel-external-workflow-execution,
+    command-type-record-marker,
+    command-type-continue-as-new-workflow-execution,
+    command-type-start-child-workflow-execution,
+    command-type-signal-external-workflow-execution,
+    command-type-upsert-workflow-search-attributes,
+    command-type-protocol-message,
+    command-type-modify-workflow-properties,
+    command-type-schedule-nexus-operation,
+    command-type-request-cancel-nexus-operation,
+  }
+}

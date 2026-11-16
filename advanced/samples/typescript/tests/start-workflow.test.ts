@@ -46,6 +46,9 @@ describe("start-workflow generated output", () => {
           calls.push(["CancelWorkflow", input]);
           return {};
         },
+        async signalWithStart() {
+          return { started: true };
+        },
       });
 
       const result = await executeWorkflowWithNexus<{
@@ -81,7 +84,7 @@ describe("start-workflow generated output", () => {
       expect(restartRequest?.taskQueue).toBe("demo-task-queue");
 
       const cancelRequest = calls[2]?.[1] as CancelWorkflowRequest | undefined;
-      expect(cancelRequest?.namespace).toBe("default");
+      expect(cancelRequest?.namespace).toBe("stored-namespace");
       expect(cancelRequest?.workflowExecution.workflowId).toBe("workflow-id");
       expect(cancelRequest?.workflowExecution.runId).toBe("run-123");
 

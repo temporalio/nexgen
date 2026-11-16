@@ -1,0 +1,8 @@
+package test:annotations;
+world api { export models; }
+interface models {
+  record request {
+    /// @nexus.name python="first" python="second"
+    value: string,
+  }
+}

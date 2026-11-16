@@ -7,6 +7,8 @@ public final class GenericRequest<ContextT> {
   private final java.util.List<ContextT> contexts;
   private final java.util.Map<String, ContextT> byName;
   private final wit.genericmodels.Inner<ContextT> nested;
+  private final wit.genericmodels.GetterProbe<ContextT> probe;
+  private final wit.genericmodels.ContextRef<ContextT> reference;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GenericRequest(
@@ -15,11 +17,17 @@ public final class GenericRequest<ContextT> {
       @com.fasterxml.jackson.annotation.JsonProperty("byName")
           java.util.Map<String, ContextT> byName,
       @com.fasterxml.jackson.annotation.JsonProperty("nested")
-          wit.genericmodels.Inner<ContextT> nested) {
+          wit.genericmodels.Inner<ContextT> nested,
+      @com.fasterxml.jackson.annotation.JsonProperty("probe")
+          wit.genericmodels.GetterProbe<ContextT> probe,
+      @com.fasterxml.jackson.annotation.JsonProperty("reference")
+          wit.genericmodels.ContextRef<ContextT> reference) {
     this.context = context;
     this.contexts = contexts;
     this.byName = byName;
     this.nested = nested;
+    this.probe = probe;
+    this.reference = reference;
   }
 
   public ContextT getContext() {
@@ -36,6 +44,14 @@ public final class GenericRequest<ContextT> {
 
   public wit.genericmodels.Inner<ContextT> getNested() {
     return nested;
+  }
+
+  public wit.genericmodels.GetterProbe<ContextT> getProbe() {
+    return probe;
+  }
+
+  public wit.genericmodels.ContextRef<ContextT> getReference() {
+    return reference;
   }
 
   public Builder<ContextT> toBuilder() {
@@ -59,6 +75,8 @@ public final class GenericRequest<ContextT> {
       this.contexts = value.contexts;
       this.byName = value.byName;
       this.nested = value.nested;
+      this.probe = value.probe;
+      this.reference = value.reference;
     }
 
     private ContextT context = null;
@@ -89,8 +107,22 @@ public final class GenericRequest<ContextT> {
       return this;
     }
 
+    private wit.genericmodels.GetterProbe<ContextT> probe = null;
+
+    public Builder<ContextT> setProbe(wit.genericmodels.GetterProbe<ContextT> value) {
+      this.probe = value;
+      return this;
+    }
+
+    private wit.genericmodels.ContextRef<ContextT> reference = null;
+
+    public Builder<ContextT> setReference(wit.genericmodels.ContextRef<ContextT> value) {
+      this.reference = value;
+      return this;
+    }
+
     public GenericRequest<ContextT> build() {
-      return new GenericRequest<ContextT>(context, contexts, byName, nested);
+      return new GenericRequest<ContextT>(context, contexts, byName, nested, probe, reference);
     }
   }
 }

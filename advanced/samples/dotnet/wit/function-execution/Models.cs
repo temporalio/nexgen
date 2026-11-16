@@ -10,12 +10,36 @@ namespace Nexgen.FunctionExecution
 {
 
     [GeneratedCode("nexgen", null)]
+    public record ExecuteCallbackRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteCallbackRequest"/> class.
+        /// </summary>
+        public ExecuteCallbackRequest(string function, string name, bool enabled)
+        {
+            Function = function;
+            Name = name;
+            Enabled = enabled;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// The name argument for the function.
+        /// </summary>
+        public string Name { get; init; }
+        /// <summary>
+        /// The enabled argument for the function.
+        /// </summary>
+        public bool Enabled { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record ExecuteCountedFunctionRequest
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ExecuteCountedFunctionRequest"/> class.
         /// </summary>
-        public ExecuteCountedFunctionRequest(string function, string name, int count)
+        public ExecuteCountedFunctionRequest(string function, string name, uint count)
         {
             Function = function;
             Name = name;
@@ -30,7 +54,7 @@ namespace Nexgen.FunctionExecution
         /// <summary>
         /// The count argument for the function.
         /// </summary>
-        public int Count { get; init; }
+        public uint Count { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -45,6 +69,42 @@ namespace Nexgen.FunctionExecution
         }
 
         public string Value { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record ExecuteDescriptorsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExecuteDescriptorsRequest"/> class.
+        /// </summary>
+        public ExecuteDescriptorsRequest(string function, string durations, string callback, string callable)
+        {
+            Function = function;
+            Durations = durations;
+            Callback = callback;
+            Callable = callable;
+        }
+
+        public string Function { get; init; }
+        /// <summary>
+        /// Arguments for the function.
+        /// </summary>
+        public IReadOnlyCollection<string>? Args { get; init; }
+        public string Durations { get; init; }
+        /// <summary>
+        /// Arguments for the durations.
+        /// </summary>
+        public IReadOnlyCollection<string>? DurationValues { get; init; }
+        public string Callback { get; init; }
+        /// <summary>
+        /// Arguments for the callback.
+        /// </summary>
+        public IReadOnlyCollection<string>? CallbackValues { get; init; }
+        public string Callable { get; init; }
+        /// <summary>
+        /// Arguments for the callable.
+        /// </summary>
+        public IReadOnlyCollection<string>? CallableValues { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]

@@ -44,7 +44,7 @@ Distilled:
 **Support:** no — the whole `if`/`then`/`else` trio is
 **rejected at load time (P6).**
 
-Conditional shape has no coherent lowering across the four targets:
+Conditional shape has no coherent lowering across the five targets:
 
 - **P6 (strict subset), conditional shape.** The effective type forks on a
   runtime predicate — "*if* field `kind` is `"a"` *then* these members are

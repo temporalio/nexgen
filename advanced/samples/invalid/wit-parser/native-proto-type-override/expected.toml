@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.type` on type `models.record-model`",
+  "cannot be combined with `@nexus.proto` on a native WIT declaration",
+]

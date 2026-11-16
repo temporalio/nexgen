@@ -10,11 +10,11 @@ use prost_types::field_descriptor_proto::{Label, Type};
 use crate::descriptors::{DescriptorIndex, MessageMetadata, ProtoOneofGroup, real_oneof_groups};
 use crate::error::{Error, Result};
 use crate::generator::proto::typescript as typescript_proto;
-use crate::generator::python;
+use crate::generator::{dotnet, python};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
-    RecordFieldVisibility, RecordSpec, ServiceSpec, TypeSpec,
+    FieldPolicy, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -27,6 +27,7 @@ struct MessageUsage {
 #[derive(Clone, Copy)]
 struct ModelConfig<'a> {
     record: &'a RecordSpec,
+    language: Language,
 }
 
 pub(crate) struct AuthoredValidationPass<'a> {
@@ -43,7 +44,9 @@ impl<'a> AuthoredValidationPass<'a> {
     }
 
     pub(crate) fn validate_spec(&self, spec: &ApiSpec) -> Result<()> {
-        validate_external_type_bindings(spec, self.descriptors, self.language)
+        dotnet::validate_namespace_configuration(spec, self.language)?;
+        validate_external_type_bindings(spec, self.descriptors, self.language)?;
+        super::record_backing::validate(spec, self.descriptors, self.language)
     }
 }
 
@@ -60,16 +63,27 @@ impl CompilerPass<AuthoredFamily, AuthoredFamily> for AuthoredValidationPass<'_>
 }
 
 impl<'a> ModelConfig<'a> {
-    fn from_record(record: &'a RecordSpec) -> Self {
-        Self { record }
+    fn from_record(record: &'a RecordSpec, language: Language) -> Self {
+        Self { record, language }
+    }
+
+    fn origin(&self, field_name: &str) -> Option<&FieldPolicy> {
+        self.record
+            .fields
+            .get(field_name)
+            .and_then(|field| field.origin.for_language(self.language))
     }
 
     fn is_field_omitted(&self, field_name: &str) -> bool {
-        self.record.field_omitted(field_name)
+        self.record
+            .fields
+            .get(field_name)
+            .is_some_and(|field| field.origin.is_omitted())
     }
 
     fn is_field_hidden(&self, field_name: &str) -> bool {
-        self.record.field_omitted(field_name) || self.record.field_source(field_name).is_some()
+        self.is_field_omitted(field_name)
+            || self.origin(field_name).is_some_and(FieldPolicy::is_sourced)
     }
 }
 
@@ -93,6 +107,49 @@ fn validate_external_type_bindings(
         }
     }
 
+    for (_, model) in spec.enums() {
+        let Some(proto_name) = model
+            .source
+            .as_ref()
+            .and_then(ExternalTypeSourceSpec::proto_type)
+        else {
+            continue;
+        };
+        let Some(enumeration) = descriptors.enumeration(proto_name.as_str()) else {
+            if descriptors.file_count() == 0 {
+                continue;
+            }
+            return Err(Error::UnknownTypeOverride {
+                type_name: proto_name.as_str().to_string(),
+            });
+        };
+        let invalid = |reason| Error::InvalidProtoEnumBinding {
+            enumeration: enumeration.full_name.clone(),
+            reason,
+        };
+        let members = &enumeration.descriptor.value;
+        if model.values.len() != members.len() {
+            return Err(invalid(format!(
+                "authored enum `{}` declares {} cases, but protobuf declares {}; all cases must be declared in protobuf order",
+                model.full_name,
+                model.values.len(),
+                members.len(),
+            )));
+        }
+        for (value, member) in model.values.iter().zip(members) {
+            let expected = value.wire_name.to_shouty_snake_case();
+            if member.name() != expected || member.number() != value.number {
+                return Err(invalid(format!(
+                    "authored case `{}` has number {}, but the corresponding protobuf case is `{} = {}`; case names, order, and numbers must match exactly (reordered and sparse enums are not supported)",
+                    value.wire_name,
+                    value.number,
+                    member.name(),
+                    member.number(),
+                )));
+            }
+        }
+    }
+
     for (_, record) in spec.records() {
         let Some(proto_name) = record
             .source
@@ -112,7 +169,7 @@ fn validate_external_type_bindings(
         validate_message_model_config(
             spec,
             proto_name.as_str(),
-            ModelConfig::from_record(record),
+            ModelConfig::from_record(record, language),
             message,
             descriptors,
             usages.get(proto_name.as_str()).copied().unwrap_or_default(),
@@ -268,13 +325,14 @@ fn validate_oneof_model_config(
                 field: oneof.name.to_string(),
             });
         };
-        if grouped_field.visibility == RecordFieldVisibility::Omitted {
+        if grouped_field.origin.is_omitted() {
             continue;
         }
-        if matches!(
-            grouped_field.visibility,
-            RecordFieldVisibility::Sourced { .. }
-        ) {
+        if grouped_field
+            .origin
+            .for_language(model_config.language)
+            .is_some_and(FieldPolicy::is_sourced)
+        {
             return Err(Error::InvalidTypeOverrideField {
                 message: message_name.to_string(),
                 field: oneof.name.to_string(),
@@ -449,19 +507,7 @@ fn validate_message_model_config(
         .record
         .fields
         .iter()
-        .filter(|(_, field)| field.required)
-        .map(|(field_name, _)| field_name)
-    {
-        if oneof_by_name(&oneofs, field_name).is_some() {
-            continue;
-        }
-        validate_model_required_field(message_name, field_name, message, descriptors)?;
-    }
-    for field_name in model_config
-        .record
-        .fields
-        .iter()
-        .filter(|(_, field)| field.visibility == RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| field.origin.is_omitted())
         .map(|(field_name, _)| field_name)
     {
         if oneof_by_name(&oneofs, field_name).is_some() {
@@ -469,8 +515,8 @@ fn validate_message_model_config(
         }
         validate_model_override_field(message_name, field_name, message)?;
     }
-    for field_name in model_config.record.fields.keys() {
-        if oneof_by_name(&oneofs, field_name).is_some() {
+    for (field_name, field) in &model_config.record.fields {
+        if oneof_by_name(&oneofs, field_name).is_some() || is_resource_field(field) {
             continue;
         }
         validate_model_override_field(message_name, field_name, message)?;
@@ -485,10 +531,11 @@ fn validate_message_model_config(
     )?;
     validate_authored_field_types(message_name, model_config, message, &oneofs, descriptors)?;
     validate_invocation_fields(message_name, model_config, message, descriptors, usage)?;
-    for (field_name, _) in
-        model_config.record.fields.iter().filter(|(_, field)| {
-            field.required && field.visibility == RecordFieldVisibility::Omitted
-        })
+    for (field_name, _) in model_config
+        .record
+        .fields
+        .iter()
+        .filter(|(_, field)| field.required && field.origin.is_omitted())
     {
         return Err(Error::ConflictingTypeOverrideField {
             message: message_name.to_string(),
@@ -508,17 +555,15 @@ fn validate_record_fields(
     language: Language,
 ) -> Result<()> {
     for (field_name, field) in &model_config.record.fields {
-        if oneof_by_name(oneofs, field_name).is_some() {
+        if oneof_by_name(oneofs, field_name).is_some() || is_resource_field(field) {
             continue;
         }
         validate_model_override_field(message_name, field_name, message)?;
-        if field.visibility == RecordFieldVisibility::Omitted
+        if field.origin.is_omitted()
             && (field.doc.is_some()
                 || field.annotation.is_some()
                 || field.flattened_annotation.is_some()
-                || field.default_value.is_some()
-                || field.function.is_some()
-                || matches!(field.visibility, RecordFieldVisibility::Sourced { .. }))
+                || field.function.is_some())
         {
             return Err(Error::OmittedCustomizedTypeOverrideField {
                 message: message_name.to_string(),
@@ -573,7 +618,11 @@ fn validate_record_fields(
         }
     }
 
-    for (field_name, _, _) in model_config.record.sourced_fields() {
+    for (field_name, _) in model_config.record.fields.iter().filter(|(name, _)| {
+        model_config
+            .origin(name)
+            .is_some_and(FieldPolicy::is_sourced)
+    }) {
         if oneof_by_name(oneofs, field_name).is_some() {
             continue;
         }
@@ -596,13 +645,17 @@ fn validate_record_fields(
         }
     }
 
+    // A record that holds a resource declares only what its caller sees. The resource binds
+    // the fields that it needs, and the other fields of the message are left out.
+    let holds_resource = model_config.record.fields.values().any(is_resource_field);
     let mut seen_generated_names: BTreeMap<String, String> = BTreeMap::new();
     for field in &message.descriptor.field {
         let proto_name = field
             .name
             .as_deref()
             .expect("descriptor fields should be named");
-        if !model_config.is_field_omitted(proto_name)
+        if !holds_resource
+            && !model_config.is_field_omitted(proto_name)
             && !model_config.record.fields.contains_key(proto_name)
             && !oneofs.iter().any(|oneof| {
                 model_config.record.fields.contains_key(oneof.name)
@@ -658,6 +711,9 @@ fn validate_authored_field_types(
             continue;
         }
 
+        if is_resource_field(field_spec) {
+            continue;
+        }
         let field = validate_model_override_field(message_name, field_name, message)?;
         if model_config.is_field_omitted(field_name) {
             continue;
@@ -670,66 +726,9 @@ fn validate_authored_field_types(
             field,
             descriptors,
         )?;
-        if let Some(default) = &field_spec.default_value {
-            validate_default_enum_case(
-                message_name,
-                field_name,
-                &default.enum_case,
-                field,
-                descriptors,
-            )?;
-        }
     }
 
     Ok(())
-}
-
-fn validate_default_enum_case(
-    message_name: &str,
-    field_name: &str,
-    case_name: &str,
-    field: &FieldDescriptorProto,
-    descriptors: &DescriptorIndex,
-) -> Result<()> {
-    if field_type(field) != Some(Type::Enum) {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "defaults are only supported on protobuf enum fields".to_string(),
-        });
-    }
-    let Some(enum_name) = field.type_name.as_deref() else {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "protobuf enum type is unavailable in the descriptors".to_string(),
-        });
-    };
-    let Some(enumeration) = descriptors.enumeration(enum_name) else {
-        return Err(Error::InvalidTypeOverrideField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            property: "default",
-            reason: "protobuf enum type is unavailable in the descriptors".to_string(),
-        });
-    };
-    let expected = case_name.to_shouty_snake_case();
-    if enumeration.descriptor.value.iter().any(|value| {
-        value
-            .name
-            .as_deref()
-            .is_some_and(|name| name == expected || name.ends_with(&format!("_{expected}")))
-    }) {
-        return Ok(());
-    }
-    Err(Error::InvalidTypeOverrideField {
-        message: message_name.to_string(),
-        field: field_name.to_string(),
-        property: "default",
-        reason: format!("unknown protobuf enum case `{case_name}`"),
-    })
 }
 
 fn validate_invocation_fields(
@@ -830,9 +829,8 @@ fn validate_invocation_fields(
             });
         }
         if model_config
-            .record
-            .field_source(&function.args_field)
-            .is_some()
+            .origin(&function.args_field)
+            .is_some_and(FieldPolicy::is_sourced)
         {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
                 message: message_name.to_string(),
@@ -1180,38 +1178,10 @@ fn validate_model_override_field<'a>(
         })
 }
 
-fn validate_model_required_field(
-    message_name: &str,
-    field_name: &str,
-    message: &MessageMetadata,
-    descriptors: &DescriptorIndex,
-) -> Result<()> {
-    let field = validate_model_override_field(message_name, field_name, message)?;
-    let field_type = field_type(field);
-
-    if field_label(field) == Some(Label::Repeated) {
-        let reason = if field_is_map(field, descriptors) {
-            "map fields cannot be marked required"
-        } else {
-            "repeated fields cannot be marked required"
-        };
-        return Err(Error::UnsupportedRequiredTypeField {
-            message: message_name.to_string(),
-            field: field_name.to_string(),
-            reason: reason.to_string(),
-        });
-    }
-
-    if field_has_presence(field, field_type) || field_supports_required_without_presence(field_type)
-    {
-        return Ok(());
-    }
-
-    Err(Error::UnsupportedRequiredTypeField {
-        message: message_name.to_string(),
-        field: field_name.to_string(),
-        reason: "field must support presence or be a string/bytes scalar".to_string(),
-    })
+/// A resource field holds a resource that an operation result builds from the message, so
+/// it has no proto field of its own.
+fn is_resource_field(field: &RecordFieldSpec) -> bool {
+    matches!(field.field_type.without_option(), TypeSpec::Resource(_))
 }
 
 fn field_is_map(field: &FieldDescriptorProto, descriptors: &DescriptorIndex) -> bool {
@@ -1240,10 +1210,6 @@ fn field_has_presence(field: &FieldDescriptorProto, field_type: Option<Type>) ->
         || field.oneof_index.is_some()
 }
 
-fn field_supports_required_without_presence(field_type: Option<Type>) -> bool {
-    matches!(field_type, Some(Type::String | Type::Bytes))
-}
-
 fn field_label(field: &FieldDescriptorProto) -> Option<Label> {
     field.label.and_then(|label| Label::try_from(label).ok())
 }
@@ -1252,43 +1218,4 @@ fn field_type(field: &FieldDescriptorProto) -> Option<Type> {
     field
         .r#type
         .and_then(|field_type| Type::try_from(field_type).ok())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::*;
-
-    #[test]
-    fn rejects_unknown_default_for_proto_enum_alias() {
-        let descriptors = DescriptorIndex::load(
-            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("advanced/samples/descriptors/temporal_api.bin"),
-        )
-        .unwrap();
-        let message = descriptors
-            .message("temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest")
-            .unwrap();
-        let field = message
-            .descriptor
-            .field
-            .iter()
-            .find(|field| field.name.as_deref() == Some("workflow_id_reuse_policy"))
-            .unwrap();
-        let error = validate_default_enum_case(
-            &message.full_name,
-            "workflow_id_reuse_policy",
-            "missing-case",
-            field,
-            &descriptors,
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("unknown protobuf enum case `missing-case`"),
-            "{error}"
-        );
-    }
 }

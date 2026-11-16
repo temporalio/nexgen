@@ -1,0 +1,1 @@
+`@nexus.api-omit` on an operation hides that operation's public top-level function and its export for the named `targets` (default is every target). The operation stays registered, stays in the generated service, and stays bindable by resource methods, so it is reached through its resource.

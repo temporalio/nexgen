@@ -81,6 +81,12 @@ def workflow_namespace() -> str:
     return info().namespace
 
 
+def workflow_task_queue() -> str:
+    from temporalio.workflow import info
+
+    return info().task_queue
+
+
 def signal_with_start_workflow_serialization_context(
     request: SignalWithStartWorkflowModelRequest,
 ) -> temporalio_converter.WorkflowSerializationContext:
@@ -168,7 +174,8 @@ def payload_from_proto(
     type_hint: type[typing.Any] | None = None,
 ) -> typing.Any:
     converter = temporalio.nexus.system._current_user_payload_converter()
-    if type_hint is None:
+    # object is a statically unknown payload, not a concrete decoding target.
+    if type_hint is None or type_hint is object:
         return converter.from_payload(_clone_payload(proto))
     return converter.from_payload(_clone_payload(proto), type_hint)
 

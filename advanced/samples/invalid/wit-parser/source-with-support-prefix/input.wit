@@ -1,0 +1,11 @@
+package test:source-support-prefix;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source python="_support.workflow_namespace()"
+    namespace: option<string>,
+  }
+}

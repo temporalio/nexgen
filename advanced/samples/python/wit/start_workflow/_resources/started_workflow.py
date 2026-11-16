@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime
 import temporalio.workflow
 
@@ -13,19 +12,30 @@ from ..models import (
     StartWorkflowResult,
     WorkflowExecution,
 )
+import temporal_support as _support
 
 
-@dataclasses.dataclass
 class StartedWorkflow:
     namespace: str
     workflow_id: str
     run_id: str | None
+
+    def __init__(
+        self,
+        namespace: str,
+        workflow_id: str,
+        run_id: str | None,
+    ) -> None:
+        self.namespace = namespace
+        self.workflow_id = workflow_id
+        self.run_id = run_id
 
     async def cancel(
         self,
         reason: str | None = None,
     ) -> None:
         request = CancelWorkflowRequest(
+            namespace=self.namespace,
             workflow_execution=WorkflowExecution(
                 workflow_id=self.workflow_id, run_id=self.run_id
             ),
@@ -40,6 +50,7 @@ class StartedWorkflow:
         task_queue: str,
     ) -> StartedWorkflow:
         request = StartWorkflowRequest(
+            namespace=self.namespace,
             workflow_id=self.workflow_id,
             workflow=workflow,
             task_queue=task_queue,
@@ -50,6 +61,20 @@ class StartedWorkflow:
         self,
     ) -> str:
         raise NotImplementedError("started-workflow.get_result is not yet implemented")
+
+
+def get_started_workflow(
+    *,
+    namespace: str,
+    workflow_id: str,
+    run_id: str | None = None,
+) -> StartedWorkflow:
+    """A handle on an existing ``StartedWorkflow``, with no call."""
+    return StartedWorkflow(
+        namespace=namespace,
+        workflow_id=workflow_id,
+        run_id=run_id,
+    )
 
 
 async def _cancel_workflow(
@@ -72,6 +97,7 @@ async def cancel_workflow(
     reason: str | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[CancelWorkflowResponse,]:
     request = CancelWorkflowRequest(
+        namespace=_support.workflow_namespace(),
         workflow_execution=workflow_execution,
         reason=reason,
     )
@@ -110,5 +136,6 @@ async def restart_workflow(
         workflow_id=workflow_id,
         task_queue=task_queue,
         workflow_start_delay=workflow_start_delay,
+        namespace=_support.workflow_namespace(),
     )
     return await _restart_workflow(request)

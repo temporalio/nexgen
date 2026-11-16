@@ -2,10 +2,20 @@
 
 import * as workflow from "@temporalio/workflow";
 import { startWorkflowService } from "../services";
-import { requiredField } from "../models";
 import type { StartWorkflowRequest } from "../models";
 import * as support from "../../../support/temporal_model_converters";
 import { StartedWorkflow } from "../resources";
+
+function requiredField<T>(
+  value: T | null | undefined,
+  owner: string,
+  field: string,
+): T {
+  if (value == null) {
+    throw new Error(`missing required field ${owner}.${field}`);
+  }
+  return value;
+}
 
 type RestartWorkflowInput = StartWorkflowRequest extends infer Input
   ? Input extends unknown
@@ -23,6 +33,12 @@ export async function restartWorkflow(
     ...requestInput,
     namespace: support.workflowNamespace(),
   } as StartWorkflowRequest;
+  return await _restartWorkflow(request);
+}
+
+export async function _restartWorkflow(
+  request: StartWorkflowRequest,
+): Promise<StartedWorkflow> {
   const client = workflow.createNexusServiceClient({
     service: startWorkflowService,
     endpoint: "temporal-system",

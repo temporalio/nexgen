@@ -54,9 +54,7 @@ async def _start_system_nexus_operation(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
             await interceptor.start_second_operation(typed_input.input),
         )
-    raise ValueError(
-        f"unsupported System Nexus operation: {input.service}/{input.operation_name}"
-    )
+    return await interceptor.start_system_nexus_operation(input)
 
 
 class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
@@ -64,6 +62,14 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
     def _next_system_nexus_interceptor(
         self,
     ) -> _SystemNexusWorkflowOutboundInterceptorBase: ...
+
+    @abc.abstractmethod
+    async def start_system_nexus_operation(
+        self,
+        input: StartNexusOperationInput[_InputT, _OutputT],
+    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:
+        """Intercept a System Nexus operation through the generic hook."""
+        ...
 
     async def start_first_operation(
         self, request: models.Request

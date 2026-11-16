@@ -1,0 +1,10 @@
+package test:implicit-default-targets@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.default python="1" typescript="1" go="1" dotnet="1u"
+    /// @nexus.default targets="workflow" python="2" typescript="2" go="2" dotnet="2u"
+    attempts: u32,
+  }
+  submit: func(request: request);
+}

@@ -7,24 +7,21 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@temporalio/client": "^1.23.0",
-    "@temporalio/common": "^1.23.0",
-    "@temporalio/proto": "^1.23.0",
-    "@temporalio/testing": "^1.23.0",
-    "@temporalio/worker": "^1.23.0",
-    "@temporalio/workflow": "^1.23.0",
-    "long": "5.2.3",
+    "@temporalio/client": "^1.24.0",
+    "@temporalio/common": "^1.24.0",
+    "@temporalio/proto": "^1.24.0",
+    "@temporalio/testing": "^1.24.0",
+    "@temporalio/worker": "^1.24.0",
+    "@temporalio/workflow": "^1.24.0",
+    "long": "5.3.2",
     "nexus-rpc": "^0.0.3"
   },
   "devDependencies": {
-    "prettier": "^3.8.3",
+    "oxfmt": "^0.75.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "engines": {
     "node": ">=26"
-  },
-  "prettier": {
-    "printWidth": 88
   }
 }

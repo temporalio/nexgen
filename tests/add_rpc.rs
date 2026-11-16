@@ -103,6 +103,10 @@ fn cli_add_rpc_generates_standalone_wit_for_signal_with_start() {
 
 #[test]
 fn add_rpc_matches_signal_with_start_proto_shape_but_not_handwritten_refinements() {
+    let _config = nexgen::nexgen_config::scope(nexgen::nexgen_config::NexgenConfig {
+        system_nexus: true,
+        ..Default::default()
+    });
     let root = project_root();
     let descriptors = descriptor_path(&root);
     let generated = add_rpc_to_string(
@@ -256,6 +260,10 @@ fn add_rpc_matches_signal_with_start_proto_shape_but_not_handwritten_refinements
 
 #[test]
 fn add_rpc_can_extend_an_existing_wit_file() {
+    let _config = nexgen::nexgen_config::scope(nexgen::nexgen_config::NexgenConfig {
+        system_nexus: true,
+        ..Default::default()
+    });
     let root = project_root();
     let descriptors = descriptor_path(&root);
     let input = root.join(PRIMARY_EXAMPLE_PATH);
@@ -287,6 +295,10 @@ fn add_rpc_can_extend_an_existing_wit_file() {
 
 #[test]
 fn add_rpc_can_update_existing_signal_with_start_operation() {
+    let _config = nexgen::nexgen_config::scope(nexgen::nexgen_config::NexgenConfig {
+        system_nexus: true,
+        ..Default::default()
+    });
     let root = project_root();
     let descriptors = descriptor_path(&root);
     let input = root.join(PRIMARY_EXAMPLE_PATH);

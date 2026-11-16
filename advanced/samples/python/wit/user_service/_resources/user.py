@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
-import dataclasses
 import typing
 
-from ..models import UpdateEmailRequest
+from ..models import (
+    NotifyRequest,
+    UpdateEmailRequest,
+)
+from .._resources._resource_data import UserData
 
 
-@dataclasses.dataclass
 class User:
     user_id: str
     email: str
+
+    def __init__(
+        self,
+        user_id: str,
+        email: str,
+    ) -> None:
+        self.user_id = user_id
+        self.email = email
 
     async def update_email(
         self,
@@ -25,13 +35,37 @@ class User:
         handle = await nexus_client.start_operation(
             operation="UpdateEmail",
             input=request,
-            output_type=User,
+            output_type=UserData,
         )
-        resource = await handle
+        result = await handle
+        resource = User(
+            user_id=result.user_id,
+            email=result.email,
+        )
         return bind_user_client(
             resource,
             nexus_client,
         )
+
+    async def notify(
+        self,
+        *,
+        reason: str | None = None,
+        channels: list[str],
+        sender: str,
+    ) -> None:
+        request = NotifyRequest(
+            user_id=self.user_id,
+            reason=reason,
+            channels=channels,
+            sender=sender,
+        )
+        nexus_client = getattr(self, "_nexus_client")
+        handle = await nexus_client.start_operation(
+            operation="Notify",
+            input=request,
+        )
+        await handle
 
 
 def bind_user_client(

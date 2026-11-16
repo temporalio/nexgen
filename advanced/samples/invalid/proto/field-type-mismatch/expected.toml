@@ -1,0 +1,8 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-type-override-field"
+contains = [
+  "type override for `temporal.api.activity.v1.ActivityOptions.retry_policy` has invalid field `type`: authored field type `option<string>` does not match proto field type `option<temporal.api.common.v1.RetryPolicy>`; use `@nexus.flattened-type` if only the flattened API should differ",
+]

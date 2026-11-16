@@ -84,7 +84,7 @@ branches, and **rejecting the unmergeable** — a pair with no single-schema
 representation. Everything else falls out of the normal pipeline.
 
 Grounding ([[PRINCIPLES.md]]): **P1** — a merged single schema round-trips
-identically across all four targets because there is no combinator left to
+identically across all five targets because there is no combinator left to
 represent per-language; **P6** — this is the coherent-representation bar the
 applicator rejection sets: intersection *can* be represented as one type, so it
 is admitted as a merge, whereas [[oneOf]]'s sibling applicators (`anyOf`
@@ -258,7 +258,7 @@ rejects every object carrying `b`. Because the generator
 **merges the property sets first**, `false` in any branch closes the merged
 object against the **union** of all branches' declared properties — the
 intuitive intent. This is a deliberate, documented divergence from raw allOf
-validation semantics; it is coherent under **P1** (all four targets generate
+validation semantics; it is coherent under **P1** (all five targets generate
 from the one flattened schema and agree value-for-value) and is the only
 behavior that lets base-type extension with a closed base work at all. If
 **any** branch is closed, the merged object is closed to the union; if all are
@@ -328,7 +328,7 @@ Naming follows the ordinary rule ([[properties]] §"Synthesized type names",
 reused verbatim by [[oneOf]]/[[const]]/[[enum]]):
 - an `allOf` that **is** a named `$defs` entry takes the def name;
 - an **anonymous** inline object merge is hoisted and named
-  `<EnclosingType><Property>` in all four targets;
+  `<EnclosingType><Property>` in all five targets;
 - an anonymous inline enum merge uses a named carrier in Go and Java, while
   TypeScript and Python inline the literal set.
 

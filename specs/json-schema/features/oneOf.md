@@ -10,7 +10,7 @@ against **exactly one** branch. Among the boolean-logic applicators, `oneOf` and
 whereas `oneOf` is *retained* as a closed sum type. [[anyOf]], [[not]],
 [[if-then-else]] stay **rejected** per **P6** (see [[dependentSchemas]] for the
 same rationale). `oneOf` earns its place because "exactly one" is a *sum type*,
-which lowers coherently to all four targets —
+which lowers coherently to all five targets —
 **but only when the branches carry a decidable selector**, so a deserializer can
 route a wire value to exactly one branch without trial-validating every
 subschema. Two selectors are supported, composed in layers: the
@@ -180,7 +180,7 @@ name) keeps it stable under type renaming.
   branches themselves.
 
 Grounding ([[PRINCIPLES.md]]): **P1** — a sum type with a decidable selector
-round-trips identically across all four targets; **P6** — the selector
+round-trips identically across all five targets; **P6** — the selector
 requirement is the strict-subset line that admits `oneOf` as a retained union
 while still excluding the non-collapsing applicators (`anyOf`/`not`/`if`);
 **P7 / P7.1** — a selector-less union (overlapping branches) would force
@@ -256,7 +256,7 @@ Two consequences worth stating:
 - **The naming is uniform across targets.** An anonymous union on a *property*
   stays inline in TS/Python (only Go/Java synthesize `<Enclosing><Property>`),
   but an element union is a `$defs` definition before any backend sees it, so
-  all four emit the same named type. That is the point: one hoist replaces four
+  all five emit the same named type. That is the point: one hoist replaces four
   element-position emitters.
 - **The nullability `oneOf` is not hoisted.** `items: {oneOf: [{T},{null}]}` has
   one non-null branch, so it is [[nullability]]'s degenerate pattern, not a sum
@@ -626,6 +626,60 @@ declaring class:
 public final class ShowcaseDetailObject implements Showcase.Detail { /* … */ }
 ```
 
+### C#
+
+C# has interfaces that a record can implement several of, so the union is a
+`public interface` — not a base record, since one model may be a member of
+several unions. Its nested `Converter` carries the dispatcher every position
+uses:
+
+```csharp
+[JsonConverter(typeof(Foo.Converter))]
+public interface Foo
+{
+    // Widget implements Foo (object branch — the record gains `: Foo`)
+    public sealed class FooString : Foo { public FooString(string value) { … } public string Value { get; } }
+    public sealed class FooArray : Foo { public FooArray(IReadOnlyList<double> value) { … } public IReadOnlyList<double> Value { get; } }
+
+    internal sealed class Converter : JsonConverter<Foo>
+    {
+        // Reads one JsonElement into a member, or records a Violation and returns null.
+        internal static Foo? Parse(JsonElement node, string path, List<Violation> violations) { … }
+        internal static void Validate(Foo value, string path, List<Violation> violations) { … }
+        internal static void WriteValue(Utf8JsonWriter writer, Foo value) { … }
+    }
+}
+```
+
+An object `$ref` branch is its existing record, which gains `: Foo`; a scalar or
+array branch is wrapped in a nested class holding a `Value`, and the free-form
+object branch in `<Union>Object` over the catch-all member type an open model
+uses ([[additionalProperties]]). Writing dispatches on the member's runtime
+type: a model through its own converter, a wrapper by writing its `Value`.
+
+A **property-level** union is the same interface nested in the declaring model
+as `<Member>Union` (`Showcase.DetailUnion`). The suffix is required: C# keeps a
+type's properties and nested types in one declaration space, so the interface
+cannot share the `Detail` property's name (CS0102; see **PRINCIPLES C# §2**). As
+in Java, its wrappers are declared beside the interface in the declaring model
+rather than inside it, so a call site names `Showcase.DetailUnionString` instead
+of repeating the interface name (`Showcase.DetailUnion.DetailUnionString`). The
+wrappers therefore share the model's member scope, and a member spelled like one
+is a P15 collision. Its structured branches are top-level records that name the
+interface through the declaring type:
+
+```csharp
+public sealed record Showcase
+{
+    public interface DetailUnion { /* Converter */ }
+    public sealed class DetailUnionString : DetailUnion { … }
+
+    public DetailUnion? Detail { get; init; }
+}
+
+public sealed record ShowcaseDetailObject : Showcase.DetailUnion { … }
+```
+
 ### Nullable unions
 
 A `null` branch adds no member type; it makes the union field nullable using
@@ -638,6 +692,7 @@ type rather than a scalar:
 | TypeScript | `Foo`               | `Foo \| null` (optional adds `?`)                   |
 | Python     | `Foo` (`TypeAlias`) | `Foo \| None`                                       |
 | Java       | `Foo`               | `@Nullable Foo`                                     |
+| C#         | `Foo`               | `Foo?`                                              |
 
 The presence/null state machine (required+nullable emits `null`, optional
 collapses in Go/Java/Python, faithful in TS) is exactly the [[nullability]]
@@ -710,13 +765,14 @@ not preserved (unlike a branch's own unknown *members*, which stay open per
 | TypeScript | `fromTransferType` is the `typeof`/`Array.isArray` chain shown above; for an object it switches on the discriminant literal (`raw.kind`) and delegates to that branch's converter (e.g. `catTransferTypeConverter.fromTransferType`); the fall-through pushes one `Violation`. Plain checks only (**PRINCIPLES TS §1** — no runtime schema lib).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Python     | The union's module-private `_<union>_from_transfer_type(value, path, violations)`, called by the declaring model's `_<Model>TransferTypeConverter` (**PRINCIPLES Python §3**), classifies the raw value with `isinstance` — `dict`→object, `list`→array, `str`→string, a non-`bool` `int`/`float`→the numeric branch via `_parse_spec_integer`/the spec-number rule so `1.5` still yields a `Violation`, `bool`→boolean, `None`→null. For an object token with 2+ object branches it reads the discriminator key out of the raw dict and delegates to that branch's converter, re-pathing its `PayloadValidationError` application failure under the current path with `_collect`. No decidable branch / unknown discriminator value → a `Violation` appended and `None` returned, so sibling members are still checked and the model's converter raises the one `PayloadValidationError` application failure (**PRINCIPLES Python §2**). |
 | Java       | The union interface's static `fromNode` (called by the enclosing POJO's collecting deserializer, **PRINCIPLES Java §5**) switches on the `JsonNode` kind (`isObject`/`isArray`/`isTextual`/`isNumber`/`isBoolean`); for an object with 2+ object branches it peeks the discriminator node and dispatches to the matching POJO's collecting deserializer. On no match / unknown discriminator it pushes a `Violation` into the single `PayloadValidationError` application failure and returns `null`. One dispatcher serves both positions: a named union def and a union written inline on a property.                                                                                                                                                                                                                                                                                                                                   |
+| C#         | The union's `Converter.Parse` (called by the declaring model's converter with the member's path, **PRINCIPLES C# §4**) switches on `JsonElement.ValueKind`; for an object with 2+ object branches it reads the discriminator and dispatches to the matching model's `Converter.Parse`. On no match / unknown discriminator it records a `Violation` in the single `PayloadValidationError` application failure and returns `null`. One dispatcher serves both positions: a named union and a union written inline on a property.                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Reason strings name **what was expected**, never a bare `oneOf`, per the
 informative-reason convention the constraint families use: no decidable branch →
 `expected one of: <labels>` over the admissible kinds / branch types; an object
 whose discriminator value matches no branch →
 `unknown discriminator <field> <value>: expected one of [...]` over the
-admissible tag values. Both strings are identical in all four targets.
+admissible tag values. Both strings are identical in all five targets.
 
 ### Branch constraints
 
@@ -738,6 +794,7 @@ bounds and `multipleOf`, `minItems`/`maxItems`/ `uniqueItems`/`contains`, a
 | TypeScript | the narrowing chain itself: each `typeof`/`Array.isArray` arm runs the branch's checks over the narrowed value, in `fromTransferType` and again on the serialize side (a named union in its own converter's `toTransferType`, an inline one in the declaring model's, so a branch violation aggregates with its siblings).                                                                                                                                                                                                  |
 | Python     | the classification arm itself, exactly as in TypeScript: each `isinstance` arm runs the branch's checks over the classified value — the numeric bounds, length bounds, `multipleOf`, and the `pattern`/`format` regex match all inline; only `uniqueItems` and `contains` go through a runtime helper (`_check_unique_items` / `_check_contains`) — in `_<union>_from_transfer_type` and again in `_<union>_to_transfer_type`, so a branch violation aggregates with its siblings. Selecting the branch *is* validating it. |
 | Java       | a package-private `validate(path, violations)` on the wrapper class, with its compiled `pattern`/`format` `Pattern` statics. `fromNode` calls it on the wrapper it just built; the interface's static `validate` dispatches on the member's runtime class and is called by the declaring POJO's `Serializer` (and per element/member for a collection of unions) before any wire member is written.                                                                                                                         |
+| C#         | an internal `Validate(path, violations)` on the wrapper class, with its compiled `Regex` statics. The union's `Converter.Parse` calls it on the wrapper it just built; the union's `Converter.Validate` dispatches on the member's runtime type (a model branch through that model's `Validate`) and runs before any wire member is written.                                                                                                                                                                                |
 
 A **closed value set** (`const`/`enum`) on a branch closes the *type* where the
 target can express that — a TypeScript literal union
@@ -745,7 +802,7 @@ target can express that — a TypeScript literal union
 check in the validator in Go and Java, which have no field to hang a defined
 type or value class off (the same treatment a typed map's member gets,
 [[additionalProperties]] §"Per-member `T` validation"). The accepted value set
-is identical in all four.
+is identical in all five.
 
 ### Serialize-side (P12)
 

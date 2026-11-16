@@ -1,0 +1,11 @@
+package test:getter-collision;
+
+world system { export api; }
+
+interface api {
+  record request {
+    id: string,
+    get-id: string,
+  }
+  read: func(request: request) -> request;
+}

@@ -38,4 +38,18 @@ public final class User {
             .setEmail(email)
             .build());
   }
+
+  public void notify(
+      @com.fasterxml.jackson.annotation.JsonProperty("reason") String reason,
+      @com.fasterxml.jackson.annotation.JsonProperty("channels") java.util.List<String> channels,
+      @com.fasterxml.jackson.annotation.JsonProperty("sender") String sender) {
+    UserServiceOperations.executeNotify(
+        endpoint,
+        wit.userservice.NotifyRequest.newBuilder()
+            .setUserId(this.userId)
+            .setReason(reason)
+            .setChannels(channels)
+            .setSender(sender)
+            .build());
+  }
 }

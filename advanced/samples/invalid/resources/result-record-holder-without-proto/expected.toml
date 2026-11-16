@@ -1,0 +1,8 @@
+descriptors = "temporal"
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource"
+contains = [
+  "resource `Api.WorkflowRun` is invalid: result record `StartRunResult` of operation `StartRun` holds a resource, so it needs `@nexus.proto`",
+]

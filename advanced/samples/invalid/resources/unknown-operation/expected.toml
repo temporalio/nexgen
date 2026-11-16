@@ -1,0 +1,7 @@
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "resource method `UserService.User.update-email` is invalid: bound operation `UpdatesEmail` was not found",
+]

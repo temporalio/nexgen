@@ -1,0 +1,29 @@
+package temporal:nexus@1.0.0;
+
+world system { export workflow-service; }
+
+/// @nexus.endpoint "__temporal_system"
+interface workflow-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder, retry-policy, task-queue};
+
+  /// @nexus.proto "temporal.api.activity.v1.ActivityOptions"
+  record request {
+    task-queue: option<task-queue>,
+    /// @nexus.proto-field "retry_policy"
+    retry-policy: option<string>,
+    /// @nexus.omit
+    schedule-to-close-timeout: placeholder,
+    /// @nexus.omit
+    schedule-to-start-timeout: placeholder,
+    /// @nexus.omit
+    start-to-close-timeout: placeholder,
+    /// @nexus.omit
+    heartbeat-timeout: placeholder,
+    /// @nexus.omit
+    priority: placeholder,
+    /// @nexus.omit
+    start-delay: placeholder,
+  }
+
+  run: func(request: request) -> request;
+}

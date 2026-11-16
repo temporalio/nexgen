@@ -2,25 +2,41 @@
 
 from __future__ import annotations
 
-import dataclasses
 import temporalio.workflow
 
 from ..models import (
     DeactivateRequest,
     RenameRequest,
     UpdateEmailRequest,
+    UpdateLabelsRequest,
     UserProfile,
     UserStatus,
 )
+from .._resources._resource_data import UserData
 
 
-@dataclasses.dataclass
 class User:
+    """Python user."""
+
     user_id: str
     email: str
     display_name: str
     status: UserStatus
     profile: UserProfile
+
+    def __init__(
+        self,
+        user_id: str,
+        email: str,
+        display_name: str,
+        status: UserStatus,
+        profile: UserProfile,
+    ) -> None:
+        self.user_id = user_id
+        self.email = email
+        self.display_name = display_name
+        self.status = status
+        self.profile = profile
 
     async def update_email(
         self,
@@ -36,6 +52,7 @@ class User:
         self,
         display_name: str,
     ) -> User:
+        """Python rename."""
         request = RenameRequest(
             user_id=self.user_id,
             display_name=display_name,
@@ -53,6 +70,23 @@ class User:
         handle = await _deactivate(request)
         await handle
 
+    async def update_labels(
+        self,
+        tags: list[str],
+        metadata: dict[str, str],
+        extra_tags: list[str] | None = None,
+        extra_metadata: dict[str, str] | None = None,
+    ) -> None:
+        request = UpdateLabelsRequest(
+            user_id=self.user_id,
+            tags=tags,
+            metadata=metadata,
+            extra_tags=extra_tags,
+            extra_metadata=extra_metadata,
+        )
+        handle = await _update_labels(request)
+        await handle
+
 
 async def _update_email(
     request: UpdateEmailRequest,
@@ -64,9 +98,17 @@ async def _update_email(
     handle = await nexus_client.start_operation(
         operation="UpdateEmail",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def update_email(
@@ -91,9 +133,17 @@ async def _rename(
     handle = await nexus_client.start_operation(
         operation="Rename",
         input=request,
-        output_type=User,
+        output_type=UserData,
     )
-    return await handle
+    result = await handle
+    resource = User(
+        user_id=result.user_id,
+        email=result.email,
+        display_name=result.display_name,
+        status=result.status,
+        profile=result.profile,
+    )
+    return resource
 
 
 async def rename(
@@ -131,3 +181,34 @@ async def deactivate(
         reason=reason,
     )
     return await _deactivate(request)
+
+
+async def _update_labels(
+    request: UpdateLabelsRequest,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="TypeShowcase",
+        endpoint="type-showcase",
+    )
+    return await nexus_client.start_operation(
+        operation="UpdateLabels",
+        input=request,
+    )
+
+
+async def update_labels(
+    *,
+    user_id: str,
+    tags: list[str],
+    metadata: dict[str, str],
+    extra_tags: list[str] | None = None,
+    extra_metadata: dict[str, str] | None = None,
+) -> temporalio.workflow.NexusOperationHandle[None,]:
+    request = UpdateLabelsRequest(
+        user_id=user_id,
+        tags=tags,
+        metadata=metadata,
+        extra_tags=extra_tags,
+        extra_metadata=extra_metadata,
+    )
+    return await _update_labels(request)

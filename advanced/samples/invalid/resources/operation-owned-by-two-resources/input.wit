@@ -1,0 +1,23 @@
+package test:duplicate-resource-owner;
+
+world system { export user-service; }
+
+/// @nexus.endpoint "users"
+interface user-service {
+  resource active-user {
+    constructor(user-id: string);
+    update-name: func(name: string);
+  }
+
+  resource archived-user {
+    constructor(user-id: string);
+    update-name: func(name: string);
+  }
+
+  record update-name-request {
+    user-id: string,
+    name: string,
+  }
+
+  update-name: func(request: update-name-request);
+}

@@ -33,6 +33,8 @@ namespace Nexgen.GenericModelService
         public IReadOnlyList<TContext> Contexts { get; set; }
         public IReadOnlyDictionary<string, TContext> ByName { get; set; }
         public Inner<TContext> Nested { get; set; }
+        public GetterProbe<TContext>? Probe { get; set; }
+        public ContextRef<TContext>? Reference { get; set; }
     }
 
     /// <summary>
@@ -56,7 +58,11 @@ namespace Nexgen.GenericModelService
         [GeneratedCode("nexgen", null)]
         public static Task<GenericResponse<TContext, object, object>> CompleteAsync<TContext>(CompleteOptions<TContext> options)
         {
-            var request = new GenericRequest<TContext>(options.Context, options.Contexts, options.ByName, options.Nested);
+            var request = new GenericRequest<TContext>(options.Context, options.Contexts, options.ByName, options.Nested)
+            {
+                Probe = options.Probe,
+                Reference = options.Reference,
+            };
             return CompleteAsync(request);
         }
 

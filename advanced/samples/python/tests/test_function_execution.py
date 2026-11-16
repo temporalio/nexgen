@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import typing
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 import wit.function_execution as function_execution
+from wit.function_execution.models import ExecuteCallbackRequest, ExecuteFunctionResult
 
 
 def valid_function(name: str, enabled: bool) -> str:
@@ -27,6 +30,30 @@ def wrong_count_function(name: str, count: str) -> str:
 
 def one_arg_function(name: str) -> str:
     return name
+
+
+@pytest.mark.asyncio
+async def test_secondary_fixed_argument_callable_builds_request() -> None:
+    handle = object()
+    start_operation = AsyncMock(return_value=handle)
+    client = Mock(start_operation=start_operation)
+    with patch("temporalio.workflow.create_nexus_client", return_value=client):
+        result = await function_execution.execute_callback(
+            function=valid_function,
+            name="one",
+            enabled=True,
+        )
+
+    assert result is handle
+    start_operation.assert_awaited_once_with(
+        operation="ExecuteCallback",
+        input=ExecuteCallbackRequest(
+            function=valid_function,
+            name="one",
+            enabled=True,
+        ),
+        output_type=ExecuteFunctionResult,
+    )
 
 
 if typing.TYPE_CHECKING:

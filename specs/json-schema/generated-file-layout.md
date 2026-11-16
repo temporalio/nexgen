@@ -79,12 +79,13 @@ per class.
 
 Per input file `<subpath>/<name>`:
 
-| Language       | Per-input module                                                                                                                                            | Shared runtime (once)                                                                                                        | Recursive module               | Aggregator                                                                                                |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| **Python**     | `<subpath>/<name>/models.py` (+ `services.py` if it declares services)                                                                                      | `_definitions.py` (package root)                                                                                             | `_recursive.py` (package root) | `__init__.py` per directory — the per-input directory, every intermediate directory, and the package root |
-| **TypeScript** | `<subpath>/<name>/models.ts` (+ `services.ts`)                                                                                                              | `definitions.ts` (package root)                                                                                              | —                              | `index.ts` per directory (barrels chain upward)                                                           |
-| **Go**         | `<module>.go` in the one flat package (`<module>` = flattened path)                                                                                         | `definitions.go` (same package)                                                                                              | —                              | — (capitalized = exported)                                                                                |
-| **Java**       | one `<ClassName>.java` per exported class plus `package-info.java` in each package containing generated classes, in a package mirroring `<subpath>/<name>/` | each runtime class its own file in the root package (`Violation.java`, `SpecNumbers.java`, …), plus root `package-info.java` | —                              | — (`public` = exported)                                                                                   |
+| Language       | Per-input module                                                                                                                                            | Shared runtime (once)                                                                                                                                                                 | Recursive module               | Aggregator                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Python**     | `<subpath>/<name>/models.py` (+ `services.py` if it declares services)                                                                                      | `_definitions.py` (package root)                                                                                                                                                      | `_recursive.py` (package root) | `__init__.py` per directory — the per-input directory, every intermediate directory, and the package root |
+| **TypeScript** | `<subpath>/<name>/models.ts` (+ `services.ts`)                                                                                                              | `definitions.ts` (package root)                                                                                                                                                       | —                              | `index.ts` per directory (barrels chain upward)                                                           |
+| **Go**         | `<module>.go` in the one flat package (`<module>` = flattened path)                                                                                         | `definitions.go` (same package)                                                                                                                                                       | —                              | — (capitalized = exported)                                                                                |
+| **Java**       | one `<ClassName>.java` per exported class plus `package-info.java` in each package containing generated classes, in a package mirroring `<subpath>/<name>/` | each runtime class its own file in the root package (`Violation.java`, `SpecNumbers.java`, …), plus root `package-info.java`                                                          | —                              | — (`public` = exported)                                                                                   |
+| **C#**         | `<subpath>/<name>/Models.cs` (+ `Services.cs`), in a namespace mirroring `<subpath>/<name>/` below the root namespace                                       | each runtime type its own file at the output root, in the root namespace (`Violation.cs`, `SpecJson.cs`, `ValueEquality.cs`, and when used `TemporalSupport.cs` / `Base64Support.cs`) | —                              | — (`public` = exported)                                                                                   |
 
 **A module emits only the types its own input file declares.** A type reached by
 `$ref` into another file belongs to the module that declares it, and is imported
@@ -112,6 +113,7 @@ All output lands at the package root (no per-input subdirectory, no
 | **TypeScript** | `models.ts` (+ `services.ts`), `definitions.ts`, `index.ts`                                                                                                  |
 | **Go**         | one `<package>.go` (types and services) + the shared `definitions.go`                                                                                        |
 | **Java**       | one `.java` per public class + the runtime classes and root `package-info.java`; nothing to aggregate                                                        |
+| **C#**         | `Models.cs` (+ `Services.cs`) and the runtime type files, all in the root namespace; nothing to aggregate                                                    |
 
 Java reserves the runtime class identifiers `Violation`, `SpecNumbers`,
 `TemporalSupport`, and `Base64Support` in every module scope. The temporal and
@@ -130,6 +132,10 @@ Its final dot-separated segment must match the output directory name. A
 `package-info.java` carrying `@NullMarked` is emitted for each package that
 contains generated classes; class-less intermediate directories are not Java
 packages and receive no file.
+
+For C#, in both layouts, the root namespace is the required `--namespace`, as
+Java requires `--package-name`. C# does not tie namespaces to directories, so it
+has no output-directory rule.
 
 ## The shared `definitions` file
 
@@ -256,7 +262,7 @@ such a keyword today, and there is no per-module escape hatch at all
   type — service `ChatService` against a `$defs/ChatService`; see [[services]],
   which shares this one namespace.
 
-**Python / TypeScript / Java / .NET** — nesting keeps distinct input files in
+**Python / TypeScript / Java / C#** — nesting keeps distinct input files in
 distinct modules, so files no longer contend for one flat *module* name. What
 remains is a small set of **reserved generated names** per scope; an input file
 or directory that maps onto one → **load reject** naming that input and a rename
@@ -284,17 +290,18 @@ is reserved in every target — the union across languages — so an input named
 of them rejects regardless of which target is being generated. The rationale is
 specific to **module names**, and does not generalize to identifiers. A module
 name comes from the input file's path, not from any target's recasing, and one
-input set has to yield a coherent layout in all four targets, so the reservation
+input set has to yield a coherent layout in all five targets, so the reservation
 is settled once over the union. Identifier validity is the opposite case and
 legitimately does vary per target ([[properties]]): a member name may reject for
-one target and load for the other three. What may never vary per target is the
+one target and load for the other four. What may never vary per target is the
 accepted and rejected **wire** value set.
 
 Two further module-level load rejects belong to this namespace:
 
 - a module segment that is not a valid identifier, or that is a
-  **reserved word in any of the four targets** (`class.json`, `2fa.json`) —
-  target-independent for the same reason;
+  **reserved word in any of the four targets that emit module names verbatim**
+  (`class.json`, `2fa.json`; C# PascalCases them into namespace segments, and no
+  C# keyword is PascalCase) — target-independent for the same reason;
 - an input file whose module path conflicts with a **directory** of the same
   path (`foo.yaml` beside `foo/bar.yaml`), which is why a per-input directory
   never has children — and therefore why `models` / `services` can only ever
@@ -321,8 +328,8 @@ namespace, because two of them re-aggregate:
   the scope run-wide; which names enter it — declared, imported or synthesized —
   is **P15**'s, and a name synthesized beside a type has no narrower scope than
   the type itself.
-- **Java and .NET** give each module its own sub-package/namespace
-  (`com.example.api.content.page`, `Nexgen.Generated.Content.Page`) and emit no
+- **Java and C#** give each module its own sub-package/namespace
+  (`com.example.api.content.page`, `Example.Api.Content.Page`) and emit no
   aggregating barrel, so two input files may each declare a `Page` and stay
   unambiguous. Their scope really is the module.
 

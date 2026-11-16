@@ -29,6 +29,7 @@ describe("user-service generated output", () => {
           calls.push(["UpdateEmail", input]);
           return new User(input.userId, input.email);
         },
+        async notify() {},
       });
 
       const result = await executeWorkflowWithNexus<{

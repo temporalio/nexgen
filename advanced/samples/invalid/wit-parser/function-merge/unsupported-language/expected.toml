@@ -1,0 +1,5 @@
+languages = ["java"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["argument `python` requests python, but `@nexus.merge-from-function` supports only java"]

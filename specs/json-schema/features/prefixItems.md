@@ -33,7 +33,7 @@ Distilled:
 
 **Support:** no — **rejected at load time (P6).**
 
-A positional tuple has no coherent lowering across the four targets:
+A positional tuple has no coherent lowering across the five targets:
 - **P6 (strict subset)**: Go and Java have **no tuple type**; the only
   representations are a heterogeneous `[]any` / `Object[]` (forfeiting the
   typing the subset exists to provide) or a generated positional struct (a shape

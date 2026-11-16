@@ -9,11 +9,11 @@ from temporalio.api.common.v1 import Payload
 import temporalio.common
 from temporalio.converter import DataConverter
 
-from wit.type_roundtrip.models import ActivityOptions
+from wit.proto_backed_showcase.models import ActivityOptions
 
 
 WIRE_FIXTURE_DIR = (
-    Path(__file__).resolve().parents[2] / "wire" / "proto" / "type_roundtrip"
+    Path(__file__).resolve().parents[2] / "wire" / "proto" / "proto_backed_showcase"
 )
 
 

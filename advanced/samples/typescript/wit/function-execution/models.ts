@@ -3,17 +3,6 @@
 import type { temporal } from "@temporalio/proto";
 import * as support from "../../support/temporal_model_converters";
 
-export function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 function requestArgsFromPayloads(
   payloads: temporal.api.common.v1.IPayloads | null | undefined,
 ): unknown[] | undefined {
@@ -38,6 +27,23 @@ export interface ExecuteFunctionResult {
 }
 
 export interface ExecuteFunctionRequest<
+  FunctionFn extends (name: string, enabled: boolean) => string = (
+    name: string,
+    enabled: boolean,
+  ) => string,
+> {
+  function_: FunctionFn;
+  /**
+   * The name argument for the function.
+   */
+  name: string;
+  /**
+   * The enabled argument for the function.
+   */
+  enabled: boolean;
+}
+
+export interface ExecuteCallbackRequest<
   FunctionFn extends (name: string, enabled: boolean) => string = (
     name: string,
     enabled: boolean,
@@ -175,4 +181,113 @@ export type ExecuteNamedVarargsFunctionRequest<
            */
           args?: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
         }))
+>;
+
+export type ReplaceExecuteDescriptorsRequest<Base, New> = Omit<
+  Base,
+  | "args"
+  | "callable"
+  | "callableValues"
+  | "callback"
+  | "callbackValues"
+  | "durationValues"
+  | "durations"
+  | "function_"
+> &
+  New;
+
+export type ExecuteDescriptorsRequest<
+  FunctionFn extends (...args: any[]) => string = (...args: any[]) => string,
+  CallableFn extends (...args: any[]) => string = (...args: any[]) => string,
+  CallbackFn extends (...args: any[]) => string = (...args: any[]) => string,
+  DurationsFn extends (...args: any[]) => string = (...args: any[]) => string,
+> = ReplaceExecuteDescriptorsRequest<
+  {
+    function_: string | FunctionFn;
+    /**
+     * Arguments for function_.
+     */
+    args?: ReadonlyArray<unknown> | Readonly<Parameters<FunctionFn>>;
+    durations: DurationsFn;
+    /**
+     * Arguments for durations.
+     */
+    durationValues?: ReadonlyArray<unknown> | Readonly<Parameters<DurationsFn>>;
+    callback: CallbackFn;
+    /**
+     * Arguments for callback.
+     */
+    callbackValues?: ReadonlyArray<unknown> | Readonly<Parameters<CallbackFn>>;
+    callable: CallableFn;
+    /**
+     * Arguments for callable.
+     */
+    callableValues?: ReadonlyArray<unknown> | Readonly<Parameters<CallableFn>>;
+  },
+  (
+    | {
+        function_: string;
+        /**
+         * Arguments for function_.
+         */
+        args?: ReadonlyArray<unknown>;
+      }
+    | ({
+        function_: FunctionFn;
+      } & (Parameters<FunctionFn> extends [any, ...any[]]
+        ? {
+            /**
+             * Arguments for function_.
+             */
+            args: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+          }
+        : {
+            /**
+             * Arguments for function_.
+             */
+            args?: Parameters<FunctionFn> | Readonly<Parameters<FunctionFn>>;
+          }))
+  ) & {
+    callable: CallableFn;
+  } & (Parameters<CallableFn> extends [any, ...any[]]
+      ? {
+          /**
+           * Arguments for callable.
+           */
+          callableValues: Parameters<CallableFn> | Readonly<Parameters<CallableFn>>;
+        }
+      : {
+          /**
+           * Arguments for callable.
+           */
+          callableValues?: Parameters<CallableFn> | Readonly<Parameters<CallableFn>>;
+        }) & {
+      callback: CallbackFn;
+    } & (Parameters<CallbackFn> extends [any, ...any[]]
+      ? {
+          /**
+           * Arguments for callback.
+           */
+          callbackValues: Parameters<CallbackFn> | Readonly<Parameters<CallbackFn>>;
+        }
+      : {
+          /**
+           * Arguments for callback.
+           */
+          callbackValues?: Parameters<CallbackFn> | Readonly<Parameters<CallbackFn>>;
+        }) & {
+      durations: DurationsFn;
+    } & (Parameters<DurationsFn> extends [any, ...any[]]
+      ? {
+          /**
+           * Arguments for durations.
+           */
+          durationValues: Parameters<DurationsFn> | Readonly<Parameters<DurationsFn>>;
+        }
+      : {
+          /**
+           * Arguments for durations.
+           */
+          durationValues?: Parameters<DurationsFn> | Readonly<Parameters<DurationsFn>>;
+        })
 >;

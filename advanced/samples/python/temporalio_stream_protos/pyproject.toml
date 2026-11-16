@@ -1,0 +1,30 @@
+# The Python modules of the Stream protos of temporalio/api#895, at the paths where temporalio
+# will have them. Drop this package once a temporalio release has them.
+#
+# Python and basedpyright find these modules only inside the installed temporalio package,
+# since temporalio is a regular package. So they can't be files of the sample project. A local
+# temporalio/ directory hides the installed package, or Python skips it.
+[project]
+name = "temporalio-stream-protos"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+# uv installs a path dependency from a wheel that it builds, so the package needs a backend.
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+# temporalio/ here has no __init__.py, so the wheel adds the Stream modules to the installed
+# temporalio and replaces none of its files.
+[tool.uv.build-backend]
+module-name = "temporalio"
+module-root = ""
+namespace = true
+
+# A change to a module rebuilds the wheel, not only a change to this file.
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "temporalio/**/*.py" },
+    { file = "temporalio/**/*.pyi" },
+]

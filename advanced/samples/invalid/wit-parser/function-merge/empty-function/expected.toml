@@ -1,0 +1,5 @@
+languages = ["java"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["requires `function` naming a callable field"]

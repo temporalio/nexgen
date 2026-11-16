@@ -1,0 +1,8 @@
+descriptors = "temporal"
+
+[error]
+kind = "mixed-record-backing"
+contains = [
+  """JSON-backed record `models.wrapper` field `values[].value[1]` contains protobuf-backed record \
+     `models.timestamp`; nested records must use the same backing""",
+]

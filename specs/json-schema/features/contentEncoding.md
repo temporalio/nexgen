@@ -120,20 +120,21 @@ The encoded string is materialized to the language-native **bytes** type; the
 wire stays a JSON string. Both encodings share the type and differ only in the
 canonical wire form.
 
-| Go       | Java     | Python  | TS           | Canonical wire (identical in all targets)                                                                                          |
-| -------- | -------- | ------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `[]byte` | `byte[]` | `bytes` | `Uint8Array` | `base64`: padded standard alphabet (RFC 4648 §4); `base64url`: unpadded URL-safe alphabet (RFC 4648 §5); no line breaks either way |
+| Go       | Java     | Python  | TS           | C#       | Canonical wire (identical in all targets)                                                                                          |
+| -------- | -------- | ------- | ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `[]byte` | `byte[]` | `bytes` | `Uint8Array` | `byte[]` | `base64`: padded standard alphabet (RFC 4648 §4); `base64url`: unpadded URL-safe alphabet (RFC 4648 §5); no line breaks either way |
 
-The four adapters call the stdlib codec **explicitly** (we own the adapters; we
+The five adapters call the stdlib codec **explicitly** (we own the adapters; we
 do not rely on any native `[]byte`/`byte[]` default binding), choosing the
 standard or URL-safe variant per the declared `contentEncoding`:
 
-| Language | `base64` codec                                     | `base64url` codec                                                                                           |
-| -------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Go       | `base64.StdEncoding`                               | `base64.RawURLEncoding`                                                                                     |
-| Java     | `Base64.getDecoder()` / `Base64.getEncoder()`      | `Base64.getUrlDecoder()` / `Base64.getUrlEncoder().withoutPadding()`                                        |
-| Python   | `base64.b64decode(s, validate=True)` / `b64encode` | `urlsafe_b64decode(s + pad)` / `urlsafe_b64encode(b).rstrip(b"=")`                                          |
-| TS       | generator-owned `b64ToBytes(s)` / `bytesToB64(v)`  | generator-owned `b64urlToBytes(s)` / `bytesToB64url(v)` — same pure-JS codec, URL-safe alphabet, no padding |
+| Language | `base64` codec                                        | `base64url` codec                                                                                           |
+| -------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Go       | `base64.StdEncoding`                                  | `base64.RawURLEncoding`                                                                                     |
+| Java     | `Base64.getDecoder()` / `Base64.getEncoder()`         | `Base64.getUrlDecoder()` / `Base64.getUrlEncoder().withoutPadding()`                                        |
+| C#       | `Convert.FromBase64String` / `Convert.ToBase64String` | the same after mapping `-`/`_` to `+`/`/` and restoring padding; encoding trims the padding                 |
+| Python   | `base64.b64decode(s, validate=True)` / `b64encode`    | `urlsafe_b64decode(s + pad)` / `urlsafe_b64encode(b).rstrip(b"=")`                                          |
+| TS       | generator-owned `b64ToBytes(s)` / `bytesToB64(v)`     | generator-owned `b64urlToBytes(s)` / `bytesToB64url(v)` — same pure-JS codec, URL-safe alphabet, no padding |
 
 - **TS** — field `Uint8Array` (the idiomatic binary type in both the browser and
   Node). No native bytes-in-JSON, so the codec is a
@@ -186,6 +187,7 @@ could decode to the same bytes and re-encode differently.
 | TypeScript | `fromTransferType`: pinned regex (`/…/u`) — **essential**, since the pure-JS decoder assumes canonical input and won't itself reject malformed text — then the generator-owned decoder → `Uint8Array`. `toTransferType`: the generator-owned encoder. Lookup table + arithmetic; **no `Buffer`/`atob`**, so it runs in the browser.                                                                                                                   |
 | Python     | `_parse_base64(v, path, violations)` / `_parse_base64url(...)`, called from the converter: regex over the wire string, then `b64decode(s, validate=True)` (`base64`) or `urlsafe_b64decode(s + pad)` (`base64url`) → `bytes`; on failure they append a `Violation` and return `None` so the rest of the object still validates. Serialize: `_format_base64` / `_format_base64url` emit `b64encode(b)` / `urlsafe_b64encode(b).rstrip(b"=")` as ASCII. |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5): regex over the `String`, then `Base64.getDecoder()` / `getUrlDecoder()` `.decode(s)` → `byte[]`, pushing a `Violation` on failure. The `Serializer` emits with `getEncoder()` / `getUrlEncoder().withoutPadding()`.                                                                                                                                                                        |
+| C#         | `Converter.Parse`: the pinned regex over the `string`, then `Base64Support.ParseBase64` / `ParseBase64Url` decodes to `byte[]`, recording a `Violation` on failure. `WriteValue` emits `Base64Support.FormatBase64` / `FormatBase64Url`.                                                                                                                                                                                                              |
 
 **Informative `reason` strings.** The `Violation` `reason` names the encoding
 and the offending value (`must be base64url-encoded, got "…"`), per the

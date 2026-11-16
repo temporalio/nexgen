@@ -70,6 +70,7 @@ comparison changed to `≥` as the failing test (`v ≥ exclusiveMaximum` → a
 | TypeScript | ``if (v >= exclMax) push(Violation{path, reason: `must be < ${exclMax}, got ${v}`})``.                                                                                                                                                                                            |
 | Python     | `if v >= exclMax: violations.append(Violation(path=…, reason=f"must be < {exclMax}, got {v}"))` in the transfer type converter, after `_parse_spec_integer` normalizes an integer field's wire value (see [[type]]).                                                              |
 | Java       | Collecting deserializer (PRINCIPLES Java §5) checks `v >= exclMax` via the [[type]] `SpecNumbers` helper, pushing a `Violation{path, "must be < " + exclMax + ", got " + v}` into the `PayloadValidationError` application failure.                                               |
+| C#         | `Converter.Parse` reads the value via `SpecJson.SpecLong`/`SpecDouble` and checks `v >= exclMax`, recording `Violation{path, "must be < " + exclMax + ", got " + v}` into the `PayloadValidationError` application failure; `Validate` repeats the check before writing.          |
 
 Reason strings name the bound and offending value (`must be < 10, got 10`), per
 the [[maximum]] convention. Integer-field-vs-float-bound exactness and the

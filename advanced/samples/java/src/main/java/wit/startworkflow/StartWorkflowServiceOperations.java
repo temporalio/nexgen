@@ -14,6 +14,7 @@ public final class StartWorkflowServiceOperations {
     requestBuilder.setTaskQueue(options.getTaskQueue());
     if (options.getWorkflowStartDelay() != null)
       requestBuilder.setWorkflowStartDelay(options.getWorkflowStartDelay());
+    requestBuilder.setNamespace(support.TemporalModelConverters.workflowNamespace());
     wit.startworkflow.StartWorkflowRequest request = requestBuilder.build();
     return executeStartWorkflow(request);
   }
@@ -43,6 +44,7 @@ public final class StartWorkflowServiceOperations {
     requestBuilder.setTaskQueue(options.getTaskQueue());
     if (options.getWorkflowStartDelay() != null)
       requestBuilder.setWorkflowStartDelay(options.getWorkflowStartDelay());
+    requestBuilder.setNamespace(support.TemporalModelConverters.workflowNamespace());
     wit.startworkflow.StartWorkflowRequest request = requestBuilder.build();
     return executeRestartWorkflow(request);
   }
@@ -70,6 +72,7 @@ public final class StartWorkflowServiceOperations {
         wit.startworkflow.CancelWorkflowRequest.newBuilder();
     requestBuilder.setWorkflowExecution(options.getWorkflowExecution());
     if (options.getReason() != null) requestBuilder.setReason(options.getReason());
+    requestBuilder.setNamespace(support.TemporalModelConverters.workflowNamespace());
     wit.startworkflow.CancelWorkflowRequest request = requestBuilder.build();
     return executeCancelWorkflow(request);
   }
@@ -89,5 +92,32 @@ public final class StartWorkflowServiceOperations {
                     wit.startworkflow.CancelWorkflowResponse.class,
                     request);
     return result;
+  }
+
+  public static SignalResult signalWithStart(wit.startworkflow.SignalWithStartOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.startworkflow.CancelWorkflowRequest.Builder requestBuilder =
+        wit.startworkflow.CancelWorkflowRequest.newBuilder();
+    requestBuilder.setWorkflowExecution(options.getWorkflowExecution());
+    if (options.getReason() != null) requestBuilder.setReason(options.getReason());
+    requestBuilder.setNamespace(support.TemporalModelConverters.workflowNamespace());
+    wit.startworkflow.CancelWorkflowRequest request = requestBuilder.build();
+    return executeSignalWithStart(request);
+  }
+
+  static SignalResult executeSignalWithStart(wit.startworkflow.CancelWorkflowRequest request) {
+    wit.startworkflow.SignalResultResponse result =
+        (wit.startworkflow.SignalResultResponse)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "StartWorkflowService",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("temporal-system")
+                        .build())
+                .execute(
+                    "SignalWithStart",
+                    wit.startworkflow.SignalResultResponse.class,
+                    wit.startworkflow.SignalResultResponse.class,
+                    request);
+    return new SignalResult(request.getNamespace(), result.getStarted());
   }
 }

@@ -1,0 +1,25 @@
+package temporal:nexus@1.0.0;
+
+world system { export proto-oneof; }
+
+interface proto-oneof {
+  use nexus:temporal-types/model@1.0.0.{failure, placeholder};
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.proto "temporal.api.update.v1.Outcome.value"
+  variant outcome-value {
+    success(output-t),
+    failure(failure),
+  }
+
+  /// @nexus.proto "temporal.api.update.v1.Outcome"
+  record outcome {
+    value: outcome-value,
+  }
+
+  record outcome-value-success {
+    value: string,
+  }
+}

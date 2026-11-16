@@ -29,6 +29,29 @@ func (m updateEmailRequest) GetEmail() string {
 	return m.Email
 }
 
+type notifyRequest struct {
+	UserID   string
+	Reason   *string
+	Channels []string
+	Sender   string
+}
+
+func (m notifyRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m notifyRequest) GetReason() *string {
+	return m.Reason
+}
+
+func (m notifyRequest) GetChannels() []string {
+	return m.Channels
+}
+
+func (m notifyRequest) GetSender() string {
+	return m.Sender
+}
+
 // --- Resources ---
 
 type User struct {
@@ -46,46 +69,84 @@ func NewUser(userID string, email string) *User {
 }
 
 func (u *User) UpdateEmail(ctx workflow.Context, email string) workflow.Future {
-	return updateEmail(ctx, updateEmailRequest{UserID: u.UserID, Email: email})
-}
-
-// --- Operations (internal) ---
-
-func getUser(ctx workflow.Context, request getUserRequest) workflow.Future {
-	c := workflow.NewNexusClient("user-service", "UserService")
-	fut := c.ExecuteOperation(ctx, "GetUser", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func updateEmail(ctx workflow.Context, request updateEmailRequest) workflow.Future {
+	request := updateEmailRequest{UserID: u.UserID, Email: email}
 	c := workflow.NewNexusClient("user-service", "UserService")
 	fut := c.ExecuteOperation(ctx, "UpdateEmail", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
+func (u *User) Notify(ctx workflow.Context, reason string, channels []string, sender string) workflow.Future {
+	var reasonPtr *string
+	if reason != "" {
+		reasonPtr = &reason
+	}
+	request := notifyRequest{UserID: u.UserID, Reason: reasonPtr, Channels: channels, Sender: sender}
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "Notify", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
 // --- Operations (public API) ---
 
+// GetUserOptions - Options for GetUser.
 type GetUserOptions struct {
-	// UserID - Required.
-	UserID string
 }
 
-func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
-	return getUser(ctx, getUserRequest{
-		UserID: opts.UserID,
-	})
+// GetUser.
+func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
+	request := getUserRequest{
+		UserID: userID,
+	}
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "GetUser", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// UpdateEmailOptions - Options for UpdateEmail.
 type UpdateEmailOptions struct {
-	// UserID - Required.
-	UserID string
-	// Email - Required.
-	Email string
 }
 
-func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions) workflow.Future {
-	return updateEmail(ctx, updateEmailRequest{
-		UserID: opts.UserID,
-		Email:  opts.Email,
-	})
+// UpdateEmail.
+func UpdateEmail(
+	ctx workflow.Context,
+	opts UpdateEmailOptions,
+	userID string,
+	email string,
+) workflow.Future {
+	request := updateEmailRequest{
+		UserID: userID,
+		Email:  email,
+	}
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "UpdateEmail", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+// NotifyOptions - Options for Notify.
+type NotifyOptions struct {
+	// Reason - Optional.
+	Reason string
+}
+
+// Notify.
+func Notify(
+	ctx workflow.Context,
+	opts NotifyOptions,
+	userID string,
+	channels []string,
+	sender string,
+) workflow.Future {
+	var reason *string
+	if opts.Reason != "" {
+		reason = &opts.Reason
+	}
+	request := notifyRequest{
+		UserID:   userID,
+		Reason:   reason,
+		Channels: channels,
+		Sender:   sender,
+	}
+	c := workflow.NewNexusClient("user-service", "UserService")
+	fut := c.ExecuteOperation(ctx, "Notify", request, workflow.NexusOperationOptions{})
+	return fut
 }

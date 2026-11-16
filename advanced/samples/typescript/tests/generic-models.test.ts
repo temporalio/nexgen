@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+  ContextRef,
   GenericRequest,
   GenericResponse,
   OperationCompletionResult,
@@ -8,11 +9,13 @@ import type {
 
 describe("generic models generated output", () => {
   it("preserves correlated model parameters", () => {
+    const reference: ContextRef<string> = { id: "context-1" };
     const request: GenericRequest<string> = {
       context: "context",
       contexts: ["first"],
       byName: { primary: "value" },
       nested: { value: "nested" },
+      reference,
     };
     const completion: OperationCompletionResult<number> = {
       tag: "success",
@@ -25,6 +28,7 @@ describe("generic models generated output", () => {
     };
 
     expect(response.context).toBe("context");
+    expect(request.reference).toEqual(reference);
     expect(response.completion).toEqual({ tag: "success", value: { output: 42 } });
   });
 });

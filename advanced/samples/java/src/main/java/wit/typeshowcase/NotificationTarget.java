@@ -10,7 +10,9 @@ public final class NotificationTarget {
     @com.fasterxml.jackson.annotation.JsonProperty("sms")
     SMS,
     @com.fasterxml.jackson.annotation.JsonProperty("none")
-    NONE
+    NONE,
+    @com.fasterxml.jackson.annotation.JsonProperty("undocumented")
+    UNDOCUMENTED
   }
 
   private final Tag tag;
@@ -39,6 +41,10 @@ public final class NotificationTarget {
 
   public static NotificationTarget none() {
     return new NotificationTarget(Tag.NONE, null);
+  }
+
+  public static NotificationTarget undocumented() {
+    return new NotificationTarget(Tag.UNDOCUMENTED, null);
   }
 
   public static final class Deserializer
@@ -74,6 +80,8 @@ public final class NotificationTarget {
               context.readTreeAsValue(node.get("value"), context.constructType(String.class)));
         case "none":
           return NotificationTarget.none();
+        case "undocumented":
+          return NotificationTarget.undocumented();
         default:
           throw new java.io.IOException("Unknown variant tag: " + node.get("tag"));
       }

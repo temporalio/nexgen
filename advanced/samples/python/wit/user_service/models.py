@@ -14,3 +14,11 @@ class GetUserRequest:
 class UpdateEmailRequest:
     user_id: str
     email: str
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class NotifyRequest:
+    user_id: str
+    reason: str | None = None
+    channels: list[str]
+    sender: str

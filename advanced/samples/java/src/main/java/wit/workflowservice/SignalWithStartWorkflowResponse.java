@@ -6,7 +6,7 @@ package wit.workflowservice;
     SignalWithStartWorkflowResponse.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class SignalWithStartWorkflowResponse {
-  /** Run ID of the started workflow. */
+  /** Run ID of the signaled workflow. */
   private final String runId;
 
   /** Whether the workflow was started. */
@@ -49,14 +49,14 @@ public final class SignalWithStartWorkflowResponse {
       this.started = value.started;
     }
 
-    private String runId = null;
+    private String runId = "";
 
     public Builder setRunId(String value) {
       this.runId = value;
       return this;
     }
 
-    private Boolean started = null;
+    private Boolean started = false;
 
     public Builder setStarted(Boolean value) {
       this.started = value;

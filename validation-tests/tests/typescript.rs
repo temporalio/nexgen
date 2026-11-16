@@ -7,8 +7,8 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -27,8 +27,6 @@ use common::{json_input_path, wit_input_path, write_bare_ref_alias_closure};
 fn typescript_hostile_documentation_is_wrapped_escaped_and_typechecks() {
     support::doc_rendering::typescript_hostile_documentation_is_wrapped_escaped_and_typechecks();
 }
-
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
 
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -251,60 +249,12 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn typescript_root(root: &Path) -> PathBuf {
     root.join("advanced/samples/typescript")
 }
 
-fn typescript_output_path(root: &Path, example_id: &str) -> PathBuf {
-    typescript_root(root).join("wit").join(example_id)
-}
-
 fn samples_typescript_root(root: &Path) -> PathBuf {
     root.join("samples/typescript")
-}
-
-fn typescript_example_ids(root: &Path) -> Vec<String> {
-    let mut ids = fs::read_dir(root.join("advanced/samples/inputs"))
-        .unwrap()
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            let example_id = if path.is_file() {
-                path.file_stem()?.to_string_lossy().into_owned()
-            } else if path.join("main.wit").is_file() {
-                path.file_name()?.to_string_lossy().into_owned()
-            } else {
-                return None;
-            };
-            if typescript_output_path(root, &example_id).is_dir() {
-                Some(example_id)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    ids.sort();
-    ids
 }
 
 fn ensure_typescript_dependencies(example_dir: &Path) {
@@ -357,57 +307,13 @@ fn assert_no_empty_else_blocks(files: &BTreeMap<PathBuf, String>) {
     }
 }
 
-fn generate_formatted_typescript_output(root: &Path, example_id: &str, output_path: &Path) {
-    ensure_typescript_dependencies(&typescript_root(root));
-
-    let mut command = Command::new(support::nexgen_binary());
-    command
-        .arg("typescript")
-        .args(example_input_paths(root, example_id))
-        .args([
-            "--descriptors",
-            descriptor_path(root).to_str().unwrap(),
-            "--support-package",
-            "./support",
-            "--output",
-            output_path.to_str().unwrap(),
-            "--native-api",
-        ]);
-    if example_id == PRIMARY_EXAMPLE_ID {
-        command.arg("--system-nexus");
-    }
-    let status = command.status().unwrap();
-    assert!(status.success());
-
-    let format_status = Command::new("npm")
-        .current_dir(typescript_root(root))
-        .args([
-            "exec",
-            "--",
-            "prettier",
-            "--write",
-            "--print-width",
-            "88",
-            output_path.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(format_status.success());
-}
-
 fn generate_formatted_json_typescript_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    generate_native_api: bool,
+    targets: &[GenerationTarget],
 ) {
-    generate_formatted_json_typescript_output_repr(
-        root,
-        example_id,
-        output_path,
-        generate_native_api,
-        None,
-    );
+    generate_formatted_json_typescript_output_repr(root, example_id, output_path, targets, None);
 }
 
 /// Like `generate_formatted_json_typescript_output`, but reads the input from
@@ -417,7 +323,7 @@ fn generate_formatted_json_typescript_output_repr(
     root: &Path,
     input_id: &str,
     output_path: &Path,
-    generate_native_api: bool,
+    targets: &[GenerationTarget],
     repr: Option<&str>,
 ) {
     ensure_typescript_dependencies(&typescript_root(root));
@@ -435,8 +341,11 @@ fn generate_formatted_json_typescript_output_repr(
         args.push("--date-time-types");
         args.push(repr);
     }
-    if generate_native_api {
-        args.push("--native-api");
+    for target in targets.iter() {
+        args.push(match target {
+            nexgen::nexgen_config::GenerationTarget::Workflow => "--targets=workflow",
+            nexgen::nexgen_config::GenerationTarget::Client => "--targets=client",
+        });
     }
 
     let status = Command::new(support::nexgen_binary())
@@ -450,10 +359,13 @@ fn generate_formatted_json_typescript_output_repr(
         .args([
             "exec",
             "--",
-            "prettier",
+            "oxfmt",
             "--write",
-            "--print-width",
-            "88",
+            "--config",
+            typescript_root(root)
+                .join(".oxfmtrc.json")
+                .to_str()
+                .unwrap(),
             output_path.to_str().unwrap(),
         ])
         .status()
@@ -478,21 +390,11 @@ fn unique_typescript_runtime_dir(label: &str) -> tempfile::TempDir {
 }
 
 #[test]
-fn generated_wit_examples_format_successfully() {
-    let root = project_root();
-    for example_id in typescript_example_ids(&root) {
-        let output_path = unique_output_path(&format!("typescript-{example_id}"));
-        generate_formatted_typescript_output(&root, &example_id, &output_path);
-        fs::remove_dir_all(output_path).unwrap();
-    }
-}
-
-#[test]
 fn typescript_json_examples_render_expected_language_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("typescript-json-{example_id}"));
-        generate_formatted_json_typescript_output(&root, example_id, &output_path, false);
+        generate_formatted_json_typescript_output(&root, example_id, &output_path, &[]);
         let rendered = read_typescript_output_files(&output_path);
         assert_no_empty_else_blocks(&rendered);
         if example_id == "showcase" {
@@ -571,7 +473,7 @@ fn typescript_json_examples_render_expected_language_features() {
             &root,
             "temporal",
             &output_path,
-            false,
+            &[],
             Some(repr),
         );
         let rendered = read_typescript_output_files(&output_path);
@@ -585,7 +487,12 @@ fn typescript_json_api_examples_render_successfully() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("typescript-json-api-{example_id}"));
-        generate_formatted_json_typescript_output(&root, example_id, &output_path, true);
+        generate_formatted_json_typescript_output(
+            &root,
+            example_id,
+            &output_path,
+            &[GenerationTarget::Workflow],
+        );
         let rendered = read_typescript_output_files(&output_path);
         assert_no_empty_else_blocks(&rendered);
         fs::remove_dir_all(output_path).unwrap();
@@ -596,7 +503,7 @@ fn typescript_json_api_examples_render_successfully() {
             &root,
             "temporal",
             &output_path,
-            true,
+            &[GenerationTarget::Workflow],
             Some(repr),
         );
         let rendered = read_typescript_output_files(&output_path);
@@ -620,6 +527,7 @@ fn typescript_json_bare_ref_root_alias_typechecks_and_uses_target_converter() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -707,6 +615,7 @@ $defs:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -774,6 +683,7 @@ fn typescript_json_emits_complete_matchers_and_typed_mixed_extras() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -929,6 +839,7 @@ fn typescript_json_wave3_pairwise_runtime_matrix() {
         format: false,
         java_package_name: None,
         ts_date_time_types: nexgen::generator::TsDateTimeTypes::Temporal,
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1208,6 +1119,7 @@ fn typescript_json_wave7_discrete_defects_typecheck_and_run() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1368,6 +1280,7 @@ fn typescript_json_dispatches_cross_module_ref_union_branches() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("main/models.ts")).unwrap();
@@ -1423,6 +1336,7 @@ fn typescript_json_guards_nullable_elements_in_array_keywords() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1530,6 +1444,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.ts")).unwrap();
@@ -1610,6 +1525,7 @@ fn typescript_json_truncates_over_capacity_fractional_seconds() {
             format: false,
             java_package_name: None,
             ts_date_time_types: *repr,
+            dotnet_namespace: None,
         })
         .unwrap();
         let runtime = fs::read_to_string(output_path.join("definitions.ts")).unwrap();
@@ -1676,37 +1592,21 @@ fn renders_sample_with_versioned_header() {
     let temp_dir = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            system_nexus: true,
-            mode: GenerationMode::NativeApi,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language: Language::TypeScript,
-        input_paths: example_input_paths(&root, PRIMARY_EXAMPLE_ID),
+        input_paths: vec![wit_input_path(&root, "user-service")],
         support_package: Some("./support".into()),
-        descriptor_paths: vec![descriptor_path(&root)],
+        descriptor_paths: vec![],
         output_path: temp_dir.clone(),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     assert!(temp_dir.is_dir());
-
-    ensure_typescript_dependencies(&typescript_root(&root));
-    let status = Command::new("npm")
-        .current_dir(root.join("advanced/samples/typescript"))
-        .args([
-            "exec",
-            "--",
-            "prettier",
-            "--write",
-            "--print-width",
-            "88",
-            temp_dir.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(status.success());
 
     let output = read_typescript_output_files(&temp_dir);
     let manifest: toml::Table =

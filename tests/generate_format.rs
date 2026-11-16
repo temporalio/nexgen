@@ -14,15 +14,7 @@ mod format_tests {
     }
 
     fn sample_input_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/inputs/workflow-service.wit")
-    }
-
-    fn descriptor_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/descriptors/temporal_api.bin")
-    }
-
-    fn linked_inputs_path(root: &Path) -> PathBuf {
-        root.join("advanced/samples/inputs/deps")
+        root.join("advanced/samples/inputs/user-service.wit")
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {
@@ -63,9 +55,7 @@ mod format_tests {
             .args([
                 "python",
                 sample_input_path(&root).to_str().unwrap(),
-                linked_inputs_path(&root).to_str().unwrap(),
-                "--descriptors",
-                descriptor_path(&root).to_str().unwrap(),
+                "--targets=workflow",
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",
@@ -84,27 +74,40 @@ mod format_tests {
     }
 
     #[test]
-    fn java_formats_only_emitted_files_and_propagates_errors() {
+    fn java_formats_output_directory_and_propagates_errors() {
         let root = project_root();
         let temp = tempfile::tempdir().unwrap();
-        let output = temp.path().join("generated");
-        fs::create_dir(&output).unwrap();
-        let neighbor = output.join("UserCode.java");
-        fs::write(&neighbor, "handwritten, intentionally not valid Java").unwrap();
+        let output = temp.path().join("output with spaces/generated");
+        fs::create_dir_all(&output).unwrap();
+        let neighbor = output.join("nested/UserCode.java");
+        fs::create_dir(output.join("nested")).unwrap();
+        fs::write(&neighbor, "class UserCode {}").unwrap();
         let manifest = output.join("notes.txt");
         fs::write(&manifest, "leave alone").unwrap();
-        let java = temp.path().join("java");
-        fs::write(&java, "#!/bin/sh\nfor arg do\ncase \"$arg\" in *.java) printf '\\n// formatted by test\\n' >> \"$arg\" ;; esac\ndone\n").unwrap();
-        let mut permissions = fs::metadata(&java).unwrap().permissions();
+        let formatter = temp.path().join("google-java-format");
+        fs::write(
+            &formatter,
+            r#"#!/bin/sh
+[ "$1" = --replace ] || exit 1
+shift
+printf 'invoked\n' >> "$FORMAT_LOG"
+for arg do
+  case "$arg" in
+    *.java)
+      printf '\n// formatted by test\n' >> "$arg"
+      ;;
+  esac
+done
+"#,
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&formatter).unwrap().permissions();
         permissions.set_mode(0o755);
-        fs::set_permissions(&java, permissions).unwrap();
+        fs::set_permissions(&formatter, permissions).unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
         command
             .env("PATH", formatter_path_env(temp.path()))
-            .env(
-                "NEXGEN_JAVA_FORMAT_JAR",
-                temp.path().join("formatter with spaces.jar"),
-            )
+            .env("FORMAT_LOG", temp.path().join("format.log"))
             .args([
                 "java",
                 root.join("samples/schemas/chat.nexusrpc.yaml")
@@ -117,6 +120,8 @@ mod format_tests {
                 "--format",
             ]);
         assert!(command.status().unwrap().success());
+        let log = fs::read_to_string(temp.path().join("format.log")).unwrap();
+        assert_eq!(log.lines().count(), 1);
         assert!(
             fs::read_to_string(output.join("Message.java"))
                 .unwrap()
@@ -124,35 +129,22 @@ mod format_tests {
         );
         assert_eq!(
             fs::read_to_string(&neighbor).unwrap(),
-            "handwritten, intentionally not valid Java"
+            "class UserCode {}\n// formatted by test\n"
         );
         assert_eq!(fs::read_to_string(&manifest).unwrap(), "leave alone");
 
-        fs::write(java, "#!/bin/sh\nexit 23\n").unwrap();
+        fs::write(formatter, "#!/bin/sh\nexit 23\n").unwrap();
         let failure = command.output().unwrap();
         assert!(!failure.status.success());
         assert!(String::from_utf8_lossy(&failure.stderr).contains("failed for"));
     }
 
     #[test]
-    fn java_download_is_atomic_and_cached() {
+    fn java_reports_missing_preinstalled_formatter() {
         let root = project_root();
         let temp = tempfile::tempdir().unwrap();
-        let cache = temp.path().join("cache");
-        let curl = temp.path().join("curl");
-        let java = temp.path().join("java");
-        fs::write(&curl, "#!/bin/sh\nwhile [ $# -gt 0 ]; do\nif [ \"$1\" = --output ]; then shift; printf partial > \"$1\"; break; fi\nshift\ndone\nexit 7\n").unwrap();
-        fs::write(&java, "#!/bin/sh\nexit 0\n").unwrap();
-        for path in [&curl, &java] {
-            let mut permissions = fs::metadata(path).unwrap().permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(path, permissions).unwrap();
-        }
-        let mut command = Command::new(env!("CARGO_BIN_EXE_nexgen"));
-        command
-            .env("PATH", formatter_path_env(temp.path()))
-            .env_remove("NEXGEN_JAVA_FORMAT_JAR")
-            .env("XDG_CACHE_HOME", &cache)
+        let failure = Command::new(env!("CARGO_BIN_EXE_nexgen"))
+            .env("PATH", temp.path())
             .args([
                 "java",
                 root.join("samples/schemas/chat.nexusrpc.yaml")
@@ -163,20 +155,13 @@ mod format_tests {
                 "--package-name",
                 "test.generated",
                 "--format",
-            ]);
-        let jar = cache.join("nexgen/google-java-format-1.24.0-all-deps.jar");
-        assert!(!command.status().unwrap().success());
-        assert!(!jar.exists());
-        assert_eq!(fs::read_dir(cache.join("nexgen")).unwrap().count(), 0);
-
-        let script = fs::read_to_string(&curl)
-            .unwrap()
-            .replace("exit 7", "exit 0");
-        fs::write(&curl, script).unwrap();
-        assert!(command.status().unwrap().success());
-        assert!(jar.is_file());
-        fs::write(curl, "#!/bin/sh\nexit 99\n").unwrap();
-        assert!(command.status().unwrap().success());
+            ])
+            .output()
+            .unwrap();
+        assert!(!failure.status.success());
+        let stderr = String::from_utf8_lossy(&failure.stderr);
+        assert!(stderr.contains("google-java-format"), "{stderr}");
+        assert!(stderr.contains("failed to run formatter"), "{stderr}");
     }
 
     #[test]
@@ -185,16 +170,14 @@ mod format_tests {
         let temp_dir = unique_temp_dir("typescript-format");
         fs::create_dir_all(&temp_dir).unwrap();
         let output_path = temp_dir.join("output");
-        write_formatter_script(&temp_dir, "prettier", "// formatted by test");
+        write_formatter_script(&temp_dir, "oxfmt", "// formatted by test");
 
         let status = Command::new(env!("CARGO_BIN_EXE_nexgen"))
             .env("PATH", formatter_path_env(&temp_dir))
             .args([
                 "ts",
                 sample_input_path(&root).to_str().unwrap(),
-                linked_inputs_path(&root).to_str().unwrap(),
-                "--descriptors",
-                descriptor_path(&root).to_str().unwrap(),
+                "--targets=workflow",
                 "--output",
                 output_path.to_str().unwrap(),
                 "--support-package",
@@ -231,13 +214,6 @@ mod reject_tests {
         assert!(
             !Command::new(binary)
                 .args(["python", "--date-time-types", "date"])
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            !Command::new(binary)
-                .args(["python", "--no-native-api"])
                 .status()
                 .unwrap()
                 .success()

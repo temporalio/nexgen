@@ -1,0 +1,18 @@
+package test:mixed-records@1.0.0;
+world system { export models; }
+interface models {
+  /// @nexus.proto "google.protobuf.Timestamp"
+  record timestamp {
+    seconds: option<s64>,
+    nanos: option<s32>,
+  }
+
+  variant choice {
+    empty,
+    at(timestamp),
+  }
+
+  record wrapper {
+    choice: result<choice, string>,
+  }
+}

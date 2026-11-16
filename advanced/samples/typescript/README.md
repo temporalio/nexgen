@@ -1,7 +1,7 @@
 # TypeScript WIT Samples
 
 Advanced TypeScript sample suite for outputs generated from authored WIT inputs,
-plus the snapshot-only native-api (Nexus service/client) output of the
+plus the snapshot-only Workflow API (Nexus service/client) output of the
 JSON-Schema samples.
 
 - Authored WIT inputs live in [`advanced/samples/inputs/*.wit`](../inputs)
@@ -9,7 +9,7 @@ JSON-Schema samples.
   `advanced/samples/typescript/wit/<example>/`
 - Authored Temporal converters live in the shared `support/` directory;
   generated modules import them rather than copying them into each output
-- Snapshot-only JSON-Schema native-api output lives in
+- Snapshot-only JSON-Schema Workflow API output lives in
   `advanced/samples/typescript/json_schema/api/<example>/`
 - Vitest files live in `advanced/samples/typescript/tests/` (WIT round-trip and
   real-workflow/Nexus tests); proto wire fixtures live in
@@ -40,6 +40,25 @@ cargo build-examples --format wit --lang typescript workflow-service
 The definitions-mode JSON-Schema samples (plain data models) live under
 [`samples/typescript`](../../samples/typescript).
 
+## Temporary notification protobuf declarations
+
+The notification-service example uses the SDK namespace
+`temporal.api.notificationservice.v1`. Until the TypeScript SDK exports these
+models,
+[`support/notification-service-proto.d.ts`](support/notification-service-proto.d.ts)
+supplies sample-only interface declarations matching the checked-in descriptor.
+Remove this file and update the SDK dependency **before landing this change**.
+The generator has no fallback types or notification-specific logic.
+
+The notification tests exercise conversion of plain wire objects, including
+generic payloads, failure details, and oneof validation. They do not yet
+exercise notification protobuf binary encoding or SDK message constructors.
+
+The `proto-generic` and `proto-oneof` samples use the SDK's existing protobuf
+models without a shim. Their tests include binary encode/decode round-trips,
+nested generic payloads, required and optional oneofs, and scalar member
+presence (including an explicitly selected empty string).
+
 ## Using a support module
 
 In your own project, keep hand-written helpers
@@ -53,15 +72,15 @@ For example, this repository exports `retryPolicyToProto` and
 `durationFromProto` from
 [`support/temporal_model_converters.ts`](support/temporal_model_converters.ts),
 outside the generated `wit/<example>/` directories. The module is
-`../../support/temporal_model_converters` relative to its `wit/type-roundtrip`
-output directory:
+`../../support/temporal_model_converters` relative to its
+`wit/proto-backed-showcase` output directory:
 
 ```sh
-cargo run --features advanced -- typescript advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- typescript advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package ../../support/temporal_model_converters \
-  --native-api --output advanced/samples/typescript/wit/type-roundtrip
+  --targets workflow --output advanced/samples/typescript/wit/proto-backed-showcase
 ```
 
 Include both your authored module and generated output in your TypeScript

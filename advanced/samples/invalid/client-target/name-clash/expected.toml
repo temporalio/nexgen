@@ -1,0 +1,7 @@
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+
+[error]
+kind = "client-target-name-conflict"
+contains = ["`describe` is a client method of both `OrderService` and `UserService`"]

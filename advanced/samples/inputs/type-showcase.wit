@@ -5,6 +5,7 @@ world system {
 }
 
 /// @nexus.endpoint "type-showcase"
+/// @nexus.experimental
 interface type-showcase {
   enum user-status {
     active,
@@ -18,13 +19,32 @@ interface type-showcase {
     deactivate,
   }
 
+  /// @nexus.doc "Default notification target." python="Python notification target." typescript="TypeScript notification target." go="Go notification target." dotnet="Dotnet variant <doc> & more."
+  /// @nexus.experimental
   variant notification-target {
+    /// @nexus.doc "Default payload." python="Python payload." typescript="TypeScript payload */ safe." go="Go payload." dotnet="Dotnet payload <doc> & more."
     email(string),
+    /// @nexus.doc "XML characters remain valid in docs: <tag attr=\"value\"> & 'quoted'."
     sms(string),
+    /// @nexus.doc "Default empty case."
     none,
+    /// @nexus.doc typescript="TypeScript-only case."
+    undocumented,
+  }
+
+  /// @nexus.doc "Default-only documentation on a single-case variant."
+  variant single-target {
+    /// @nexus.doc "Only case."
+    only,
+  }
+
+  /// @nexus.experimental
+  variant experimental-target {
+    second,
   }
 
   record postal-address {
+    /// @nexus.doc "Street with <tag> & \"quotes\"." dotnet="Street with <tag> & \"quotes\"."
     street: string,
     city: string,
     country: string,
@@ -32,22 +52,30 @@ interface type-showcase {
   }
 
   record user-profile {
+    /// @nexus.doc "A very long field doc that has to be wrapped because it exceeds the generated comment line width by a comfortable margin for testing."
     tags: list<string>,
+    /// @nexus.doc "Default metadata." go="Go-specific metadata." python="Python metadata."
     metadata: map<string, string>,
     capabilities: user-capability,
     sync-state: result<string, string>,
     notification-target: notification-target,
     address: option<postal-address>,
+    single-target: option<single-target>,
+    experimental-target: option<experimental-target>,
   }
 
+  /// @nexus.doc "Default user." go="Go user." python="Python user."
   resource user {
     constructor(user-id: string, email: string, display-name: string, status: user-status, profile: user-profile);
 
     update-email: func(email: string) -> user-result;
+    /// @nexus.doc "Default rename." go="Go rename." python="Python rename."
     rename: func(display-name: string) -> user-result;
     deactivate: func(reason: option<string>);
+    update-labels: func(tags: list<string>, metadata: map<string, string>, extra-tags: option<list<string>>, extra-metadata: option<map<string, string>>);
   }
 
+  /// @nexus.experimental
   record get-user-request {
     user-id: string,
     consistency-token: option<string>,
@@ -70,10 +98,14 @@ interface type-showcase {
     profile: user-profile,
   }
 
+  /// @nexus.experimental
   record sync-report {
     route: list<tuple<f64, f64>>,
     attempts: list<result<string, string>>,
     region-status: map<string, result<string, string>>,
+    item-count: u32,
+    byte-count: u64,
+    clock-skew-ms: s64,
   }
 
   record record-sync-request {
@@ -86,10 +118,48 @@ interface type-showcase {
     reason: option<string>,
   }
 
+  record update-labels-request {
+    user-id: string,
+    tags: list<string>,
+    metadata: map<string, string>,
+    extra-tags: option<list<string>>,
+    extra-metadata: option<map<string, string>>,
+  }
+
+  // Required input models remain public even when marked for flattening.
+  /// @nexus.flatten-in-api
+  record notification-settings {
+    email-enabled: bool,
+    sms-enabled: bool,
+  }
+
+  record update-notification-settings-request {
+    user-id: string,
+    settings: notification-settings,
+  }
+
+  // Optional input fields flatten into options, but the returned model must
+  // still be public.
+  /// @nexus.flatten-in-api
+  record sync-settings {
+    region: option<string>,
+    checkpoint: option<string>,
+  }
+
+  record get-sync-settings-request {
+    user-id: string,
+    settings: option<sync-settings>,
+  }
+
+  /// @nexus.doc "Get a user." returns="The matching user."
+  /// @nexus.experimental
   get-user: func(request: get-user-request) -> user-result;
   update-email: func(request: update-email-request) -> user-result;
   rename: func(request: rename-request) -> user-result;
   set-profile: func(request: set-profile-request) -> user-result;
   record-sync: func(request: record-sync-request);
   deactivate: func(request: deactivate-request);
+  update-labels: func(request: update-labels-request);
+  update-notification-settings: func(request: update-notification-settings-request);
+  get-sync-settings: func(request: get-sync-settings-request) -> sync-settings;
 }

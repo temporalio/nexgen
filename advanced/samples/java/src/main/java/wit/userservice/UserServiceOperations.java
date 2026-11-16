@@ -53,4 +53,29 @@ public final class UserServiceOperations {
                     "UpdateEmail", wit.userservice.User.class, wit.userservice.User.class, request);
     return result.withEndpoint(endpoint);
   }
+
+  public static void notify(wit.userservice.NotifyOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.userservice.NotifyRequest.Builder requestBuilder =
+        wit.userservice.NotifyRequest.newBuilder();
+    requestBuilder.setUserId(options.getUserId());
+    if (options.getReason() != null) requestBuilder.setReason(options.getReason());
+    requestBuilder.setChannels(options.getChannels());
+    requestBuilder.setSender(options.getSender());
+    String endpoint = options.getEndpoint();
+    wit.userservice.NotifyRequest request = requestBuilder.build();
+    executeNotify(endpoint, request);
+  }
+
+  static void executeNotify(String endpoint, wit.userservice.NotifyRequest request) {
+    Void result =
+        (Void)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "UserService",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint(endpoint)
+                        .build())
+                .execute("Notify", Void.class, Void.class, request);
+    return;
+  }
 }

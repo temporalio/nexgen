@@ -6,16 +6,20 @@ public final class GenericResponse<ContextT, OutputT, MetadataT> {
   private final ContextT context;
   private final wit.genericmodels.OperationCompletionResult<OutputT> completion;
   private final MetadataT metadata;
+  private final wit.genericmodels.GetterPair<ContextT, OutputT> pair;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GenericResponse(
       @com.fasterxml.jackson.annotation.JsonProperty("context") ContextT context,
       @com.fasterxml.jackson.annotation.JsonProperty("completion")
           wit.genericmodels.OperationCompletionResult<OutputT> completion,
-      @com.fasterxml.jackson.annotation.JsonProperty("metadata") MetadataT metadata) {
+      @com.fasterxml.jackson.annotation.JsonProperty("metadata") MetadataT metadata,
+      @com.fasterxml.jackson.annotation.JsonProperty("pair")
+          wit.genericmodels.GetterPair<ContextT, OutputT> pair) {
     this.context = context;
     this.completion = completion;
     this.metadata = metadata;
+    this.pair = pair;
   }
 
   public ContextT getContext() {
@@ -28,6 +32,10 @@ public final class GenericResponse<ContextT, OutputT, MetadataT> {
 
   public MetadataT getMetadata() {
     return metadata;
+  }
+
+  public wit.genericmodels.GetterPair<ContextT, OutputT> getPair() {
+    return pair;
   }
 
   public Builder<ContextT, OutputT, MetadataT> toBuilder() {
@@ -51,6 +59,7 @@ public final class GenericResponse<ContextT, OutputT, MetadataT> {
       this.context = value.context;
       this.completion = value.completion;
       this.metadata = value.metadata;
+      this.pair = value.pair;
     }
 
     private ContextT context = null;
@@ -75,8 +84,16 @@ public final class GenericResponse<ContextT, OutputT, MetadataT> {
       return this;
     }
 
+    private wit.genericmodels.GetterPair<ContextT, OutputT> pair = null;
+
+    public Builder<ContextT, OutputT, MetadataT> setPair(
+        wit.genericmodels.GetterPair<ContextT, OutputT> value) {
+      this.pair = value;
+      return this;
+    }
+
     public GenericResponse<ContextT, OutputT, MetadataT> build() {
-      return new GenericResponse<ContextT, OutputT, MetadataT>(context, completion, metadata);
+      return new GenericResponse<ContextT, OutputT, MetadataT>(context, completion, metadata, pair);
     }
   }
 }

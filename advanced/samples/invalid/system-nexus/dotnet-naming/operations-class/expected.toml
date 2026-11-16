@@ -1,0 +1,7 @@
+languages = ["dotnet"]
+
+[error]
+kind = "system-nexus-required"
+contains = [
+  "operations-class on interface `api` requires System Nexus mode (--system-nexus)",
+]

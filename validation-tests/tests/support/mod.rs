@@ -6,6 +6,7 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 pub mod common;
+pub mod csharp_json_case;
 pub mod doc_rendering;
 pub mod json_schema;
 

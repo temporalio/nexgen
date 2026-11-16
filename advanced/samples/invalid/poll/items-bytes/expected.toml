@@ -1,0 +1,11 @@
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+descriptors = "temporal"
+
+[error]
+kind = "unsupported-poll"
+contains = [
+  "the client target can't make an iterator for `@nexus.poll` on operation `Reader.ListWorkflows`",
+  "since the operation has an `items` field `next_page_token` that isn't a list in its response",
+]

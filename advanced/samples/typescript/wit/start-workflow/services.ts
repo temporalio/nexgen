@@ -6,12 +6,14 @@ import {
   startWorkflowRequestTransferTypeConverter,
   cancelWorkflowResponseTransferTypeConverter,
   cancelWorkflowRequestTransferTypeConverter,
+  signalResultResponseTransferTypeConverter,
 } from "./models";
 import type {
   StartWorkflowResult,
   StartWorkflowRequest,
   CancelWorkflowResponse,
   CancelWorkflowRequest,
+  SignalResultResponse,
 } from "./models";
 
 export const startWorkflowService = nexus.service("StartWorkflowService", {
@@ -29,5 +31,10 @@ export const startWorkflowService = nexus.service("StartWorkflowService", {
     name: "CancelWorkflow",
     inputType: { transferTypeConverter: cancelWorkflowRequestTransferTypeConverter },
     outputType: { transferTypeConverter: cancelWorkflowResponseTransferTypeConverter },
+  }),
+  signalWithStart: nexus.operation<CancelWorkflowRequest, SignalResultResponse>({
+    name: "SignalWithStart",
+    inputType: { transferTypeConverter: cancelWorkflowRequestTransferTypeConverter },
+    outputType: { transferTypeConverter: signalResultResponseTransferTypeConverter },
   }),
 });

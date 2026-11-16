@@ -1,0 +1,12 @@
+package test:ordinary-client@1.0.0;
+
+world system { export example; }
+
+/// @nexus.endpoint "example"
+interface example {
+  record request {
+    id: string,
+  }
+
+  send: func(request: request);
+}

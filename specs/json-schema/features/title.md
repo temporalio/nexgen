@@ -66,7 +66,7 @@ The defining choices (citing [[PRINCIPLES.md]]):
     Stage 1–4 case-mapping pipeline, so it would land differently per language —
     the exact footgun openapi-generator was filed for (issue #5248: title-named
     schemas bypass the naming transform and cause import failures). Our names go
-    through one pipeline precisely so all four targets agree.
+    through one pipeline precisely so all five targets agree.
 - **Summary line, co-owned with [[description]].** `title` and [[description]]
   feed the **same** generated doc comment: `title` is the
   **first/summary line**, [[description]] the body. The shared doc-comment
@@ -122,11 +122,12 @@ placement, line-wrapping, escaping — is owned by [[description]]; this is only
 | TypeScript | first line of the `/** … */` JSDoc above the `interface`/field.                                                                                                                                   |
 | Python     | first line of the class **docstring**; for a **field**, the first line of the string literal that follows the field declaration (the attribute-docstring convention documentation tooling reads). |
 | Java       | first sentence of the `/** … */` Javadoc above the class/getter.                                                                                                                                  |
+| C#         | first line of the `/// <summary>` above the type/property.                                                                                                                                        |
 
 **Go — the identifier-led first line.** Idiomatic Go doc comments for an
 exported identifier **begin with the name being described** (`godoc` / `golint`:
 `// User is a registered account.`, not `// A registered account.`). So Go does
-**not** emit the bare `title` as the summary line the way the other three
+**not** emit the bare `title` as the summary line the way the other four
 languages do — it prefixes the identifier:
 
 ```go

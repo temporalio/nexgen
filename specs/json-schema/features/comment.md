@@ -47,7 +47,7 @@ it, not refusing the schema:
   [[description]]: the spec forbids presenting `$comment` to end users, so it is
   **not** routed into the generated doc comment. A maintainer note that says
   "TODO: tighten this once the API stabilises" must not leak into a published
-  Go/TS/Python/Java doc block. Authors who want prose in the generated output
+  Go/TS/Python/Java/C# doc block. Authors who want prose in the generated output
   use [[description]]; `$comment` stays in the source schema only.
 
 Loader behavior:

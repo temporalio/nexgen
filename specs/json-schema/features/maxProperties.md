@@ -95,6 +95,7 @@ split is a language-side artifact, not a wire fact).
 | TypeScript | `fromTransferType` applies the predicate to the wire object's own enumerable keys; `toTransferType` applies it to the keys the outbound conversion will actually emit. The comparison is inlined in each converter.                                                                                                       |
 | Python     | `from_transfer_type` counts `len(raw)` on the raw wire dict — one number over the wire object, taken before any default is materialized — and appends `Violation(path="", reason=f"must have at most {max} properties, got {n}")` when `n > max`, into the single generated `PayloadValidationError` application failure. |
 | Java       | the per-POJO collecting deserializer (PRINCIPLES Java §5) counts distinct keys in the parsed tree (`> max`) — one number over the wire object, **not** populated POJO fields + catch-all map summed post-bind; a violation joins the single `PayloadValidationError` application failure.                                 |
+| C#         | `Converter.Parse` counts the distinct wire keys (`SpecJson.Members(node).Count`, a repeated key counted once) — one number over the wire object; `Validate` counts the keys it will write.                                                                                                                                |
 
 ### Serialize-side (P12)
 

@@ -1,19 +1,22 @@
 # .NET advanced samples
 
 Generated C# for the WIT inputs in [`../inputs/`](../inputs/), plus the
-snapshot-only native-api form of the JSON-Schema inputs.
+snapshot-only Workflow API form of the JSON-Schema inputs.
 
 - `TemporalSupport/` — authored converters and workflow-service helpers shared
   by the generated projects.
 - `wit/` — generated output per WIT example (`workflow-service`, `user-service`,
-  `type-showcase`, `type-roundtrip`, `start-workflow`, `function-execution`):
-  models, operations, and Nexus service interfaces.
-- `json_schema/api/` — native-api (service + client) output for the JSON-Schema
-  inputs. Snapshot-only: regenerated and diffed by the Rust tests, not exercised
-  by runtime tests here.
+  `type-showcase`, `proto-backed-showcase`, `start-workflow`,
+  `function-execution`): models, operations, and Nexus service interfaces.
+- `json_schema/api/` — Workflow API (service + client) output for the
+  JSON-Schema inputs, compiled by its own project,
+  `json_schema/Nexgen.DotNetJsonSchemaApi.csproj` (`net7.0` with its default C#
+  11, the JSON Schema output's floor; the WIT projects pin C# 9).
 - `tests/` — endpoint runtime checks (`WorkflowService`, `UserService`), the
   generated-api compile check, and proto-wire compatibility checks against the
   fixtures in [`../wire/proto/`](../wire/proto/).
+  `Nexgen.DotNetStreamServiceSystemNexus.csproj` compiles the stream interceptor
+  on the SDK stand-in in `tests/SystemNexusStandIn/`.
 
 Regenerate WIT output with `cargo build-examples --format wit --lang dotnet`
 from the repo root.
@@ -21,6 +24,7 @@ from the repo root.
 ```bash
 dotnet build Nexgen.DotNetExamples.csproj
 dotnet test tests/
+dotnet build json_schema/Nexgen.DotNetJsonSchemaApi.csproj
 ```
 
 For the beginner-facing JSON-Schema definitions models, see
@@ -41,11 +45,11 @@ For example, this repository keeps support sources in
 directories. They declare `namespace Nexgen.Support`:
 
 ```sh
-cargo run --features advanced -- dotnet advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package Nexgen.Support \
-  --native-api --output advanced/samples/dotnet/wit/type-roundtrip
+  --targets workflow --output advanced/samples/dotnet/wit/proto-backed-showcase
 ```
 
 If your project disables default compile items or excludes the support

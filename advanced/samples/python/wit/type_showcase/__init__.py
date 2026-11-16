@@ -14,14 +14,20 @@ from ._resources.user import rename
 from .operations.set_profile import set_profile
 from .operations.record_sync import record_sync
 from ._resources.user import deactivate
+from ._resources.user import update_labels
+from .operations.update_notification_settings import update_notification_settings
+from .operations.get_sync_settings import get_sync_settings
 
 __all__ = [
     "deactivate",
+    "get_sync_settings",
     "get_user",
     "record_sync",
     "rename",
     "set_profile",
     "update_email",
+    "update_labels",
+    "update_notification_settings",
 ]
 
 
@@ -47,7 +53,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "TypeShowcase",
         "GetUser",
@@ -83,5 +91,23 @@ __nexus_operation_registry__ = {
         "Deactivate",
     ): _NexusOperationInfo(
         operation=_services.TypeShowcase.deactivate,
+    ),
+    (
+        "TypeShowcase",
+        "UpdateLabels",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.update_labels,
+    ),
+    (
+        "TypeShowcase",
+        "UpdateNotificationSettings",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.update_notification_settings,
+    ),
+    (
+        "TypeShowcase",
+        "GetSyncSettings",
+    ): _NexusOperationInfo(
+        operation=_services.TypeShowcase.get_sync_settings,
     ),
 }

@@ -3,4 +3,5 @@
 export { startWorkflow } from "./operations/start-workflow";
 export { restartWorkflow } from "./operations/restart-workflow";
 export { cancelWorkflow } from "./operations/cancel-workflow";
+export { signalWithStart } from "./operations/signal-with-start";
 export type { CancelWorkflowRequest, StartWorkflowRequest } from "./models";

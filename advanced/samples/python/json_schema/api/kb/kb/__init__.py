@@ -12,7 +12,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import KnowledgeBaseServiceClient
+from ._clients import KnowledgeBaseServiceClient
 from . import services as _services
 
 __all__ = [
@@ -45,7 +45,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "example.kb.v1.KnowledgeBaseService",
         "GetPage",

@@ -1,0 +1,12 @@
+package test:context-nested-qualifier;
+
+world system { export sample-service; }
+
+/// @nexus.endpoint "temporal-system"
+interface sample-service {
+  /// @nexus.proto "temporal.api.common.v1.WorkflowType"
+  record request { name: string }
+
+  /// @nexus.serialization-context go="helpers.nested.Context"
+  send: func(request: request);
+}

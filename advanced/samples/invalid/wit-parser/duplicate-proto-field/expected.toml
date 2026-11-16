@@ -1,0 +1,5 @@
+[error]
+kind = "invalid-wit"
+contains = [
+  "type `models.request` field `workflow-id-alias` maps to duplicate proto field `workflow_id`",
+]

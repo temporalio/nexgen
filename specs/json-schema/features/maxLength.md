@@ -9,9 +9,9 @@ code units, or grapheme clusters. A pure runtime assertion — no type impact. T
 canonical spec for the string-length pair; [[minLength]] shares the machinery
 documented here and differs only in the comparison operator. The one
 string-length hazard is that the naive "length" primitive counts the
-**wrong unit** in three of the four targets (Go bytes, TS/Java UTF-16 units) —
-so the shared predicate is pinned to a code-point count, verified across all
-four targets.
+**wrong unit** in four of the five targets (Go bytes, TS/Java UTF-16 units) — so
+the shared predicate is pinned to a code-point count, verified across all five
+targets.
 
 ## Spec summary
 
@@ -44,13 +44,13 @@ Distilled:
 
 Lowers to a single length comparison in every language; no effect on emitted
 types. Citing [[PRINCIPLES.md]]: **P1** (the count must be *identical* across
-all four — the crux, see below), **P10** (enforced at the boundary), **P11**
+all five — the crux, see below), **P10** (enforced at the boundary), **P11**
 (aggregated), **P12** (a pure predicate over the decoded value in the
 **shared `Validate`** layer — identical in both directions, no parse/encode
 adapter logic of its own).
 
 **The P1 crux — count code points, not the native "length".** The naive
-per-language length primitive counts a different unit in three of the four
+per-language length primitive counts a different unit in four of the five
 targets, so a schema like `{type:"string", maxLength:3}` against the 4-byte /
 2-UTF-16-unit / 3-code-point string `"a😀b"` would *disagree* value-for-value if
 each language used its default. Verified in `string_probe` (`"a😀b"`): Go
@@ -59,7 +59,7 @@ each language used its default. Verified in `string_probe` (`"a😀b"`): Go
 count (3) is spec-correct and portable, so the shared predicate is pinned to it
 and each language uses its code-point-counting primitive (table below),
 **never** the bare `len`/`.length`. This is the string analog of
-[[multipleOf]]'s "standardize on the portable operation across all four"
+[[multipleOf]]'s "standardize on the portable operation across all five"
 decision.
 
 Loader behavior:
@@ -70,7 +70,7 @@ Loader behavior:
 - A bound greater than `9007199254740991` (2^53−1) → reject. A length bound must
   be exactly representable in every target, which is the same ceiling and the
   same reason the count keywords use ([[maxItems]] / [[maxProperties]]); the
-  bound is emitted as a numeric literal into all four, and above 2^53−1 the
+  bound is emitted as a numeric literal into all five, and above 2^53−1 the
   literal no longer denotes the authored integer.
 - **A bound in `[2^31, 2^53−1]` obliges Java to emit a `long` literal**
   (`{n}L`), exactly as in [[maxItems]]. Java integer literals stop at 2^31−1, so
@@ -101,7 +101,7 @@ string).
 Per **P10**/**P11**. A single `≤` comparison of the **code-point count** against
 the fixed bound, identical in both directions (a pure predicate over the decoded
 value — the **shared `Validate`** layer of **P12**). The per-language row
-differs only in how it counts code points; all four are verified equal in
+differs only in how it counts code points; all five are verified equal in
 `string_probe`. Go/Python/Java lean on a stdlib primitive
 (`utf8.RuneCountInString` / `len` / `codePointCount`); TS has no allocation-free
 code-point-count primitive, so it emits a small surrogate-aware scan once as a
@@ -113,8 +113,9 @@ TS row).
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Go         | The comparison is a predicate in the shared `Validate(model)` (`if n := utf8.RuneCountInString(v); n > max { push(Violation{Path, Reason: fmt.Sprintf("must have length <= %d, got %d", max, n)}) }`), which the generated `UnmarshalJSON` calls after decoding; violations collect into one `PayloadValidationError` application failure. **`utf8.RuneCountInString`, not `len`** — `len` is the UTF-8 byte count (verified `len("a😀b") == 6`).                                                                                                                                                                                                                                                                                                                                                                                           |
 | TypeScript | An **allocation-free** surrogate-aware pass that **early-exits** the moment the bound is crossed: walk `v` by UTF-16 unit counting code points (each well-formed high+low surrogate pair is one code point), and stop as soon as the running count exceeds `max`. On the (rare) failure path compute the exact count with the shared `codePointLength(v)` helper for the message: ``push(Violation{path, reason: `must have length <= ${max}, got ${codePointLength(v)}`})``; throw one `PayloadValidationError` application failure. **Never `v.length`** — that is the UTF-16 code-unit count (verified `"a😀b".length === 4`). `max` is an emitted numeric constant. This beats the obvious `[...v].length` (which allocates a full code-point array) ~3.5×, and early-exit bounds work on adversarially long input regardless of `max`. |
-| Python     | `if (n := len(v)) > max: violations.append(Violation(path=…, reason=f"must have length <= {max}, got {n}"))` in the transfer type converter (PRINCIPLES Python §3). **`len` on a `str` is the code-point count** — a single astral emoji is 1 code point but 4 UTF-8 bytes / 2 UTF-16 units (`len("a😀b") == 3`) — so it is spec-correct with no extra scan, matching the other three. Aggregates into the single generated `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                   |
+| Python     | `if (n := len(v)) > max: violations.append(Violation(path=…, reason=f"must have length <= {max}, got {n}"))` in the transfer type converter (PRINCIPLES Python §3). **`len` on a `str` is the code-point count** — a single astral emoji is 1 code point but 4 UTF-8 bytes / 2 UTF-16 units (`len("a😀b") == 3`) — so it is spec-correct with no extra scan, matching the other four. Aggregates into the single generated `PayloadValidationError` application failure.                                                                                                                                                                                                                                                                                                                                                                    |
 | Java       | The per-POJO collecting deserializer (PRINCIPLES Java §5) reads the field node as a `String`, then checks `int n = v.codePointCount(0, v.length()); if (n > max)`, pushing a `Violation{path, "must have length <= " + max + ", got " + n}` into the single `PayloadValidationError` application failure. **`codePointCount(0, length())`, not `length()`** — `length()` is the UTF-16 code-unit count (verified `"a😀b".length() == 4`). Not bean-validation `@Size` — the check is hand-written in the collecting deserializer like every other constraint.                                                                                                                                                                                                                                                                               |
+| C#         | `Converter.Parse` reads the `string`, then checks `var n = SpecJson.CodePoints(v); if (n > max)`, recording `Violation{path, "must have length <= " + max + ", got " + n}` into the single `PayloadValidationError` application failure. **Code points, not `string.Length`** — `Length` is the UTF-16 unit count (`"a😀b".Length == 4`). `Validate` repeats the check before writing.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 **Informative `reason` strings.** The `Violation` `reason` names the
 **concrete bound and the offending count** — `must have length <= 2, got 3` —
@@ -186,7 +187,7 @@ redeclaration.
   failure whose reason names the bound and count
   (`must have length <= 2, got 3`).
 - **Astral / multi-byte fixtures (the P1 core):** `"a😀b"` counts as **3** in
-  all four (not 6/4/4); `"😀😀"` counts as **2**; NFC `"é"` counts as **1** and
+  all five (not 6/4/4); `"😀😀"` counts as **2**; NFC `"é"` counts as **1** and
   NFD `"e"+U+0301` as **2** — every language agrees on each because none
   normalizes.
 - Combined with other failing assertions ([[minLength]], [[pattern]], a failing

@@ -7,7 +7,7 @@ import typing
 
 import nexusrpc
 import temporalio.converter
-from .services import UserServiceClient
+from ._clients import UserServiceClient
 from . import services as _services
 
 __all__ = [
@@ -37,7 +37,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "UserService",
         "GetUser",
@@ -49,5 +51,11 @@ __nexus_operation_registry__ = {
         "UpdateEmail",
     ): _NexusOperationInfo(
         operation=_services.UserService.update_email,
+    ),
+    (
+        "UserService",
+        "Notify",
+    ): _NexusOperationInfo(
+        operation=_services.UserService.notify,
     ),
 }

@@ -1,0 +1,10 @@
+package test:context-helper-path;
+
+world system { export api; }
+
+interface api {
+  record request { value: string }
+
+  /// @nexus.serialization-context go="helpers/Context"
+  send: func(request: request);
+}

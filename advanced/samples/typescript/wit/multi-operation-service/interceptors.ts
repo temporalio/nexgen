@@ -30,11 +30,6 @@ export function dispatchSystemNexusSpecificInterceptors(
           return composeInterceptors(interceptors, "firstOperation", (request) =>
             next<Request, Response>(request),
           )(input as Request) as Promise<nexus.NexusOperationHandle<unknown>>;
-        default:
-          return next(input);
-      }
-    case "InterceptorService":
-      switch (operation) {
         case "SecondOperation":
           return composeInterceptors(interceptors, "secondOperation", (request) =>
             next<Request, Response>(request),

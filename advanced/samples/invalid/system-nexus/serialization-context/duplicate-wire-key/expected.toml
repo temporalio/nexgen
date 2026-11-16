@@ -1,0 +1,9 @@
+languages = ["go"]
+descriptors = "temporal"
+system_nexus = true
+
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.serialization-context` on Go operation registry in `<go-plan>`: duplicate registry key: service `SameWireService`, operation `SameWireOperation`",
+]

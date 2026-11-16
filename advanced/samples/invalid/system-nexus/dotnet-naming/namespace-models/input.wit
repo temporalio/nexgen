@@ -1,0 +1,6 @@
+package test:namespace-models;
+world system { export models; }
+/// @nexus.namespace dotnet="Acme.Models"
+interface models {
+  record value { name: string }
+}

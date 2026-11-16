@@ -1,0 +1,5 @@
+languages = ["python"]
+
+[error]
+kind = "system-nexus-required"
+contains = ["poll on interface `models` function `read` requires System Nexus mode (--system-nexus)"]

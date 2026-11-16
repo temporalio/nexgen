@@ -8,6 +8,7 @@ import typing_extensions
 import temporalio.api.compute.v1.config_pb2
 import temporalio.api.compute.v1.provider_pb2
 import temporalio.api.compute.v1.scaler_pb2
+import temporalio.api.failure.v1.message_pb2
 import temporalio.converter
 
 import temporal_support as _support
@@ -15,6 +16,61 @@ import temporal_support as _support
 
 ContextT = typing.TypeVar("ContextT")
 OutputT = typing.TypeVar("OutputT")
+
+
+@dataclasses.dataclass(slots=True)
+class OptionalPayloads(typing.Generic[OutputT]):
+    details: OutputT | None = None
+
+
+class _OptionalPayloadsTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        OptionalPayloads[OutputT],
+        temporalio.api.failure.v1.message_pb2.CanceledFailureInfo,
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.failure.v1.message_pb2.CanceledFailureInfo] | None
+    ) = temporalio.api.failure.v1.message_pb2.CanceledFailureInfo
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.failure.v1.message_pb2.CanceledFailureInfo,
+        type_hint: type[OptionalPayloads[OutputT]],
+    ) -> OptionalPayloads[OutputT]:
+        (output_type,) = typing.get_args(type_hint) or (typing.Any,)
+        if len(value.details.payloads) > 1:
+            raise ValueError(
+                f"expected at most one payload in OptionalPayloads.details, found {len(value.details.payloads)}"
+            )
+        return OptionalPayloads(
+            details=typing.cast(
+                OutputT,
+                (
+                    _support.payloads_from_proto(value.details, [output_type])[0]
+                    if value.details.payloads
+                    else None
+                ),
+            )
+            if value.HasField("details")
+            else None,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: OptionalPayloads[OutputT],
+    ) -> temporalio.api.failure.v1.message_pb2.CanceledFailureInfo:
+        message = temporalio.api.failure.v1.message_pb2.CanceledFailureInfo()
+        if value.details is not None:
+            message.details.CopyFrom(_support.payloads_to_proto([value.details]))
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _OptionalPayloadsTransferTypeConverter[typing.Any]
+)(OptionalPayloads)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)

@@ -1,0 +1,9 @@
+package test:reserved-field-name;
+
+world system { export models; }
+
+interface models {
+  record request {
+    include: string,
+  }
+}

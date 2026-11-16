@@ -1,0 +1,10 @@
+package test:merge;
+world system { export api; }
+interface api {
+  record request {
+    target: string,
+    /// @nexus.merge-from-function function="target" java="merge"
+    value: string,
+  }
+  call: func(request: request);
+}

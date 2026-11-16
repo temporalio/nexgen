@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from nexusrpc import Operation, service
-import typing
-import temporalio.workflow
-
 from .models import (
     GetShowcaseInput,
     Showcase,
@@ -17,9 +14,9 @@ class ShowcaseServicePy:
     """Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
     override: the emitted service code identifier is renamed to the derived name plus a
     per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`,
-    Python class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the
-    wire service name / `@Service` / `ServiceName` string stays
-    `example.showcase.v1.ShowcaseService`.
+    Python class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`, C# interface
+    `IShowcaseServiceCs`) while the wire service name / `@Service` / `ServiceName`
+    string stays `example.showcase.v1.ShowcaseService`.
     """
 
     get_showcase_py: Operation[
@@ -29,25 +26,7 @@ class ShowcaseServicePy:
     """Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override:
     the emitted operation code identifier is renamed to the derived name plus a
     per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
-    `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
-    `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from
-    the operation key, not the override).
+    `get_showcase_py`, Java `getShowcaseJava`, C# `GetShowcaseCs`) while the wire
+    operation name stays `GetShowcase` and the synthesized I/O type stays
+    `GetShowcaseInput` (derived from the operation key, not the override).
     """
-
-
-class ShowcaseServicePyClient:
-    def __init__(self, endpoint: str) -> None:
-        self._nexus_client: typing.Any = temporalio.workflow.create_nexus_client(
-            service="example.showcase.v1.ShowcaseService",
-            endpoint=endpoint,
-        )
-
-    async def get_showcase_py(
-        self,
-        request: GetShowcaseInput,
-    ) -> temporalio.workflow.NexusOperationHandle[Showcase]:
-        return await self._nexus_client.start_operation(
-            operation="GetShowcase",
-            input=request,
-            output_type=Showcase,
-        )

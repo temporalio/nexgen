@@ -20,4 +20,13 @@ public interface TypeShowcase {
 
   @io.nexusrpc.Operation(name = "Deactivate")
   void deactivate(wit.typeshowcase.DeactivateRequest request);
+
+  @io.nexusrpc.Operation(name = "UpdateLabels")
+  void updateLabels(wit.typeshowcase.UpdateLabelsRequest request);
+
+  @io.nexusrpc.Operation(name = "UpdateNotificationSettings")
+  void updateNotificationSettings(wit.typeshowcase.UpdateNotificationSettingsRequest request);
+
+  @io.nexusrpc.Operation(name = "GetSyncSettings")
+  wit.typeshowcase.SyncSettings getSyncSettings(wit.typeshowcase.GetSyncSettingsRequest request);
 }

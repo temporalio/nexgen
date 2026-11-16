@@ -97,7 +97,7 @@ public final class StartWorkflowRequest {
       return this;
     }
 
-    private String namespace = null;
+    private String namespace = "";
 
     public Builder setNamespace(String value) {
       this.namespace = value;
@@ -106,11 +106,7 @@ public final class StartWorkflowRequest {
 
     public StartWorkflowRequest build() {
       return new StartWorkflowRequest(
-          workflow,
-          workflowId,
-          taskQueue,
-          workflowStartDelay,
-          namespace == null ? support.TemporalModelConverters.workflowNamespace() : namespace);
+          workflow, workflowId, taskQueue, workflowStartDelay, namespace);
     }
   }
 

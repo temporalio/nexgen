@@ -1,5 +1,5 @@
 // Drives the `nexgen` binary over the WIT/proto CLI surface (`--descriptors`,
-// `--native-api`, `--support-package`), all behind the `advanced` feature.
+// `--targets`, `--support-package`), all behind the `advanced` feature.
 #![cfg(feature = "advanced")]
 
 use std::collections::BTreeMap;
@@ -9,14 +9,11 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use nexgen::generator::generate_source;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod common;
 use common::{json_input_path, wit_input_path};
 
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
-const TYPE_ROUNDTRIP_EXAMPLE_ID: &str = "type-roundtrip";
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// A property whose union has one inline structured object branch (named
@@ -87,26 +84,6 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     fn visit(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
         let mut entries = fs::read_dir(dir)
@@ -138,64 +115,6 @@ fn read_python_package_files(dir: &Path) -> BTreeMap<PathBuf, String> {
     files
 }
 
-fn render_output_files(files: BTreeMap<PathBuf, String>) -> String {
-    files
-        .into_iter()
-        .map(|(path, contents)| format!("### {}\n{contents}", path.display()))
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
-fn generate_python_to_string(input_paths: &[PathBuf], descriptor_paths: &[PathBuf]) -> String {
-    let temp_dir = unique_output_path("python-rendered");
-    let output_path = temp_dir.join("output");
-    generate_to_file(&GenerateRequest {
-        config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
-            ..Default::default()
-        },
-        language: nexgen::language::Language::Python,
-        input_paths: input_paths.to_vec(),
-        support_package: Some("temporal_support".into()),
-        descriptor_paths: descriptor_paths.to_vec(),
-        output_path: output_path.clone(),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-    })
-    .unwrap();
-    let rendered = if output_path.is_file() {
-        fs::read_to_string(&output_path).unwrap()
-    } else {
-        render_output_files(read_python_package_files(&output_path))
-    };
-    fs::remove_dir_all(temp_dir).unwrap();
-    rendered
-}
-
-fn generate_python_package_files(
-    input_paths: &[PathBuf],
-    descriptor_paths: &[PathBuf],
-) -> BTreeMap<PathBuf, String> {
-    let temp_dir = unique_output_path("python-package");
-    let output_path = temp_dir.join("output");
-    generate_to_file(&GenerateRequest {
-        config: Default::default(),
-        language: nexgen::language::Language::Python,
-        input_paths: input_paths.to_vec(),
-        support_package: Some("temporal_support".into()),
-        descriptor_paths: descriptor_paths.to_vec(),
-        output_path: output_path.clone(),
-        format: false,
-        java_package_name: None,
-        ts_date_time_types: Default::default(),
-    })
-    .unwrap();
-    let files = read_python_package_files(&output_path);
-    fs::remove_dir_all(temp_dir).unwrap();
-    files
-}
-
 fn unique_output_path(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -213,6 +132,7 @@ fn cli_generates_wit_direct_example_without_descriptors() {
         .args([
             "python",
             wit_input_path(&root, "user-service").to_str().unwrap(),
+            "--targets=workflow",
             "--output",
             output_path.to_str().unwrap(),
             "--support-package",
@@ -266,569 +186,6 @@ fn cli_requires_support_package_for_wit_but_not_json_schema() {
     fs::remove_dir_all(output_path).unwrap();
 }
 
-#[test]
-fn cli_defaults_to_definitions_without_native_api_or_endpoint() {
-    let temp_dir = unique_output_path("python-definitions-only");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("input.wit");
-    let output_path = temp_dir.join("output");
-    fs::write(
-        &input_path,
-        r#"
-package temporal:example@1.0.0;
-
-world system {
-  export example-service;
-}
-
-interface example-service {
-  record request {
-    name: string,
-  }
-
-  record response {
-    message: string,
-  }
-
-  example-operation: func(request: request) -> response;
-}
-"#,
-    )
-    .unwrap();
-
-    let output = Command::new(env!("CARGO_BIN_EXE_nexgen"))
-        .args([
-            "python",
-            input_path.to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--support-package",
-            "temporal_support",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(output_path.join("__init__.py").is_file());
-    assert!(output_path.join("models.py").is_file());
-    assert!(output_path.join("services.py").is_file());
-    assert!(!output_path.join("operations/example_operation.py").exists());
-
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn python_request_models_are_bidirectional_wire_models() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("Python package should include models.py");
-    let rendered = generate_python_to_string(
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-
-    assert!(!rendered.contains("SignalWithStartWorkflowRequest.from_proto"));
-    assert!(!rendered.contains(
-        "proto: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,\n    ) -> SignalWithStartWorkflowRequest:"
-    ));
-    assert!(rendered.contains("class SignalWithStartWorkflowRequest:"));
-    assert!(rendered.contains(
-        "@dataclasses.dataclass(slots=True, kw_only=True)\nclass SignalWithStartWorkflowRequest:\n    \"\"\"Request fields for signaling a workflow, starting it first if needed.\n\n    .. warning::\n        This API is experimental and subject to change.\n    \"\"\"\n    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]\n    args: list[typing.Any] | None = None\n    id: str\n    task_queue: str\n    signal: str | collections.abc.Callable[..., None | collections.abc.Awaitable[None]]\n    signal_args: list[typing.Any] | None = None\n    execution_timeout: datetime.timedelta | None = None"
-    ));
-    assert!(rendered.contains("temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE"));
-    assert!(rendered.contains("args: list[typing.Any] | None = None"));
-    assert!(rendered.contains("signal_args: list[typing.Any] | None = None"));
-    assert!(!rendered.contains("args: tuple[typing.Any, ...] | None = None"));
-    assert!(!rendered.contains("signal_args: tuple[typing.Any, ...] | None = None"));
-    assert!(!rendered.contains("(typing.TypedDict, total=False):"));
-    assert!(!rendered.contains("typing.Unpack["));
-    assert!(!rendered.contains("namespace: str | None = None"));
-    assert!(!rendered.contains("namespace: str | None"));
-    assert!(rendered.contains("namespace: str = ("));
-    assert!(rendered.contains("dataclasses.field(default_factory=_support.workflow_namespace)"));
-    assert!(rendered.contains("message.namespace = value.namespace"));
-    assert!(rendered.contains("result = await handle"));
-    assert!(rendered.contains(
-        "from temporalio.workflow import (\n        create_nexus_client,\n        get_external_workflow_handle,\n    )"
-    ));
-    assert!(rendered.contains("return get_external_workflow_handle("));
-    assert!(rendered.contains("run_id=result.run_id"));
-    assert!(rendered.contains("async def _signal_with_start_workflow("));
-    assert!(rendered.contains("request: SignalWithStartWorkflowRequest"));
-    assert!(rendered.contains(
-        "if typing.TYPE_CHECKING:\n    from temporalio.workflow import ExternalWorkflowHandle"
-    ));
-    assert!(rendered.contains(") -> ExternalWorkflowHandle[object]:"));
-    assert!(rendered.contains("    nexus_client = create_nexus_client("));
-    assert!(rendered.contains("async def signal_with_start_workflow("));
-    assert!(rendered.contains("@typing.overload"));
-    assert!(rendered.contains("workflow: str,"));
-    assert!(rendered.contains("*args: object,"));
-    assert!(rendered.contains("id: str,"));
-    assert!(rendered.contains("args: list[typing.Any] | None = ...,"));
-    assert!(rendered.contains(
-        "workflow: collections.abc.Callable[[SelfType, typing_extensions.Unpack[WorkflowArgs]], collections.abc.Awaitable[WorkflowResult]],"
-    ));
-    assert!(rendered.contains("WorkflowArgs = typing_extensions.TypeVarTuple(\"WorkflowArgs\")"));
-    assert!(rendered.contains("WorkflowResult = typing.TypeVar(\"WorkflowResult\")"));
-    assert!(rendered.contains("SelfType = typing.TypeVar(\"SelfType\")"));
-    assert!(rendered.contains(") -> ExternalWorkflowHandle[SelfType]:"));
-    assert!(rendered.contains("*args: typing_extensions.Unpack[WorkflowArgs],"));
-    assert!(rendered.contains("args: list[typing.Any],"));
-    assert!(!rendered.contains("tuple[FirstWorkflowArg"));
-    assert!(rendered.contains(
-        "signal: collections.abc.Callable[[SelfType, SignalArg], None | collections.abc.Awaitable[None]],"
-    ));
-    assert!(rendered.contains("SignalArg = typing.TypeVar(\"SignalArg\")"));
-    assert!(rendered.contains("signal_args: SignalArg,"));
-    assert!(rendered.contains("signal_args: list[typing.Any],"));
-    assert!(rendered.contains(
-        "async def signal_with_start_workflow(\n    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]],\n    *positional_args: object,\n    args: list[typing.Any] | None = None,\n    id: str,\n    task_queue: str,\n    signal: str | collections.abc.Callable[..., None | collections.abc.Awaitable[None]],\n    signal_args: object | list[typing.Any] | None = None,"
-    ));
-    assert!(rendered.contains(
-        "signal: str | collections.abc.Callable[..., None | collections.abc.Awaitable[None]],"
-    ));
-    assert!(rendered.contains("args: list[typing.Any] | None = None,"));
-    assert_eq!(
-        rendered
-            .matches("Signal a workflow, starting it first if needed.")
-            .count(),
-        1
-    );
-    assert!(rendered.contains(
-        "\"\"\"Signal a workflow, starting it first if needed.\n\n    .. warning::\n        This API is experimental and subject to change.\n\n    Args:\n        workflow: Workflow type name or callable identifying the workflow to start.\n        positional_args: Positional arguments for workflow. Cannot be set if args is\n            set.\n        args: List-form arguments for workflow. Cannot be set if positional_args are\n            set. For typed workflow callables, list contents are not statically\n            typechecked; pass workflow arguments positionally for precise typechecking.\n        id: Unique identifier for the workflow execution. Must be nonempty.\n        task_queue: Task queue to run the workflow on.\n        signal: Signal name or callable to send with the start request.\n        signal_args: Argument value, or list of argument values, for signal. For typed\n            single-argument signals, scalar signal_args values are statically\n            typechecked. List-form signal_args values are not precisely typechecked. To\n            pass a single signal argument that is itself a list, wrap it in another\n            list; otherwise the list is interpreted as multiple signal arguments."
-    ));
-    assert!(rendered.contains(
-        "cron_schedule: Cron schedule for recurring workflow executions. See\n            https://docs.temporal.io/cron-job."
-    ));
-    assert!(rendered.contains(
-        "static_summary: Single-line fixed summary for the workflow execution that may\n            appear in UI and CLI. This can be in single-line Temporal Markdown format."
-    ));
-    assert!(rendered.contains(
-        "\n\n    Returns:\n        A workflow handle to the started workflow.\n    \"\"\""
-    ));
-    assert!(rendered.contains(
-        "id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (\n        temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE\n    ),"
-    ));
-    assert!(
-        rendered.contains(
-            "id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = None,"
-        )
-    );
-    assert!(rendered.contains("static_summary: str | None = None,"));
-    assert!(rendered.contains("static_details: str | None = None,"));
-    assert!(!rendered.contains("identity: str | None"));
-    assert!(!rendered.contains("user_metadata_static_summary:"));
-    assert!(!rendered.contains("user_metadata_static_details:"));
-    assert!(rendered.contains("request = SignalWithStartWorkflowRequest("));
-    assert!(rendered.contains("workflow=workflow,"));
-    assert!(!rendered.contains("def _nexus_is_function_args_list("));
-    assert!(!rendered.contains("def _nexus_normalize_function_args("));
-    assert!(!rendered.contains("_nexus_arg_unset = object()"));
-    assert!(rendered.contains("if positional_args and args is not None:"));
-    assert!(
-        rendered.contains("raise TypeError(\"cannot specify both positional arguments and args\")")
-    );
-    assert!(rendered.contains("normalized_args: list[typing.Any] | None = ("));
-    assert!(rendered.contains("list(positional_args)"));
-    assert!(rendered.contains("else args"));
-    assert!(rendered.contains(
-        "normalized_signal_args: list[typing.Any] | None\n    if signal_args is None:\n        normalized_signal_args = None\n    elif isinstance(signal_args, list):\n        normalized_signal_args = typing.cast(list[typing.Any], signal_args)\n    else:\n        normalized_signal_args = [signal_args]"
-    ));
-    assert!(rendered.contains("user_metadata = ("));
-    assert!(rendered.contains("if static_summary is None and static_details is None"));
-    assert!(rendered.contains("static_summary=static_summary,"));
-    assert!(rendered.contains("static_details=static_details,"));
-    assert!(rendered.contains("args=normalized_args,"));
-    assert!(rendered.contains("id=id,"));
-    assert!(rendered.contains("signal_args=normalized_signal_args,"));
-    assert!(rendered.contains("user_metadata=user_metadata,"));
-    assert!(rendered.contains("return await _signal_with_start_workflow(request)"));
-    assert!(models.contains("payloads_to_proto(value.args)"));
-    assert!(models.contains("def from_transfer_type("));
-    assert!(models.contains("  # pyright: ignore[reportUnusedCallResult]\n"));
-    assert!(!models.contains("_ = temporalio.converter.transfer_type_convertible("));
-    assert!(!models.contains("@temporalio.converter.transfer_type_convertible("));
-    assert!(!models.contains("def from_proto("));
-    assert!(models.contains("import temporal_support as _support"));
-    assert!(models.contains("_support.retry_policy_to_proto("));
-    assert!(rendered.contains("import temporal_support as _support"));
-    assert!(rendered.contains(
-        "): _NexusOperationInfo(\n        operation=_services.WorkflowService.signal_with_start_workflow,\n        serialization_context=_support.signal_with_start_workflow_serialization_context,\n    ),"
-    ));
-    assert!(rendered.contains(
-        "handle = await nexus_client.start_operation(\n        operation=\"SignalWithStartWorkflowExecution\",\n        input=request,\n        output_type=SignalWithStartWorkflowResponse,\n    )"
-    ));
-    assert!(!rendered.contains("class SignalWithStartWorkflowModelRequest(typing.Protocol):"));
-    assert!(!rendered.contains("def signal_with_start_workflow_serialization_context("));
-
-    let type_roundtrip_rendered = generate_python_to_string(
-        &example_input_paths(&root, TYPE_ROUNDTRIP_EXAMPLE_ID),
-        &[descriptor_path(&root)],
-    );
-    assert!(type_roundtrip_rendered.contains("async def activity_options_operation("));
-    assert!(type_roundtrip_rendered.contains("task_queue: str | None = None,"));
-    assert!(type_roundtrip_rendered.contains("retry_policy: temporalio.common.RetryPolicy,"));
-    assert!(type_roundtrip_rendered.contains("request = ActivityOptions("));
-}
-
-#[test]
-fn python_standalone_proto_oneof_models_are_exported_and_converted() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, "proto-oneof"),
-        &[descriptor_path(&root)],
-    );
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("standalone Python package should include models.py");
-    let package_init = package
-        .get(&PathBuf::from("__init__.py"))
-        .expect("standalone Python package should include __init__.py");
-    assert!(!package.contains_key(&PathBuf::from("services.py")));
-    assert!(!package_init.contains("OutcomeClient"));
-
-    let outcome_model = models
-        .find("class Outcome(typing.Generic[OutputT]):")
-        .expect("generic model should be emitted");
-    let outcome_converter = models
-        .find("class _OutcomeTransferTypeConverter(")
-        .expect("generic converter should be emitted");
-    let outcome_registration = models
-        .find(
-            "temporalio.converter.transfer_type_convertible(_OutcomeTransferTypeConverter[typing.Any])(Outcome)",
-        )
-        .expect("generic converter should be registered");
-    assert!(outcome_model < outcome_converter);
-    assert!(outcome_converter < outcome_registration);
-    assert!(models.contains("Outcome[OutputT]"));
-    assert!(!models.contains("\"Outcome[typing.Any]\""));
-    assert!(!models.contains("@typing.cast("));
-    assert!(models.contains("output_type, = typing.get_args(type_hint) or (typing.Any,)"));
-    assert!(models.contains(
-        "@dataclasses.dataclass(slots=True)\nclass OutcomeValueSuccess(typing.Generic[OutputT]):\n    value: OutputT"
-    ));
-    assert!(!models.contains("@dataclasses.dataclass(slots=True, init=False)"));
-    assert!(!models.contains("tag: typing.Literal[\"success\"]"));
-    assert!(models.contains("class OutcomeValueFailure:"));
-    assert!(models.contains(
-        "OutcomeValue = (\n    OutcomeValueSuccess[OutputT]\n    | OutcomeValueFailure\n)"
-    ));
-    assert!(models.contains("    value: OutcomeValue[OutputT]\n"));
-    assert!(!models.contains("value: OutcomeValue[OutputT] | None"));
-    assert!(!models.contains("class Failure:"));
-    assert!(!models.contains("class Payloads:"));
-    assert!(models.contains(
-        "        _oneof_value: OutcomeValueSuccess[OutputT] | OutcomeValueFailure\n        match value.WhichOneof(\"value\"):\n            case \"success\":\n"
-    ));
-    assert!(models.contains(
-        "            case None:\n                raise ValueError(\"missing required field Outcome.value\")\n"
-    ));
-    assert!(!models.contains("unknown protobuf oneof case"));
-    assert!(models.contains(
-        "typing.cast(OutputT, _support.payloads_from_proto(value.success, [output_type])[0])"
-    ));
-    assert!(models.contains(
-        "_oneof_value = OutcomeValueFailure(_support.failure_from_proto(value.failure))"
-    ));
-    assert!(models.contains(
-        "        match value.value:\n            case OutcomeValueSuccess():\n                message.success.CopyFrom(_support.payloads_to_proto([value.value.value]))\n            case OutcomeValueFailure():\n                message.failure.CopyFrom(_support.failure_to_proto(value.value.value))\n"
-    ));
-    assert!(models.contains(
-        "        if value.activity is not None:\n            match value.activity:\n                case ActivitySelectionId():\n"
-    ));
-    assert!(!models.contains("runtime_value"));
-    assert!(!models.contains("unsupported variant case"));
-    assert!(models.contains("class PauseActivityRequest:"));
-    assert!(models.contains(
-        "temporalio.converter.transfer_type_convertible(_PauseActivityRequestTransferTypeConverter)(PauseActivityRequest)"
-    ));
-    assert!(models.contains("namespace: str"));
-    assert!(models.contains("execution: WorkflowExecution | None = None"));
-    assert!(models.contains("identity: str"));
-    assert!(models.contains("activity: ActivitySelection | None = None"));
-    assert!(models.contains("reason: str"));
-    assert!(models.contains("request_id: str"));
-    assert!(models.contains("class WorkflowExecution:"));
-    assert!(models.contains(
-        "        _oneof_activity: ActivitySelectionId | ActivitySelectionType | None\n        match value.WhichOneof(\"activity\"):\n"
-    ));
-    assert!(models.contains("            case None:\n                _oneof_activity = None\n"));
-    assert!(package_init.contains("ActivitySelection,"));
-    assert!(package_init.contains("ActivitySelectionId,"));
-    assert!(package_init.contains("ActivitySelectionType,"));
-    assert!(package_init.contains("OutcomeValue,"));
-    assert!(package_init.contains("OutcomeValueSuccess,"));
-    assert!(package_init.contains("OutcomeValueFailure,"));
-    assert!(package_init.contains("PauseActivityRequest,"));
-}
-
-#[test]
-fn python_notification_models_do_not_emit_an_empty_service() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, "notification-service"),
-        &[descriptor_path(&root)],
-    );
-    let package_init = package
-        .get(&PathBuf::from("__init__.py"))
-        .expect("notification package should include __init__.py");
-
-    assert!(package.contains_key(&PathBuf::from("models.py")));
-    assert!(!package.contains_key(&PathBuf::from("services.py")));
-    assert!(package_init.contains("OnCompleteRequest,"));
-    assert!(package_init.contains("OnCompleteResponse,"));
-    assert!(!package_init.contains("NotificationServiceClient"));
-}
-
-#[test]
-fn python_non_proto_variants_remain_tagged_tuples_without_transfer_converters() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, "type-showcase"),
-        &[descriptor_path(&root)],
-    );
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("type showcase should include models.py");
-    let resource = package
-        .get(&PathBuf::from("_resources/user.py"))
-        .expect("type showcase should include the User resource module");
-
-    assert!(models.contains(
-        "NotificationTarget = (\n    tuple[typing.Literal[\"email\"], str]\n    | tuple[typing.Literal[\"sms\"], str]\n    | tuple[typing.Literal[\"none\"]]\n)"
-    ));
-    assert!(!models.contains("class NotificationTargetEmail"));
-    assert!(!models.contains("TransferTypeConverter"));
-    assert!(!resource.contains("TransferTypeConverter"));
-}
-
-#[test]
-fn python_rejects_proto_variant_case_class_name_collisions() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-proto-variant-case-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let collision_path = temp_dir.join("collision.wit");
-    let fixture = fs::read_to_string(wit_input_path(&root, "proto-oneof")).unwrap();
-    let fixture = fixture.strip_suffix("}\n").unwrap();
-    fs::write(
-        &collision_path,
-        format!("{fixture}  record outcome-value-success {{\n    value: string,\n  }}\n}}\n"),
-    )
-    .unwrap();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &[collision_path, linked_inputs_path(&root)],
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "temporal_support",
-    )
-    .unwrap_err();
-
-    assert!(
-        error
-            .to_string()
-            .contains("Python generated name `OutcomeValueSuccess`")
-    );
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn python_proto_generics_propagate_payload_type_hints() {
-    let root = project_root();
-    let package = generate_python_package_files(
-        &example_input_paths(&root, "proto-generic"),
-        &[descriptor_path(&root)],
-    );
-    let models = package
-        .get(&PathBuf::from("models.py"))
-        .expect("proto generic models should include models.py");
-    assert!(
-        !package.keys().any(|path| path.starts_with("_support")),
-        "user support files must not be copied into generated packages"
-    );
-    assert!(models.contains("import temporal_support as _support"));
-
-    assert!(models.contains("class PayloadBackedEnvelope(typing.Generic[OutputT, ContextT]):"));
-    assert!(models.contains("PayloadBackedEnvelope[OutputT, ContextT]"));
-    assert!(models.contains("PayloadBackedOutput[OutputT]"));
-    assert!(models.contains("PayloadBackedContext[ContextT]"));
-    assert!(!models.contains("@typing.cast("));
-    assert!(models.contains(
-        "temporalio.converter.transfer_type_convertible(_PayloadBackedEnvelopeTransferTypeConverter[typing.Any, typing.Any])(PayloadBackedEnvelope)"
-    ));
-    assert!(models.contains(
-        "output_type, context_type = typing.get_args(type_hint) or (typing.Any, typing.Any)"
-    ));
-    assert!(models.contains(
-        "_PayloadBackedOutputTransferTypeConverter().from_transfer_type(value.provider, PayloadBackedOutput[output_type])"
-    ));
-    assert!(models.contains(
-        "_PayloadBackedContextTransferTypeConverter().from_transfer_type(value.scaler, PayloadBackedContext[context_type])"
-    ));
-    assert!(models.contains("output_type, = typing.get_args(type_hint) or (typing.Any,)"));
-    assert!(models.contains("payload_from_proto(value.details, output_type)"));
-    assert!(models.contains("context_type, = typing.get_args(type_hint) or (typing.Any,)"));
-    assert!(models.contains("payload_from_proto(value.details, context_type)"));
-    assert!(
-        models.contains(
-            "typing.cast(OutputT, _support.payload_from_proto(value.details, output_type))"
-        )
-    );
-    assert!(models.contains(
-        "typing.cast(ContextT, _support.payload_from_proto(value.details, context_type))"
-    ));
-    assert!(models.contains("typing.cast(PayloadBackedOutput[OutputT],"));
-    assert!(models.contains("typing.cast(PayloadBackedContext[ContextT],"));
-    assert!(models.contains("_support.payload_from_proto(value.details, output_type)"));
-    assert!(models.contains("_support.payload_to_proto("));
-}
-
-#[test]
-fn python_sourced_helper_import_is_automatic() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-sourced-support-only");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let wit_path = temp_dir.join("source-only.wit");
-    let wit = r#"
-package temporal:source-only@1.0.0;
-
-world system { export models; }
-
-interface models {
-  type placeholder = string;
-
-  /// @nexus.proto "temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest"
-  record cancel-request {
-    /// @nexus.source python="workflow_namespace()"
-    namespace: string,
-    /// @nexus.omit
-    workflow-execution: placeholder,
-    /// @nexus.omit
-    reason: placeholder,
-    /// @nexus.omit
-    identity: placeholder,
-    /// @nexus.omit
-    request-id: placeholder,
-    /// @nexus.omit
-    first-execution-run-id: placeholder,
-    /// @nexus.omit
-    links: placeholder,
-  }
-}
-"#;
-    fs::write(&wit_path, wit).unwrap();
-    let files = generate_python_package_files(&[wit_path], &[descriptor_path(&root)]);
-    let models = &files[&PathBuf::from("models.py")];
-    assert!(models.contains("import temporal_support as _support"));
-    assert!(models.contains("default_factory=_support.workflow_namespace"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
-#[test]
-fn python_proto_helpers_use_the_supplied_support_module() {
-    let root = project_root();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &example_input_paths(&root, PRIMARY_EXAMPLE_ID),
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let output = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "company.shared.temporal_support",
-    )
-    .unwrap();
-
-    assert!(output.contains("import company.shared.temporal_support as _support"));
-    assert!(output.contains("_support.retry_policy_to_proto("));
-    assert!(output.contains("_support.signal_with_start_workflow_serialization_context"));
-    assert!(!output.contains("### _support/"));
-}
-
-#[test]
-fn python_generated_standalone_operation_path_collision_names_both_operations() {
-    let root = project_root();
-    let temp_dir = unique_output_path("python-operation-path-collision");
-    fs::create_dir_all(&temp_dir).unwrap();
-    let input_path = temp_dir.join("operations-collision.wit");
-    fs::write(
-        &input_path,
-        r#"
-package temporal:collision@1.0.0;
-
-world system {
-  export first-service;
-  export second-service;
-}
-
-/// @nexus.endpoint "first"
-interface first-service {
-  record first-request {
-    value: string,
-  }
-  collide: func(request: first-request);
-}
-
-/// @nexus.endpoint "second"
-interface second-service {
-  record second-request {
-    value: string,
-  }
-  collide: func(request: second-request);
-}
-"#,
-    )
-    .unwrap();
-    let spec = nexgen::parser::load_api_spec_from_wit_for_language_with_inputs(
-        nexgen::language::Language::Python,
-        &[input_path],
-    )
-    .unwrap();
-    let descriptors = nexgen::descriptors::DescriptorIndex::load(&descriptor_path(&root)).unwrap();
-    let error = generate_source(
-        nexgen::language::Language::Python,
-        spec,
-        &descriptors,
-        "temporal_support",
-    )
-    .unwrap_err();
-
-    let nexgen::error::Error::GeneratedFileSourceConflict {
-        path,
-        first_source,
-        second_source,
-        remedy,
-    } = error
-    else {
-        panic!("expected generated-file source conflict, got {error}");
-    };
-    assert_eq!(path, PathBuf::from("operations/collide.py"));
-    assert_eq!(first_source, "Python operation `FirstService.Collide`");
-    assert_eq!(second_source, "Python operation `SecondService.Collide`");
-    assert!(remedy.contains("operation `Collide` in service `FirstService`"));
-    assert!(remedy.contains("operation `Collide` in service `SecondService`"));
-    assert!(!remedy.contains("generated output"));
-    fs::remove_dir_all(temp_dir).unwrap();
-}
-
 /// An inline **structured** object `oneOf` branch on a property: the branch is
 /// named `<Union>Object` and emitted as a module-level dataclass, which the
 /// union's dispatcher selects for the object member of the union.
@@ -851,6 +208,7 @@ fn python_json_names_inline_object_union_branch() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -888,6 +246,7 @@ fn python_json_validates_non_object_union_branch_constraints() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -943,6 +302,7 @@ fn python_json_annotates_element_position_unions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1034,6 +394,7 @@ fn generate_python_schema_tree(name: &str, files: &[(&str, &str)]) -> (PathBuf, 
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     (temp_dir, output_path)
@@ -1154,6 +515,7 @@ fn python_json_cross_module_py_name_override_moves_every_reference() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1216,6 +578,7 @@ fn python_json_rejects_same_type_name_in_two_modules() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     };
 
     let error = generate_to_file(&request("out"))
@@ -1289,6 +652,7 @@ services:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1336,6 +700,7 @@ fn generate_unformatted_python_package(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output_path
@@ -1409,6 +774,7 @@ $defs:
             format: false,
             java_package_name: None,
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         })
         .unwrap_err()
         .to_string();

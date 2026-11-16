@@ -1,0 +1,12 @@
+package test:parameter-map-key;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.type-parameter
+  type key-t = string;
+
+  type keyed-values = map<key-t, string>;
+
+  record request { by-key: keyed-values }
+}

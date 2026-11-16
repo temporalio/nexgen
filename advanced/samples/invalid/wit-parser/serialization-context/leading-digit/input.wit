@@ -1,0 +1,10 @@
+package test:context-leading-digit;
+
+world system { export api; }
+
+interface api {
+  record request { value: string }
+
+  /// @nexus.serialization-context go="1context"
+  send: func(request: request);
+}

@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use nexgen::generator::TsDateTimeTypes;
 use nexgen::language::Language;
 #[cfg(feature = "advanced")]
-use nexgen::nexgen_config::NexgenConfig;
+use nexgen::nexgen_config::{GenerationTarget, NexgenConfig};
 #[cfg(feature = "advanced")]
 use nexgen::parser::write_prepared_wit_directory;
 #[cfg(feature = "advanced")]
@@ -23,9 +23,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[cfg(feature = "advanced")]
     #[command(about = "Generate C# / .NET bindings")]
-    Dotnet(SupportPackageGenerateArgs),
+    Dotnet(DotnetGenerateArgs),
     #[command(about = "Generate Go bindings")]
     Go(SupportPackageGenerateArgs),
     #[command(about = "Generate Java bindings")]
@@ -61,13 +60,15 @@ struct GenerateArgs {
     #[cfg(feature = "advanced")]
     #[arg(long)]
     format: bool,
-    #[cfg(feature = "advanced")]
-    #[arg(long = "native-api")]
-    generate_native_api: bool,
     /// Generate Temporal System Nexus-specific bindings.
     #[cfg(feature = "advanced")]
     #[arg(long = "system-nexus")]
     system_nexus: bool,
+    /// Generate APIs for these callers: workflow or client (Python only).
+    /// Defaults to models and definitions only. Repeat the flag or use commas.
+    #[cfg(feature = "advanced")]
+    #[arg(long = "targets", value_enum, value_delimiter = ',')]
+    targets: Vec<GenerationTarget>,
 }
 
 #[derive(Args)]
@@ -77,6 +78,16 @@ struct SupportPackageGenerateArgs {
     /// Import path or namespace of the user-owned support package (required for WIT).
     #[arg(long = "support-package")]
     support_package: Option<String>,
+}
+
+#[derive(Args)]
+struct DotnetGenerateArgs {
+    #[command(flatten)]
+    common: SupportPackageGenerateArgs,
+    /// The root namespace for generated types (required for JSON Schema).
+    /// Each input module's types live in a namespace below it.
+    #[arg(long = "namespace")]
+    namespace: Option<String>,
 }
 
 #[derive(Args)]
@@ -165,21 +176,27 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        #[cfg(feature = "advanced")]
-        Commands::Dotnet(args) => generate_to_file(&generate_request(
-            Language::Dotnet,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
-        Commands::Go(args) => generate_to_file(&generate_request(
-            Language::Go,
-            args.common,
-            Default::default(),
-            None,
-            args.support_package,
-        )),
+        Commands::Dotnet(args) => {
+            let mut request = generate_request(
+                Language::Dotnet,
+                args.common.common,
+                Default::default(),
+                None,
+                args.common.support_package,
+            );
+            request.dotnet_namespace = args.namespace;
+            generate_to_file(&request)
+        }
+        Commands::Go(args) => {
+            let request = generate_request(
+                Language::Go,
+                args.common,
+                Default::default(),
+                None,
+                args.support_package,
+            );
+            generate_to_file(&request)
+        }
         Commands::Java(args) => generate_to_file(&generate_request(
             Language::Java,
             args.common,
@@ -187,72 +204,20 @@ fn main() -> ExitCode {
             Some(args.package_name),
             args.support_package,
         )),
-        Commands::Python(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
-                    system_nexus,
-                };
-                let mut request = generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::Python,
-                    args.common,
-                    Default::default(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
-        Commands::Typescript(args) => {
-            #[cfg(feature = "advanced")]
-            {
-                let system_nexus = args.common.system_nexus;
-                let config = NexgenConfig {
-                    mode: if args.common.generate_native_api {
-                        nexgen::generator::GenerationMode::NativeApi
-                    } else {
-                        nexgen::generator::GenerationMode::DefinitionsOnly
-                    },
-                    system_nexus,
-                };
-                let mut request = generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                );
-                request.config = config;
-                generate_to_file(&request)
-            }
-            #[cfg(not(feature = "advanced"))]
-            {
-                generate_to_file(&generate_request(
-                    Language::TypeScript,
-                    args.common,
-                    args.ts_date_time_types.into(),
-                    None,
-                    args.support_package,
-                ))
-            }
-        }
+        Commands::Python(args) => generate_to_file(&generate_request(
+            Language::Python,
+            args.common,
+            Default::default(),
+            None,
+            args.support_package,
+        )),
+        Commands::Typescript(args) => generate_to_file(&generate_request(
+            Language::TypeScript,
+            args.common,
+            args.ts_date_time_types.into(),
+            None,
+            args.support_package,
+        )),
         #[cfg(feature = "advanced")]
         Commands::AddRpc(args) => add_rpc_to_file(&AddRpcRequest {
             descriptor_paths: args.descriptors,
@@ -291,12 +256,8 @@ fn generate_request(
     GenerateRequest {
         #[cfg(feature = "advanced")]
         config: NexgenConfig {
-            mode: if args.generate_native_api {
-                nexgen::generator::GenerationMode::NativeApi
-            } else {
-                nexgen::generator::GenerationMode::DefinitionsOnly
-            },
             system_nexus: args.system_nexus,
+            targets: args.targets,
         },
         #[cfg(not(feature = "advanced"))]
         config: Default::default(),
@@ -314,6 +275,7 @@ fn generate_request(
         format: false,
         java_package_name,
         ts_date_time_types,
+        dotnet_namespace: None,
     }
 }
 
@@ -324,7 +286,7 @@ mod tests {
 
     #[test]
     fn support_package_option_is_available_but_not_a_json_schema_requirement() {
-        for language in ["go", "python", "typescript"] {
+        for language in ["dotnet", "go", "python", "typescript"] {
             assert!(
                 Cli::try_parse_from(["nexgen", language, "input.json", "--output", "out"]).is_ok()
             );
@@ -341,8 +303,18 @@ mod tests {
                 .is_ok()
             );
         }
-        #[cfg(feature = "advanced")]
-        assert!(Cli::try_parse_from(["nexgen", "dotnet", "input.wit", "--output", "out"]).is_ok());
+        assert!(
+            Cli::try_parse_from([
+                "nexgen",
+                "dotnet",
+                "input.json",
+                "--output",
+                "out",
+                "--namespace",
+                "Example.Chat",
+            ])
+            .is_ok()
+        );
         assert!(matches!(
             Cli::try_parse_from([
                 "nexgen",

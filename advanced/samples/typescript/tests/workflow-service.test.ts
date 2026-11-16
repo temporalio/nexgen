@@ -1,11 +1,17 @@
 import { fileURLToPath } from "node:url";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import * as workflow from "@temporalio/workflow";
+import * as common from "@temporalio/common";
 import * as nexus from "nexus-rpc";
 
 import { signalWithStartWorkflow } from "../wit/workflow-service/index.ts";
 import type { SignalWithStartWorkflowRequest } from "../wit/workflow-service/index.ts";
 import { workflowService } from "../wit/workflow-service/services.ts";
+import { signalWithStartWorkflowRequestTransferTypeConverter as requestConverter } from "../wit/workflow-service/models.ts";
+import {
+  headerFromProto,
+  headerToProto,
+} from "../support/temporal_model_converters.ts";
 import { executeWorkflowWithNexus, withWorkflowEnvironment } from "./helpers.ts";
 
 const workflowsPath = fileURLToPath(
@@ -27,6 +33,18 @@ vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
 });
 
 describe("workflow-service generated output", () => {
+  test("passes through encoded interceptor headers", () => {
+    const headers: Record<string, unknown> = {
+      trace: {
+        metadata: { encoding: new TextEncoder().encode("json/plain") },
+        data: new TextEncoder().encode('"trace-id"'),
+      },
+    };
+    const proto = headerToProto(headers);
+    expect(proto.fields).toBe(headers);
+    expect(headerFromProto(proto)).toBe(headers);
+  });
+
   test("exposes workflow service metadata", () => {
     expect(workflowService.name).toBe(
       "temporal.api.workflowservice.v1.WorkflowService",
@@ -52,6 +70,7 @@ describe("workflow-service generated output", () => {
       const result = await executeWorkflowWithNexus<{
         runId: string | undefined;
         workflowId: string;
+        taskQueue: string;
       }>(env, {
         endpoint: "temporal-system",
         nexusServices: [handler],
@@ -62,6 +81,7 @@ describe("workflow-service generated output", () => {
       expect(result).toEqual({
         runId: "run-123",
         workflowId: "workflow-id",
+        taskQueue: expect.any(String),
       });
       expect(calls).toHaveLength(1);
 
@@ -69,7 +89,7 @@ describe("workflow-service generated output", () => {
       expect(request?.namespace).toBe("default");
       expect(request?.workflow).toBe("exampleWorkflow");
       expect(request?.id).toBe("workflow-id");
-      expect(request?.taskQueue).toBe("demo-task-queue");
+      expect(request?.taskQueue).toBe(result.taskQueue);
       expect(request?.signal).toBe("wake-up");
       expect(request?.cronSchedule).toBe("");
     });
@@ -99,8 +119,20 @@ if (false) {
     cronSchedule,
     staticSummary: "Workflow summary",
     staticDetails: "Workflow details",
+    idReusePolicy: common.WorkflowIdReusePolicy.ALLOW_DUPLICATE,
     namespace: "default",
   };
+
+  const wire = requestConverter.toTransferType(request);
+  const decoded = requestConverter.fromTransferType<
+    typeof exampleWorkflow,
+    typeof wakeUpSignal
+  >(wire);
+  expectTypeOf(decoded).toEqualTypeOf<
+    SignalWithStartWorkflowRequest<typeof exampleWorkflow, typeof wakeUpSignal>
+  >();
+  expectTypeOf(decoded.workflow).toEqualTypeOf<string | typeof exampleWorkflow>();
+  expectTypeOf(decoded.signal).toEqualTypeOf<string | typeof wakeUpSignal>();
 
   // @ts-expect-error flattened user metadata fields should be strings
   request.staticSummary = 7;

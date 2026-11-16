@@ -69,6 +69,13 @@ describe("type-showcase generated output", () => {
         async deactivate(_ctx, input) {
           calls.push(["Deactivate", input]);
         },
+        async updateLabels(_ctx, input) {
+          calls.push(["UpdateLabels", input]);
+        },
+        async updateNotificationSettings() {},
+        async getSyncSettings(_ctx, input) {
+          return { region: input.region, checkpoint: input.checkpoint };
+        },
       });
 
       const result = await executeWorkflowWithNexus<{
@@ -138,6 +145,9 @@ describe("type-showcase generated output", () => {
                 "us-west": { tag: "ok", value: "healthy" },
                 "eu-central": { tag: "err", value: "degraded" },
               },
+              itemCount: 3,
+              byteCount: 5_000_000_000,
+              clockSkewMs: -5_000_000_000,
             },
             userId: "user-123",
           },
@@ -162,6 +172,9 @@ describe("type-showcase generated output", () => {
           "us-west": { tag: "ok", value: "healthy" },
           "eu-central": { tag: "err", value: "degraded" },
         },
+        itemCount: 3,
+        byteCount: 5_000_000_000,
+        clockSkewMs: -5_000_000_000,
       },
     };
     expect(expected.report.regionStatus?.["us-west"]).toEqual({

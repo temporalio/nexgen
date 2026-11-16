@@ -1,0 +1,18 @@
+package test:rpc-option-field;
+
+world service { export job-service; }
+
+// A client call takes the RPC options `rpc_metadata` and `rpc_timeout` next to its fields.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  record run-job-request {
+    name: string,
+    rpc-timeout: option<string>,
+  }
+
+  record run-job-response {
+    output: string,
+  }
+
+  run-job: func(request: run-job-request) -> run-job-response;
+}

@@ -1,9 +1,10 @@
 # Go WIT samples
 
-WIT-generated packages live in directories such as `typeroundtrip/` and
+WIT-generated packages live in directories such as `protobackedshowcase/` and
 `workflowservice/`. Hand-written converters live in [`support/`](support/) for
-ordinary Nexus samples and [`systemsupport/`](systemsupport/) for system Nexus
-samples, outside the regenerated directories.
+ordinary Nexus samples and [`systemsupport/`](systemsupport/) for System Nexus
+samples. The workflow-service sample also generates a facade in
+`workflowservice_facade/`.
 
 ## Using the support package
 
@@ -25,23 +26,24 @@ import cycle.
 
 For example, this repository's [`go.mod`](go.mod) and [`support/`](support/)
 make the import path `go.temporal.io/sdk/advanced/samples/go/support`. From the
-repository root, generate its `type-roundtrip` example with:
+repository root, generate its `proto-backed-showcase` example with:
 
 ```sh
-cargo run --features advanced -- go advanced/samples/inputs/type-roundtrip.wit \
+cargo run --features advanced -- go advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package go.temporal.io/sdk/advanced/samples/go/support \
-  --native-api --output advanced/samples/go/typeroundtrip
+  --targets workflow --output advanced/samples/go/protobackedshowcase
 ```
 
-The system Nexus sample support source imports `go.temporal.io/sdk/internal`
+The System Nexus sample support source imports `go.temporal.io/sdk/internal`
 because it lives under the SDK module tree; a project in another module cannot
 copy that import unchanged. Adapt those conversions using APIs available to your
 module. For `@nexus.source`, write the helper call without the package prefix.
 The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
-`support.WorkflowNamespace(ctx)`. The support helper calls
-`workflow.GetInfo(ctx).Namespace`. Run `go test ./...` from this sample module
-after generation. Run the same command from your own module root. See
-[the WIT guide](../../../GUIDE.md#go) for more detail. JSON Schema generation
-does not need user support.
+`support.WorkflowNamespace(ctx)`. The System Nexus support helper calls
+`internal.GetWorkflowInfo(ctx).Namespace`. Run `go test ./...` from this sample
+module after generation. Run the same command from your own module root. See
+[the WIT guide](../../../GUIDE.md#go) for support contracts and
+[`@nexus.facade`](../../../GUIDE.md#nexusfacade) for facade generation. JSON
+Schema generation does not need user support.

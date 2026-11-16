@@ -15,6 +15,9 @@ const syncReport = (): SyncReport => ({
     "us-west": { tag: "ok" as const, value: "healthy" },
     "eu-central": { tag: "err" as const, value: "degraded" },
   },
+  itemCount: 3,
+  byteCount: 5_000_000_000,
+  clockSkewMs: -5_000_000_000,
 });
 
 export async function typeShowcaseCaller(): Promise<{

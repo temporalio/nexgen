@@ -1,6 +1,7 @@
 use std::fmt;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Language {
     Dotnet,
     Go,
@@ -20,6 +21,11 @@ impl Language {
             Self::Ruby => "ruby",
             Self::TypeScript => "typescript",
         }
+    }
+
+    /// Whether nexgen generates the client target for the language.
+    pub const fn has_client_target(self) -> bool {
+        matches!(self, Self::Python)
     }
 }
 

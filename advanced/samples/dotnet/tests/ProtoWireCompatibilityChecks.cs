@@ -5,8 +5,8 @@ using System.Text.Json;
 using Google.Protobuf;
 using Nexgen.Support;
 using Xunit;
-using ActivityOptions = Nexgen.TypeRoundtripService.ActivityOptions;
-using FailureContainer = Nexgen.TypeRoundtripService.FailureContainer;
+using ActivityOptions = Nexgen.ProtoBackedShowcaseService.ActivityOptions;
+using FailureContainer = Nexgen.ProtoBackedShowcaseService.FailureContainer;
 using Payload = Temporalio.Api.Common.V1.Payload;
 
 namespace Nexgen.DotNetExamples.Tests
@@ -26,7 +26,7 @@ namespace Nexgen.DotNetExamples.Tests
                 "activity-options.dotnet.payload.json",
             })
             {
-                var payload = ReadPayload("type_roundtrip", fixtureName);
+                var payload = ReadPayload("proto_backed_showcase", fixtureName);
                 Assert.Equal("json/protobuf", payload.Metadata["encoding"].ToStringUtf8());
                 Assert.Equal(
                     "temporal.api.activity.v1.ActivityOptions",

@@ -71,4 +71,21 @@ public final class User {
             .setReason(reason)
             .build());
   }
+
+  public void updateLabels(
+      @com.fasterxml.jackson.annotation.JsonProperty("tags") java.util.List<String> tags,
+      @com.fasterxml.jackson.annotation.JsonProperty("metadata")
+          java.util.Map<String, String> metadata,
+      @com.fasterxml.jackson.annotation.JsonProperty("extraTags") java.util.List<String> extraTags,
+      @com.fasterxml.jackson.annotation.JsonProperty("extraMetadata")
+          java.util.Map<String, String> extraMetadata) {
+    TypeShowcaseOperations.executeUpdateLabels(
+        wit.typeshowcase.UpdateLabelsRequest.newBuilder()
+            .setUserId(this.userId)
+            .setTags(tags)
+            .setMetadata(metadata)
+            .setExtraTags(extraTags)
+            .setExtraMetadata(extraMetadata)
+            .build());
+  }
 }

@@ -6,7 +6,11 @@ import type { GetUserRequest } from "../models";
 import { User } from "../resources";
 
 /**
+ * Get a user.
+ *
  * @param request - Request for the operation.
+ * @returns The matching user.
+ * @experimental This API is experimental and subject to change.
  */
 export async function getUser(request: GetUserRequest): Promise<User> {
   const client = workflow.createNexusServiceClient({

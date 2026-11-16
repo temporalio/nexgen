@@ -13,6 +13,7 @@ pub(crate) mod typescript;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{PlannedFamily, PlannedSpec, PlannedType};
 use crate::spec::{ApiSpec, RecordSpec};
 use crate::spec::{ApiSpecNode, ApiSpecTree};
@@ -354,15 +355,6 @@ impl GeneratedFileMap {
         Ok(prefixed)
     }
 
-    pub(crate) fn rekey_all(self, path: impl Into<PathBuf>) -> Result<Self> {
-        let path = path.into();
-        let mut rekeyed = Self::default();
-        for file in self.files.into_values() {
-            rekeyed.insert(path.clone(), file.contents, file.origin)?;
-        }
-        Ok(rekeyed)
-    }
-
     pub(crate) fn extend(&mut self, other: Self) -> Result<()> {
         for (path, file) in other.files {
             self.insert(path, file.contents, file.origin)?;
@@ -413,11 +405,19 @@ pub(crate) trait ExternalModelBackend<ModelType = PlannedType> {
     ) -> Option<Self::WireConversion>;
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum GenerationMode {
-    #[default]
-    NativeApi,
-    DefinitionsOnly,
+/// Language-independent package emission order. Backends prepare their metadata
+/// once, emit shared definitions once, then emit each selected API independently.
+pub(crate) fn emit_package<C>(
+    context: &mut C,
+    targets: &[GenerationTarget],
+    models: impl FnOnce(&mut C) -> Result<()>,
+    mut api: impl FnMut(&mut C, GenerationTarget) -> Result<()>,
+) -> Result<()> {
+    models(context)?;
+    for &target in targets {
+        api(context, target)?;
+    }
+    Ok(())
 }
 
 /// The TypeScript in-memory representation of a materialized temporal `format`
@@ -446,17 +446,19 @@ pub(crate) struct GenerateFilesOptions {
     /// The TypeScript temporal representation (`--date-time-types`); ignored by
     /// the non-TypeScript backends.
     pub(crate) ts_date_time_types: TsDateTimeTypes,
+    /// The C# root namespace (`--namespace`); ignored by the other backends.
+    pub(crate) dotnet_namespace: Option<String>,
 }
 
-pub(crate) fn generate_files_for_tree_with_mode_and_options(
+pub(crate) fn generate_files_for_tree_with_targets_and_options(
     language: Language,
     tree: ApiSpecTree,
     descriptors: &DescriptorIndex,
-    mode: GenerationMode,
+    targets: &[GenerationTarget],
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
     let config = crate::nexgen_config::NexgenConfig {
-        mode,
+        targets: targets.to_vec(),
         ..crate::nexgen_config::current()
     };
     let _scope = crate::nexgen_config::scope(config);
@@ -469,9 +471,32 @@ pub(crate) fn generate_files_from_planned_tree(
     descriptors: &DescriptorIndex,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
-    let mode = crate::nexgen_config::current().mode;
+    let targets = crate::nexgen_config::current().targets;
+    fn validate_sources(
+        node: &ApiSpecNode<PlannedFamily>,
+        targets: &[GenerationTarget],
+    ) -> Result<()> {
+        match node {
+            ApiSpecNode::Leaf(leaf) => {
+                for &target in targets {
+                    resource_plan::validate_resource_origins(&leaf.spec, target)?;
+                }
+            }
+            ApiSpecNode::Branch(branch) => {
+                for child in branch.children.values() {
+                    validate_sources(child, targets)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    validate_sources(&tree.root, &targets)?;
     let mut generated = match language {
-        Language::Dotnet => dotnet::generate(tree, options.support_package.as_deref()),
+        Language::Dotnet => dotnet::generate(
+            tree,
+            options.support_package.as_deref(),
+            options.dotnet_namespace.as_deref(),
+        ),
         Language::Go => generate_go_tree(tree, options),
         Language::Java => java::generate(
             tree,
@@ -489,12 +514,31 @@ pub(crate) fn generate_files_from_planned_tree(
         ),
         language => Err(Error::UnsupportedLanguage { language }),
     }?;
-    generated.warnings = if mode == GenerationMode::NativeApi {
+    generated.warnings = if !targets.is_empty() {
         generation_warnings_for_tree(tree)
     } else {
         Vec::new()
     };
     Ok(generated)
+}
+
+pub(crate) fn validate_targets(language: Language) -> Result<()> {
+    let config = crate::nexgen_config::current();
+    if !config.targets.contains(&GenerationTarget::Client) {
+        return Ok(());
+    }
+    if !language.has_client_target() {
+        return Err(Error::UnsupportedClientTarget {
+            reason: format!("isn't for {language} yet"),
+        });
+    }
+    if !config.system_nexus {
+        return Err(Error::SystemNexusRequired {
+            feature: "client API generation",
+            context: format!("language `{language}`"),
+        });
+    }
+    Ok(())
 }
 
 fn generate_go_tree(
@@ -506,7 +550,6 @@ fn generate_go_tree(
         &go::GoOptions {
             output_dir_name: options.go_output_dir_name,
             support_package: options.support_package,
-            ..go::GoOptions::default()
         },
     )
 }
@@ -517,27 +560,21 @@ pub fn generate_source(
     descriptors: &DescriptorIndex,
     support_package: &str,
 ) -> Result<String> {
-    generate_source_with_mode(
-        language,
-        spec,
-        descriptors,
-        support_package,
-        GenerationMode::NativeApi,
-    )
+    generate_source_with_targets(language, spec, descriptors, support_package, &[])
 }
 
-pub fn generate_source_with_mode(
+pub fn generate_source_with_targets(
     language: Language,
     spec: ApiSpec,
     descriptors: &DescriptorIndex,
     support_package: &str,
-    mode: GenerationMode,
+    targets: &[GenerationTarget],
 ) -> Result<String> {
-    let generated = generate_files_for_tree_with_mode_and_options(
+    let generated = generate_files_for_tree_with_targets_and_options(
         language,
         ApiSpecTree::single(spec),
         descriptors,
-        mode,
+        targets,
         GenerateFilesOptions {
             support_package: Some(support_package.to_string()),
             ..GenerateFilesOptions::default()
@@ -607,8 +644,8 @@ mod tests {
     use crate::language::Language;
 
     use super::{
-        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationMode,
-        generate_files_for_tree_with_mode_and_options,
+        GenerateFilesOptions, GeneratedFileMap, GeneratedFileOrigin, GenerationTarget,
+        generate_files_for_tree_with_targets_and_options,
     };
     use crate::spec::ApiSpecTree;
 
@@ -908,11 +945,11 @@ interface user-service {
         .unwrap();
         let descriptors =
             DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() }).unwrap();
-        let generated = generate_files_for_tree_with_mode_and_options(
+        let generated = generate_files_for_tree_with_targets_and_options(
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationMode::NativeApi,
+            &[GenerationTarget::Workflow],
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()
@@ -959,11 +996,11 @@ interface example-service {
         let descriptors =
             DescriptorIndex::from_descriptor_set(FileDescriptorSet { file: Vec::new() }).unwrap();
 
-        let generated = generate_files_for_tree_with_mode_and_options(
+        let generated = generate_files_for_tree_with_targets_and_options(
             Language::Python,
             ApiSpecTree::single(spec),
             &descriptors,
-            GenerationMode::DefinitionsOnly,
+            &[],
             GenerateFilesOptions {
                 support_package: Some("support".to_string()),
                 ..GenerateFilesOptions::default()
@@ -979,5 +1016,105 @@ interface example-service {
                 .contains_key(&PathBuf::from("operations/example_operation.py"))
         );
         assert!(generated.files[&PathBuf::from("services.py")].contains("class ExampleService"));
+    }
+
+    fn workflow_files(language: Language, wit: &str) -> BTreeMap<PathBuf, String> {
+        let _config = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let spec = crate::parser::parse_api_spec_from_wit_for_language_with_inputs(
+            language,
+            wit,
+            PathBuf::from("inline.wit"),
+            &[root.join("advanced/samples/inputs/deps")],
+        )
+        .unwrap();
+        let descriptors = DescriptorIndex::load_many(&[
+            root.join("advanced/samples/descriptors/temporal_api.bin"),
+            root.join("advanced/samples/descriptors/streams.bin"),
+        ])
+        .unwrap();
+        generate_files_for_tree_with_targets_and_options(
+            language,
+            ApiSpecTree::single(spec),
+            &descriptors,
+            &[GenerationTarget::Workflow],
+            GenerateFilesOptions {
+                support_package: Some("support".to_string()),
+                ..GenerateFilesOptions::default()
+            },
+        )
+        .unwrap()
+        .files
+    }
+
+    #[test]
+    fn a_workflow_call_sends_an_omitted_required_list_empty() {
+        let wit = r#"
+package test:jobs@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  record run-request {
+    id: string,
+    /// @nexus.api-omit targets="workflow"
+    tags: list<string>,
+  }
+
+  run: func(request: run-request);
+}
+"#;
+        let python = workflow_files(Language::Python, wit);
+        let operation = &python[&PathBuf::from("operations/run.py")];
+        assert!(operation.contains("tags=[],"), "{operation}");
+        let typescript = workflow_files(Language::TypeScript, wit);
+        let operation = &typescript[&PathBuf::from("operations/run.ts")];
+        assert!(operation.contains("tags: [],"), "{operation}");
+        let dotnet = workflow_files(Language::Dotnet, wit);
+        let models = &dotnet[&PathBuf::from("Models.cs")];
+        assert!(
+            models.contains("Tags = tags ?? System.Array.Empty<string>();"),
+            "{models}"
+        );
+    }
+
+    #[test]
+    fn a_typescript_model_keeps_the_name_optionality_and_long_of_a_sourced_field() {
+        let wit = r#"
+package temporal:nexus@1.0.0;
+
+world system { export stream-service; }
+
+/// @nexus.endpoint "streams"
+interface stream-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
+  record read-records-request {
+    /// @nexus.omit
+    ref: placeholder,
+    /// @nexus.omit
+    from-offset: placeholder,
+    max-records: option<s32>,
+    /// @nexus.omit
+    wait: placeholder,
+    /// @nexus.name typescript="limit"
+    /// @nexus.source targets="workflow" typescript="startLimit()"
+    max-bytes: option<s64>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  read-records: func(request: read-records-request);
+}
+"#;
+        let typescript = workflow_files(Language::TypeScript, wit);
+        let models = &typescript[&PathBuf::from("models.ts")];
+        assert!(models.contains("limit?: Long;"), "{models}");
+        assert!(models.contains("maxBytes: model.limit"), "{models}");
     }
 }

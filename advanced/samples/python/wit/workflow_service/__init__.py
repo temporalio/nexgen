@@ -38,7 +38,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "temporal.api.workflowservice.v1.WorkflowService",
         "SignalWithStartWorkflowExecution",

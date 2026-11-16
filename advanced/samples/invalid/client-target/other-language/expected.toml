@@ -1,0 +1,7 @@
+languages = ["typescript", "go", "dotnet"]
+system_nexus = true
+targets = ["client"]
+
+[error]
+kind = "unsupported-client-target"
+contains = ["the client target isn't for"]

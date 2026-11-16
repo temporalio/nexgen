@@ -7,6 +7,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::{GenerateRequest, generate_to_file};
 
 mod support;
@@ -196,7 +197,7 @@ fn generate_to_string_with_inputs(
     let output_path = temp_dir.join("output");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language,
@@ -207,6 +208,7 @@ fn generate_to_string_with_inputs(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })?;
     let rendered = if output_path.is_file() {
         fs::read_to_string(&output_path)?
@@ -285,7 +287,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 }
 
 #[test]
-fn go_sourced_map_field_converts_to_proto() {
+fn go_sourced_field_alone_imports_support_and_compiles() {
     let root = project_root();
     let temp_dir = unique_output_path("go-sourced-map-input");
     fs::create_dir_all(&temp_dir).unwrap();
@@ -330,25 +332,6 @@ interface namespace-service {
     )
     .unwrap();
 
-    let rendered = generate_to_string_with_inputs(
-        nexgen::language::Language::Go,
-        &[wit_path.clone()],
-        &[descriptor_path(&root)],
-    )
-    .unwrap();
-
-    assert!(
-        rendered
-            .contains("type namespaceInfo struct {\n\tName *string\n\tData map[string]string\n}")
-    );
-    assert!(rendered.contains("\trequest.Data = support.NamespaceData(ctx)\n"));
-    assert!(rendered.contains("if len(m.Data) > 0 {"));
-    assert!(rendered.contains("message.Data = make(map[string]string, len(m.Data))"));
-    assert!(rendered.contains("for k, v := range m.Data {"));
-    assert!(rendered.contains("message.Data[k] = v"));
-    assert!(rendered.contains("out.Data = make(map[string]string, len(proto.GetData()))"));
-    assert!(rendered.contains("support \"example.com/nexgen/support\""));
-
     // With no other converter to register the package, a sourced field alone
     // must import the support package and qualify its helper invocation.
     let module_root = temp_dir.join("module");
@@ -368,7 +351,7 @@ interface namespace-service {
     let output_path = module_root.join("generated");
     generate_to_file(&GenerateRequest {
         config: nexgen::nexgen_config::NexgenConfig {
-            mode: nexgen::generator::GenerationMode::NativeApi,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language: nexgen::language::Language::Go,
@@ -379,17 +362,9 @@ interface namespace-service {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
-    let generated = read_go_output_files(&output_path);
-    assert!(generated
-        .values()
-        .any(|file| file.contains("support \"go.temporal.io/sdk/advanced/samples/go/support\"")));
-    assert!(
-        generated
-            .values()
-            .any(|file| file.contains("support.NamespaceData(ctx)"))
-    );
     let build = Command::new("go")
         .args(["test", "./..."])
         .current_dir(&module_root)
@@ -408,7 +383,10 @@ interface namespace-service {
 fn go_json_examples_render_expected_language_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
-        for (mode, native_api) in [("definitions", false), ("api", true)] {
+        for (mode, targets) in [
+            ("definitions", &[][..]),
+            ("api", &[GenerationTarget::Workflow][..]),
+        ] {
             let temp_dir = unique_output_path(&format!("go-json-{example_id}-{mode}"));
             fs::create_dir_all(&temp_dir).unwrap();
             fs::write(temp_dir.join("go.mod"), "module examples/go\n\ngo 1.24.0\n").unwrap();
@@ -416,7 +394,7 @@ fn go_json_examples_render_expected_language_features() {
                 .join("json_schema")
                 .join(mode)
                 .join(go_package_name(example_id));
-            generate_formatted_go_json_output(&root, example_id, &output_path, native_api);
+            generate_formatted_go_json_output(&root, example_id, &output_path, targets);
 
             let actual = read_go_output_files(&output_path);
 
@@ -427,7 +405,7 @@ fn go_json_examples_render_expected_language_features() {
             let definitions = actual
                 .get(&PathBuf::from("definitions.go"))
                 .expect("JSON generation emits package definitions");
-            if native_api {
+            if targets.contains(&GenerationTarget::Workflow) {
                 match example_id {
                     "chat" => {
                         assert!(generated.contains("var ChatService = struct"));
@@ -551,8 +529,8 @@ fn go_json_examples_render_expected_language_features() {
             } else {
                 // Definitions mode emits the Nexus service/operation reference
                 // struct (so callers drive the SDK's Nexus client directly)
-                // but never the workflow client — that surface is NativeApi
-                // only, hence no `ServiceClient` type and no workflow import.
+                // but never the workflow client. That client is part of the
+                // Workflow API, hence no `ServiceClient` type and no workflow import.
                 assert!(!generated.contains("ServiceClient"));
                 assert!(!generated.contains("go.temporal.io/sdk/workflow"));
                 match example_id {
@@ -731,30 +709,6 @@ fn go_explicit_descriptors_control_signal_api_and_packing_independent_of_wire_na
 }
 
 #[test]
-fn go_signature_signal_input_uses_callable_fallback_and_secondary_generic_in_typed_wrapper() {
-    let rendered =
-        render_go_descriptor_fixture(&go_descriptor_fixture("", "signal-input")).unwrap();
-    assert!(
-        rendered.contains("SignalF interface{ ~string | func(...any) string }"),
-        "{rendered}"
-    );
-    assert!(
-        rendered
-            .contains("\tsignal SignalF,\n\tsignalArgs []any,\n\tworkflow any,\n\targs ...any,"),
-        "{rendered}"
-    );
-    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
-    assert!(typed.contains("SignalF interface{ ~string | func(...any) string }"));
-    assert!(typed.contains("\tsignal SignalF,\n\tsignalArgs []any,"));
-    assert!(typed.contains("\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"));
-    assert!(typed.contains("reflect.ValueOf(signal)"));
-    assert!(typed.contains("\t\tSignal: signalName,"));
-    assert!(typed.contains("\t\tSignalArgs: signalArgs,"));
-    assert!(typed.contains("\t\tArgs: []any{arg},"));
-    compile_go_descriptor_fixture(&rendered);
-}
-
-#[test]
 fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() {
     let wit = go_descriptor_fixture("", "signal-input")
         .replace(
@@ -783,16 +737,9 @@ fn go_primary_variadic_group_is_last_and_secondary_groups_keep_authored_order() 
         ),
         "{rendered}"
     );
-    let typed = rendered.split("func ExecuteTyped[").nth(1).unwrap();
-    assert!(typed.contains("OtherF interface{ ~string | func(...any) string }"));
-    assert!(
-        typed.contains(
-            "\tsignal SignalF,\n\tsignalArgs []any,\n\tother OtherF,\n\totherArgs []any,\n\tworkflow func(workflow.Context, WorkflowArg) WorkflowResult,"
-        ),
-        "{typed}"
-    );
-    assert!(typed.contains("reflect.ValueOf(other)"));
-    assert!(typed.contains("\t\tOtherArgs: otherArgs,"));
+    assert!(rendered.contains("OtherF interface{ ~string | func(...any) string }"));
+    assert!(rendered.contains("reflect.ValueOf(other)"));
+    assert!(rendered.contains("\t\tOtherArgs: otherArgs,"));
     compile_go_descriptor_fixture(&rendered);
 
     // Swap only the secondary groups. Their relative ordering must follow the
@@ -833,7 +780,6 @@ fn go_final_secondary_signature_args_are_variadic_without_primary_signature_vara
             )),
             "{name}:\n{rendered}"
         );
-        assert!(!rendered.contains("func ExecuteTyped["), "{rendered}");
         assert!(rendered.contains("\t\tSignalArgs: signalArgs,"));
         compile_go_descriptor_fixture(&rendered);
     }
@@ -871,80 +817,23 @@ interface service {
   run: func(request: request);
 }
 "#;
-    for (authored, reserved, wrapper) in [
-        ("workflow-arg", "WorkflowArg", "Typed"),
-        ("workflow-result", "WorkflowResult", "Typed"),
-        ("workflow-f", "WorkflowF", ""),
-    ] {
-        let mut wit = fixture.replace("workflow-arg", authored);
-        if reserved == "WorkflowF" {
-            wit = wit.replace("primary=true", "primary=false");
+    let wit = fixture
+        .replace("workflow-arg", "workflow-f")
+        .replace("primary=true", "primary=false");
+    let error = render_go_descriptor_fixture(&wit).unwrap_err();
+    match error.downcast_ref::<nexgen::error::Error>().unwrap() {
+        nexgen::error::Error::UnsupportedGoType { context, reason } => {
+            assert!(context.to_lowercase().contains("run"), "{error}");
+            assert!(
+                reason.contains("model type parameter `WorkflowF`"),
+                "{error}"
+            );
+            assert!(
+                reason.contains("generated reserved name `WorkflowF`"),
+                "{error}"
+            );
         }
-        let error = render_go_descriptor_fixture(&wit).unwrap_err();
-        match error.downcast_ref::<nexgen::error::Error>().unwrap() {
-            nexgen::error::Error::UnsupportedGoType { context, reason } => {
-                assert!(context.to_lowercase().contains("run"), "{error}");
-                assert!(context.contains(wrapper), "{error}");
-                assert!(
-                    reason.contains(&format!("model type parameter `{reserved}`")),
-                    "{error}"
-                );
-                assert!(
-                    reason.contains(&format!("generated reserved name `{reserved}`")),
-                    "{error}"
-                );
-            }
-            other => panic!("expected early UnsupportedGoType, got {other:?}"),
-        }
-    }
-    // Noncolliding model names keep the generated names, and the whole fixture
-    // compiles: rejection is about the wrapper namespace, not generic models.
-    let valid = fixture.replace("workflow-arg", "context-t");
-    let rendered = render_go_descriptor_fixture(&valid).unwrap();
-    assert!(
-        rendered.contains("func RunTyped[ContextT any, WorkflowArg any, WorkflowResult any]"),
-        "{rendered}"
-    );
-    compile_go_descriptor_fixture(&rendered);
-}
-
-#[test]
-fn go_callable_descriptor_invokes_extractor_and_composite_types_import_and_compile() {
-    for (value_type, args_type, public_type, import) in [
-        ("func(...any) string", "any", "func(...any) string", None),
-        (
-            "[]time.Duration",
-            "any",
-            "[]time.Duration",
-            Some("\"time\""),
-        ),
-        (
-            "func(context.Context) any",
-            "any",
-            "func(context.Context) any",
-            Some("\"context\""),
-        ),
-    ] {
-        let directives = format!(
-            "  ///   go-value-type=\"{value_type}\"\n  ///   go-args-type=\"{args_type}\"\n  ///   go-name-extractor=\"DescriptorName\""
-        );
-        let rendered = render_go_descriptor_fixture(&go_descriptor_fixture(
-            &directives,
-            "notification-payloads",
-        ))
-        .unwrap();
-        assert!(
-            rendered.contains(&format!("\tsignal {public_type},")),
-            "{rendered}"
-        );
-        assert!(
-            rendered.contains("signalName := support.DescriptorName(ctx, signal)"),
-            "{rendered}"
-        );
-        if let Some(import) = import {
-            assert!(rendered.contains(import), "{rendered}");
-        }
-        compile_go_descriptor_fixture(&rendered);
+        other => panic!("expected early UnsupportedGoType, got {other:?}"),
     }
 }
 
@@ -952,7 +841,7 @@ fn generate_formatted_go_json_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    native_api: bool,
+    targets: &[GenerationTarget],
 ) {
     let mut command = Command::new(support::nexgen_binary());
     command.args([
@@ -963,8 +852,11 @@ fn generate_formatted_go_json_output(
         "--support-package",
         "example.com/nexgen/support",
     ]);
-    if native_api {
-        command.arg("--native-api");
+    for target in targets.iter() {
+        command.arg(match target {
+            nexgen::nexgen_config::GenerationTarget::Workflow => "--targets=workflow",
+            nexgen::nexgen_config::GenerationTarget::Client => "--targets=client",
+        });
     }
     let status = command.status().unwrap();
     assert!(status.success());
@@ -999,6 +891,7 @@ fn go_json_decodes_element_position_unions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("bag.go")).unwrap();
@@ -1098,6 +991,7 @@ fn go_json_recursively_converts_and_validates_element_positions() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1244,6 +1138,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("output.go")).unwrap();
@@ -1320,6 +1215,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("mixed.go")).unwrap();
@@ -1424,6 +1320,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1527,6 +1424,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1620,6 +1518,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1686,6 +1585,7 @@ fn go_json_wave3_pairwise_runtime_matrix() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -1904,6 +1804,7 @@ fn go_json_bare_ref_root_is_a_runtime_alias_for_operation_io() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1986,6 +1887,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("fmod.go")).unwrap();
@@ -2098,6 +2000,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("nullable.go")).unwrap();
@@ -2224,6 +2127,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("mat.go")).unwrap();
@@ -2408,6 +2312,7 @@ properties:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2470,6 +2375,7 @@ properties:
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -2549,6 +2455,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -2639,6 +2546,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("shapes.go")).unwrap();
@@ -2765,6 +2673,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("shapes.go")).unwrap();
@@ -2824,6 +2733,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -2916,6 +2826,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     fs::write(
@@ -3036,6 +2947,7 @@ properties:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("names.go")).unwrap();

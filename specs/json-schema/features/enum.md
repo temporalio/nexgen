@@ -123,12 +123,12 @@ The emitted type is **closed to the value set**, in each language's idiom and
 for **every scalar kind** (**P13.1**). Optional vs required wrapping is owned by
 [[required]] / [[nullability]].
 
-| enum value kind | Go                                                | TypeScript                   | Python                          | Java                   |
-| --------------- | ------------------------------------------------- | ---------------------------- | ------------------------------- | ---------------------- |
-| string          | `type Color string` + one typed const per value   | `"red" \| "green" \| "blue"` | `Literal["red","green","blue"]` | value class `Color`    |
-| integer         | `type Priority int64` + one typed const per value | `1 \| 2 \| 3`                | `Literal[1,2,3]`                | value class `Priority` |
-| number          | `type Ratio float64` + one typed const per value  | `1.5 \| 2.5`                 | `float`                         | value class `Ratio`    |
-| boolean         | `type Flag bool` + typed const per value          | `true \| false`              | `Literal[True,False]`           | value class `Flag`     |
+| enum value kind | Go                                                | TypeScript                   | Python                          | Java                   | C#                                 |
+| --------------- | ------------------------------------------------- | ---------------------------- | ------------------------------- | ---------------------- | ---------------------------------- |
+| string          | `type Color string` + one typed const per value   | `"red" \| "green" \| "blue"` | `Literal["red","green","blue"]` | value class `Color`    | closed-value class `ColorValue`    |
+| integer         | `type Priority int64` + one typed const per value | `1 \| 2 \| 3`                | `Literal[1,2,3]`                | value class `Priority` | closed-value class `PriorityValue` |
+| number          | `type Ratio float64` + one typed const per value  | `1.5 \| 2.5`                 | `float`                         | value class `Ratio`    | closed-value class `RatioValue`    |
+| boolean         | `type Flag bool` + typed const per value          | `true \| false`              | `Literal[True,False]`           | value class `Flag`     | closed-value class `FlagValue`     |
 
 **Go.** A **defined type** over the primitive plus
 **one typed value constant per member**, for every scalar kind:
@@ -226,17 +226,18 @@ where the language allows it, so it leaves the package/module namespace.
 > **`$defs`-named scalar closed values are unimplemented.** A `$defs` entry must
 > currently be `type: object`, a `oneOf` union, or a bare `$ref`, so
 > `$defs: {Color: {type: string, enum: [red, green, blue]}}` is a load reject in
-> all four languages. Every "named definition" branch below — the `$defs`-name
+> all five languages. Every "named definition" branch below — the `$defs`-name
 > reuse, the P15 row for a `$defs`-named type, and `x-<lang>-const-name` on a
 > `$defs` node — describes the intended design and is unreachable until scalar
 > `$defs` entries are admitted.
 
-| Target     | Synthesized identifier(s)                                        | Placement / scope                                       |
-| ---------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| Go         | defined type `Color` **+** one const per value (`ColorRed`, …)   | **flat package** (Go has no nested types); P15 backstop |
-| Java       | value class `Color` + class-scoped constants (`RED`, …)          | **nested** `Palette.Color`                              |
-| TypeScript | none — the type is the inline union `"red" \| "green" \| "blue"` | —                                                       |
-| Python     | none — the type is the inline `Literal[…]`                       | —                                                       |
+| Target     | Synthesized identifier(s)                                           | Placement / scope                                       |
+| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Go         | defined type `Color` **+** one const per value (`ColorRed`, …)      | **flat package** (Go has no nested types); P15 backstop |
+| Java       | value class `Color` + class-scoped constants (`RED`, …)             | **nested** `Palette.Color`                              |
+| C#         | closed-value class `ColorValue` + class-scoped constants (`Red`, …) | **nested** `Palette.ColorValue`                         |
+| TypeScript | none — the type is the inline union `"red" \| "green" \| "blue"`    | —                                                       |
+| Python     | none — the type is the inline `Literal[…]`                          | —                                                       |
 
 Per **P15** every synthesized name enters the **same per-scope namespace** as
 the declared names and as one another; the generator runs a single collision
@@ -315,6 +316,7 @@ identical in both directions (a pure predicate over the decoded value — the
 | TypeScript | the emitted validator tests membership against the literal set with an inline inequality chain, throwing one `PayloadValidationError` application failure. The field's union type closes it in-language.                                                                                                                                                                                                                                                                                                                               |
 | Python     | the transfer type converter (PRINCIPLES Python §3) tests membership against an inline tuple and appends a `Violation` into the single generated `PayloadValidationError` application failure. The field is the closed `Literal` (`float` enums are plain `float`, validated the same way).                                                                                                                                                                                                                                             |
 | Java       | the aggregating path is the per-POJO collecting deserializer (PRINCIPLES Java §5): a **non-throwing membership lookup** — known value → the constant, otherwise record a `Violation{path, "must be one of [...], got …"}` — so multiple bad fields collect into the single `PayloadValidationError` application failure. The value class's `@JsonCreator fromString` *throws* only on the **standalone/interop** path, where fail-fast is expected. Serialize needs no separate check: the value class can only hold a known constant. |
+| C#         | `Converter.Parse` does a **non-throwing lookup** — a known value maps to its constant, any other records a `Violation{path, "must be one of [...], got …"}` — so bad fields collect into the single `PayloadValidationError` application failure. Serialize needs no separate check: the class can only hold a known constant.                                                                                                                                                                                                         |
 
 The reason string names the **expected set and the offending value**
 (`must be one of ["red","green","blue"], got "purple"`), never a bare keyword.

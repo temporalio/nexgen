@@ -1,0 +1,12 @@
+package test:fallback-without-proto;
+
+world system { export models; }
+
+interface models {
+  enum level {
+    /// @nexus.fallback
+    unknown,
+    low,
+    high,
+  }
+}

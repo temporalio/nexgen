@@ -70,7 +70,14 @@ namespace Temporalio.Worker
                 var handle = outbound.Value.SecondOperationAsync(request);
                 return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
             }
-            throw new System.ArgumentException($"Unsupported System Nexus operation: {service}/{operationName}");
+            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
+                Service: service,
+                Operation: new(
+                    operationName,
+                    arg?.GetType() ?? typeof(object),
+                    typeof(TResult)),
+                Arg: arg,
+                Headers: null));
         }
 
         internal partial class OutboundImpl

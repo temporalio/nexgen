@@ -1,0 +1,12 @@
+package temporal:unknown-source-target@1.0.0;
+
+world system { export example; }
+
+interface example {
+  record request {
+    /// @nexus.source targets="activity" value="namespace()"
+    namespace: string,
+  }
+
+  submit: func(request: request);
+}

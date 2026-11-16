@@ -1,0 +1,17 @@
+[tools]
+rust = { version = "1.96.0", components = "rustfmt" }
+rumdl = "0.2.79"
+python = "3.10"
+uv = "0.11.27"
+node = "26"
+go = "1.26"
+java = "temurin-21"
+google-java-format = "1.24.0"
+dotnet = ["10", "8", "7"]
+
+[tool_alias]
+dotnet = "core:dotnet"
+
+[settings.dotnet]
+# Multi-target tests need one host to see all required runtimes.
+isolated = false

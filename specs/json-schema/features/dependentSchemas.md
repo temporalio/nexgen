@@ -37,7 +37,7 @@ Distilled:
 **Support:** no — **rejected at load time (P6).**
 
 `dependentSchemas` branches the object's shape on a runtime condition, which has
-no coherent lowering across the four targets:
+no coherent lowering across the five targets:
 
 - **P6 (strict subset), conditional shape.** The set of members and their types
   depends on whether a trigger key is present at runtime. Modeling that

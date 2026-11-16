@@ -10,6 +10,7 @@ from ..models import (
     StartWorkflowResult,
 )
 from .._resources import StartedWorkflow
+import temporal_support as _support
 
 
 async def _start_workflow(
@@ -44,5 +45,6 @@ async def start_workflow(
         workflow_id=workflow_id,
         task_queue=task_queue,
         workflow_start_delay=workflow_start_delay,
+        namespace=_support.workflow_namespace(),
     )
     return await _start_workflow(request)

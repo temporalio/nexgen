@@ -9,6 +9,16 @@ use crate::language::Language;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "test-support", derive(strum::EnumDiscriminants))]
+#[cfg_attr(feature = "test-support", strum_discriminants(name(ErrorKind)))]
+#[cfg_attr(
+    feature = "test-support",
+    strum_discriminants(derive(serde::Deserialize))
+)]
+#[cfg_attr(
+    feature = "test-support",
+    strum_discriminants(serde(rename_all = "kebab-case"))
+)]
 pub enum Error {
     #[error("failed to read `{path}`: {source}")]
     ReadFile {
@@ -47,6 +57,47 @@ pub enum Error {
     },
 
     #[error(
+        "the client target can't make an iterator for `@nexus.poll` on operation `{operation}` in \
+         `{path}`, since the operation {reason}"
+    )]
+    UnsupportedPoll {
+        path: PathBuf,
+        operation: String,
+        reason: String,
+    },
+
+    #[error("the client target {reason}")]
+    UnsupportedClientTarget { reason: String },
+
+    #[error("the generic resource `{resource}` isn't supported in {language}")]
+    UnsupportedGenericResource {
+        language: Language,
+        resource: String,
+    },
+
+    #[error("{language} runtime type inference for resource `{resource}` is unsupported: {reason}")]
+    UnsupportedResourceTypeInference {
+        language: Language,
+        resource: String,
+        reason: String,
+    },
+
+    #[error("the {language} runtime type `{name}` of `{parameter}` clashes with {conflicting}")]
+    RuntimeTypeArgumentNameConflict {
+        language: Language,
+        name: String,
+        parameter: String,
+        conflicting: String,
+    },
+
+    #[error("`{name}` is a client method of both `{first_service}` and `{second_service}`")]
+    ClientTargetNameConflict {
+        name: String,
+        first_service: String,
+        second_service: String,
+    },
+
+    #[error(
         "Python generated name `{name}` for {generated_by} conflicts with {conflicting_declaration}"
     )]
     PythonGeneratedNameConflict {
@@ -54,6 +105,9 @@ pub enum Error {
         generated_by: String,
         conflicting_declaration: String,
     },
+
+    #[error("can't flatten a request field of operation `{operation}`: {reason}")]
+    UnsupportedFlatten { operation: String, reason: String },
 
     #[error(
         ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
@@ -139,6 +193,12 @@ pub enum Error {
     )]
     MissingSupportPackage { language: Language },
 
+    #[error("{feature} on {context} requires System Nexus mode (--system-nexus)")]
+    SystemNexusRequired {
+        feature: &'static str,
+        context: String,
+    },
+
     #[error("{language} protobuf conversion does not yet support oneof group `{message}.{oneof}`")]
     UnsupportedProtoOneofConversion {
         language: Language,
@@ -218,6 +278,19 @@ pub enum Error {
     },
 
     #[error(
+        "{backing}-backed record `{record}` field `{field}` contains {nested_backing}-backed record \
+         `{nested_record}`; nested records must use the same backing. Remove `@nexus.proto` from \
+         the protobuf-backed record, or bind the JSON-backed record to a matching protobuf message"
+    )]
+    MixedRecordBacking {
+        record: String,
+        field: String,
+        backing: &'static str,
+        nested_record: String,
+        nested_backing: &'static str,
+    },
+
+    #[error(
         "service `{service}` operation `{operation}` output is missing required `type` or `transform` field"
     )]
     IncompleteOperationOutputTransform { service: String, operation: String },
@@ -292,13 +365,6 @@ pub enum Error {
         reason: String,
     },
 
-    #[error("type override for `{message}.{field}` cannot be marked required: {reason}")]
-    UnsupportedRequiredTypeField {
-        message: String,
-        field: String,
-        reason: String,
-    },
-
     #[error("type override for `{message}.{field}` cannot use field `source`: {reason}")]
     UnsupportedSourcedTypeField {
         message: String,
@@ -312,20 +378,14 @@ pub enum Error {
         property: &'static str,
     },
 
+    #[error("invalid binding for protobuf enum `{enumeration}`: {reason}")]
+    InvalidProtoEnumBinding { enumeration: String, reason: String },
+
     #[error("Go code generation does not support {context}: {reason}")]
     UnsupportedGoType { context: String, reason: String },
 
     #[error("Go proto conversion for {context} is not supported: {reason}")]
     UnsupportedGoProtoConversion { context: String, reason: String },
-
-    #[error(
-        "`@nexus.namespace go=\"{namespace}\"` implies Go package `{expected_package}`, but the output directory resolves to package `{actual_package}`; point `--output` at a directory named `{expected_package}`"
-    )]
-    GoNamespacePackageMismatch {
-        namespace: String,
-        expected_package: String,
-        actual_package: String,
-    },
 
     #[error(
         "output directory name `{output_dir_name}` has no ASCII letters, digits, or underscores to build a Go package name from; rename the output directory"
@@ -334,6 +394,11 @@ pub enum Error {
 
     #[error("Java code generation requires `--package-name`")]
     JavaPackageNameMissing,
+
+    #[error(
+        "C# code generation from JSON Schema requires `--namespace`, the root namespace for the generated types (for example `--namespace Acme.Payments.Contracts`)"
+    )]
+    DotnetNamespaceMissing,
 
     #[error(
         "`--package-name {package_name}` must end with the output directory name `{output_dir_name}`, but its last segment is `{last_segment}`; point `--output` at a directory named `{last_segment}` or change the package's last segment to `{output_dir_name}`"

@@ -46,7 +46,7 @@ representable and is tracked for a future release.
 Why deferred rather than landed in v1 (citing [[PRINCIPLES.md]]):
 - **P6 (strict subset)**: regex-keyed members produce a **dynamically keyed**
   member set that cannot lower to named, statically-typed fields in
-  Go/TS/Java/Python. It is a map construct wearing object clothes.
+  Go/TS/Java/Python/C#. It is a map construct wearing object clothes.
 - **P7 / P7.1 (reject ambiguity loudly)**: overlapping patterns mean a single
   member may be governed by several subschemas at once (validate against *all*
   matching) — the emitted value type would be an intersection with no coherent
@@ -78,7 +78,8 @@ Loader behavior (v1):
 
 ## Type mapping
 
-None — rejected before any type is emitted.
+None — rejected before any type is emitted. The reject is the shared loader's,
+so C# fails the same way as every other target, with the same diagnostic.
 
 ## Validator mapping
 

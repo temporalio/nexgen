@@ -3,7 +3,9 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class PostalAddress {
+  /** Street with &lt;tag&gt; &amp; "quotes". */
   private final String street;
+
   private final String city;
   private final String country;
   private final wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> coordinates;

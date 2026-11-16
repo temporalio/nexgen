@@ -80,7 +80,7 @@ Loader behavior:
   other than line feed and tab, notably U+0000 → **reject**. Degenerate metadata
   in the same class as the empty string, and unrepresentable in a comment in at
   least two targets, so rejecting once at load is the only form that keeps the
-  four accept sets identical (P1); escaping it four different ways is not.
+  five accept sets identical (P1); escaping it five different ways is not.
   Diagnostic names the offending code point.
 - `description` as a **sibling of `$ref`** is **not** rejected: a
   sibling-bearing `$ref` is rewritten to an implicit `allOf` and **merged** (see
@@ -123,6 +123,7 @@ Per-language block and placement:
 | TypeScript | `/** … */` JSDoc above the `interface`/field.                                                                                                                                                                                  |
 | Python     | class **docstring** for a type/service; for a **field**, an **attribute docstring** — a bare string literal on the line(s) immediately after the field declaration, which every Python documentation tool and editor picks up. |
 | Java       | `/** … */` Javadoc above the class/getter/method.                                                                                                                                                                              |
+| C#         | `/// <summary> … </summary>` XML doc comment above the type and property.                                                                                                                                                      |
 
 On an ordinary declaration `description` synthesizes no identifier and has no
 P15 surface. **Beside a `$ref` it does**: `description` is not in the inert
@@ -208,6 +209,7 @@ not listed here still has to be neutralized.
 | TypeScript | replace `*/` → `* /` so the body can't close the JSDoc block early.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Python     | escape `\` → `\\` and `"""` → `\"\"\"` so the body can't terminate the docstring.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Java       | replace `*/` → `* /`; HTML-escape `&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`, and `\`→`&#92;` (applied after the `&` pass). The backslash is not cosmetic: JLS §3.3 translates Unicode escapes in a first lexical phase that covers comments, so a `\u` not followed by four hex digits is a hard compile error, and a well-formed one is silently substituted — neither of which any other target does. A Javadoc body is HTML, so the entity renders as the character the author wrote.                                                            |
+| C#         | XML-escape `&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`. A `///` comment ends at the line break, so each description line is its own `///` line and no character sequence can close the comment early.                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Validator mapping
 

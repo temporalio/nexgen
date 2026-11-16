@@ -10,6 +10,7 @@ use crate::generator::json_schema::java as java_json;
 use crate::generator::{
     GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GeneratedOutputLayout,
 };
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding,
@@ -72,6 +73,18 @@ fn generate_api(
     collect_leaves(&tree.root, &mut leaves);
     let mut names = BTreeMap::new();
     for leaf in &leaves {
+        if let Some(resource) = leaf
+            .spec
+            .services
+            .iter()
+            .flat_map(|service| &service.resources)
+            .find(|resource| !resource.data.type_parameters.is_empty())
+        {
+            return Err(Error::UnsupportedGenericResource {
+                language: crate::language::Language::Java,
+                resource: resource.name.clone(),
+            });
+        }
         let pkg = package_for_module(package, &leaf.module_path.0);
         for (key, entry) in &leaf.spec.types {
             let name = match &entry.declaration {
@@ -177,7 +190,10 @@ fn generate_api(
                 .unwrap_or(&service.name)
                 .to_upper_camel_case();
             insert(&n, ctx.service(service, &n))?;
-            if crate::nexgen_config::current().mode == crate::generator::GenerationMode::NativeApi {
+            if crate::nexgen_config::current()
+                .targets
+                .contains(&GenerationTarget::Workflow)
+            {
                 insert(&operations_class(service), ctx.operations(service)?)?;
                 for operation in &service.operations {
                     if let Some(options) = ctx.operation_options(service, operation)? {
@@ -192,7 +208,12 @@ fn generate_api(
                 )?;
             }
         }
-        if crate::nexgen_config::current().system_nexus && !leaf.spec.services.is_empty() {
+        if crate::nexgen_config::current().system_nexus
+            && crate::nexgen_config::current()
+                .targets
+                .contains(&GenerationTarget::Workflow)
+            && !leaf.spec.services.is_empty()
+        {
             insert("SystemNexusWorkflowOutboundInterceptor", ctx.interceptors())?;
             insert("SystemNexusOperations", ctx.registry())?;
         }
@@ -475,8 +496,8 @@ impl Context<'_> {
     fn ty(&self, ty: &PlannedType) -> String {
         match ty {
             TypeSpec::Bool => "Boolean".into(),
-            TypeSpec::Int(IntSpec::I32) => "Integer".into(),
-            TypeSpec::Int(IntSpec::I64) => "Long".into(),
+            TypeSpec::Int(IntSpec::I32 | IntSpec::U32) => "Integer".into(),
+            TypeSpec::Int(IntSpec::I64 | IntSpec::U64) => "Long".into(),
             TypeSpec::Float => "Double".into(),
             TypeSpec::String => "String".into(),
             TypeSpec::Bytes => "byte[]".into(),
@@ -597,14 +618,7 @@ impl Context<'_> {
         let fields = record
             .fields
             .values()
-            .filter(|f| {
-                matches!(
-                    f.visibility,
-                    RecordFieldVisibility::Public
-                        | RecordFieldVisibility::ApiOmitted
-                        | RecordFieldVisibility::Sourced { .. }
-                )
-            })
+            .filter(|f| !f.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .collect::<Vec<_>>();
         let mut out = String::new();
         render_java_doc_comment(&mut out, "", record.doc.value(), &[]);
@@ -720,22 +734,13 @@ impl Context<'_> {
         }
         out.push_str("    }\n");
         for f in &fields {
-            let default = if matches!(f.visibility, RecordFieldVisibility::Sourced { .. })
-                || (f.function.is_some() && f.data.wire_binding.is_none())
+            let default: String = if (f.function.is_some() && f.data.wire_binding.is_none())
                 || (options && api_field_required(f))
             {
                 "null".into()
-            } else if let Some(v) = &f.data.default_enum_value {
-                format!(
-                    "{}.{}({})",
-                    self.field_ty(f),
-                    if matches!(f.field_type.without_option(), TypeSpec::Enum(_)) {
-                        "fromNumber"
-                    } else {
-                        "forNumber"
-                    },
-                    v.number
-                )
+            } else if options && f.default_for(GenerationTarget::Workflow).is_some() {
+                // Defaults are evaluated by the operation, not while constructing reusable options.
+                "null".into()
             } else if !f.required || matches!(f.field_type, TypeSpec::Option(_)) {
                 "null".into()
             } else {
@@ -797,7 +802,7 @@ impl Context<'_> {
                     for nested_field in nested
                         .fields
                         .values()
-                        .filter(|f| matches!(f.visibility, RecordFieldVisibility::Public))
+                        .filter(|f| !f.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                     {
                         let annotation = nested_field
                             .flattened_annotation
@@ -816,15 +821,7 @@ impl Context<'_> {
             "    public {name}{args} build() {{ return new {name}{args}({}); }}\n  }}",
             fields
                 .iter()
-                .map(|f| match &f.visibility {
-                    RecordFieldVisibility::Sourced { source_expr } => format!(
-                        "{} == null ? {} : {}",
-                        ident(&f.name),
-                        self.helper(source_expr),
-                        ident(&f.name)
-                    ),
-                    _ => ident(&f.name),
-                })
+                .map(|f| ident(&f.name))
                 .collect::<Vec<_>>()
                 .join(", ")
         )
@@ -849,13 +846,10 @@ impl Context<'_> {
             "  public {p} toProto(io.temporal.common.converter.DataConverter converter) {{\n    {p}.Builder proto = {p}.newBuilder();\n"
         );
         for f in record.fields.values() {
-            if matches!(f.visibility, RecordFieldVisibility::Omitted) {
+            if f.origin.as_ref().is_some_and(FieldPolicy::is_omitted) {
                 continue;
             }
-            let value = match &f.visibility {
-                RecordFieldVisibility::Sourced { .. } => format!("this.{}", ident(&f.name)),
-                _ => format!("this.{}", ident(&f.name)),
-            };
+            let value = format!("this.{}", ident(&f.name));
             match &f.data.wire_binding {
                 Some(PlannedWireFieldBinding::Value {
                     wire_name,
@@ -915,14 +909,11 @@ impl Context<'_> {
         }
         out.push_str("    return proto.build();\n  }\n");
         writeln!(out, "  public static {args} {name}{args} fromProto({p} proto, io.temporal.common.converter.DataConverter converter, java.lang.reflect.Type modelType) {{\n    Builder{args} builder = {name}.{args}newBuilder();").unwrap();
-        for f in record.fields.values().filter(|f| {
-            matches!(
-                f.visibility,
-                RecordFieldVisibility::Public
-                    | RecordFieldVisibility::ApiOmitted
-                    | RecordFieldVisibility::Sourced { .. }
-            )
-        }) {
+        for f in record
+            .fields
+            .values()
+            .filter(|f| !f.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
+        {
             if let Some(PlannedWireFieldBinding::Value {
                 wire_name,
                 wire_type,
@@ -1527,34 +1518,50 @@ impl Context<'_> {
                 message_name,
                 fields,
             } => {
-                let name = self
-                    .spec
-                    .record(message_name)
-                    .or_else(|| {
-                        self.spec
-                            .records()
-                            .map(|(_, record)| record)
-                            .find(|record| {
-                                record
-                                    .data
-                                    .proto
-                                    .as_ref()
-                                    .is_some_and(|proto| proto.full_name == *message_name)
-                            })
-                    })
+                let record = crate::generator::resource_plan::record_for_request_name(
+                    self.spec,
+                    message_name,
+                );
+                let name = record
                     .map(|r| self.named(&r.full_name, &r.name))
                     .unwrap_or_else(|| message_name.to_upper_camel_case());
-                format!(
-                    "{name}.newBuilder(){}.build()",
-                    fields
-                        .iter()
-                        .map(|f| format!(
+                let mut assignments = fields
+                    .iter()
+                    .map(|f| {
+                        format!(
                             ".set{}({})",
                             f.field_name.to_upper_camel_case(),
                             self.request_plan(&f.value)
-                        ))
-                        .collect::<String>()
-                )
+                        )
+                    })
+                    .collect::<String>();
+                if let Some(record) = record {
+                    for field in record.fields.values() {
+                        if fields
+                            .iter()
+                            .any(|assigned| assigned.field_name == field.name)
+                        {
+                            continue;
+                        }
+                        let value = field
+                            .source_for(GenerationTarget::Workflow)
+                            .map(|source| self.helper(source))
+                            .or_else(|| {
+                                field
+                                    .default_for(GenerationTarget::Workflow)
+                                    .map(str::to_string)
+                            });
+                        if let Some(value) = value {
+                            write!(
+                                assignments,
+                                ".set{}({value})",
+                                field.name.to_upper_camel_case()
+                            )
+                            .unwrap();
+                        }
+                    }
+                }
+                format!("{name}.newBuilder(){assignments}.build()")
             }
         }
     }
@@ -1626,16 +1633,22 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        for method in resource.methods.iter().filter(|_| {
-            crate::nexgen_config::current().mode == crate::generator::GenerationMode::NativeApi
-        }) {
+        for method in resource
+            .methods_for(GenerationTarget::Workflow)
+            .filter(|_| {
+                crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow)
+            })
+        {
             let return_ty = method
                 .result
                 .as_ref()
                 .map(|r| match &r.kind {
-                    crate::planning::PlannedResourceMethodResultKind::Resource { type_name } => {
-                        type_name.to_upper_camel_case()
-                    }
+                    crate::planning::PlannedResourceMethodResultKind::Resource {
+                        type_name,
+                        ..
+                    } => type_name.to_upper_camel_case(),
                     crate::planning::PlannedResourceMethodResultKind::Value(ty) => self.ty(ty),
                 })
                 .unwrap_or("void".into());
@@ -1770,14 +1783,14 @@ impl Context<'_> {
     }
     fn operation_api_fields(&self, model: &Record) -> Result<Vec<RecordFieldSpec<PlannedFamily>>> {
         let mut fields = Vec::new();
-        for (_, field) in model.public_fields() {
+        for (_, field) in model.api_fields(GenerationTarget::Workflow) {
             if let TypeSpec::Record(nested) = field.field_type.without_option() {
                 if let Some(nested) = self
                     .spec
                     .record(&nested.full_name)
-                    .filter(|r| r.flatten_in_api)
+                    .filter(|r| field.flatten_in_api || r.flatten_in_api)
                 {
-                    for (_, child) in nested.public_fields() {
+                    for (_, child) in nested.api_fields(GenerationTarget::Workflow) {
                         let mut child = child.clone();
                         child.required &= field.required;
                         if child
@@ -1883,6 +1896,7 @@ impl Context<'_> {
             source: None,
             experimental: operation.experimental,
             flatten_in_api: false,
+            declared_type_parameters: model.declared_type_parameters.clone(),
             fields,
             data: Default::default(),
         };
@@ -1926,9 +1940,9 @@ impl Context<'_> {
                 }),
                 flattened_annotation: None,
                 field_type: TypeSpec::String,
-                default_value: None,
                 required: true,
-                visibility: RecordFieldVisibility::Public,
+                origin: None,
+                flatten_in_api: false,
                 function: None,
                 merge_from_function: None,
                 data: Default::default(),
@@ -2032,12 +2046,63 @@ impl Context<'_> {
             .filter(|field| !direct.contains(field.name.as_str()) && !required_after_merge(field))
         {
             let name = field.name.to_upper_camel_case();
-            if api_field_required(field) {
+            let optional_group =
+                model
+                    .api_fields(GenerationTarget::Workflow)
+                    .find_map(|(_, parent)| {
+                        if parent.required {
+                            return None;
+                        }
+                        let TypeSpec::Record(nested) = parent.field_type.without_option() else {
+                            return None;
+                        };
+                        let nested = self.spec.record(&nested.full_name)?;
+                        if !(parent.flatten_in_api || nested.flatten_in_api)
+                            || !nested.fields.values().any(|child| {
+                                child.default_for(GenerationTarget::Workflow).is_some()
+                            })
+                            || !nested.fields.values().any(|child| child.name == field.name)
+                        {
+                            return None;
+                        }
+                        Some(
+                            nested
+                                .api_fields(GenerationTarget::Workflow)
+                                .map(|(_, child)| {
+                                    format!(
+                                        "{options}.get{}() != null",
+                                        child.name.to_upper_camel_case()
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" || "),
+                        )
+                    });
+            if let Some(condition) = &optional_group {
+                writeln!(out, "    if ({condition}) {{").unwrap();
+            }
+            if let Some(default) = field.default_for(GenerationTarget::Workflow) {
+                writeln!(out, "    {builder}.set{name}({options}.get{name}() == null ? {default} : {options}.get{name}());").unwrap();
+            } else if api_field_required(field) {
                 writeln!(out, "    {builder}.set{name}({options}.get{name}());").unwrap();
             } else {
                 writeln!(
                     out,
                     "    if ({options}.get{name}() != null) {builder}.set{name}({options}.get{name}());"
+                )
+                .unwrap();
+            }
+            if optional_group.is_some() {
+                out.push_str("    }\n");
+            }
+        }
+        for field in model.fields.values() {
+            if let Some(source) = field.source_for(GenerationTarget::Workflow) {
+                writeln!(
+                    out,
+                    "    {builder}.set{}({});",
+                    field.name.to_upper_camel_case(),
+                    self.helper(source)
                 )
                 .unwrap();
             }
@@ -2535,30 +2600,34 @@ impl Context<'_> {
                 format!("return {transform};")
             };
             out.push_str(&self.request_builder_helper(service, op, &generic)?);
-            out.push_str(&self.public_operation(
-                service,
-                op,
-                &generic,
-                result_ty,
-                !output_type_parameter.is_empty(),
-                None,
-                false,
-            )?);
+            if !op.api_omitted.contains(&GenerationTarget::Workflow) {
+                out.push_str(&self.public_operation(
+                    service,
+                    op,
+                    &generic,
+                    result_ty,
+                    !output_type_parameter.is_empty(),
+                    None,
+                    false,
+                )?);
+            }
             if self
                 .operation_input_record(op)
                 .is_some_and(has_bound_functions)
             {
                 let overloads = self.bound_overloads(self.operation_input_record(op).unwrap());
                 for shapes in &overloads {
-                    out.push_str(&self.public_operation(
-                        service,
-                        op,
-                        &generic,
-                        result_ty,
-                        !output_type_parameter.is_empty(),
-                        Some(shapes),
-                        false,
-                    )?);
+                    if !op.api_omitted.contains(&GenerationTarget::Workflow) {
+                        out.push_str(&self.public_operation(
+                            service,
+                            op,
+                            &generic,
+                            result_ty,
+                            !output_type_parameter.is_empty(),
+                            Some(shapes),
+                            false,
+                        )?);
+                    }
                 }
                 if let Some(shapes) = overloads.first() {
                     out.push_str(&self.public_operation(
@@ -2593,8 +2662,7 @@ struct BoundFunctionShape {
 fn api_field_required(field: &RecordFieldSpec<PlannedFamily>) -> bool {
     field.required
         && !matches!(field.field_type, TypeSpec::Option(_))
-        && field.default_value.is_none()
-        && field.data.default_enum_value.is_none()
+        && field.default_for(GenerationTarget::Workflow).is_none()
 }
 
 fn required_after_merge(field: &RecordFieldSpec<PlannedFamily>) -> bool {

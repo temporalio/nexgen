@@ -3,12 +3,21 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class UserProfile {
+  /**
+   * A very long field doc that has to be wrapped because it exceeds the generated comment line
+   * width by a comfortable margin for testing.
+   */
   private final java.util.List<String> tags;
+
+  /** Default metadata. */
   private final java.util.Map<String, String> metadata;
+
   private final java.util.EnumSet<wit.typeshowcase.UserCapability> capabilities;
   private final wit.typeshowcase.NexgenRuntime.Result<String, String> syncState;
   private final wit.typeshowcase.NotificationTarget notificationTarget;
   private final wit.typeshowcase.PostalAddress address;
+  private final wit.typeshowcase.SingleTarget singleTarget;
+  private final wit.typeshowcase.ExperimentalTarget experimentalTarget;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public UserProfile(
@@ -22,13 +31,19 @@ public final class UserProfile {
       @com.fasterxml.jackson.annotation.JsonProperty("notificationTarget")
           wit.typeshowcase.NotificationTarget notificationTarget,
       @com.fasterxml.jackson.annotation.JsonProperty("address")
-          wit.typeshowcase.PostalAddress address) {
+          wit.typeshowcase.PostalAddress address,
+      @com.fasterxml.jackson.annotation.JsonProperty("singleTarget")
+          wit.typeshowcase.SingleTarget singleTarget,
+      @com.fasterxml.jackson.annotation.JsonProperty("experimentalTarget")
+          wit.typeshowcase.ExperimentalTarget experimentalTarget) {
     this.tags = tags;
     this.metadata = metadata;
     this.capabilities = capabilities;
     this.syncState = syncState;
     this.notificationTarget = notificationTarget;
     this.address = address;
+    this.singleTarget = singleTarget;
+    this.experimentalTarget = experimentalTarget;
   }
 
   public java.util.List<String> getTags() {
@@ -55,6 +70,14 @@ public final class UserProfile {
     return address;
   }
 
+  public wit.typeshowcase.SingleTarget getSingleTarget() {
+    return singleTarget;
+  }
+
+  public wit.typeshowcase.ExperimentalTarget getExperimentalTarget() {
+    return experimentalTarget;
+  }
+
   public Builder toBuilder() {
     return newBuilder(this);
   }
@@ -78,6 +101,8 @@ public final class UserProfile {
       this.syncState = value.syncState;
       this.notificationTarget = value.notificationTarget;
       this.address = value.address;
+      this.singleTarget = value.singleTarget;
+      this.experimentalTarget = value.experimentalTarget;
     }
 
     private java.util.List<String> tags = java.util.Collections.emptyList();
@@ -122,8 +147,30 @@ public final class UserProfile {
       return this;
     }
 
+    private wit.typeshowcase.SingleTarget singleTarget = null;
+
+    public Builder setSingleTarget(wit.typeshowcase.SingleTarget value) {
+      this.singleTarget = value;
+      return this;
+    }
+
+    private wit.typeshowcase.ExperimentalTarget experimentalTarget = null;
+
+    public Builder setExperimentalTarget(wit.typeshowcase.ExperimentalTarget value) {
+      this.experimentalTarget = value;
+      return this;
+    }
+
     public UserProfile build() {
-      return new UserProfile(tags, metadata, capabilities, syncState, notificationTarget, address);
+      return new UserProfile(
+          tags,
+          metadata,
+          capabilities,
+          syncState,
+          notificationTarget,
+          address,
+          singleTarget,
+          experimentalTarget);
     }
   }
 }

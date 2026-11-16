@@ -12,9 +12,9 @@ use super::OperationLoweredFamily;
 
 use super::type_planning::TypePlanningContext;
 use super::{
-    PlannedFieldData, PlannedProtoEnumType, PlannedProtoMessageType, PlannedProtoType,
-    PlannedProtoTypeInfo, PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
-    materialize_selected_replacement,
+    PlannedEnumType, PlannedFieldData, PlannedProtoEnumType, PlannedProtoMessageType,
+    PlannedProtoType, PlannedProtoTypeInfo, PlannedType, PlannedWireFieldBinding,
+    PlannedWireVariantMember, materialize_selected_replacement,
 };
 
 impl PlannedProtoTypeInfo {
@@ -196,6 +196,24 @@ pub(super) fn planned_enum_reference(
     }
 }
 
+fn planned_type_for_enum(
+    enumeration: &EnumMetadata,
+    spec: &ApiSpec<OperationLoweredFamily>,
+) -> PlannedType {
+    let planned_enum = planned_enum_reference(enumeration, spec);
+    if planned_enum.replacement.is_none()
+        && let Some(model) = spec.enum_for_proto(&enumeration.full_name)
+    {
+        return TypeSpec::Enum(PlannedEnumType {
+            full_name: model.full_name.clone(),
+            name: model.name.clone(),
+        });
+    }
+    TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(
+        planned_enum,
+    )))
+}
+
 pub(super) fn record_proto_info(
     record: &RecordSpec<OperationLoweredFamily>,
     spec: &ApiSpec<OperationLoweredFamily>,
@@ -324,9 +342,7 @@ pub(super) fn planned_value_type_from_authored_proto(
     if let Some(message) = planner.descriptors.message(proto_name).cloned() {
         planned_type_for_message(&message, planner)
     } else if let Some(enumeration) = planner.descriptors.enumeration(proto_name).cloned() {
-        TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(
-            planned_enum_reference(&enumeration, &planner.spec),
-        )))
+        planned_type_for_enum(&enumeration, &planner.spec)
     } else {
         TypeSpec::String
     }
@@ -416,7 +432,20 @@ fn planned_wire_value_type(
         Some(Type::Bool) => TypeSpec::Bool,
         Some(Type::String) => TypeSpec::String,
         Some(Type::Bytes) => TypeSpec::Bytes,
-        Some(Type::Enum) => plan_enum_type(field, planner),
+        Some(Type::Enum) => field
+            .type_name
+            .as_deref()
+            .and_then(|name| {
+                planner
+                    .descriptors
+                    .enumeration(name.trim_start_matches('.'))
+            })
+            .map(|enumeration| {
+                TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(
+                    planned_enum_reference(enumeration, &planner.spec),
+                )))
+            })
+            .unwrap_or(TypeSpec::String),
         Some(Type::Message) | Some(Type::Group) => field
             .type_name
             .as_deref()
@@ -518,16 +547,5 @@ fn plan_enum_type(
         return TypeSpec::String;
     };
 
-    let replacement = planner
-        .spec
-        .external_type_binding(&enumeration.full_name)
-        .and_then(|binding| binding.replacement())
-        .cloned();
-    TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(
-        PlannedProtoEnumType {
-            proto: PlannedProtoTypeInfo::from_enum(&enumeration, &planner.spec),
-            name: enum_name(&enumeration.full_name),
-            replacement: replacement.as_ref().map(materialize_selected_replacement),
-        },
-    )))
+    planned_type_for_enum(&enumeration, &planner.spec)
 }

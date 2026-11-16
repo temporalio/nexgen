@@ -7,6 +7,10 @@ public interface FunctionExecution {
   wit.functionexecution.ExecuteFunctionResult executeFunction(
       wit.functionexecution.ExecuteFunctionRequest request);
 
+  @io.nexusrpc.Operation(name = "ExecuteCallback")
+  wit.functionexecution.ExecuteFunctionResult executeCallback(
+      wit.functionexecution.ExecuteCallbackRequest request);
+
   @io.nexusrpc.Operation(name = "ExecuteCountedFunction")
   wit.functionexecution.ExecuteCountedFunctionResult executeCountedFunction(
       wit.functionexecution.ExecuteCountedFunctionRequest request);
@@ -22,4 +26,8 @@ public interface FunctionExecution {
   @io.nexusrpc.Operation(name = "ExecuteNamedVarargsFunction")
   wit.functionexecution.ExecuteNamedVarargsFunctionResult executeNamedVarargsFunction(
       wit.functionexecution.ExecuteNamedVarargsFunctionRequest request);
+
+  @io.nexusrpc.Operation(name = "ExecuteDescriptors")
+  wit.functionexecution.ExecuteFunctionResult executeDescriptors(
+      wit.functionexecution.ExecuteDescriptorsRequest request);
 }

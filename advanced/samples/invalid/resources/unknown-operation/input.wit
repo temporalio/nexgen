@@ -1,0 +1,22 @@
+package temporal:users@1.0.0;
+
+world system { export user-service; }
+
+/// @nexus.endpoint "__user_service"
+interface user-service {
+  resource user {
+    constructor(user-id: string, email: string);
+
+    /// @nexus.operation "updates-email"
+    update-email: func(email: string) -> user-result;
+  }
+
+  type user-result = own<user>;
+
+  record update-email-request {
+    user-id: string,
+    email: string,
+  }
+
+  update-email: func(request: update-email-request) -> user-result;
+}

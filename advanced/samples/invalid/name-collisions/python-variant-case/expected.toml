@@ -1,0 +1,9 @@
+languages = ["python"]
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "python-generated-name-conflict"
+contains = [
+  "Python generated name `OutcomeValueSuccess` for variant case `proto-oneof.outcome-value.success` conflicts with record `proto-oneof.outcome-value-success`",
+]

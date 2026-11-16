@@ -1,0 +1,10 @@
+languages = ["python"]
+targets = ["workflow"]
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "flattened-api-field-conflict"
+contains = [
+  "flattened API for `SignalWithStartWorkflowRequest` would generate duplicate parameter `static_summary` from `static_summary`",
+]

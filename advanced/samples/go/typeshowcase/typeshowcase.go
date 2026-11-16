@@ -86,6 +86,60 @@ func (m deactivateRequest) GetReason() *string {
 	return m.Reason
 }
 
+type updateLabelsRequest struct {
+	UserID        string
+	Tags          []string
+	Metadata      map[string]string
+	ExtraTags     []string
+	ExtraMetadata map[string]string
+}
+
+func (m updateLabelsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateLabelsRequest) GetTags() []string {
+	return m.Tags
+}
+
+func (m updateLabelsRequest) GetMetadata() map[string]string {
+	return m.Metadata
+}
+
+func (m updateLabelsRequest) GetExtraTags() []string {
+	return m.ExtraTags
+}
+
+func (m updateLabelsRequest) GetExtraMetadata() map[string]string {
+	return m.ExtraMetadata
+}
+
+type updateNotificationSettingsRequest struct {
+	UserID   string
+	Settings NotificationSettings
+}
+
+func (m updateNotificationSettingsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m updateNotificationSettingsRequest) GetSettings() NotificationSettings {
+	return m.Settings
+}
+
+type getSyncSettingsRequest struct {
+	UserID   string
+	Settings *SyncSettings
+}
+
+func (m getSyncSettingsRequest) GetUserID() string {
+	return m.UserID
+}
+
+func (m getSyncSettingsRequest) GetSettings() *SyncSettings {
+	return m.Settings
+}
+
 // --- Resources ---
 
 type User struct {
@@ -112,11 +166,17 @@ func NewUser(userID string, email string, displayName string, status UserStatus,
 }
 
 func (u *User) UpdateEmail(ctx workflow.Context, email string) workflow.Future {
-	return updateEmail(ctx, updateEmailRequest{UserID: u.UserID, Email: email})
+	request := updateEmailRequest{UserID: u.UserID, Email: email}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateEmail", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
 func (u *User) Rename(ctx workflow.Context, displayName string) workflow.Future {
-	return rename(ctx, renameRequest{UserID: u.UserID, DisplayName: displayName})
+	request := renameRequest{UserID: u.UserID, DisplayName: displayName}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "Rename", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
 func (u *User) Deactivate(ctx workflow.Context, reason string) workflow.Future {
@@ -124,44 +184,16 @@ func (u *User) Deactivate(ctx workflow.Context, reason string) workflow.Future {
 	if reason != "" {
 		reasonPtr = &reason
 	}
-	return deactivate(ctx, deactivateRequest{UserID: u.UserID, Reason: reasonPtr})
-}
-
-// --- Operations (internal) ---
-
-func getUser(ctx workflow.Context, request getUserRequest) workflow.Future {
-	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
-	fut := c.ExecuteOperation(ctx, "GetUser", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func updateEmail(ctx workflow.Context, request updateEmailRequest) workflow.Future {
-	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
-	fut := c.ExecuteOperation(ctx, "UpdateEmail", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func rename(ctx workflow.Context, request renameRequest) workflow.Future {
-	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
-	fut := c.ExecuteOperation(ctx, "Rename", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func setProfile(ctx workflow.Context, request setProfileRequest) workflow.Future {
-	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
-	fut := c.ExecuteOperation(ctx, "SetProfile", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func recordSync(ctx workflow.Context, request recordSyncRequest) workflow.Future {
-	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
-	fut := c.ExecuteOperation(ctx, "RecordSync", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func deactivate(ctx workflow.Context, request deactivateRequest) workflow.Future {
+	request := deactivateRequest{UserID: u.UserID, Reason: reasonPtr}
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
 	fut := c.ExecuteOperation(ctx, "Deactivate", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+func (u *User) UpdateLabels(ctx workflow.Context, tags []string, metadata map[string]string, extraTags []string, extraMetadata map[string]string) workflow.Future {
+	request := updateLabelsRequest{UserID: u.UserID, Tags: tags, Metadata: metadata, ExtraTags: extraTags, ExtraMetadata: extraMetadata}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateLabels", request, workflow.NexusOperationOptions{})
 	return fut
 }
 
@@ -183,30 +215,65 @@ const (
 	UserCapabilityDeactivate  UserCapability = 1 << 2
 )
 
+// NotificationTarget - Go notification target.
+//
+// WARNING: This API is experimental and may change in the future.
 type NotificationTarget interface {
 	isNotificationTarget()
 }
 
+// NotificationTargetEmail - Go payload.
 type NotificationTargetEmail struct {
 	Value string
 }
 
 func (NotificationTargetEmail) isNotificationTarget() {}
 
+// NotificationTargetSms - XML characters remain valid in docs: <tag attr="value"> &
+// 'quoted'.
 type NotificationTargetSms struct {
 	Value string
 }
 
 func (NotificationTargetSms) isNotificationTarget() {}
 
+// NotificationTargetNone - Default empty case.
 type NotificationTargetNone struct{}
 
 func (NotificationTargetNone) isNotificationTarget() {}
 
+type NotificationTargetUndocumented struct{}
+
+func (NotificationTargetUndocumented) isNotificationTarget() {}
+
+// SingleTarget - Default-only documentation on a single-case variant.
+type SingleTarget interface {
+	isSingleTarget()
+}
+
+// SingleTargetOnly - Only case.
+type SingleTargetOnly struct{}
+
+func (SingleTargetOnly) isSingleTarget() {}
+
+// WARNING: This API is experimental and may change in the future.
+type ExperimentalTarget interface {
+	isExperimentalTarget()
+}
+
+type ExperimentalTargetSecond struct{}
+
+func (ExperimentalTargetSecond) isExperimentalTarget() {}
+
 type UserProfile struct {
-	// Tags - Required.
+	// Tags - A very long field doc that has to be wrapped because it exceeds the generated
+	// comment line width by a comfortable margin for testing.
+	//
+	// Required.
 	Tags []string
-	// Metadata - Required.
+	// Metadata - Go-specific metadata.
+	//
+	// Required.
 	Metadata map[string]string
 	// Capabilities - Required.
 	Capabilities UserCapability
@@ -216,6 +283,10 @@ type UserProfile struct {
 	NotificationTarget NotificationTarget
 	// Address - Optional.
 	Address *PostalAddress
+	// SingleTarget - Optional.
+	SingleTarget SingleTarget
+	// ExperimentalTarget - Optional.
+	ExperimentalTarget ExperimentalTarget
 }
 
 func (m UserProfile) GetTags() []string {
@@ -242,6 +313,14 @@ func (m UserProfile) GetAddress() *PostalAddress {
 	return m.Address
 }
 
+func (m UserProfile) GetSingleTarget() SingleTarget {
+	return m.SingleTarget
+}
+
+func (m UserProfile) GetExperimentalTarget() ExperimentalTarget {
+	return m.ExperimentalTarget
+}
+
 type Result[T, E any] struct {
 	// Result - Optional.
 	Result T
@@ -258,7 +337,9 @@ func (m Result[T, E]) GetError() E {
 }
 
 type PostalAddress struct {
-	// Street - Required.
+	// Street - Street with <tag> & "quotes".
+	//
+	// Required.
 	Street string
 	// City - Required.
 	City string
@@ -306,6 +387,12 @@ type SyncReport struct {
 	Attempts []Result[string, string]
 	// RegionStatus - Required.
 	RegionStatus map[string]Result[string, string]
+	// ItemCount - Required.
+	ItemCount int32
+	// ByteCount - Required.
+	ByteCount int64
+	// ClockSkewMs - Required.
+	ClockSkewMs int64
 }
 
 func (m SyncReport) GetRoute() []Tuple2[float64, float64] {
@@ -320,94 +407,250 @@ func (m SyncReport) GetRegionStatus() map[string]Result[string, string] {
 	return m.RegionStatus
 }
 
+func (m SyncReport) GetItemCount() int32 {
+	return m.ItemCount
+}
+
+func (m SyncReport) GetByteCount() int64 {
+	return m.ByteCount
+}
+
+func (m SyncReport) GetClockSkewMs() int64 {
+	return m.ClockSkewMs
+}
+
+type NotificationSettings struct {
+	// EmailEnabled - Required.
+	EmailEnabled bool
+	// SmsEnabled - Required.
+	SmsEnabled bool
+}
+
+func (m NotificationSettings) GetEmailEnabled() bool {
+	return m.EmailEnabled
+}
+
+func (m NotificationSettings) GetSmsEnabled() bool {
+	return m.SmsEnabled
+}
+
+type SyncSettings struct {
+	// Region - Optional.
+	Region *string
+	// Checkpoint - Optional.
+	Checkpoint *string
+}
+
+func (m SyncSettings) GetRegion() *string {
+	return m.Region
+}
+
+func (m SyncSettings) GetCheckpoint() *string {
+	return m.Checkpoint
+}
+
+// GetUserOptions - Options for GetUser.
 type GetUserOptions struct {
-	// UserID - Required.
-	UserID string
 	// ConsistencyToken - Optional.
 	ConsistencyToken string
 }
 
-func GetUser(ctx workflow.Context, opts GetUserOptions) workflow.Future {
+// GetUser - Get a user.
+//
+// Returns: The matching user.
+func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
 	var consistencyToken *string
 	if opts.ConsistencyToken != "" {
 		consistencyToken = &opts.ConsistencyToken
 	}
-	return getUser(ctx, getUserRequest{
-		UserID:           opts.UserID,
+	request := getUserRequest{
+		UserID:           userID,
 		ConsistencyToken: consistencyToken,
-	})
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "GetUser", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// UpdateEmailOptions - Options for UpdateEmail.
 type UpdateEmailOptions struct {
-	// UserID - Required.
-	UserID string
-	// Email - Required.
-	Email string
 }
 
-func UpdateEmail(ctx workflow.Context, opts UpdateEmailOptions) workflow.Future {
-	return updateEmail(ctx, updateEmailRequest{
-		UserID: opts.UserID,
-		Email:  opts.Email,
-	})
+// UpdateEmail.
+func UpdateEmail(
+	ctx workflow.Context,
+	opts UpdateEmailOptions,
+	userID string,
+	email string,
+) workflow.Future {
+	request := updateEmailRequest{
+		UserID: userID,
+		Email:  email,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateEmail", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// RenameOptions - Options for Rename.
 type RenameOptions struct {
-	// UserID - Required.
-	UserID string
-	// DisplayName - Required.
-	DisplayName string
 }
 
-func Rename(ctx workflow.Context, opts RenameOptions) workflow.Future {
-	return rename(ctx, renameRequest{
-		UserID:      opts.UserID,
-		DisplayName: opts.DisplayName,
-	})
+// Rename.
+func Rename(
+	ctx workflow.Context,
+	opts RenameOptions,
+	userID string,
+	displayName string,
+) workflow.Future {
+	request := renameRequest{
+		UserID:      userID,
+		DisplayName: displayName,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "Rename", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// SetProfileOptions - Options for SetProfile.
 type SetProfileOptions struct {
-	// UserID - Required.
-	UserID string
-	// Profile - Required.
-	Profile UserProfile
 }
 
-func SetProfile(ctx workflow.Context, opts SetProfileOptions) workflow.Future {
-	return setProfile(ctx, setProfileRequest{
-		UserID:  opts.UserID,
-		Profile: opts.Profile,
-	})
+// SetProfile.
+func SetProfile(
+	ctx workflow.Context,
+	opts SetProfileOptions,
+	userID string,
+	profile UserProfile,
+) workflow.Future {
+	request := setProfileRequest{
+		UserID:  userID,
+		Profile: profile,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "SetProfile", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// RecordSyncOptions - Options for RecordSync.
 type RecordSyncOptions struct {
-	// UserID - Required.
-	UserID string
-	// Report - Required.
-	Report SyncReport
 }
 
-func RecordSync(ctx workflow.Context, opts RecordSyncOptions) workflow.Future {
-	return recordSync(ctx, recordSyncRequest{
-		UserID: opts.UserID,
-		Report: opts.Report,
-	})
+// RecordSync.
+func RecordSync(
+	ctx workflow.Context,
+	opts RecordSyncOptions,
+	userID string,
+	report SyncReport,
+) workflow.Future {
+	request := recordSyncRequest{
+		UserID: userID,
+		Report: report,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "RecordSync", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// DeactivateOptions - Options for Deactivate.
 type DeactivateOptions struct {
-	// UserID - Required.
-	UserID string
 	// Reason - Optional.
 	Reason string
 }
 
-func Deactivate(ctx workflow.Context, opts DeactivateOptions) workflow.Future {
+// Deactivate.
+func Deactivate(ctx workflow.Context, opts DeactivateOptions, userID string) workflow.Future {
 	var reason *string
 	if opts.Reason != "" {
 		reason = &opts.Reason
 	}
-	return deactivate(ctx, deactivateRequest{
-		UserID: opts.UserID,
+	request := deactivateRequest{
+		UserID: userID,
 		Reason: reason,
-	})
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "Deactivate", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+// UpdateLabelsOptions - Options for UpdateLabels.
+type UpdateLabelsOptions struct {
+	// ExtraTags - Optional.
+	ExtraTags []string
+	// ExtraMetadata - Optional.
+	ExtraMetadata map[string]string
+}
+
+// UpdateLabels.
+func UpdateLabels(
+	ctx workflow.Context,
+	opts UpdateLabelsOptions,
+	userID string,
+	tags []string,
+	metadata map[string]string,
+) workflow.Future {
+	request := updateLabelsRequest{
+		UserID:        userID,
+		Tags:          tags,
+		Metadata:      metadata,
+		ExtraTags:     opts.ExtraTags,
+		ExtraMetadata: opts.ExtraMetadata,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateLabels", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+// UpdateNotificationSettingsOptions - Options for UpdateNotificationSettings.
+type UpdateNotificationSettingsOptions struct {
+}
+
+// UpdateNotificationSettings.
+func UpdateNotificationSettings(
+	ctx workflow.Context,
+	opts UpdateNotificationSettingsOptions,
+	userID string,
+	settings NotificationSettings,
+) workflow.Future {
+	request := updateNotificationSettingsRequest{
+		UserID:   userID,
+		Settings: settings,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "UpdateNotificationSettings", request, workflow.NexusOperationOptions{})
+	return fut
+}
+
+// GetSyncSettingsOptions - Options for GetSyncSettings.
+type GetSyncSettingsOptions struct {
+	// Region - Optional.
+	Region string
+	// Checkpoint - Optional.
+	Checkpoint string
+}
+
+// GetSyncSettings.
+func GetSyncSettings(ctx workflow.Context, opts GetSyncSettingsOptions, userID string) workflow.Future {
+	var settingsValue *SyncSettings
+	if opts.Region != "" || opts.Checkpoint != "" {
+		var region *string
+		if opts.Region != "" {
+			region = &opts.Region
+		}
+		var checkpoint *string
+		if opts.Checkpoint != "" {
+			checkpoint = &opts.Checkpoint
+		}
+		settingsValue = &SyncSettings{
+			Region:     region,
+			Checkpoint: checkpoint,
+		}
+	}
+	request := getSyncSettingsRequest{
+		UserID:   userID,
+		Settings: settingsValue,
+	}
+	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
+	fut := c.ExecuteOperation(ctx, "GetSyncSettings", request, workflow.NexusOperationOptions{})
+	return fut
 }

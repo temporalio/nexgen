@@ -6,8 +6,10 @@ import typing
 import temporalio.workflow
 
 from ..models import (
+    ContextRef,
     GenericRequest,
     GenericResponse,
+    GetterProbe,
     Inner,
 )
 
@@ -39,16 +41,20 @@ async def _complete(
 async def complete(
     *,
     context: ContextT,
-    contexts: list[ContextT] | None = None,
-    by_name: dict[str, ContextT] | None = None,
+    contexts: list[ContextT],
+    by_name: dict[str, ContextT],
     nested: Inner[ContextT],
+    probe: GetterProbe[ContextT] | None = None,
+    reference: ContextRef[ContextT] | None = None,
 ) -> temporalio.workflow.NexusOperationHandle[
     GenericResponse[ContextT, object, object],
 ]:
     request = GenericRequest(
         context=context,
-        contexts=contexts or [],
-        by_name=by_name or {},
+        contexts=contexts,
+        by_name=by_name,
         nested=nested,
+        probe=probe,
+        reference=reference,
     )
     return await _complete(request)

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from .models import (
+    OptionalPayloads,
     PayloadBackedContext,
     PayloadBackedEnvelope,
     PayloadBackedOutput,
 )
 
 __all__ = [
+    "OptionalPayloads",
     "PayloadBackedContext",
     "PayloadBackedEnvelope",
     "PayloadBackedOutput",

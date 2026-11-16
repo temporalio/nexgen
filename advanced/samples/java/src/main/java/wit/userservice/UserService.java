@@ -8,4 +8,7 @@ public interface UserService {
 
   @io.nexusrpc.Operation(name = "UpdateEmail")
   wit.userservice.User updateEmail(wit.userservice.UpdateEmailRequest request);
+
+  @io.nexusrpc.Operation(name = "Notify")
+  void notify(wit.userservice.NotifyRequest request);
 }

@@ -1,0 +1,11 @@
+package temporal:nexus@1.0.0;
+
+world system { export workflow-service; }
+
+interface workflow-service {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.default "request-id"
+    request-id: string,
+  }
+}

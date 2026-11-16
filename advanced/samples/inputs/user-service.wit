@@ -9,6 +9,7 @@ interface user-service {
     constructor(user-id: string, email: string);
 
     update-email: func(email: string) -> user-result;
+    notify: func(reason: option<string>, channels: list<string>, sender: string);
   }
 
   type user-result = own<user>;
@@ -22,6 +23,14 @@ interface user-service {
     email: string,
   }
 
+  record notify-request {
+    user-id: string,
+    reason: option<string>,
+    channels: list<string>,
+    sender: string,
+  }
+
   get-user: func(request: get-user-request) -> user-result;
   update-email: func(request: update-email-request) -> user-result;
+  notify: func(request: notify-request);
 }

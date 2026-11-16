@@ -7,6 +7,9 @@ public final class SyncReport {
   private final java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> attempts;
   private final java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
       regionStatus;
+  private final Integer itemCount;
+  private final Long byteCount;
+  private final Long clockSkewMs;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public SyncReport(
@@ -15,11 +18,16 @@ public final class SyncReport {
       @com.fasterxml.jackson.annotation.JsonProperty("attempts")
           java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> attempts,
       @com.fasterxml.jackson.annotation.JsonProperty("regionStatus")
-          java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
-              regionStatus) {
+          java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>> regionStatus,
+      @com.fasterxml.jackson.annotation.JsonProperty("itemCount") Integer itemCount,
+      @com.fasterxml.jackson.annotation.JsonProperty("byteCount") Long byteCount,
+      @com.fasterxml.jackson.annotation.JsonProperty("clockSkewMs") Long clockSkewMs) {
     this.route = route;
     this.attempts = attempts;
     this.regionStatus = regionStatus;
+    this.itemCount = itemCount;
+    this.byteCount = byteCount;
+    this.clockSkewMs = clockSkewMs;
   }
 
   public java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> getRoute() {
@@ -33,6 +41,18 @@ public final class SyncReport {
   public java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
       getRegionStatus() {
     return regionStatus;
+  }
+
+  public Integer getItemCount() {
+    return itemCount;
+  }
+
+  public Long getByteCount() {
+    return byteCount;
+  }
+
+  public Long getClockSkewMs() {
+    return clockSkewMs;
   }
 
   public Builder toBuilder() {
@@ -55,6 +75,9 @@ public final class SyncReport {
       this.route = value.route;
       this.attempts = value.attempts;
       this.regionStatus = value.regionStatus;
+      this.itemCount = value.itemCount;
+      this.byteCount = value.byteCount;
+      this.clockSkewMs = value.clockSkewMs;
     }
 
     private java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> route =
@@ -84,8 +107,29 @@ public final class SyncReport {
       return this;
     }
 
+    private Integer itemCount = null;
+
+    public Builder setItemCount(Integer value) {
+      this.itemCount = value;
+      return this;
+    }
+
+    private Long byteCount = null;
+
+    public Builder setByteCount(Long value) {
+      this.byteCount = value;
+      return this;
+    }
+
+    private Long clockSkewMs = 0L;
+
+    public Builder setClockSkewMs(Long value) {
+      this.clockSkewMs = value;
+      return this;
+    }
+
     public SyncReport build() {
-      return new SyncReport(route, attempts, regionStatus);
+      return new SyncReport(route, attempts, regionStatus, itemCount, byteCount, clockSkewMs);
     }
   }
 }

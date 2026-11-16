@@ -7,16 +7,17 @@ use indexmap::IndexMap;
 use crate::error::{Error, Result};
 use crate::generator::render_request_plan;
 use crate::generator::{
-    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles, GenerationMode,
+    ExternalModelBackend, GeneratedFileMap, GeneratedFileOrigin, GeneratedFiles,
 };
 use crate::language::Language;
+use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedJsonType, PlannedProtoType, PlannedProtoTypeInfo, PlannedResource,
     PlannedResourceMethodBindingSpec as PlannedResourceMethodBinding,
     PlannedResourceMethodResultKind as PlannedResourceMethodResult, PlannedSpec, PlannedType,
 };
 use crate::spec::{
-    AliasTypeSpec, EnumSpec, EnumValueSpec, ExternalTypeSpec, FieldDefaultSpec, FlagsSpec,
+    AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec,
     FunctionArgsSpec as GenericFunctionArgsSpec, FunctionFieldSpec as GenericFunctionFieldSpec,
     FunctionResultSpec as GenericFunctionResultSpec, IntSpec, ModulePath, OperationSpec,
     RecordFieldSpec, RecordSpec, SelectedTextSpec, TypeReplacementSpec, TypeSpec, VariantSpec,
@@ -25,6 +26,9 @@ use crate::spec::{ApiSpecBranch, ApiSpecLeaf, ApiSpecNode, ApiSpecTree};
 
 use super::json_schema::go as json;
 use super::proto::go as proto;
+
+mod facade;
+mod interceptor;
 
 type FunctionArgsSpec = GenericFunctionArgsSpec<PlannedFamily>;
 type FunctionFieldSpec = GenericFunctionFieldSpec<PlannedFamily>;
@@ -51,12 +55,228 @@ const GO_DOC_COMMENT_LINE_LENGTH: usize = 88;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GoOptions {
-    /// The output directory's basename, matching the Go convention that a
-    /// package's name is its directory's name. Always a real, valid-UTF-8,
-    /// non-root name -- `generate_to_file` resolves and validates it before
-    /// generation runs.
+    /// The fallback package name when no namespace is declared. This is the
+    /// output directory's basename, resolved and validated by `generate_to_file`.
     pub(crate) output_dir_name: String,
     pub(crate) support_package: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GoFacadeOptions {
+    pub(crate) package_name: String,
+    pub(crate) import_path: String,
+    pub(crate) implementation_import_path: String,
+}
+
+const INTERNAL: &str = "go.temporal.io/sdk/internal";
+const WORKFLOW: &str = "go.temporal.io/sdk/workflow";
+const INTERNAL_BINDINGS: &str = "go.temporal.io/sdk/internalbindings";
+const COMMON_CONVERTER: &str = "go.temporal.io/sdk/internal/common/converter";
+const CONVERTER: &str = "go.temporal.io/sdk/converter";
+
+/// SDK-owned symbols used by advanced Go generation, not authored type mappings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SdkSymbol {
+    Context,
+    Future,
+    NewFuture,
+    Go,
+    NexusOperationOptions,
+    NexusOperationFuture,
+    ExecuteNexusOperationInput,
+    NewNexusClient,
+    NewSystemNexusClient,
+    GetDataConverterFromWorkflowContext,
+    SystemNexusRegistryKey,
+    SystemNexusRegistryEntry,
+    UpdateSystemNexusRegistry,
+    TransferTypeConverter,
+    NewTransferTypeConverter,
+    SerializationContext,
+    SystemNexusContext,
+    NewSystemNexusTransferTypeConverter,
+}
+
+struct SdkSymbolDefinition {
+    name: &'static str,
+    package: &'static str,
+    reexports: &'static [&'static str],
+}
+
+impl SdkSymbolDefinition {
+    fn is_available_in(&self, package: &str) -> bool {
+        package == self.package || self.reexports.contains(&package)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SdkReference {
+    expression: String,
+    import: Option<(&'static str, &'static str)>,
+}
+
+impl SdkSymbol {
+    const ALL: &[Self] = &[
+        Self::Context,
+        Self::Future,
+        Self::NewFuture,
+        Self::Go,
+        Self::NexusOperationOptions,
+        Self::NexusOperationFuture,
+        Self::ExecuteNexusOperationInput,
+        Self::NewNexusClient,
+        Self::NewSystemNexusClient,
+        Self::GetDataConverterFromWorkflowContext,
+        Self::SystemNexusRegistryKey,
+        Self::SystemNexusRegistryEntry,
+        Self::UpdateSystemNexusRegistry,
+        Self::TransferTypeConverter,
+        Self::NewTransferTypeConverter,
+        Self::SerializationContext,
+        Self::SystemNexusContext,
+        Self::NewSystemNexusTransferTypeConverter,
+    ];
+
+    fn definition(self) -> SdkSymbolDefinition {
+        match self {
+            Self::Context => SdkSymbolDefinition {
+                name: "Context",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::Future => SdkSymbolDefinition {
+                name: "Future",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::NewFuture => SdkSymbolDefinition {
+                name: "NewFuture",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::Go => SdkSymbolDefinition {
+                name: "Go",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::NexusOperationOptions => SdkSymbolDefinition {
+                name: "NexusOperationOptions",
+                package: INTERNAL,
+                reexports: &[WORKFLOW, INTERNAL_BINDINGS],
+            },
+            Self::NexusOperationFuture => SdkSymbolDefinition {
+                name: "NexusOperationFuture",
+                package: INTERNAL,
+                reexports: &[WORKFLOW],
+            },
+            Self::ExecuteNexusOperationInput => SdkSymbolDefinition {
+                name: "ExecuteNexusOperationInput",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::NewNexusClient => SdkSymbolDefinition {
+                name: "NewNexusClient",
+                package: INTERNAL,
+                reexports: &[WORKFLOW, INTERNAL_BINDINGS],
+            },
+            Self::NewSystemNexusClient => SdkSymbolDefinition {
+                name: "NewSystemNexusClient",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::GetDataConverterFromWorkflowContext => SdkSymbolDefinition {
+                name: "GetDataConverterFromWorkflowContext",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::SystemNexusRegistryKey => SdkSymbolDefinition {
+                name: "SystemNexusRegistryKey",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::SystemNexusRegistryEntry => SdkSymbolDefinition {
+                name: "SystemNexusRegistryEntry",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::UpdateSystemNexusRegistry => SdkSymbolDefinition {
+                name: "UpdateSystemNexusRegistry",
+                package: INTERNAL,
+                reexports: &[],
+            },
+            Self::TransferTypeConverter => SdkSymbolDefinition {
+                name: "TransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::NewTransferTypeConverter => SdkSymbolDefinition {
+                name: "NewTransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::SerializationContext => SdkSymbolDefinition {
+                name: "SerializationContext",
+                package: COMMON_CONVERTER,
+                reexports: &[CONVERTER],
+            },
+            Self::SystemNexusContext => SdkSymbolDefinition {
+                name: "SystemNexusContext",
+                package: COMMON_CONVERTER,
+                reexports: &[],
+            },
+            Self::NewSystemNexusTransferTypeConverter => SdkSymbolDefinition {
+                name: "NewSystemNexusTransferTypeConverter",
+                package: COMMON_CONVERTER,
+                reexports: &[],
+            },
+        }
+    }
+
+    fn find(package: &str, name: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|symbol| {
+            let definition = symbol.definition();
+            name == definition.name && definition.is_available_in(package)
+        })
+    }
+
+    fn resolve(self, output_package: Option<&str>, system_nexus: bool) -> SdkReference {
+        let definition = self.definition();
+        if output_package.is_some_and(|package| definition.is_available_in(package)) {
+            return SdkReference {
+                expression: definition.name.to_string(),
+                import: None,
+            };
+        }
+        // Both files share the generation mode. Only the output package above
+        // decides locality; mode selects a fallback import for non-local symbols.
+        let (path, qualifier) = match self {
+            Self::Context
+            | Self::Future
+            | Self::NewFuture
+            | Self::Go
+            | Self::NexusOperationFuture
+            | Self::NexusOperationOptions => {
+                if system_nexus {
+                    (INTERNAL, "internal")
+                } else {
+                    (WORKFLOW, "workflow")
+                }
+            }
+            // Ordinary endpoints use the public API when an import is needed.
+            Self::NewNexusClient => (WORKFLOW, "workflow"),
+            Self::TransferTypeConverter
+            | Self::NewTransferTypeConverter
+            | Self::SerializationContext => (CONVERTER, "converter"),
+            Self::SystemNexusContext | Self::NewSystemNexusTransferTypeConverter => {
+                (COMMON_CONVERTER, "commonconverter")
+            }
+            _ => (INTERNAL, "internal"),
+        };
+        SdkReference {
+            expression: format!("{qualifier}.{}", definition.name),
+            import: Some((path, qualifier)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -120,8 +340,8 @@ pub(in crate::generator) struct PlannedField {
     annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) flattened_annotation_override: Option<SelectedTextSpec>,
     pub(in crate::generator) required: bool,
-    pub(in crate::generator) default_value: Option<FieldDefaultSpec>,
-    pub(in crate::generator) default_enum_value: Option<EnumValueSpec>,
+    api_required: bool,
+    default_expression: Option<String>,
     role: PlannedFieldRole,
     pub(in crate::generator) kind: PlannedFieldKind,
 }
@@ -176,6 +396,7 @@ pub(in crate::generator) enum PlannedScalarType {
 #[derive(Debug, Clone)]
 pub(in crate::generator) struct PlannedEnumType {
     pub(in crate::generator) info: Option<PlannedTypeInfo>,
+    pub(in crate::generator) wire_info: Option<PlannedTypeInfo>,
     pub(in crate::generator) name: Option<String>,
     pub(in crate::generator) replacement: Option<TypeReplacementSpec<PlannedFamily>>,
 }
@@ -357,8 +578,10 @@ pub(in crate::generator) fn planned_field(
         annotation_override: field.annotation.clone(),
         flattened_annotation_override: field.flattened_annotation.clone(),
         required: field.required,
-        default_value: field.default_value.clone(),
-        default_enum_value: field.data.default_enum_value.clone(),
+        api_required: field.api_required(GenerationTarget::Workflow),
+        default_expression: field
+            .default_for(GenerationTarget::Workflow)
+            .map(str::to_string),
         role,
         kind: planned_field_kind(&field.field_type, spec),
     }
@@ -436,7 +659,11 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
     match value_type.without_option() {
         TypeSpec::Bool => PlannedValueType::Scalar(PlannedScalarType::Bool),
         TypeSpec::Int(IntSpec::I32) => PlannedValueType::Scalar(PlannedScalarType::Int32),
-        TypeSpec::Int(IntSpec::I64) => PlannedValueType::Scalar(PlannedScalarType::Int64),
+        // Go keeps signed integers, as Go APIs do.
+        TypeSpec::Int(IntSpec::U32) => PlannedValueType::Scalar(PlannedScalarType::Int32),
+        TypeSpec::Int(IntSpec::I64 | IntSpec::U64) => {
+            PlannedValueType::Scalar(PlannedScalarType::Int64)
+        }
         TypeSpec::Float => PlannedValueType::Scalar(PlannedScalarType::Float),
         TypeSpec::String => PlannedValueType::Scalar(PlannedScalarType::String),
         TypeSpec::Bytes => PlannedValueType::Scalar(PlannedScalarType::Bytes),
@@ -448,6 +675,14 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
             .unwrap_or(PlannedValueType::Unknown),
         TypeSpec::Enum(enum_type) => PlannedValueType::Enum(PlannedEnumType {
             info: Some(local_type_info(&enum_type.full_name)),
+            wire_info: spec
+                .enum_decl(&enum_type.full_name)
+                .and_then(|enumeration| enumeration.source.as_ref())
+                .and_then(|source| source.proto_type())
+                .and_then(|proto| match proto {
+                    PlannedProtoType::Enum(proto) => Some(proto.proto.clone()),
+                    _ => None,
+                }),
             name: Some(enum_type.name.clone()),
             replacement: None,
         }),
@@ -459,7 +694,13 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
             info: local_type_info(&variant_type.full_name),
             name: variant_type.name.clone(),
         }),
-        TypeSpec::Resource(_) => PlannedValueType::Unknown,
+        TypeSpec::Resource(resource) => PlannedValueType::External {
+            type_name: SelectedTextSpec {
+                value: Some(resource.type_name.clone()),
+                import: None,
+            },
+            fallback: Box::new(PlannedValueType::Unknown),
+        },
         TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) => {
             PlannedValueType::Message(PlannedMessageType {
                 info: message.proto.clone(),
@@ -472,6 +713,7 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
         TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(enum_type))) => {
             PlannedValueType::Enum(PlannedEnumType {
                 info: Some(enum_type.proto.clone()),
+                wire_info: Some(enum_type.proto.clone()),
                 name: Some(enum_type.name.clone()),
                 replacement: enum_type.replacement.clone(),
             })
@@ -512,11 +754,55 @@ fn planned_value_type(value_type: &PlannedType, spec: &PlannedSpec) -> PlannedVa
 pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
+    workflow_package_alias: &'static str,
     pub(in crate::generator) has_serialization_context: bool,
     support_package: Option<String>,
+    facade: Option<GoFacadeOptions>,
+    facade_exports: BTreeMap<String, String>,
+    workflow_interceptors: bool,
 }
 
 impl GoPackageContext {
+    fn documentation_name<'a>(&'a self, name: &'a str) -> &'a str {
+        let name = split_go_type_decl_name(name).0;
+        self.facade_exports
+            .get(name)
+            .map(|public| public.rsplit('.').next().unwrap())
+            .unwrap_or(name)
+    }
+
+    fn render_declaration_doc(
+        &self,
+        output: &mut String,
+        indent: &str,
+        name: &str,
+        doc: Option<&str>,
+    ) {
+        if doc.is_some()
+            || self
+                .facade_exports
+                .contains_key(split_go_type_decl_name(name).0)
+        {
+            render_go_declaration_doc(output, indent, self.documentation_name(name), doc);
+        }
+        self.render_exposed_as(output, indent, name);
+    }
+
+    fn render_exposed_as(&self, output: &mut String, indent: &str, name: &str) {
+        let name = split_go_type_decl_name(name).0;
+        let Some(public) = self.facade_exports.get(name) else {
+            return;
+        };
+        if output
+            .lines()
+            .next_back()
+            .is_some_and(|line| line.trim_start().starts_with("//"))
+        {
+            output.push_str(&format!("{indent}//\n"));
+        }
+        output.push_str(&format!("{indent}// Exposed as: [{public}]\n"));
+    }
+
     fn new(api_plan: &PlannedSpec, options: &GoOptions) -> Result<Self> {
         // `@nexus.namespace go="..."` is WIT-only (the JSON schema parser
         // never populates a per-language namespace), and it names an
@@ -528,28 +814,52 @@ impl GoPackageContext {
             .primary_namespace()
             .and_then(|namespace| namespace.value())
             .map(str::to_string);
-        let package_name = Self::derive_package_name(&options.output_dir_name)?;
-
-        if let Some(import_path) = &import_path {
-            let namespace_package_name = go_package_name(
-                import_path
-                    .rsplit('/')
-                    .next()
-                    .filter(|segment| !segment.is_empty())
-                    .unwrap_or(import_path),
-            );
-            if namespace_package_name != package_name {
-                return Err(Error::GoNamespacePackageMismatch {
-                    namespace: import_path.clone(),
-                    expected_package: namespace_package_name,
-                    actual_package: package_name,
-                });
-            }
-        }
+        let package_name = match &import_path {
+            Some(path) => Self::derive_package_name(path.rsplit('/').next().unwrap_or(path))?,
+            None => Self::derive_package_name(&options.output_dir_name)?,
+        };
+        let facade = api_plan
+            .primary_facade()
+            .and_then(|facade| facade.value())
+            .map(|facade| {
+                Ok(GoFacadeOptions {
+                    package_name: Self::derive_package_name(
+                        facade.rsplit('/').next().unwrap_or(facade),
+                    )?,
+                    import_path: facade.to_string(),
+                    implementation_import_path: import_path
+                        .clone()
+                        .expect("facade requires an implementation namespace"),
+                })
+            })
+            .transpose()?;
 
         Ok(Self {
             package_name,
+            workflow_interceptors: crate::nexgen_config::current().system_nexus
+                && crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow),
             import_path,
+            workflow_package_alias: if api_plan
+                .records()
+                .any(|(_, record)| record.fields.values().any(|field| field.name == "workflow"))
+                || api_plan.services.iter().any(|service| {
+                    service.resources.iter().any(|resource| {
+                        resource
+                            .data
+                            .fields
+                            .iter()
+                            .any(|field| field.name == "workflow")
+                            || resource.data.methods.iter().any(|method| {
+                                method.params.iter().any(|param| param.name == "workflow")
+                            })
+                    })
+                }) {
+                "temporalworkflow"
+            } else {
+                "workflow"
+            },
             has_serialization_context: crate::nexgen_config::current().system_nexus
                 && api_plan
                     .services
@@ -557,6 +867,8 @@ impl GoPackageContext {
                     .flat_map(|service| &service.operations)
                     .any(|operation| operation.serialization_context.value().is_some()),
             support_package: options.support_package.clone(),
+            facade,
+            facade_exports: BTreeMap::new(),
         })
     }
 
@@ -584,99 +896,105 @@ impl GoPackageContext {
 
     pub(in crate::generator) fn go_type_expr(&self, type_expr: &str) -> String {
         let (imports, code_expr) = parse_go_expr(type_expr);
-        if imports.iter().any(|path| self.is_self_import(path)) {
+        if imports.keys().any(|path| {
+            self.is_self_import(path) || (self.import_path.is_some() && path == &self.package_name)
+        }) {
             self.unqualify_self_expr(&code_expr)
         } else {
-            code_expr
+            self.alias_workflow_expr(&code_expr)
         }
+    }
+
+    fn import_alias<'a>(&self, path: &'a str) -> &'a str {
+        if path == "go.temporal.io/sdk/workflow" {
+            self.workflow_package_alias
+        } else {
+            path.rsplit('/').next().unwrap_or(path)
+        }
+    }
+
+    fn alias_workflow_expr(&self, expr: &str) -> String {
+        rewrite_go_package_qualifier(expr, "workflow", self.workflow_package_alias)
     }
 
     fn function_name_extractor(&self, reference: &str) -> String {
         if self.support_package.is_some() && !reference.contains('.') {
-            format!("support.{reference}")
+            self.support_reference(reference)
         } else {
             self.go_type_expr(reference)
         }
     }
 
+    pub(in crate::generator) fn support_reference(&self, reference: &str) -> String {
+        match &self.support_package {
+            Some(path) if !self.is_self_import(path) => format!("support.{reference}"),
+            _ => self.go_type_expr(reference),
+        }
+    }
+
+    fn sdk_reference(&self, symbol: SdkSymbol) -> SdkReference {
+        let mut reference = symbol.resolve(
+            self.import_path.as_deref(),
+            crate::nexgen_config::current().system_nexus,
+        );
+        reference.expression = self.alias_workflow_expr(&reference.expression);
+        reference
+    }
+
     pub(in crate::generator) fn workflow_context_type(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Context")
+        self.sdk_reference(SdkSymbol::Context).expression
     }
 
     fn workflow_future_type(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Future")
+        self.sdk_reference(SdkSymbol::Future).expression
     }
 
     pub(in crate::generator) fn new_future(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.NewFuture")
+        self.sdk_reference(SdkSymbol::NewFuture).expression
     }
 
     fn workflow_go(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.Go")
+        self.sdk_reference(SdkSymbol::Go).expression
     }
 
     pub(in crate::generator) fn new_nexus_client(&self) -> String {
-        self.qualified_expr("go.temporal.io/sdk/workflow", "workflow.NewNexusClient")
+        self.sdk_reference(SdkSymbol::NewNexusClient).expression
     }
 
     pub(in crate::generator) fn nexus_operation_options(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/workflow",
-            "workflow.NexusOperationOptions{}",
+        format!(
+            "{}{{}}",
+            self.sdk_reference(SdkSymbol::NexusOperationOptions)
+                .expression
         )
     }
 
     pub(in crate::generator) fn transfer_type_converter_type(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            return "TransferTypeConverter".to_string();
-        }
-        self.qualified_expr(
-            "go.temporal.io/sdk/converter",
-            "converter.TransferTypeConverter",
-        )
+        self.sdk_reference(SdkSymbol::TransferTypeConverter)
+            .expression
     }
 
     pub(in crate::generator) fn new_transfer_type_converter(&self) -> String {
-        if !crate::nexgen_config::current().system_nexus {
-            self.qualified_expr(
-                "go.temporal.io/sdk/converter",
-                "converter.NewTransferTypeConverter",
-            )
-        } else if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "NewSystemNexusTransferTypeConverter".to_string()
+        let symbol = if crate::nexgen_config::current().system_nexus {
+            SdkSymbol::NewSystemNexusTransferTypeConverter
         } else {
-            "commonconverter.NewSystemNexusTransferTypeConverter".to_string()
-        }
+            SdkSymbol::NewTransferTypeConverter
+        };
+        self.sdk_reference(symbol).expression
     }
 
-    pub(in crate::generator) fn system_nexus_config_type(&self) -> String {
-        if self.is_self_import("go.temporal.io/sdk/internal/common/converter") {
-            "SystemNexusConfig".to_string()
-        } else {
-            "commonconverter.SystemNexusConfig".to_string()
-        }
+    pub(in crate::generator) fn system_nexus_context_type(&self) -> String {
+        self.sdk_reference(SdkSymbol::SystemNexusContext).expression
     }
 
     pub(in crate::generator) fn workflow_data_converter(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.GetDataConverterFromWorkflowContext",
-        )
+        self.sdk_reference(SdkSymbol::GetDataConverterFromWorkflowContext)
+            .expression
     }
 
     pub(in crate::generator) fn serialization_context_type(&self) -> String {
-        self.qualified_expr(
-            "go.temporal.io/sdk/converter",
-            "converter.SerializationContext",
-        )
-    }
-
-    fn qualified_expr(&self, import_path: &str, code_expr: &str) -> String {
-        if self.is_self_import(import_path) {
-            self.unqualify_self_expr(code_expr)
-        } else {
-            code_expr.to_string()
-        }
+        self.sdk_reference(SdkSymbol::SerializationContext)
+            .expression
     }
 
     fn unqualify_self_expr(&self, code_expr: &str) -> String {
@@ -706,8 +1024,84 @@ fn generate_in_tree(
     options: &GoOptions,
     tree_models: &[PlannedJsonType],
     primary_origin: GeneratedFileOrigin,
+    file_name: Option<PathBuf>,
 ) -> Result<GoGenerationResult> {
-    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin)
+    // Go resources have no type parameters, so nexgen can't render a generic one.
+    if let Some(resource) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find(|resource| !resource.data.type_parameters.is_empty())
+    {
+        return Err(Error::UnsupportedGenericResource {
+            language: Language::Go,
+            resource: resource.name.clone(),
+        });
+    }
+    if let Some((resource, method)) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find_map(|resource| {
+            resource
+                .methods
+                .iter()
+                .find(|method| method.varargs.is_some())
+                .map(|method| (resource, method))
+        })
+    {
+        return Err(Error::UnsupportedGoType {
+            context: format!("resource method `{}.{}`", resource.name, method.name),
+            reason: "Go doesn't support `@nexus.varargs`".to_string(),
+        });
+    }
+    if let Some((resource, method)) = api_plan
+        .services
+        .iter()
+        .flat_map(|service| &service.resources)
+        .find_map(|resource| {
+            resource
+                .methods
+                .iter()
+                .find(|method| method.api_omitted.contains(&GenerationTarget::Workflow))
+                .map(|method| (resource, method))
+        })
+    {
+        return Err(Error::UnsupportedGoType {
+            context: format!("resource method `{}.{}`", resource.name, method.name),
+            reason: "Go doesn't support `@nexus.api-omit targets=\"workflow\"` on a resource \
+                     method"
+                .to_string(),
+        });
+    }
+    if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
+        record
+            .fields
+            .iter()
+            .find(|(_, field)| field.flatten_in_api)
+            .map(|(field_name, _)| (record, field_name))
+    }) {
+        return Err(Error::UnsupportedGoType {
+            context: format!("record `{}` field `{field_name}`", record.full_name),
+            reason: "Go doesn't flatten the record of one field".to_string(),
+        });
+    }
+    if let Some((record, field_name)) = api_plan.records().find_map(|(_, record)| {
+        record
+            .fields
+            .iter()
+            .find(|(_, field)| {
+                matches!(&field.field_type, crate::planning::PlannedType::List(item)
+                    if crate::planning::flattened_list_field(api_plan, item).is_some())
+            })
+            .map(|(field_name, _)| (record, field_name))
+    }) {
+        return Err(Error::UnsupportedGoType {
+            context: format!("record `{}` field `{field_name}`", record.full_name),
+            reason: "Go doesn't flatten a list of a record".to_string(),
+        });
+    }
+    ApiPlanner::new(api_plan, options, tree_models)?.generate(primary_origin, file_name)
 }
 
 /// Every JSON model declared anywhere in the generate closure.
@@ -744,7 +1138,7 @@ fn generate_single_leaf(
     } else {
         GeneratedFileOrigin::fixed("generated Go API module")
     };
-    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin)?;
+    let mut generated = generate_in_tree(&leaf.spec, options, &[], primary_origin, None)?;
     if go_tree_has_json_models(&[leaf]) {
         let package_name = GoPackageContext::new(&leaf.spec, options)?.package_name;
         let definitions_path = PathBuf::from("definitions.go");
@@ -802,14 +1196,11 @@ fn generate_branch_tree(
             options,
             &tree_models,
             GeneratedFileOrigin::input_module(Language::Go, &leaf.source_path),
+            Some(go_flat_module_file_name(&leaf.module_path)),
         )?;
         warnings.extend(generated.warnings);
 
-        // `generate` names the single JSON member file `<package>.go`; re-key it
-        // to the flattened module path so each input file gets its own file in
-        // the flat package.
-        let file_name = go_flat_module_file_name(&leaf.module_path);
-        files.extend(generated.files.rekey_all(file_name)?)?;
+        files.extend(generated.files)?;
     }
 
     // The schema-independent runtime lives once in this package as
@@ -923,7 +1314,9 @@ impl GoExternalModels {
     ) -> Self {
         if plan_uses_json_models(api_plan) {
             Self::Json(json::ModelBackend::new(
-                crate::nexgen_config::current().mode == GenerationMode::NativeApi,
+                crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow),
             ))
         } else {
             Self::Proto(proto::ModelBackend::new(
@@ -982,6 +1375,13 @@ impl GoExternalModels {
         match self {
             Self::Json(backend) => backend.model_type_annotation(model_type),
             Self::Proto(backend) => backend.model_type_annotation(model_type),
+        }
+    }
+
+    fn support_helper_call(&self, call: &str) -> String {
+        match self {
+            Self::Proto(backend) => backend.support_converter(call.to_string()),
+            Self::Json(_) => call.to_string(),
         }
     }
 
@@ -1067,6 +1467,7 @@ struct ApiPlanner<'a> {
     api_plan: &'a PlannedSpec,
     package: GoPackageContext,
     imports: BTreeSet<String>,
+    aliased_imports: BTreeMap<String, String>,
     external_models: GoExternalModels,
     enums: IndexMap<String, RenderedEnum>,
     flags: IndexMap<String, RenderedFlags>,
@@ -1081,7 +1482,7 @@ impl<'a> ApiPlanner<'a> {
         tree_models: &[PlannedJsonType],
     ) -> Result<Self> {
         let package = GoPackageContext::new(api_plan, options)?;
-        let mut imports = BTreeSet::new();
+        let mut imports = BTreeMap::new();
 
         // Re-scan all resolved type expressions to collect import paths.
         // Type expressions like "temporal.RetryPolicy" were produced by
@@ -1089,7 +1490,19 @@ impl<'a> ApiPlanner<'a> {
         // we need to recover the imports from the original annotations.
         // We do this by re-parsing annotations from the planned spec.
         collect_imports_from_plan(api_plan, &mut imports);
-        imports.retain(|import_path| !package.is_self_import(import_path));
+        imports.retain(|import_path, _| !package.is_self_import(import_path));
+        let mut aliased_imports = BTreeMap::new();
+        let imports = imports
+            .into_iter()
+            .filter_map(|(path, alias)| {
+                if path.rsplit('/').next() == Some(alias.as_str()) {
+                    Some(path)
+                } else {
+                    aliased_imports.insert(path, alias);
+                    None
+                }
+            })
+            .collect();
 
         let mut external_models = GoExternalModels::new(
             api_plan,
@@ -1103,6 +1516,7 @@ impl<'a> ApiPlanner<'a> {
             api_plan,
             package,
             imports,
+            aliased_imports,
             external_models,
             enums: IndexMap::new(),
             flags: IndexMap::new(),
@@ -1111,8 +1525,34 @@ impl<'a> ApiPlanner<'a> {
         })
     }
 
-    fn generate(mut self, primary_origin: GeneratedFileOrigin) -> Result<GoGenerationResult> {
+    fn generate(
+        mut self,
+        primary_origin: GeneratedFileOrigin,
+        file_name: Option<PathBuf>,
+    ) -> Result<GoGenerationResult> {
         let mut services = Vec::new();
+        for service in &self.api_plan.services {
+            for operation in &service.operations {
+                interceptor::validate_context_propagation_mode(operation, &self.package)?;
+                if self.package.is_self_import("go.temporal.io/sdk/internal")
+                    && operation.context_propagation_header.value().is_some()
+                    && service.resources.iter().any(|resource| {
+                        resource.data.methods.iter().any(|method| {
+                            matches!(
+                                &method.binding,
+                                PlannedResourceMethodBinding::Operation { operation_name, .. }
+                                    if operation_name == &operation.name
+                            )
+                        })
+                    })
+                {
+                    return Err(interceptor::context_propagation_error(
+                        &operation.name,
+                        "operations bound to resource methods do not support context propagation",
+                    ));
+                }
+            }
+        }
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
         {
@@ -1182,6 +1622,12 @@ impl<'a> ApiPlanner<'a> {
                     reason: "serialization-context requires a proto-backed operation".to_string(),
                 });
             }
+            if operation.context_propagation_header.is_some() && operation.wire_binding.is_none() {
+                return Err(interceptor::context_propagation_error(
+                    operation.name,
+                    "requires a proto-backed operation",
+                ));
+            }
         }
 
         for service in &services {
@@ -1222,11 +1668,16 @@ impl<'a> ApiPlanner<'a> {
 
         // Operation wrapper functions require the workflow package.
         let has_operations = services.iter().any(|s| !s.operations.is_empty());
-        if has_operations && !self.package.is_self_import("go.temporal.io/sdk/workflow") {
-            self.imports
-                .insert("go.temporal.io/sdk/workflow".to_string());
+        if has_operations
+            && let Some((path, _)) = self.package.sdk_reference(SdkSymbol::Context).import
+        {
+            self.imports.insert(path.to_string());
         }
         let has_system_operations = crate::nexgen_config::current().system_nexus && has_operations;
+        if self.package.workflow_interceptors && has_operations {
+            self.imports
+                .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
+        }
         let has_eager_conversion = services.iter().flat_map(|s| &s.operations).any(|op| {
             op.wire_binding
                 .as_ref()
@@ -1266,22 +1717,18 @@ impl<'a> ApiPlanner<'a> {
         }
         // System transfer callbacks use the converter selected by the SDK;
         // ordinary callbacks are context-free.
-        if self.external_models.renders_transfer_type_converters() {
-            if !self.package.is_self_import("go.temporal.io/sdk/converter")
-                && (!crate::nexgen_config::current().system_nexus
-                    || !self
-                        .package
-                        .is_self_import("go.temporal.io/sdk/internal/common/converter"))
-            {
-                self.imports
-                    .insert("go.temporal.io/sdk/converter".to_string());
-            }
+        if self.external_models.renders_transfer_type_converters()
+            && let Some((path, _)) = self
+                .package
+                .sdk_reference(SdkSymbol::TransferTypeConverter)
+                .import
+        {
+            self.imports.insert(path.to_string());
         }
         let model_fragments = self.external_models.render_models()?;
         self.imports.extend(model_fragments.imports);
-        // The Nexus service definition (operation references) is emitted in
-        // both modes, so the `nexus` import is needed whenever a spec has
-        // services — not just in NativeApi.
+        // The Nexus service definition (operation references) is emitted with or without the
+        // Workflow API, so the `nexus` import is needed whenever a spec has services.
         if self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
             && !self
@@ -1291,15 +1738,33 @@ impl<'a> ApiPlanner<'a> {
             self.imports
                 .insert("github.com/nexus-rpc/sdk-go/nexus".to_string());
         }
-        if crate::nexgen_config::current().mode == GenerationMode::NativeApi
+        if crate::nexgen_config::current()
+            .targets
+            .contains(&GenerationTarget::Workflow)
             && self.external_models.renders_operation_references()
             && !self.api_plan.services.is_empty()
-            && !self.package.is_self_import("go.temporal.io/sdk/workflow")
+            && let Some((path, _)) = self.package.sdk_reference(SdkSymbol::Context).import
         {
-            self.imports
-                .insert("go.temporal.io/sdk/workflow".to_string());
+            self.imports.insert(path.to_string());
         }
         let mut external_imports = self.external_models.imports();
+        for (path, alias) in &self.aliased_imports {
+            if let Some((_, existing)) = external_imports
+                .iter()
+                .find(|(existing_path, _)| existing_path == path)
+            {
+                if existing != alias {
+                    return Err(Error::UnsupportedGoType {
+                        context: format!("import `{path}`"),
+                        reason: format!(
+                            "type annotations use alias `{alias}`, but protobuf bindings use `{existing}`"
+                        ),
+                    });
+                }
+            } else {
+                external_imports.push((path.clone(), alias.clone()));
+            }
+        }
         let registry = if crate::nexgen_config::current().system_nexus
             && self.package.has_serialization_context
         {
@@ -1328,22 +1793,40 @@ impl<'a> ApiPlanner<'a> {
                 external_imports.push((path.clone(), alias.clone()));
             }
         }
-        if services
+        if (services
             .iter()
             .flat_map(|s| &s.operations)
             .filter_map(|o| o.unpacked_input.as_ref())
             .flatten()
             .any(|p| {
-                p.function.as_ref().is_some_and(|f| {
-                    !function_value_is_string(f)
-                        && f.name_extractor.as_ref().is_some_and(|helper| {
-                            self.package
-                                .function_name_extractor(helper)
-                                .starts_with("support.")
+                p.default_expression
+                    .as_ref()
+                    .is_some_and(|s| s.contains("support."))
+                    || p.flattened_fields.as_ref().is_some_and(|fields| {
+                        fields.iter().any(|f| {
+                            f.default_expression
+                                .as_ref()
+                                .is_some_and(|s| s.contains("support."))
                         })
-                })
+                    })
             })
+            || services
+                .iter()
+                .flat_map(|s| &s.operations)
+                .filter_map(|o| o.unpacked_input.as_ref())
+                .flatten()
+                .any(|p| {
+                    p.function.as_ref().is_some_and(|f| {
+                        !function_value_is_string(f)
+                            && f.name_extractor.as_ref().is_some_and(|helper| {
+                                self.package
+                                    .function_name_extractor(helper)
+                                    .starts_with("support.")
+                            })
+                    })
+                }))
             && let Some(path) = &self.package.support_package
+            && !self.package.is_self_import(path)
             && !external_imports
                 .iter()
                 .any(|(existing, _)| existing == path)
@@ -1353,6 +1836,29 @@ impl<'a> ApiPlanner<'a> {
         for model in self.models.values() {
             validate_model_getter_names(model)?;
         }
+        let facade = self.package.facade.as_ref().map(|options| {
+            facade::plan(
+                options,
+                &self.package,
+                &self.imports,
+                &external_imports,
+                &self.enums,
+                &self.flags,
+                &self.variants,
+                &self.models,
+                &services,
+                self.api_plan,
+                &visibility,
+            )
+        });
+        if let (Some(plan), Some(options)) = (&facade, &self.package.facade) {
+            self.package.facade_exports = plan.exposed_names(&options.import_path);
+        }
+        let interceptors = if self.package.workflow_interceptors && has_operations {
+            interceptor::render(&services, &self.package, &visibility)?
+        } else {
+            String::new()
+        };
         let output = render_file(
             &self.package,
             &self.imports,
@@ -1370,15 +1876,32 @@ impl<'a> ApiPlanner<'a> {
             self.api_plan,
             &visibility,
             &registry.body,
+            &interceptors,
         );
 
         let mut files = GeneratedFileMap::default();
-        let file_name = if self.external_models.renders_operation_references() {
-            PathBuf::from(format!("{}.go", self.package.package_name))
-        } else {
-            go_api_file_name(self.api_plan)
-        };
-        files.insert(file_name, output, primary_origin)?;
+        let file_name = file_name.unwrap_or_else(|| {
+            if self.external_models.renders_operation_references() {
+                PathBuf::from(format!("{}.go", self.package.package_name))
+            } else {
+                go_api_file_name(self.api_plan)
+            }
+        });
+        files.insert(&file_name, output, primary_origin)?;
+
+        if let Some(facade) = facade {
+            files.insert(
+                file_name.with_file_name(format!(
+                    "{}_facade.go",
+                    file_name
+                        .file_stem()
+                        .expect("Go output has a file stem")
+                        .to_string_lossy()
+                )),
+                facade.render(),
+                GeneratedFileOrigin::fixed("generated Go facade"),
+            )?;
+        }
 
         Ok(GoGenerationResult {
             files,
@@ -1457,7 +1980,7 @@ impl<'a> ApiPlanner<'a> {
             let planned_record = record_for_message(self.api_plan, &input);
             let planned_fields = planned_record.map(|record| {
                 record
-                    .public_fields()
+                    .api_fields(GenerationTarget::Workflow)
                     .map(|(field_name, field)| {
                         planned_field(record, field_name, field, self.api_plan)
                     })
@@ -1466,10 +1989,12 @@ impl<'a> ApiPlanner<'a> {
             model
                 .fields
                 .iter()
-                .enumerate()
-                .filter_map(|(index, field)| {
-                    let planned_field =
-                        planned_fields.as_ref().and_then(|fields| fields.get(index));
+                .filter_map(|field| {
+                    let planned_field = planned_fields.as_ref().and_then(|fields| {
+                        fields
+                            .iter()
+                            .find(|planned| go_field_name(&planned.authored_name) == field.name)
+                    });
                     let planned_field = planned_field?;
                     let function = match &planned_field.role {
                         PlannedFieldRole::Function(function) if planned_field.required => {
@@ -1483,17 +2008,79 @@ impl<'a> ApiPlanner<'a> {
                         }
                         _ => None,
                     };
-                    let embed_in_options = !planned_field.required
+                    let flatten_in_options = !planned_field.required
                         && field_kind_is_flattened_message(&planned_field.kind, self.api_plan);
-                    let default_punning_zero = (!planned_field.required && !embed_in_options)
+                    let flattened_fields = if flatten_in_options {
+                        let PlannedFieldKind::Singular(PlannedValueType::Message(message)) =
+                            &planned_field.kind
+                        else {
+                            unreachable!()
+                        };
+                        let record = record_for_message(self.api_plan, message)
+                            .expect("flattened message should have a record");
+                        Some(
+                            self.models[&message.info.full_name]
+                                .fields
+                                .iter()
+                                .zip(record.public_fields())
+                                .map(|(field, (name, spec))| {
+                                    let planned =
+                                        self::planned_field(record, name, spec, self.api_plan);
+                                    RenderedFlattenedField {
+                                        field: field.clone(),
+                                        default_punning_zero: public_default_punning_zero_for_field(
+                                            &planned.kind,
+                                            &if field.go_type.starts_with('*') {
+                                                field.go_type.clone()
+                                            } else {
+                                                format!("*{}", field.go_type)
+                                            },
+                                        ),
+                                        default_expression: planned
+                                            .default_expression
+                                            .as_deref()
+                                            .map(|value| self.package.go_type_expr(value)),
+                                    }
+                                })
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    };
+                    let default_punning_zero = (!planned_field.required && !flatten_in_options)
                         .then(|| {
                             public_default_punning_zero_for_field(
                                 &planned_field.kind,
                                 &field.go_type,
                             )
                         })
-                        .flatten();
-                    let public_go_type = if default_punning_zero.is_some() {
+                        .flatten()
+                        .or_else(|| {
+                            planned_field.default_expression.as_ref().and_then(|_| {
+                                public_default_punning_zero_for_field(
+                                    &planned_field.kind,
+                                    &format!("*{}", field.go_type),
+                                )
+                            })
+                        });
+                    let default_input = planned_field.default_expression.clone().filter(|_| {
+                        planned_field.required
+                            && public_default_punning_zero_for_field(
+                                &planned_field.kind,
+                                &format!("*{}", field.go_type),
+                            )
+                            .is_none()
+                            && !go_type_is_nilable(&field.go_type)
+                            && !matches!(
+                                planned_field.kind,
+                                PlannedFieldKind::Singular(
+                                    PlannedValueType::Variant(_) | PlannedValueType::Unknown
+                                )
+                            )
+                    });
+                    let public_go_type = if default_input.is_some() {
+                        format!("*{}", field.go_type)
+                    } else if default_punning_zero.is_some() {
                         field
                             .go_type
                             .strip_prefix('*')
@@ -1505,14 +2092,23 @@ impl<'a> ApiPlanner<'a> {
                     Some(RenderedUnpackedParam {
                         field_name: field.name.clone(),
                         doc: field.doc.clone(),
-                        param_name: go_unexported_name(&field.name),
+                        param_name: if flatten_in_options {
+                            format!("{}Value", go_unexported_name(&field.name))
+                        } else {
+                            go_unexported_name(&field.name)
+                        },
                         go_type: field.go_type.clone(),
                         public_go_type,
                         default_punning_zero,
+                        default_input,
+                        default_expression: planned_field
+                            .default_expression
+                            .as_deref()
+                            .map(|value| self.package.go_type_expr(value)),
                         function,
                         function_args,
-                        required: field.required,
-                        embed_in_options,
+                        required: planned_field.api_required,
+                        flattened_fields,
                     })
                 })
                 .collect()
@@ -1526,22 +2122,46 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
+        let sourced_fields = record_for_message(self.api_plan, &input)
+            .map(|record| {
+                record
+                    .sources_for(GenerationTarget::Workflow)
+                    .map(|(field_name, _, source)| {
+                        (
+                            go_field_name(field_name),
+                            self.external_models.support_helper_call(source),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let context_propagation_header =
+            interceptor::context_propagation_header(operation, self.api_plan, &self.package)?;
+        if context_propagation_header.is_some() && unpacked_input.is_none() {
+            return Err(interceptor::context_propagation_error(
+                &operation.name,
+                "requires a generated request record",
+            ));
+        }
         Ok(RenderedOperation {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
             doc: operation.doc.value(),
             return_doc: operation.return_doc.value(),
-            func_name: go_unexported_name(&operation.name),
             input_type,
             model_type_parameters,
             output_type,
             raw_output_type,
             serialization_context_expr,
-            output_transform_expr: go_output_transform.map(|(_, expr)| expr),
+            context_propagation_header,
+            sourced_fields,
+            output_transform_expr: go_output_transform
+                .map(|(_, expr)| self.package.alias_workflow_expr(expr)),
             output_transform_type: go_output_transform
                 .map(|(type_name, _)| self.package.go_type_expr(type_name)),
             unpacked_input,
             wire_binding: None,
+            api_omitted: &operation.api_omitted,
         })
     }
 
@@ -1807,14 +2427,16 @@ impl<'a> ApiPlanner<'a> {
                             false,
                         )
                     })
-                    .chain(planned_model.sourced_fields().map(
-                        |(field_name, field, _source_expr)| {
-                            (
-                                planned_field(planned_model, field_name, field, self.api_plan),
-                                true,
-                            )
-                        },
-                    ))
+                    .chain(
+                        planned_model
+                            .sourced_fields()
+                            .map(|(field_name, field, _)| {
+                                (
+                                    planned_field(planned_model, field_name, field, self.api_plan),
+                                    true,
+                                )
+                            }),
+                    )
                     .collect::<Vec<_>>();
                 (planned_model.name.clone(), parameters, planned_fields)
             })
@@ -1827,6 +2449,7 @@ impl<'a> ApiPlanner<'a> {
                     message.info.full_name.clone(),
                     RenderedModel {
                         name: message.model_name.clone(),
+                        type_parameters: Vec::new(),
                         fields: Vec::new(),
                     },
                 );
@@ -1844,15 +2467,39 @@ impl<'a> ApiPlanner<'a> {
             message.info.full_name.clone(),
             RenderedModel {
                 name: go_generic_declaration_name(&model_name, &model_parameters),
+                type_parameters: model_parameters
+                    .iter()
+                    .map(|usage| usage.parameter.name.clone())
+                    .collect(),
                 fields: Vec::new(),
             },
         );
         self.external_models
             .record_model(&message.info.full_name, message);
 
+        let is_system_request = crate::nexgen_config::current().system_nexus
+            && self.api_plan.services.iter().any(|service| {
+                service.operations.iter().any(|operation| {
+                    operation
+                        .input
+                        .as_ref()
+                        .and_then(|input| planned_message_type(input, self.api_plan))
+                        .is_some_and(|input| input.info.full_name == message.info.full_name)
+                })
+            });
         let fields = planned_fields
             .iter()
-            .map(|(planned_field, sourced)| self.build_field(planned_field, *sourced))
+            .map(|(planned_field, sourced)| {
+                let mut field = self.build_field(planned_field, *sourced)?;
+                if is_system_request && !field.required {
+                    field.default_punning_zero =
+                        public_default_punning_zero_for_field(&planned_field.kind, &field.go_type);
+                    if field.default_punning_zero.is_some() {
+                        field.go_type = field.go_type.trim_start_matches('*').to_string();
+                    }
+                }
+                Ok(field)
+            })
             .collect::<Result<Vec<_>>>()?;
 
         self.models
@@ -1873,7 +2520,15 @@ impl<'a> ApiPlanner<'a> {
             .map(|annotation| self.package.go_type_expr(annotation));
 
         let go_type = if let Some(annotated) = annotated_go_type {
-            annotated
+            if !field.required
+                && field.flattened_annotation_override.is_some()
+                && !annotated.starts_with('*')
+                && !go_type_is_nilable(&annotated)
+            {
+                format!("*{annotated}")
+            } else {
+                annotated
+            }
         } else {
             match &field.kind {
                 PlannedFieldKind::Map { key, value } => {
@@ -1888,7 +2543,11 @@ impl<'a> ApiPlanner<'a> {
                 PlannedFieldKind::Singular(value) => {
                     let resolved = self.resolve_planned_value_type(value)?;
                     if !field.required
-                        && type_needs_pointer_when_optional(value, &resolved.type_expr)
+                        && type_needs_pointer_when_optional(
+                            value,
+                            &resolved.type_expr,
+                            &self.package,
+                        )
                     {
                         format!("*{}", resolved.type_expr)
                     } else {
@@ -1906,6 +2565,7 @@ impl<'a> ApiPlanner<'a> {
                 .and_then(|doc| doc.value())
                 .map(str::to_string),
             go_type,
+            default_punning_zero: None,
             required: field.required,
             sourced,
         })
@@ -2018,11 +2678,12 @@ fn render_operation_registry(
         candidates.push((path.clone(), "support".to_string()));
     }
     let mut imports = BTreeMap::new();
-    if has_helpers && !package.is_self_import("go.temporal.io/sdk/converter") {
-        imports.insert(
-            "converter".to_string(),
-            "go.temporal.io/sdk/converter".to_string(),
-        );
+    if has_helpers
+        && let Some((path, alias)) = package
+            .sdk_reference(SdkSymbol::SerializationContext)
+            .import
+    {
+        imports.insert(alias.to_string(), path.to_string());
     }
     if !package.is_self_import("go.temporal.io/sdk/internal") {
         imports.insert(
@@ -2067,14 +2728,14 @@ fn render_operation_registry(
     }
     let mut output = String::from("\n// --- Registry ---\n");
     let sc = package.serialization_context_type();
-    let key = package.qualified_expr("go.temporal.io/sdk/internal", "internal.NexusOperationKey");
-    let info = package.qualified_expr(
-        "go.temporal.io/sdk/internal",
-        "internal.NexusOperationRegistryEntry",
-    );
-    output.push_str(&format!(
-        "\nvar NexusOperationRegistry = map[{key}]{info}{{\n"
-    ));
+    let key = package
+        .sdk_reference(SdkSymbol::SystemNexusRegistryKey)
+        .expression;
+    let info = package
+        .sdk_reference(SdkSymbol::SystemNexusRegistryEntry)
+        .expression;
+    let registry_name = go_declaration_name("nexusOperationRegistry");
+    output.push_str(&format!("\nvar {registry_name} = map[{key}]{info}{{\n"));
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
@@ -2107,12 +2768,11 @@ fn render_operation_registry(
     }
     output.push_str("}\n");
     if !keys.is_empty() {
-        let register = package.qualified_expr(
-            "go.temporal.io/sdk/internal",
-            "internal.UpdateNexusOperationRegistry",
-        );
+        let register = package
+            .sdk_reference(SdkSymbol::UpdateSystemNexusRegistry)
+            .expression;
         output.push_str(&format!(
-            "\nfunc init() {{\n\t{register}(NexusOperationRegistry)\n}}\n"
+            "\nfunc init() {{\n\t{register}({registry_name})\n}}\n"
         ));
     }
     Ok(GoOperationRegistry {
@@ -2156,7 +2816,7 @@ pub(in crate::generator) struct RenderedService<'a> {
 }
 
 /// A resolved Nexus operation with enough information to render the operation
-/// constant and an unexported caller function.
+/// constant and a public operation wrapper.
 #[derive(Debug)]
 pub(in crate::generator) struct RenderedOperation<'a> {
     /// UpperCamelCase operation name (e.g. `"GetUser"`).
@@ -2169,8 +2829,6 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Return-value doc text (from `@nexus.doc returns=`), rendered as a
     /// `Returns:` paragraph in the wrapper's godoc comment.
     return_doc: Option<&'a str>,
-    /// Unexported Go function name (e.g. `"getUser"`).
-    pub(in crate::generator) func_name: String,
     /// Go type for the request parameter (e.g. `"GetUserRequest"`).
     pub(in crate::generator) input_type: String,
     /// Model-derived parameters inferred from the request.
@@ -2186,9 +2844,15 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Go expression for an `@nexus.output-transform`, if one is configured.
     /// The expression is rendered with `request` and raw `result` in scope and
     /// must evaluate to `(output_transform_type, error)`.
-    pub(in crate::generator) output_transform_expr: Option<&'a str>,
+    pub(in crate::generator) output_transform_expr: Option<String>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    /// Resolved Go request field receiving propagated context headers.
+    context_propagation_header: Option<String>,
+    /// The Go name and source expression of each sourced field of the request for the Workflow
+    /// API. The public wrapper fills them, and a resource method fills those that it has no value
+    /// for, so a resource field wins over its source.
+    sourced_fields: Vec<(String, String)>,
     /// Go return type for an `@nexus.output-transform`, with any embedded
     /// import path stripped from the WIT annotation.
     pub(in crate::generator) output_transform_type: Option<String>,
@@ -2201,6 +2865,9 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// When present, the operation function converts native values to/from
     /// wire values and types the SDK call in terms of the wire messages.
     pub(in crate::generator) wire_binding: Option<proto::OperationBinding>,
+    /// Targets whose exported convenience wrapper `@nexus.api-omit` suppresses. The internal
+    /// operation function stays, so resource methods still bind.
+    api_omitted: &'a BTreeSet<GenerationTarget>,
 }
 
 /// A single parameter in an unpacked convenience wrapper function signature.
@@ -2221,6 +2888,10 @@ struct RenderedUnpackedParam {
     public_go_type: String,
     /// Public zero value that represents absence, when default-punning applies.
     default_punning_zero: Option<String>,
+    /// A required non-punned value uses a presence-bearing public pointer.
+    default_input: Option<String>,
+    /// Selected expression evaluated before request construction when omitted.
+    default_expression: Option<String>,
     /// Function field metadata for required `@nexus.function` fields. Optional
     /// function fields remain string-shaped in generated options structs.
     function: Option<FunctionFieldSpec>,
@@ -2229,9 +2900,32 @@ struct RenderedUnpackedParam {
     /// Whether this parameter is required (positional argument) or optional
     /// (placed in the options struct).
     required: bool,
-    /// Whether this optional parameter should be embedded as a value in the
-    /// generated options struct because its model is marked `flatten-in-api`.
-    embed_in_options: bool,
+    /// Fields promoted into the options struct for a `flatten-in-api` record.
+    /// Their presence determines whether the optional nested request is built.
+    flattened_fields: Option<Vec<RenderedFlattenedField>>,
+}
+
+/// A promoted field retains the internal type and the same default-punning
+/// policy as an ordinary operation option.
+#[derive(Debug)]
+struct RenderedFlattenedField {
+    field: RenderedField,
+    default_punning_zero: Option<String>,
+    default_expression: Option<String>,
+}
+
+impl RenderedFlattenedField {
+    fn presence_condition(&self) -> String {
+        if let Some(zero) = &self.default_punning_zero {
+            format!("opts.{} != {zero}", self.field.name)
+        } else if self.field.required
+            || (!self.field.go_type.starts_with('*') && !go_type_is_nilable(&self.field.go_type))
+        {
+            "true".to_string()
+        } else {
+            format!("opts.{} != nil", self.field.name)
+        }
+    }
 }
 
 /// A WIT enum rendered as a Go `type <Name> int32` with associated constants.
@@ -2309,12 +3003,13 @@ struct RenderedVariantCase {
 pub(in crate::generator) struct RenderedModel {
     /// Go type name (e.g. `"UserProfile"`, `"Coordinates"`).
     pub(in crate::generator) name: String,
+    pub(in crate::generator) type_parameters: Vec<String>,
     /// Struct fields in declaration order.
     pub(in crate::generator) fields: Vec<RenderedField>,
 }
 
 /// A single field of a [`RenderedModel`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(in crate::generator) struct RenderedField {
     /// Exported Go field name in UpperCamelCase (e.g. `"UserId"`, `"First"`).
     pub(in crate::generator) name: String,
@@ -2323,6 +3018,8 @@ pub(in crate::generator) struct RenderedField {
     pub(in crate::generator) doc: Option<String>,
     /// Go type expression (e.g. `"string"`, `"*PostalAddress"`, `"[]string"`).
     pub(in crate::generator) go_type: String,
+    /// Zero value representing absence on a System Nexus request field.
+    pub(in crate::generator) default_punning_zero: Option<String>,
     /// Whether the field is required in the WIT definition. Rendered as a
     /// leading `// Required.` godoc comment on the generated Go struct field.
     pub(in crate::generator) required: bool,
@@ -2435,6 +3132,15 @@ fn compute_go_visibility(
         public_keys: BTreeSet::new(),
     };
 
+    // Model-only modules expose declarations directly, without an operation
+    // through which the visibility walk could discover them.
+    marker.public_keys.extend(
+        api_plan
+            .types
+            .iter()
+            .filter(|(_, entry)| entry.is_module_export())
+            .map(|(name, _)| name.clone()),
+    );
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);
@@ -2450,39 +3156,56 @@ fn compute_go_visibility(
     };
 
     for (key, enumeration) in enums {
-        if !visibility.is_public(key) {
-            visibility.type_name_replacements.insert(
-                enumeration.name.clone(),
-                go_unexported_name(&enumeration.name),
-            );
-        }
+        let name = if visibility.is_public(key) {
+            enumeration.name.clone()
+        } else {
+            go_unexported_name(&enumeration.name)
+        };
+        visibility
+            .type_name_replacements
+            .insert(enumeration.name.clone(), go_declaration_name(&name));
     }
     for (key, flag_set) in flags {
-        if !visibility.is_public(key) {
-            visibility
-                .type_name_replacements
-                .insert(flag_set.name.clone(), go_unexported_name(&flag_set.name));
-        }
+        let name = if visibility.is_public(key) {
+            flag_set.name.clone()
+        } else {
+            go_unexported_name(&flag_set.name)
+        };
+        visibility
+            .type_name_replacements
+            .insert(flag_set.name.clone(), go_declaration_name(&name));
     }
     for (key, variant) in variants {
-        if !visibility.is_public(key) {
+        for name in
+            std::iter::once(&variant.name).chain(variant.cases.iter().map(|case| &case.struct_name))
+        {
+            let emitted = if visibility.is_public(key) {
+                name.clone()
+            } else {
+                go_unexported_name(name)
+            };
             visibility
                 .type_name_replacements
-                .insert(variant.name.clone(), go_unexported_name(&variant.name));
-            for case in &variant.cases {
-                visibility.type_name_replacements.insert(
-                    case.struct_name.clone(),
-                    go_unexported_name(&case.struct_name),
-                );
-            }
+                .insert(name.clone(), go_declaration_name(&emitted));
         }
     }
     for (key, model) in models {
-        if !visibility.is_public(key) {
-            let (ident, _) = split_go_type_decl_name(&model.name);
+        let (ident, _) = split_go_type_decl_name(&model.name);
+        let name = if visibility.is_public(key) {
+            ident.to_string()
+        } else {
+            go_unexported_name(ident)
+        };
+        visibility
+            .type_name_replacements
+            .insert(ident.to_string(), go_declaration_name(&name));
+    }
+    for service in &api_plan.services {
+        for resource in &service.resources {
+            let name = &resource.data.type_name;
             visibility
                 .type_name_replacements
-                .insert(ident.to_string(), go_unexported_name(ident));
+                .insert(name.clone(), go_declaration_name(name));
         }
     }
 
@@ -2503,10 +3226,25 @@ impl GoVisibilityMarker<'_> {
             && let Some(planned_model) = record_for_message(self.api_plan, &input)
         {
             for (_, field) in planned_model.public_fields() {
-                self.mark_operation_field_kind(
-                    &planned_field_kind(&field.field_type, self.api_plan),
-                    field.name.as_str(),
-                );
+                let kind = planned_field_kind(&field.field_type, self.api_plan);
+                if !field.required && field_kind_is_flattened_message(&kind, self.api_plan) {
+                    let PlannedFieldKind::Singular(PlannedValueType::Message(message)) = &kind
+                    else {
+                        unreachable!()
+                    };
+                    // Options expose the children, not the containing model.
+                    // Other public uses can still mark that model normally.
+                    let record = record_for_message(self.api_plan, message)
+                        .expect("flattened message should have a record");
+                    for (_, child) in record.public_fields() {
+                        self.mark_operation_field_kind(
+                            &planned_field_kind(&child.field_type, self.api_plan),
+                            child.name.as_str(),
+                        );
+                    }
+                } else {
+                    self.mark_operation_field_kind(&kind, field.name.as_str());
+                }
             }
         }
 
@@ -2527,6 +3265,22 @@ impl GoVisibilityMarker<'_> {
                 }
             }
             PlannedOperationOutput::Resource { .. } | PlannedOperationOutput::None => {}
+        }
+        // A result record that holds a resource is what the caller gets.
+        if let Some(holder) = operation
+            .data
+            .output_resource_return
+            .as_ref()
+            .and_then(|resource_return| resource_return.holder.as_ref())
+            && self.public_keys.insert(holder.record_full_name.clone())
+            && let Some(record) = self.api_plan.record(&holder.record_full_name)
+        {
+            for (_, field) in record.public_fields() {
+                self.mark_operation_field_kind(
+                    &planned_field_kind(&field.field_type, self.api_plan),
+                    field.name.as_str(),
+                );
+            }
         }
     }
 
@@ -2705,6 +3459,13 @@ fn apply_go_visibility(
             if let Some(params) = &mut operation.unpacked_input {
                 for param in params {
                     param.go_type = visibility.rewrite_go_expr(&param.go_type);
+                    param.public_go_type = visibility.rewrite_go_expr(&param.public_go_type);
+                    if let Some(fields) = &mut param.flattened_fields {
+                        for flattened in fields {
+                            flattened.field.go_type =
+                                visibility.rewrite_go_expr(&flattened.field.go_type);
+                        }
+                    }
                 }
             }
         }
@@ -2835,7 +3596,8 @@ pub(in crate::generator) fn go_authored_type_annotation(wit_type: &PlannedType) 
     match wit_type {
         TypeSpec::Bool => "bool".to_string(),
         TypeSpec::Int(IntSpec::I32) => "int32".to_string(),
-        TypeSpec::Int(IntSpec::I64) => "int64".to_string(),
+        TypeSpec::Int(IntSpec::U32) => "int32".to_string(),
+        TypeSpec::Int(IntSpec::I64 | IntSpec::U64) => "int64".to_string(),
         TypeSpec::Float => "float64".to_string(),
         TypeSpec::String => "string".to_string(),
         TypeSpec::Bytes => "[]byte".to_string(),
@@ -2932,7 +3694,11 @@ fn go_generic_reference(
 /// messages, and override/replacement types -- so that "unset" is distinct from
 /// "set to the zero value". Types whose zero value is already `nil` need no
 /// pointer: variants (interfaces) and any `any`-typed value.
-fn type_needs_pointer_when_optional(value: &PlannedValueType, type_expr: &str) -> bool {
+fn type_needs_pointer_when_optional(
+    value: &PlannedValueType,
+    type_expr: &str,
+    package: &GoPackageContext,
+) -> bool {
     if matches!(
         value,
         PlannedValueType::Variant(_) | PlannedValueType::Unknown
@@ -2941,8 +3707,13 @@ fn type_needs_pointer_when_optional(value: &PlannedValueType, type_expr: &str) -
     }
     if matches!(
         type_expr,
-        "client.VersioningOverride" | "temporal.SearchAttributes"
-    ) {
+        "client.VersioningOverride"
+            | "temporal.SearchAttributes"
+            | "internal.VersioningOverride"
+            | "internal.SearchAttributes"
+    ) || (package.is_self_import("go.temporal.io/sdk/internal")
+        && matches!(type_expr, "VersioningOverride" | "SearchAttributes"))
+    {
         return false;
     }
     // Already-nilable Go types represent absence directly.
@@ -2982,15 +3753,16 @@ fn ensure_generic_tuple(
     let type_name = format!("Tuple{arity}");
     let key = format!("{GENERIC_MODEL_KEY_PREFIX}{type_name}");
     if !models.contains_key(&key) {
-        let params = (1..=arity)
+        let type_parameters = (1..=arity)
             .map(|index| format!("T{index}"))
-            .collect::<Vec<_>>()
-            .join(", ");
+            .collect::<Vec<_>>();
+        let params = type_parameters.join(", ");
         let fields = (0..arity)
             .map(|index| RenderedField {
                 name: TUPLE_FIELD_NAMES[index].to_string(),
                 doc: None,
                 go_type: format!("T{}", index + 1),
+                default_punning_zero: None,
                 required: true,
                 sourced: false,
             })
@@ -2999,6 +3771,7 @@ fn ensure_generic_tuple(
             key,
             RenderedModel {
                 name: format!("{type_name}[{params} any]"),
+                type_parameters,
                 fields,
             },
         );
@@ -3015,11 +3788,13 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
             key,
             RenderedModel {
                 name: "Result[T, E any]".to_string(),
+                type_parameters: vec!["T".to_string(), "E".to_string()],
                 fields: vec![
                     RenderedField {
                         name: "Result".to_string(),
                         doc: None,
                         go_type: "T".to_string(),
+                        default_punning_zero: None,
                         required: false,
                         sourced: false,
                     },
@@ -3027,6 +3802,7 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
                         name: "Error".to_string(),
                         doc: None,
                         go_type: "E".to_string(),
+                        default_punning_zero: None,
                         required: false,
                         sourced: false,
                     },
@@ -3036,18 +3812,37 @@ fn ensure_generic_result(models: &mut IndexMap<String, RenderedModel>) {
     }
 }
 
-/// Converts a PascalCase name to an unexported Go identifier by lowercasing
-/// the first character (e.g. `"GetUser"` becomes `"getUser"`).
+/// Converts a PascalCase name to an unexported Go identifier, lowercasing
+/// leading initialisms (e.g. `"ID"` becomes `"id"` and `"UserID"` becomes `"userID"`).
 pub(in crate::generator) fn go_unexported_name(name: &str) -> String {
-    let mut chars = name.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => {
-            let mut result = first.to_lowercase().to_string();
-            result.push_str(chars.as_str());
-            go_ident(&result)
-        }
+    if let Some(name) = name.strip_prefix("SystemNexus_") {
+        return format!("systemnexus_{}", go_unexported_name(name));
     }
+    let mut chars = name.chars().peekable();
+    let mut result = String::new();
+    while let Some(ch) = chars.next() {
+        if !result.is_empty()
+            && (!ch.is_uppercase() || chars.peek().is_some_and(|next| next.is_lowercase()))
+        {
+            result.push(ch);
+            result.extend(chars);
+            break;
+        }
+        result.extend(ch.to_lowercase());
+    }
+    go_ident(&result)
+}
+
+pub(in crate::generator) fn go_declaration_name(name: &str) -> String {
+    if !crate::nexgen_config::current().system_nexus {
+        return name.to_string();
+    }
+    let prefix = if is_go_exported_decl(name) {
+        "SystemNexus_"
+    } else {
+        "systemnexus_"
+    };
+    format!("{prefix}{name}")
 }
 
 /// Converts a WIT field name (kebab-case) to an exported Go field name
@@ -3076,6 +3871,51 @@ fn go_ident(name: &str) -> String {
     } else {
         name.to_string()
     }
+}
+
+/// Rebinds package selectors in expressions without changing literals or
+/// selectors on values, such as `request.workflow`.
+fn rewrite_go_package_qualifier(expr: &str, from: &str, to: &str) -> String {
+    if from == to {
+        return expr.to_string();
+    }
+    let bytes = expr.as_bytes();
+    let mut output = String::with_capacity(expr.len());
+    let mut copied = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        if matches!(bytes[index], b'"' | b'`' | b'\'') {
+            let quote = bytes[index];
+            index += 1;
+            while index < bytes.len() {
+                let byte = bytes[index];
+                index += 1;
+                if byte == b'\\' && quote != b'`' && index < bytes.len() {
+                    index += 1;
+                } else if byte == quote {
+                    break;
+                }
+            }
+        } else if is_go_ident_start(bytes[index]) {
+            let start = index;
+            index += 1;
+            while index < bytes.len() && is_go_ident_continue(bytes[index]) {
+                index += 1;
+            }
+            if &expr[start..index] == from
+                && previous_non_whitespace(bytes, start) != Some(b'.')
+                && next_non_whitespace(bytes, index) == Some(b'.')
+            {
+                output.push_str(&expr[copied..start]);
+                output.push_str(to);
+                copied = index;
+            }
+        } else {
+            index += 1;
+        }
+    }
+    output.push_str(&expr[copied..]);
+    output
 }
 
 /// Parses a Go type expression that may contain an embedded import path.
@@ -3140,7 +3980,7 @@ fn parse_go_import(type_expr: &str) -> (Option<String>, String) {
 
 /// Parse package references at any depth without treating Go punctuation as
 /// part of a module path. The same walk drives public rendering and imports.
-fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
+fn parse_go_expr(expr: &str) -> (BTreeMap<String, String>, String) {
     // A leading explicit import applies to the entire expression, including
     // composite forms such as `example.org/types:[]types.Value`.
     if let Some((path, code)) = expr.split_once(':')
@@ -3148,27 +3988,32 @@ fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
             .chars()
             .any(|ch| matches!(ch, '[' | ']' | '(' | ')' | '*' | ' '))
     {
-        return (BTreeSet::from([path.to_string()]), code.to_string());
+        return (
+            BTreeMap::from([(path.to_string(), go_import_alias(code, path))]),
+            code.to_string(),
+        );
     }
-    let mut imports = BTreeSet::new();
+    let mut imports = BTreeMap::new();
     let mut rendered = String::new();
     let mut token = String::new();
-    let flush = |token: &mut String, rendered: &mut String, imports: &mut BTreeSet<String>| {
-        if token.is_empty() {
-            return;
-        }
-        let (prefix, reference) = token
-            .strip_prefix("...")
-            .map(|s| ("...", s))
-            .unwrap_or(("", token.as_str()));
-        let (import, code) = parse_go_import(reference);
-        if let Some(import) = import {
-            imports.insert(import);
-        }
-        rendered.push_str(prefix);
-        rendered.push_str(&code);
-        token.clear();
-    };
+    let flush =
+        |token: &mut String, rendered: &mut String, imports: &mut BTreeMap<String, String>| {
+            if token.is_empty() {
+                return;
+            }
+            let (prefix, reference) = token
+                .strip_prefix("...")
+                .map(|s| ("...", s))
+                .unwrap_or(("", token.as_str()));
+            let (import, code) = parse_go_import(reference);
+            if let Some(import) = import {
+                let alias = go_import_alias(&code, &import);
+                imports.insert(import, alias);
+            }
+            rendered.push_str(prefix);
+            rendered.push_str(&code);
+            token.clear();
+        };
     for ch in expr.chars() {
         if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | ':' | '-') {
             token.push(ch);
@@ -3181,15 +4026,34 @@ fn parse_go_expr(expr: &str) -> (BTreeSet<String>, String) {
     (imports, rendered)
 }
 
+fn go_import_alias(expression: &str, import_path: &str) -> String {
+    expression
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && !matches!(ch, '_' | '.'))
+        .find_map(|token| token.split_once('.').map(|(alias, _)| alias))
+        .unwrap_or_else(|| import_path.rsplit('/').next().unwrap_or(import_path))
+        .to_string()
+}
+
 /// Walks the [`PlannedSpec`] and collects Go import paths from any `@nexus.type`
 /// annotations that embed a module path (e.g. `go.temporal.io/sdk/temporal.RetryPolicy`).
-fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeMap<String, String>) {
     for (_, model) in api_plan.records() {
         for (_, field) in model.model_fields() {
-            collect_imports_from_value_type(
-                &planned_field_kind(&field.field_type, api_plan),
-                imports,
-            );
+            if let Some(annotation) = field
+                .flattened_annotation
+                .as_ref()
+                .or(field.annotation.as_ref())
+                .and_then(|annotation| annotation.value())
+            {
+                // Match field rendering: the override replaces the underlying
+                // type, including its import requirements.
+                imports.extend(parse_go_expr(annotation).0);
+            } else {
+                collect_imports_from_value_type(
+                    &planned_field_kind(&field.field_type, api_plan),
+                    imports,
+                );
+            }
             if field.required
                 && let Some(function) = &field.function
             {
@@ -3213,17 +4077,17 @@ fn collect_imports_from_plan(api_plan: &PlannedSpec, imports: &mut BTreeSet<Stri
                 if let (Some(annotation), Some(_expr)) =
                     (transform.type_name.value(), transform.transform.value())
                 {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
     }
 }
 
-fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_function(
+    function: &FunctionFieldSpec,
+    imports: &mut BTreeMap<String, String>,
+) {
     if !function_value_is_string(function)
         && let Some(helper) = &function.name_extractor
         && !helper.starts_with("support.")
@@ -3233,7 +4097,10 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
     if let Some(descriptor) = &function.type_descriptor {
         for text in [&descriptor.value_type, &descriptor.args_type] {
             if let Some(import) = text.import() {
-                imports.insert(import.to_string());
+                imports.insert(
+                    import.to_string(),
+                    go_import_alias(text.value().unwrap_or_default(), import),
+                );
             } else if let Some(value) = text.value() {
                 imports.extend(parse_go_expr(value).0);
             }
@@ -3256,16 +4123,16 @@ fn collect_imports_from_function(function: &FunctionFieldSpec, imports: &mut BTr
         FunctionResultSpec::Authored(result) => collect_imports_from_authored_type(result, imports),
         FunctionResultSpec::Annotation(result) => {
             if let Some(annotation) = result.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             }
         }
     }
 }
 
-fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_authored_type(
+    wit_type: &PlannedType,
+    imports: &mut BTreeMap<String, String>,
+) {
     match wit_type {
         TypeSpec::Option(inner) | TypeSpec::List(inner) => {
             collect_imports_from_authored_type(inner, imports);
@@ -3291,10 +4158,7 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
             type_name, target, ..
         })) => {
             if let Some(annotation) = type_name.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             } else {
                 collect_imports_from_authored_type(target, imports);
             }
@@ -3304,19 +4168,22 @@ fn collect_imports_from_authored_type(wit_type: &PlannedType, imports: &mut BTre
 }
 
 /// Collects Go imports from a message type's replacement or authored type.
-fn collect_imports_from_message_type(message: &PlannedMessageType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_message_type(
+    message: &PlannedMessageType,
+    imports: &mut BTreeMap<String, String>,
+) {
     if let Some(replacement) = &message.replacement {
         if let Some(annotation) = replacement.type_name.value() {
-            let (import_path, _) = parse_go_import(annotation);
-            if let Some(path) = import_path {
-                imports.insert(path);
-            }
+            imports.extend(parse_go_expr(annotation).0);
         }
     }
 }
 
 /// Collects Go imports from value types within a field kind.
-fn collect_imports_from_value_type(kind: &PlannedFieldKind, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_value_type(
+    kind: &PlannedFieldKind,
+    imports: &mut BTreeMap<String, String>,
+) {
     match kind {
         PlannedFieldKind::Singular(value) | PlannedFieldKind::Repeated(value) => {
             collect_imports_from_planned_value(value, imports);
@@ -3329,7 +4196,10 @@ fn collect_imports_from_value_type(kind: &PlannedFieldKind, imports: &mut BTreeS
 }
 
 /// Recursively collects Go imports from a planned value type.
-fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BTreeSet<String>) {
+fn collect_imports_from_planned_value(
+    value: &PlannedValueType,
+    imports: &mut BTreeMap<String, String>,
+) {
     match value {
         PlannedValueType::TypeParameter(_) => {}
         PlannedValueType::External {
@@ -3337,10 +4207,7 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
             fallback,
         } => {
             if let Some(annotation) = type_name.value() {
-                let (import_path, _) = parse_go_import(annotation);
-                if let Some(path) = import_path {
-                    imports.insert(path);
-                }
+                imports.extend(parse_go_expr(annotation).0);
             } else {
                 collect_imports_from_planned_value(fallback, imports);
             }
@@ -3348,20 +4215,14 @@ fn collect_imports_from_planned_value(value: &PlannedValueType, imports: &mut BT
         PlannedValueType::Enum(enum_type) => {
             if let Some(replacement) = &enum_type.replacement {
                 if let Some(annotation) = replacement.type_name.value() {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
         PlannedValueType::Message(message_type) => {
             if let Some(replacement) = &message_type.replacement {
                 if let Some(annotation) = replacement.type_name.value() {
-                    let (import_path, _) = parse_go_import(annotation);
-                    if let Some(path) = import_path {
-                        imports.insert(path);
-                    }
+                    imports.extend(parse_go_expr(annotation).0);
                 }
             }
         }
@@ -3435,6 +4296,7 @@ fn render_file(
     api_plan: &PlannedSpec,
     visibility: &GoVisibility,
     registry: &str,
+    interceptors: &str,
 ) -> String {
     let mut output = String::new();
     output.push_str(GENERATED_HEADER);
@@ -3470,23 +4332,13 @@ fn render_file(
             output.push('\n');
         }
         for import_path in &third_party {
-            output.push('\t');
-            output.push('"');
-            output.push_str(import_path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(
+                import_path,
+                package.import_alias(import_path),
+            ));
         }
         for (path, alias) in external_imports {
-            output.push('\t');
-            let default_alias = path.rsplit('/').next().unwrap_or(path);
-            if alias != default_alias || alias == "support" {
-                output.push_str(alias);
-                output.push(' ');
-            }
-            output.push('"');
-            output.push_str(path);
-            output.push('"');
-            output.push('\n');
+            output.push_str(&go_aliased_import_line(path, alias));
         }
         output.push_str(")\n");
     }
@@ -3515,8 +4367,6 @@ fn render_file(
         output.push_str(registry);
         return output;
     }
-
-    let has_operations = services.iter().any(|s| !s.operations.is_empty());
 
     // --- Datatypes ---
     let private_enums = enums
@@ -3548,15 +4398,15 @@ fn render_file(
         output.push_str("\n// --- Datatypes ---\n");
         for enumeration in private_enums {
             output.push('\n');
-            render_enum(&mut output, enumeration);
+            render_enum(&mut output, enumeration, package);
         }
         for flag_set in private_flags {
             output.push('\n');
-            render_flags(&mut output, flag_set);
+            render_flags(&mut output, flag_set, package);
         }
         for variant in private_variants {
             output.push('\n');
-            render_variant(&mut output, variant);
+            render_variant(&mut output, variant, package);
         }
         for (key, model) in private_models {
             output.push('\n');
@@ -3586,25 +4436,19 @@ fn render_file(
                     visibility,
                     constructor_returns_value,
                 );
-                render_resource_methods(
-                    &mut output,
-                    service,
-                    resource,
-                    api_plan,
-                    package,
-                    visibility,
-                );
-            }
-        }
-    }
-
-    // --- Operations (internal) ---
-    if has_operations {
-        output.push_str("\n// --- Operations (internal) ---\n");
-        for service in services {
-            for operation in &service.operations {
-                output.push('\n');
-                render_operation_function(&mut output, service, operation, package);
+                if crate::nexgen_config::current()
+                    .targets
+                    .contains(&GenerationTarget::Workflow)
+                {
+                    render_resource_methods(
+                        &mut output,
+                        service,
+                        resource,
+                        api_plan,
+                        package,
+                        visibility,
+                    );
+                }
             }
         }
     }
@@ -3635,35 +4479,62 @@ fn render_file(
         || !public_variants.is_empty()
         || !public_models.is_empty();
 
-    let has_endpoint_operations = services
-        .iter()
-        .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
+    let has_endpoint_operations = crate::nexgen_config::current()
+        .targets
+        .contains(&GenerationTarget::Workflow)
+        && services
+            .iter()
+            .any(|service| service.endpoint.is_some() && !service.operations.is_empty());
 
     if has_endpoint_operations || has_public_datatypes {
         output.push_str("\n// --- Operations (public API) ---\n");
         for enumeration in public_enums {
             output.push('\n');
-            render_enum(&mut output, enumeration);
+            render_enum(&mut output, enumeration, package);
         }
         for flag_set in public_flags {
             output.push('\n');
-            render_flags(&mut output, flag_set);
+            render_flags(&mut output, flag_set, package);
         }
         for variant in public_variants {
             output.push('\n');
-            render_variant(&mut output, variant);
+            render_variant(&mut output, variant, package);
         }
         for (key, model) in public_models {
             output.push('\n');
+            package.render_declaration_doc(
+                &mut output,
+                "",
+                &model.name,
+                record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
+            );
             render_model(&mut output, key, model, external_models, true);
         }
         for service in services {
+            if !crate::nexgen_config::current()
+                .targets
+                .contains(&GenerationTarget::Workflow)
+            {
+                continue;
+            }
             if service.endpoint.is_none() {
                 continue;
             }
             for operation in &service.operations {
+                // An api-omitted operation keeps its internal function, which resource methods
+                // call, but drops the exported convenience wrapper from the public API.
+                if operation.api_omitted.contains(&GenerationTarget::Workflow) {
+                    continue;
+                }
+                let operation_name = go_declaration_name(&go_field_name(operation.name));
+                let options_name = format!("{operation_name}Options");
+                let options_doc = format!(
+                    "Options for {}.",
+                    package.documentation_name(&operation_name)
+                );
+                output.push('\n');
+                package.render_declaration_doc(&mut output, "", &options_name, Some(&options_doc));
                 if let Some(params) = &operation.unpacked_input {
-                    output.push('\n');
                     render_options_struct(&mut output, operation, params);
                     output.push('\n');
                     render_convenience_wrapper(
@@ -3674,46 +4545,90 @@ fn render_file(
                         package,
                         visibility,
                     );
-                    if unary_primary_varargs_function_param(params).is_some() {
-                        output.push('\n');
-                        render_typed_convenience_wrapper(
-                            &mut output,
-                            service,
-                            operation,
-                            params,
-                            package,
-                            visibility,
-                        );
-                    }
                 } else {
-                    // External input type — generate a simple forwarding wrapper
-                    output.push('\n');
+                    // External input type — keep the request parameter intact.
                     render_empty_options_struct(&mut output, operation);
                     output.push('\n');
-                    render_forwarding_wrapper(&mut output, service, operation, package);
+                    render_external_input_wrapper(&mut output, service, operation, package);
                 }
             }
         }
     }
 
     output.push_str(registry);
+    output.push_str(interceptors);
 
     // Imports collected while planning can become unused when the SDK owns
-    // input conversion instead of the generated wrapper.
-    let unused_external_imports: Vec<_> = external_imports
+    // input conversion instead of the generated wrapper, or when the Workflow API
+    // that needs them is not selected.
+    let body = &output[body_start..];
+    let unused_imports: Vec<String> = imports
         .iter()
-        .filter(|(_, alias)| !output[body_start..].contains(&format!("{alias}.")))
+        .filter(|path| {
+            !external_imports
+                .iter()
+                .any(|(external, _)| external == *path)
+        })
+        .filter(|path| !uses_go_package(body, package.import_alias(path)))
+        .map(|path| go_aliased_import_line(path, package.import_alias(path)))
+        .chain(
+            external_imports
+                .iter()
+                .filter(|(_, alias)| !uses_go_package(body, alias))
+                .map(|(path, alias)| go_aliased_import_line(path, alias)),
+        )
         .collect();
-    for (path, alias) in unused_external_imports {
-        let default_alias = path.rsplit('/').next().unwrap_or(path);
-        let import = if alias == default_alias {
-            format!("\t\"{path}\"\n")
-        } else {
-            format!("\t{alias} \"{path}\"\n")
-        };
+    for import in unused_imports {
         output = output.replacen(&import, "", 1);
     }
+    let block = "\nimport (\n";
+    if let Some(start) = output.find(block)
+        && let Some(length) = output[start + block.len()..].find(")\n")
+        && output[start + block.len()..][..length].trim().is_empty()
+    {
+        output.replace_range(start..start + block.len() + length + 2, "");
+    }
     output
+}
+
+/// The import line for an external package, with its alias when the alias differs from the
+/// last path segment.
+fn go_aliased_import_line(path: &str, alias: &str) -> String {
+    let default_alias = path.rsplit('/').next().unwrap_or(path);
+    if alias != default_alias || alias == "support" {
+        format!("\t{alias} \"{path}\"\n")
+    } else {
+        format!("\t\"{path}\"\n")
+    }
+}
+
+/// Whether `code` refers to the package `name`. The check ignores `runtime.` when it looks for
+/// `time.`.
+fn uses_go_package(code: &str, name: &str) -> bool {
+    let reference = format!("{name}.");
+    code.match_indices(&reference).any(|(start, _)| {
+        !code[..start].chars().next_back().is_some_and(|previous| {
+            previous.is_alphanumeric() || previous == '_' || previous == '.'
+        })
+    })
+}
+
+fn render_go_declaration_doc(output: &mut String, indent: &str, name: &str, doc: Option<&str>) {
+    let doc = doc.map(str::trim).filter(|doc| !doc.is_empty());
+    let text = match doc {
+        Some(doc)
+            if doc.strip_prefix(name).is_some_and(|rest| {
+                rest.chars()
+                    .next()
+                    .is_none_or(|ch| !ch.is_alphanumeric() && ch != '_')
+            }) =>
+        {
+            doc.to_string()
+        }
+        Some(doc) => format!("{name} - {doc}"),
+        None => format!("{name}."),
+    };
+    render_go_doc_comment(output, indent, &text);
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
@@ -3803,12 +4718,13 @@ fn render_field_doc_comment(
 /// the operation's `@nexus.doc` text and `returns=` text.
 ///
 /// ```go
-/// // Signal a workflow, starting it first if needed.
+/// // SignalWithStartWorkflow - Signal a workflow, starting it first if needed.
 /// //
 /// // Returns: A workflow handle to the started workflow.
 /// ```
 fn render_operation_doc_comment(
     output: &mut String,
+    name: &str,
     operation: &RenderedOperation<'_>,
     input_docs: &[(String, String)],
 ) {
@@ -3817,21 +4733,15 @@ fn render_operation_doc_comment(
         .return_doc
         .map(str::trim)
         .filter(|doc| !doc.is_empty());
-    if let Some(doc) = doc {
-        render_go_doc_comment(output, "", doc);
-    }
+    render_go_declaration_doc(output, "", name, doc);
     if !input_docs.is_empty() {
-        if doc.is_some() {
-            output.push_str("//\n");
-        }
+        output.push_str("//\n");
         for (name, doc) in input_docs {
             render_go_doc_comment(output, "", &format!("Input {name}: {doc}"));
         }
     }
     if let Some(return_doc) = return_doc {
-        if doc.is_some() || !input_docs.is_empty() {
-            output.push_str("//\n");
-        }
+        output.push_str("//\n");
         render_go_doc_comment(output, "", &format!("Returns: {return_doc}"));
     }
 }
@@ -3846,7 +4756,8 @@ fn render_operation_doc_comment(
 ///     UserStatusSuspended UserStatus = 1
 /// )
 /// ```
-fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
+fn render_enum(output: &mut String, enumeration: &RenderedEnum, package: &GoPackageContext) {
+    package.render_declaration_doc(output, "", &enumeration.name, None);
     output.push_str("type ");
     output.push_str(&enumeration.name);
     output.push_str(" int32\n");
@@ -3857,6 +4768,12 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
 
     output.push_str("\nconst (\n");
     for value in &enumeration.values {
+        package.render_declaration_doc(
+            output,
+            "\t",
+            &format!("{}{}", enumeration.name, value.name),
+            None,
+        );
         output.push('\t');
         output.push_str(&enumeration.name);
         output.push_str(&value.name);
@@ -3880,7 +4797,8 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum) {
 ///     UserCapabilityUpdateEmail UserCapability = 1 << 1
 /// )
 /// ```
-fn render_flags(output: &mut String, flags: &RenderedFlags) {
+fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageContext) {
+    package.render_declaration_doc(output, "", &flags.name, None);
     output.push_str("type ");
     output.push_str(&flags.name);
     output.push_str(" int32\n");
@@ -3891,6 +4809,7 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 
     output.push_str("\nconst (\n");
     for flag in &flags.flags {
+        package.render_declaration_doc(output, "\t", &format!("{}{}", flags.name, flag.name), None);
         output.push('\t');
         output.push_str(&flags.name);
         output.push_str(&flag.name);
@@ -3920,9 +4839,16 @@ fn render_flags(output: &mut String, flags: &RenderedFlags) {
 ///
 /// func (NotificationTargetNone) isNotificationTarget() {}
 /// ```
-fn render_variant(output: &mut String, variant: &RenderedVariant) {
+fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPackageContext) {
     if let Some(doc) = variant.doc.value() {
-        render_go_doc_comment(output, "", doc);
+        render_go_declaration_doc(
+            output,
+            "",
+            package.documentation_name(&variant.name),
+            Some(doc),
+        );
+    } else if package.facade_exports.contains_key(&variant.name) {
+        render_go_declaration_doc(output, "", package.documentation_name(&variant.name), None);
     }
     if variant.experimental {
         if variant.doc.value().is_some() {
@@ -3934,6 +4860,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
             "WARNING: This API is experimental and may change in the future.",
         );
     }
+    package.render_exposed_as(output, "", &variant.name);
     output.push_str("type ");
     output.push_str(&go_generic_declaration_name(
         &variant.name,
@@ -3956,9 +4883,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant) {
 
     for case in &variant.cases {
         output.push('\n');
-        if let Some(doc) = case.doc.value() {
-            render_go_doc_comment(output, "", doc);
-        }
+        package.render_declaration_doc(output, "", &case.struct_name, case.doc.value());
         output.push_str("type ");
         output.push_str(&go_generic_declaration_name(
             &case.struct_name,
@@ -4042,6 +4967,19 @@ fn render_model(
     external_models.render_model_converters(output, key, model);
 }
 
+fn render_go_default_local(
+    output: &mut String,
+    name: &str,
+    go_type: &str,
+    present: &str,
+    default: &str,
+    supplied: &str,
+) {
+    output.push_str(&format!(
+        "\tvar {name} {go_type}\n\tif {present} {{\n\t\t{name} = {supplied}\n\t}} else {{\n\t\t{name} = {default}\n\t}}\n"
+    ));
+}
+
 fn model_getter_name(field: &RenderedField) -> String {
     format!("Get{}", field.name)
 }
@@ -4119,8 +5057,9 @@ fn render_resource(
     visibility: &GoVisibility,
     constructor_returns_value: bool,
 ) {
+    package.render_declaration_doc(output, "", &go_declaration_name(&resource.type_name), None);
     output.push_str("type ");
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" struct {\n");
 
     if resource.fields.is_empty() {
@@ -4148,8 +5087,15 @@ fn render_resource(
         output.push_str("}\n");
     }
 
-    output.push_str("\nfunc New");
-    output.push_str(&resource.type_name);
+    output.push('\n');
+    package.render_declaration_doc(
+        output,
+        "",
+        &go_declaration_name(&format!("New{}", resource.type_name)),
+        None,
+    );
+    output.push_str("func ");
+    output.push_str(&go_declaration_name(&format!("New{}", resource.type_name)));
     output.push('(');
     for (index, field) in resource.fields.iter().enumerate() {
         if index > 0 {
@@ -4173,7 +5119,7 @@ fn render_resource(
     if !constructor_returns_value {
         output.push('*');
     }
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" {\n");
     for field in resource.fields.iter().filter(|field| field.optional) {
         let name = go_unexported_name(&go_field_name(&field.name));
@@ -4199,7 +5145,7 @@ fn render_resource(
     if !constructor_returns_value {
         output.push('&');
     }
-    output.push_str(&resource.type_name);
+    output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str("{\n");
     for field in &resource.fields {
         let name = go_unexported_name(&go_field_name(&field.name));
@@ -4242,7 +5188,7 @@ pub(in crate::generator) fn resolve_resource_field_kind(
         PlannedFieldKind::Singular(value) => {
             let (base_type, _is_struct) =
                 resolve_resource_value_type_with_struct_flag(value, package);
-            if optional && type_needs_pointer_when_optional(value, &base_type) {
+            if optional && type_needs_pointer_when_optional(value, &base_type, package) {
                 format!("*{base_type}")
             } else {
                 base_type
@@ -4336,15 +5282,9 @@ fn resolve_resource_value_type_with_struct_flag(
     }
 }
 
-/// Renders methods on a resource struct. Each method that is bound to an
-/// operation delegates to the corresponding unexported operation function,
-/// constructing the request from the receiver's fields and the method params.
-///
-/// ```go
-/// func (u *User) UpdateEmail(ctx workflow.Context, email string) (*User, error) {
-///     return updateEmail(ctx, UpdateEmailRequest{UserId: u.UserId, Email: email})
-/// }
-/// ```
+/// Renders resource methods that construct their bound request and inline
+/// operation execution and result adaptation. The Nexus client path preserves
+/// resource-owned values instead of reapplying convenience-wrapper sources.
 ///
 /// Methods bound to `Stub` emit a panic placeholder.
 fn render_resource_methods(
@@ -4382,7 +5322,7 @@ fn render_resource_methods(
 
                 // Method signature: func (u *Type) Method(ctx workflow.Context, params...) (return)
                 output.push_str("func (u *");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push_str(") ");
                 output.push_str(&method_name);
                 output.push_str("(ctx ");
@@ -4427,10 +5367,12 @@ fn render_resource_methods(
                         go_type: "string".to_string(),
                         public_go_type: "any".to_string(),
                         default_punning_zero: None,
+                        default_input: None,
+                        default_expression: None,
                         function: primary.function.clone(),
                         function_args: None,
                         required: true,
-                        embed_in_options: false,
+                        flattened_fields: None,
                     };
                     render_function_name_inline_assignment(output, &synthetic, package);
                     name_var
@@ -4457,7 +5399,7 @@ fn render_resource_methods(
                     }
                 }
 
-                // Body: construct request and delegate
+                // Body: construct the bound request and execute it directly.
                 let method_param_sources = method
                     .params
                     .iter()
@@ -4481,16 +5423,103 @@ fn render_resource_methods(
                         (param.name.clone(), value)
                     })
                     .collect::<BTreeMap<_, _>>();
+                let request_locals = std::cell::RefCell::new(String::new());
+                let top_message = match request_plan {
+                    crate::planning::RequestPlan::Construct { message_name, .. } => {
+                        Some(message_name.as_str())
+                    }
+                    crate::planning::RequestPlan::Source(_) => None,
+                };
                 let mut request_expr = render_request_plan(
                     request_plan,
                     go_field_name,
                     |name, value| format!("{name}: {value}"),
-                    |msg_name, fields| {
+                    |msg_name, mut fields, supplied| {
                         // Look up the rendered model name; fall back to
                         // deriving it from the message name.
                         let type_name = record_for_model_key(api_plan, msg_name)
                             .map(|m| visibility.adjusted_model_name(record_message_key(m), &m.name))
                             .unwrap_or_else(|| message_model_name(msg_name));
+                        if let Some(record) = record_for_model_key(api_plan, msg_name) {
+                            for (_, field) in record.model_fields() {
+                                let Some(default) = field.default_for(GenerationTarget::Workflow)
+                                else {
+                                    continue;
+                                };
+                                let kind = planned_field_kind(&field.field_type, api_plan);
+                                let native_type =
+                                    resolve_resource_field_kind(&kind, false, package);
+                                let Some(index) = supplied.iter().position(|provided| {
+                                    go_field_name(&provided.field_name)
+                                        == go_field_name(&field.name)
+                                }) else {
+                                    fields
+                                        .push(format!("{}: {default}", go_field_name(&field.name)));
+                                    continue;
+                                };
+                                let (source, optional) = match &supplied[index].value {
+                                    crate::planning::RequestPlan::Source(
+                                        crate::planning::RequestPlanSource::MethodParam(name),
+                                    ) => (
+                                        method_param_sources[name].clone(),
+                                        method
+                                            .params
+                                            .iter()
+                                            .find(|param| param.name == *name)
+                                            .is_some_and(|param| param.optional),
+                                    ),
+                                    crate::planning::RequestPlan::Source(
+                                        crate::planning::RequestPlanSource::ResourceField(name),
+                                    ) => (
+                                        format!("u.{}", go_field_name(name)),
+                                        resource
+                                            .fields
+                                            .iter()
+                                            .find(|field| field.name == *name)
+                                            .is_some_and(|field| field.optional),
+                                    ),
+                                    _ => continue,
+                                };
+                                let zero = if optional || go_type_is_nilable(&native_type) {
+                                    Some("nil".to_string())
+                                } else {
+                                    public_default_punning_zero_for_field(
+                                        &kind,
+                                        &format!("*{native_type}"),
+                                    )
+                                };
+                                if let Some(zero) = zero {
+                                    let local =
+                                        format!("{}Default", go_unexported_name(&field.name));
+                                    let value = if optional && !go_type_is_nilable(&native_type) {
+                                        format!("*{source}")
+                                    } else {
+                                        source.clone()
+                                    };
+                                    render_go_default_local(
+                                        &mut request_locals.borrow_mut(),
+                                        &local,
+                                        &visibility.rewrite_go_expr(&native_type),
+                                        &format!("{source} != {zero}"),
+                                        default,
+                                        &value,
+                                    );
+                                    fields[index] =
+                                        format!("{}: {local}", go_field_name(&field.name));
+                                }
+                            }
+                        }
+                        // The operation function doesn't fill sources, so a field that the
+                        // resource has no value for takes its source here.
+                        if top_message == Some(msg_name) {
+                            for (field_name, expression) in &operation.sourced_fields {
+                                if supplied.iter().all(|provided| {
+                                    go_field_name(&provided.field_name) != *field_name
+                                }) {
+                                    fields.push(format!("{field_name}: {expression}"));
+                                }
+                            }
+                        }
                         if fields.is_empty() {
                             format!("{type_name}{{}}")
                         } else {
@@ -4516,17 +5545,23 @@ fn render_resource_methods(
                     request_expr = format!("{prefix}, {}: args}}", args_param.field_name);
                 }
 
-                output.push_str("\treturn ");
-                output.push_str(&operation.func_name);
-                output.push_str("(ctx, ");
+                output.push_str(&request_locals.into_inner());
+                output.push_str("\trequest := ");
                 output.push_str(&request_expr);
-                output.push_str(")\n");
+                output.push('\n');
+                render_operation_body(
+                    output,
+                    service,
+                    operation,
+                    package,
+                    OperationExecution::NexusClient,
+                );
                 output.push_str("}\n");
             }
             PlannedResourceMethodBinding::Stub => {
                 // Stub method -- emit a panic placeholder
                 output.push_str("func (u *");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push_str(") ");
                 output.push_str(&method_name);
                 output.push_str("(ctx ");
@@ -4544,7 +5579,7 @@ fn render_resource_methods(
                 render_operation_future_return_type(output, package);
                 output.push_str(" {\n");
                 output.push_str("\tpanic(\"");
-                output.push_str(&resource.type_name);
+                output.push_str(&go_declaration_name(&resource.type_name));
                 output.push('.');
                 output.push_str(&method_name);
                 output.push_str(" is not yet implemented\")\n");
@@ -4607,7 +5642,10 @@ pub(in crate::generator) fn new_nexus_client_expr(
 ) -> String {
     if crate::nexgen_config::current().system_nexus {
         return format!(
-            "internal.NewSystemNexusClient({})",
+            "{}({})",
+            package
+                .sdk_reference(SdkSymbol::NewSystemNexusClient)
+                .expression,
             go_string_literal(service_name)
         );
     }
@@ -4619,53 +5657,39 @@ pub(in crate::generator) fn new_nexus_client_expr(
     )
 }
 
-/// Renders an unexported operation wrapper function that creates a Nexus
-/// client and executes the operation.
-///
-/// For operations returning a value:
-/// ```go
-/// func getUser(ctx workflow.Context, request GetUserRequest) (*User, error) {
-///     c := workflow.NewNexusClient(Endpoint, ServiceName)
-///     fut := c.ExecuteOperation(ctx, GetUserOp, request, workflow.NexusOperationOptions{})
-///     var result User
-///     if err := fut.Get(ctx, &result); err != nil {
-///         return nil, err
-///     }
-///     return &result, nil
-/// }
-/// ```
-///
-/// For void operations:
-/// ```go
-/// func deactivate(ctx workflow.Context, request DeactivateRequest) error {
-///     c := workflow.NewNexusClient(Endpoint, ServiceName)
-///     fut := c.ExecuteOperation(ctx, DeactivateOp, request, workflow.NexusOperationOptions{})
-///     return fut.Get(ctx, nil)
-/// }
-/// ```
-fn render_operation_function(
+#[derive(Clone, Copy)]
+pub(in crate::generator) enum OperationExecution {
+    NexusClient,
+    ExecuteNexusOperation(&'static str),
+}
+
+pub(in crate::generator) fn render_operation_execution(
     output: &mut String,
     service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
+    input: &str,
     package: &GoPackageContext,
+    execution: OperationExecution,
 ) {
-    if let Some(binding) = &operation.wire_binding {
-        proto::render_operation_function_proto(output, service, operation, binding, package);
+    if let OperationExecution::ExecuteNexusOperation(execute) = execution {
+        output.push_str(&format!(
+            "\tfut := {execute}(ctx, {}{{\n\
+             \t\tClient: {}({}),\n\
+             \t\tOperation: {},\n\
+             \t\tInput: {input},\n\
+             \t\tNexusHeader: nexus.Header{{}},\n\
+             \t}})\n",
+            package
+                .sdk_reference(SdkSymbol::ExecuteNexusOperationInput)
+                .expression,
+            package
+                .sdk_reference(SdkSymbol::NewSystemNexusClient)
+                .expression,
+            go_string_literal(service.wire_name),
+            go_string_literal(operation.wire_name),
+        ));
         return;
     }
-
-    let operation_name = go_string_literal(operation.wire_name);
-
-    output.push_str("func ");
-    output.push_str(&operation.func_name);
-    render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
-    output.push_str("(ctx ");
-    output.push_str(&package.workflow_context_type());
-    output.push_str(", request ");
-    output.push_str(&operation.input_type);
-    output.push_str(") ");
-    render_operation_future_return_type(output, package);
-    output.push_str(" {\n");
     let endpoint = service
         .endpoint
         .as_deref()
@@ -4673,12 +5697,28 @@ fn render_operation_function(
     output.push_str("\tc := ");
     output.push_str(&new_nexus_client_expr(endpoint, service.wire_name, package));
     output.push_str("\n\tfut := c.ExecuteOperation(ctx, ");
-    output.push_str(&operation_name);
-    output.push_str(", request, ");
+    output.push_str(&go_string_literal(operation.wire_name));
+    output.push_str(", ");
+    output.push_str(input);
+    output.push_str(", ");
     output.push_str(&package.nexus_operation_options());
     output.push_str(")\n");
+}
+
+fn render_operation_body(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    package: &GoPackageContext,
+    execution: OperationExecution,
+) {
+    if let Some(binding) = &operation.wire_binding {
+        proto::render_operation_body_proto(output, service, operation, binding, package, execution);
+        return;
+    }
+    render_operation_execution(output, service, operation, "request", package, execution);
     if let (Some(transform_expr), Some(transform_type)) = (
-        operation.output_transform_expr,
+        operation.output_transform_expr.as_deref(),
         operation.output_transform_type.as_ref(),
     ) {
         render_operation_future_adapter(output, package, transform_type, false, |output| {
@@ -4704,10 +5744,9 @@ fn render_operation_function(
     } else {
         output.push_str("\treturn fut\n");
     }
-    output.push_str("}\n");
 }
 
-/// Renders an options struct for non-function parameters of a convenience wrapper.
+/// Renders an options struct for omittable parameters of a convenience wrapper.
 ///
 /// ```go
 /// type GetUserOptions struct {
@@ -4720,11 +5759,30 @@ fn render_options_struct(
     params: &[RenderedUnpackedParam],
 ) {
     output.push_str("type ");
-    output.push_str(&go_field_name(operation.name));
+    output.push_str(&go_declaration_name(&go_field_name(operation.name)));
     output.push_str("Options");
     render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
     output.push_str(" struct {\n");
     for param in params.iter().filter(|p| param_belongs_in_options(p)) {
+        if let Some(fields) = &param.flattened_fields {
+            for flattened in fields {
+                let field = &flattened.field;
+                render_field_doc_comment(
+                    output,
+                    "\t",
+                    &field.name,
+                    field.doc.as_deref(),
+                    field.required,
+                );
+                let public_type = if flattened.default_punning_zero.is_some() {
+                    field.go_type.trim_start_matches('*')
+                } else {
+                    &field.go_type
+                };
+                output.push_str(&format!("\t{} {}\n", field.name, public_type));
+            }
+            continue;
+        }
         render_field_doc_comment(
             output,
             "\t",
@@ -4733,13 +5791,9 @@ fn render_options_struct(
             param.required,
         );
         output.push('\t');
-        if param.embed_in_options {
-            output.push_str(param.public_go_type.trim_start_matches('*'));
-        } else {
-            output.push_str(&param.field_name);
-            output.push(' ');
-            output.push_str(&param.public_go_type);
-        }
+        output.push_str(&param.field_name);
+        output.push(' ');
+        output.push_str(&param.public_go_type);
         output.push('\n');
     }
     output.push_str("}\n");
@@ -4747,14 +5801,14 @@ fn render_options_struct(
 
 fn render_empty_options_struct(output: &mut String, operation: &RenderedOperation<'_>) {
     output.push_str("type ");
-    output.push_str(&go_field_name(operation.name));
+    output.push_str(&go_declaration_name(&go_field_name(operation.name)));
     output.push_str("Options");
     render_go_model_type_parameter_declaration(output, &operation.model_type_parameters);
     output.push_str(" struct {\n}\n");
 }
 
 fn param_belongs_in_options(param: &RenderedUnpackedParam) -> bool {
-    param.function.is_none() && param.function_args.is_none()
+    !param.required && param.function.is_none() && param.function_args.is_none()
 }
 
 fn param_is_positional(param: &RenderedUnpackedParam) -> bool {
@@ -4789,22 +5843,10 @@ fn required_function_type_parameters(
         .collect()
 }
 
-fn typed_wrapper_type_parameter_names(primary: &RenderedUnpackedParam) -> (String, String) {
-    let function = primary.function.as_ref().unwrap();
-    (
-        format!("{}Arg", primary.field_name),
-        function
-            .result_type_parameter
-            .clone()
-            .unwrap_or_else(|| format!("{}Result", primary.field_name)),
-    )
-}
-
-// Planning and both wrapper renderers share the complete declaration namespace.
+// Planning and rendering share the complete declaration namespace.
 fn wrapper_type_parameters(
     operation: &RenderedOperation<'_>,
     params: &[RenderedUnpackedParam],
-    typed_primary: Option<&RenderedUnpackedParam>,
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) -> Vec<(String, String)> {
@@ -4816,10 +5858,6 @@ fn wrapper_type_parameters(
     declarations.extend(required_function_type_parameters(
         params, package, visibility,
     ));
-    if let Some(primary) = typed_primary {
-        let (arg, result) = typed_wrapper_type_parameter_names(primary);
-        declarations.extend([(arg, "any".to_string()), (result, "any".to_string())]);
-    }
     declarations
 }
 
@@ -4829,31 +5867,23 @@ fn validate_wrapper_type_parameters(
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) -> Result<()> {
-    let typed_primary = unary_primary_varargs_function_param(params);
-    for primary in std::iter::once(None).chain(typed_primary.map(Some)) {
-        let mut occupied = BTreeMap::new();
-        for (index, (name, _)) in
-            wrapper_type_parameters(operation, params, primary, package, visibility)
-                .into_iter()
-                .enumerate()
-        {
-            let source = if index < operation.model_type_parameters.len() {
-                format!("model type parameter `{name}`")
-            } else {
-                format!("generated type parameter `{name}`")
-            };
-            if let Some(previous) = occupied.insert(name.clone(), source) {
-                return Err(Error::UnsupportedGoType {
-                    context: format!(
-                        "operation `{}`{} wrapper",
-                        operation.name,
-                        if primary.is_some() { " Typed" } else { "" }
-                    ),
-                    reason: format!(
-                        "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
-                    ),
-                });
-            }
+    let mut occupied = BTreeMap::new();
+    for (index, (name, _)) in wrapper_type_parameters(operation, params, package, visibility)
+        .into_iter()
+        .enumerate()
+    {
+        let source = if index < operation.model_type_parameters.len() {
+            format!("model type parameter `{name}`")
+        } else {
+            format!("generated type parameter `{name}`")
+        };
+        if let Some(previous) = occupied.insert(name.clone(), source) {
+            return Err(Error::UnsupportedGoType {
+                context: format!("operation `{}` wrapper", operation.name),
+                reason: format!(
+                    "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
+                ),
+            });
         }
     }
     Ok(())
@@ -5212,51 +6242,33 @@ fn wrapper_input_docs<'a>(
 /// Renders an exported convenience wrapper that unpacks required fields as
 /// positional arguments and optional fields into a required options struct.
 ///
-/// The request struct is always constructed across multiple lines. The function
-/// signature is also split across multiple lines when it has more than three
-/// parameters (counting `ctx`).
+/// Request structs are constructed across multiple lines. The function signature
+/// is also split across multiple lines when it has more than three parameters
+/// (counting `ctx`).
 ///
-/// ```go
-/// func UpdateEmail(ctx workflow.Context, userId string, email string) (*User, error) {
-///     return updateEmail(ctx, UpdateEmailRequest{
-///         UserId: userId,
-///         Email:  email,
-///     })
-/// }
-/// ```
-///
-/// With more than three parameters:
-/// ```go
-/// func StartWorkflow(
-///     ctx workflow.Context,
-///     workflow string,
-///     workflowId string,
-///     taskQueue string,
-///     opts StartWorkflowOptions,
-/// ) (*StartedWorkflow, error) {
-///     return startWorkflow(ctx, StartWorkflowRequest{
-///         Workflow:           workflow,
-///         Args:               opts.Args,
-///         WorkflowId:         workflowId,
-///         TaskQueue:          taskQueue,
-///         WorkflowStartDelay: opts.WorkflowStartDelay,
-///     })
-/// }
-/// ```
+/// Ordinary wrappers construct the request and execute it inline. System Nexus
+/// wrappers pass defaulted arguments to the SDK's typed interceptor chain or the
+/// generated terminal function.
 fn render_convenience_wrapper(
     output: &mut String,
-    _service: &RenderedService<'_>,
+    service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
     params: &[RenderedUnpackedParam],
     package: &GoPackageContext,
     visibility: &GoVisibility,
 ) {
-    let exported_name = go_field_name(operation.name);
-    let type_params = wrapper_type_parameters(operation, params, None, package, visibility);
+    let exported_name = go_declaration_name(&go_field_name(operation.name));
+    let type_params = wrapper_type_parameters(operation, params, package, visibility);
 
     let positional_params = ordered_positional_params(params);
     let input_docs = wrapper_input_docs(positional_params.iter().copied());
-    render_operation_doc_comment(output, operation, &input_docs);
+    render_operation_doc_comment(
+        output,
+        package.documentation_name(&exported_name),
+        operation,
+        &input_docs,
+    );
+    package.render_exposed_as(output, "", &exported_name);
 
     let mut signature_params: Vec<(String, String)> = vec![(
         "opts".to_string(),
@@ -5324,14 +6336,37 @@ fn render_convenience_wrapper(
     render_operation_wrapper_return_type(output, package);
     output.push_str(" {\n");
 
-    // Function body -- build the request as a multi-line struct literal,
-    // sourcing required fields from positional args and optional fields from
-    // opts.
-    render_public_default_punning_locals(output, params);
+    if package.workflow_interceptors {
+        if operation.context_propagation_header.is_some() {
+            output.push_str("\tassertNotInReadOnlyState(ctx)\n");
+        }
+        interceptor::render_defaults(output, params);
+        render_function_name_inlining(output, params, package);
+        interceptor::render_call(output, operation, package);
+        output.push_str("}\n");
+        return;
+    }
+    render_public_input_locals(output, params, true);
     render_function_name_inlining(output, params, package);
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
+    output.push_str("\trequest := ");
+    render_operation_request(output, operation, params, false);
+    output.push('\n');
+    render_operation_body(
+        output,
+        service,
+        operation,
+        package,
+        OperationExecution::NexusClient,
+    );
+    output.push_str("}\n");
+}
+
+fn render_operation_request(
+    output: &mut String,
+    operation: &RenderedOperation<'_>,
+    params: &[RenderedUnpackedParam],
+    resolved_functions: bool,
+) {
     output.push_str(&operation.input_type);
     output.push_str("{\n");
     for param in params {
@@ -5342,6 +6377,7 @@ fn render_convenience_wrapper(
             .function
             .as_ref()
             .is_some_and(function_value_is_string)
+            || (resolved_functions && param.function.is_some())
         {
             output.push_str(&param.param_name);
         } else if has_explicit_args(param) {
@@ -5354,21 +6390,32 @@ fn render_convenience_wrapper(
             output.push_str(&function_name_local_var_for_params(param, params));
         } else if param.function_args.is_some() {
             output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push('&');
+        } else if resolved_functions && param.default_expression.is_some() {
+            if param.default_input.is_some() {
+                output.push('*');
+            }
             output.push_str("opts.");
             output.push_str(&param.field_name);
+        } else if param_is_positional(param)
+            || param.default_punning_zero.is_some()
+            || param.flattened_fields.is_some()
+            || param.default_expression.is_some()
+        {
+            output.push_str(&param.param_name);
         } else {
             output.push_str("opts.");
             output.push_str(&param.field_name);
         }
         output.push_str(",\n");
     }
-    output.push_str("\t})\n");
-
-    output.push_str("}\n");
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\t\t");
+        output.push_str(field_name);
+        output.push_str(": ");
+        output.push_str(expression);
+        output.push_str(",\n");
+    }
+    output.push_str("\t}");
 }
 
 fn singular_args_public_param_name(param: &RenderedUnpackedParam) -> String {
@@ -5427,11 +6474,100 @@ fn wrapper_param_signature(
     }
 }
 
-fn render_public_default_punning_locals(output: &mut String, params: &[RenderedUnpackedParam]) {
+fn render_public_input_locals(
+    output: &mut String,
+    params: &[RenderedUnpackedParam],
+    apply_defaults: bool,
+) {
     for param in params
         .iter()
         .filter(|param| param_belongs_in_options(param))
     {
+        if let Some(default) = &param.default_expression {
+            if !apply_defaults {
+                continue;
+            }
+            let source = format!("opts.{}", param.field_name);
+            let supplied = if param.default_input.is_some() {
+                format!("*{source}")
+            } else {
+                source.clone()
+            };
+            render_go_default_local(
+                output,
+                &param.param_name,
+                &param.go_type,
+                &format!(
+                    "{source} != {}",
+                    param.default_punning_zero.as_deref().unwrap_or("nil")
+                ),
+                default,
+                &supplied,
+            );
+            continue;
+        }
+        if let Some(fields) = &param.flattened_fields {
+            output.push_str(&format!("\tvar {} {}\n", param.param_name, param.go_type));
+            let conditions = fields
+                .iter()
+                .map(RenderedFlattenedField::presence_condition)
+                .collect::<Vec<_>>();
+            let condition = if conditions.is_empty() {
+                "false".to_string()
+            } else {
+                conditions.join(" || ")
+            };
+            output.push_str(&format!("\tif {condition} {{\n"));
+            let mut assignments = Vec::new();
+            for flattened in fields {
+                let field = &flattened.field;
+                let name = go_unexported_name(&field.name);
+                if let Some(default) = &flattened.default_expression
+                    && apply_defaults
+                {
+                    let mut local = String::new();
+                    render_go_default_local(
+                        &mut local,
+                        &name,
+                        &field.go_type,
+                        &format!(
+                            "opts.{} != {}",
+                            field.name,
+                            flattened.default_punning_zero.as_deref().unwrap_or("nil")
+                        ),
+                        default,
+                        &format!("opts.{}", field.name),
+                    );
+                    for line in local.lines() {
+                        output.push('\t');
+                        output.push_str(line);
+                        output.push('\n');
+                    }
+                    assignments.push(format!("{}: {name}", field.name));
+                } else if field.go_type.starts_with('*') && flattened.default_punning_zero.is_some()
+                {
+                    output.push_str(&format!(
+                        "\t\tvar {name} {}\n\t\tif {} {{\n\t\t\t{name} = &opts.{}\n\t\t}}\n",
+                        field.go_type,
+                        flattened.presence_condition(),
+                        field.name,
+                    ));
+                    assignments.push(format!("{}: {name}", field.name));
+                } else {
+                    assignments.push(format!("{}: opts.{}", field.name, field.name));
+                }
+            }
+            output.push_str(&format!(
+                "\t\t{} = &{}{{\n",
+                param.param_name,
+                param.go_type.trim_start_matches('*')
+            ));
+            for assignment in assignments {
+                output.push_str(&format!("\t\t\t{assignment},\n"));
+            }
+            output.push_str("\t\t}\n");
+            output.push_str("\t}\n");
+        }
         if let Some(zero) = &param.default_punning_zero {
             output.push_str("\tvar ");
             output.push_str(&param.param_name);
@@ -5451,173 +6587,32 @@ fn render_public_default_punning_locals(output: &mut String, params: &[RenderedU
     }
 }
 
-fn render_operation_params(
+/// Renders an exported wrapper for operations whose input type is an
+/// external/replacement type, keeping the request parameter intact.
+fn render_external_input_wrapper(
     output: &mut String,
-    signature_params: &[(String, String)],
-    package: &GoPackageContext,
-) {
-    let multiline_signature = signature_params.len() + 1 > 3;
-    if multiline_signature {
-        output.push_str("(\n\tctx ");
-        output.push_str(&package.workflow_context_type());
-        output.push_str(",\n");
-        for (name, ty) in signature_params {
-            output.push('\t');
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-            output.push_str(",\n");
-        }
-        output.push(')');
-    } else {
-        output.push_str("(ctx ");
-        output.push_str(&package.workflow_context_type());
-        for (name, ty) in signature_params {
-            output.push_str(", ");
-            output.push_str(name);
-            output.push(' ');
-            output.push_str(ty);
-        }
-        output.push(')');
-    }
-}
-
-fn render_typed_convenience_wrapper(
-    output: &mut String,
-    _service: &RenderedService<'_>,
+    service: &RenderedService<'_>,
     operation: &RenderedOperation<'_>,
-    params: &[RenderedUnpackedParam],
     package: &GoPackageContext,
-    visibility: &GoVisibility,
 ) {
-    let primary = unary_primary_varargs_function_param(params)
-        .expect("typed wrapper requires a unary-capable primary function");
-    let function = primary.function.as_ref().unwrap();
-    let exported_name = format!("{}Typed", go_field_name(operation.name));
-    let options_name = format!("{}Options", go_field_name(operation.name));
-    let (arg_type, result_type) = typed_wrapper_type_parameter_names(primary);
-    let mut signature = vec![(
-        "opts".to_string(),
-        go_generic_reference(&options_name, &operation.model_type_parameters, false),
-    )];
-    let positional = ordered_positional_params(params);
-    let type_params =
-        wrapper_type_parameters(operation, params, Some(primary), package, visibility);
-    for (index, param) in positional.iter().enumerate() {
-        if param.field_name == primary.field_name {
-            let mut args = match &function.args {
-                FunctionArgsSpec::Varargs { prefix, .. } => prefix
-                    .iter()
-                    .map(|arg| go_authored_function_type_expr(&arg.field_type, package, visibility))
-                    .collect::<Vec<_>>(),
-                FunctionArgsSpec::Fixed(_) => Vec::new(),
-            };
-            args.push(arg_type.clone());
-            signature.push((
-                param.param_name.clone(),
-                format!("func({}) {result_type}", args.join(", ")),
-            ));
-            signature.push(("arg".to_string(), arg_type.clone()));
-        } else if param.function_args.as_ref() == Some(function) {
-            continue;
-        } else {
-            signature.push(wrapper_param_signature(
-                param,
-                params,
-                index + 1 == positional.len(),
-                package,
-                visibility,
-            ));
-        }
-    }
+    let exported_name = go_declaration_name(&go_field_name(operation.name));
+
     render_operation_doc_comment(
         output,
+        package.documentation_name(&exported_name),
         operation,
-        &wrapper_input_docs(ordered_positional_params(params)),
+        &[],
     );
-    output.push_str("func ");
-    output.push_str(&exported_name);
-    output.push('[');
-    output.push_str(
-        &type_params
-            .iter()
-            .map(|(name, constraint)| format!("{name} {constraint}"))
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    output.push(']');
-    render_operation_params(output, &signature, package);
-    output.push(' ');
-    render_operation_wrapper_return_type(output, package);
-    output.push_str(" {\n");
-    render_public_default_punning_locals(output, params);
-    render_function_name_inlining(output, params, package);
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, ");
-    output.push_str(&operation.input_type);
-    output.push_str("{\n");
-    for param in params {
-        output.push_str("\t\t");
-        output.push_str(&param.field_name);
-        output.push_str(": ");
-        if param.field_name == primary.field_name {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.as_ref() == Some(function) {
-            output.push_str(&format!("{}{{arg}}", param.go_type));
-        } else if param
-            .function
-            .as_ref()
-            .is_some_and(function_value_is_string)
-        {
-            output.push_str(&param.param_name);
-        } else if has_explicit_args(param) {
-            output.push_str(&format!(
-                "{}{{{}}}",
-                param.go_type,
-                singular_args_public_param_name(param)
-            ));
-        } else if param.function.is_some() {
-            output.push_str(&function_name_local_var_for_params(param, params));
-        } else if param.function_args.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.default_punning_zero.is_some() {
-            output.push_str(&param.param_name);
-        } else if param.embed_in_options {
-            output.push_str("&opts.");
-            output.push_str(&param.field_name);
-        } else {
-            output.push_str("opts.");
-            output.push_str(&param.field_name);
-        }
-        output.push_str(",\n");
-    }
-    output.push_str("\t})\n}\n");
-}
-
-/// Renders an exported forwarding wrapper for operations whose input type is
-/// an external/replacement type (no model to unpack). The wrapper simply
-/// forwards to the unexported operation function.
-///
-/// ```go
-/// func ExampleOperation(ctx workflow.Context, request SomeExternalType) (*SomeExternalType, error) {
-///     return exampleOperation(ctx, request)
-/// }
-/// ```
-fn render_forwarding_wrapper(
-    output: &mut String,
-    _service: &RenderedService<'_>,
-    operation: &RenderedOperation<'_>,
-    package: &GoPackageContext,
-) {
-    let exported_name = go_field_name(operation.name);
-
-    render_operation_doc_comment(output, operation, &[]);
+    package.render_exposed_as(output, "", &exported_name);
     output.push_str("func ");
     output.push_str(&exported_name);
     output.push_str("(ctx ");
     output.push_str(&package.workflow_context_type());
-    output.push_str(", _ ");
+    output.push_str(if package.workflow_interceptors {
+        ", opts "
+    } else {
+        ", _ "
+    });
     output.push_str(&exported_name);
     output.push_str("Options, request ");
     output.push_str(&operation.input_type);
@@ -5626,174 +6621,253 @@ fn render_forwarding_wrapper(
     render_operation_wrapper_return_type(output, package);
 
     output.push_str(" {\n");
-    output.push_str("\treturn ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx, request)\n");
+    if package.workflow_interceptors {
+        interceptor::render_call(output, operation, package);
+        output.push_str("}\n");
+        return;
+    }
+    for (field_name, expression) in &operation.sourced_fields {
+        output.push_str("\trequest.");
+        output.push_str(field_name);
+        output.push_str(" = ");
+        output.push_str(expression);
+        output.push('\n');
+    }
+    render_operation_body(
+        output,
+        service,
+        operation,
+        package,
+        OperationExecution::NexusClient,
+    );
     output.push_str("}\n");
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
-    use prost::Message;
-    use prost_types::{
-        DescriptorProto, FieldDescriptorProto, FileDescriptorProto, FileDescriptorSet, FileOptions,
-        field_descriptor_proto::{Label, Type},
-    };
+    use super::{COMMON_CONVERTER, CONVERTER, INTERNAL, SdkReference, SdkSymbol, WORKFLOW};
+    use crate::error::Error;
 
-    use crate::error::{Error, Result};
-    use crate::{GenerateRequest, generate_to_file};
+    #[test]
+    fn definitions_and_reexports_are_local_by_full_import_path() {
+        for symbol in SdkSymbol::ALL {
+            let definition = symbol.definition();
+            for package in
+                std::iter::once(definition.package).chain(definition.reexports.iter().copied())
+            {
+                for system_nexus in [false, true] {
+                    assert_eq!(
+                        symbol.resolve(Some(package), system_nexus),
+                        SdkReference {
+                            expression: definition.name.to_string(),
+                            import: None,
+                        },
+                        "{symbol:?} in {package}",
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            SdkSymbol::Future
+                .resolve(Some("example.org/workflow"), true)
+                .import,
+            Some((INTERNAL, "internal")),
+        );
+    }
 
-    fn generate_record_models(declarations: &str) -> Result<String> {
-        let temp = tempfile::tempdir().unwrap();
-        let input = temp.path().join("models.wit");
-        std::fs::write(
-            &input,
-            format!(
-                "package test:models@1.0.0;\nworld model-world {{ export models; }}\ninterface models {{\n{declarations}\n}}"
+    #[test]
+    fn private_symbols_do_not_acquire_public_reexports() {
+        for (symbol, public, path, qualifier) in [
+            (
+                SdkSymbol::NewSystemNexusClient,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
             ),
-        )
-        .unwrap();
-        let output = temp.path().join("generated");
-        generate_to_file(&GenerateRequest {
-            config: crate::nexgen_config::NexgenConfig {
-                mode: crate::generator::GenerationMode::NativeApi,
-                ..Default::default()
-            },
-            language: crate::language::Language::Go,
-            input_paths: vec![input],
-            support_package: Some("example.com/nexgen/support".to_string()),
-            descriptor_paths: Vec::new(),
-            output_path: output.clone(),
-            format: false,
-            java_package_name: None,
-            ts_date_time_types: Default::default(),
-        })?;
-        Ok(std::fs::read_dir(output)
-            .unwrap()
-            .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
-            .collect::<Vec<_>>()
-            .join("\n"))
-    }
-
-    #[test]
-    fn record_getters_use_value_receivers_and_native_field_types() {
-        let source = generate_record_models(
-            r#"enum status { ready, waiting }
-            type request-alias = request;
-            record request {
-                id: string,
-                status: status,
-                maybe: option<u32>,
-                values: list<string>,
-                /// @nexus.type go="map[string]int32"
-                lookup: list<tuple<string, u32>>,
-                /// @nexus.type go="time.Duration"
-                elapsed: u64,
-                /// @nexus.source go="WorkflowNamespace(ctx)"
-                namespace: string,
-                /// @nexus.source go="RequestType(ctx)"
-                %type: string,
-            }
-            read: func(request: request) -> request;"#,
-        )
-        .unwrap();
-        for (getter, field, go_type) in [
-            ("GetID", "ID", "string"),
-            ("GetMaybe", "Maybe", "*int32"),
-            ("GetValues", "Values", "[]string"),
-            ("GetLookup", "Lookup", "map[string]int32"),
-            ("GetElapsed", "Elapsed", "time.Duration"),
-            ("GetNamespace", "Namespace", "string"),
-            ("GetType", "Type", "string"),
+            (
+                SdkSymbol::GetDataConverterFromWorkflowContext,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusRegistryKey,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusRegistryEntry,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::UpdateSystemNexusRegistry,
+                WORKFLOW,
+                INTERNAL,
+                "internal",
+            ),
+            (
+                SdkSymbol::SystemNexusContext,
+                CONVERTER,
+                COMMON_CONVERTER,
+                "commonconverter",
+            ),
+            (
+                SdkSymbol::NewSystemNexusTransferTypeConverter,
+                CONVERTER,
+                COMMON_CONVERTER,
+                "commonconverter",
+            ),
         ] {
-            assert!(
-                source.contains(&format!(
-                    "func (m Request) {getter}() {go_type} {{\n\treturn m.{field}\n}}"
-                )),
-                "{source}"
-            );
-        }
-        assert!(!source.contains("func (m *Request) Get"), "{source}");
-        assert!(!source.contains("if m == nil"), "{source}");
-        assert!(!source.contains("// Get"), "{source}");
-        for receiver in ["ReadOptions", "Status", "RequestAlias"] {
-            assert!(
-                !source.contains(&format!("func (m {receiver}) Get")),
-                "{source}"
+            assert_eq!(
+                symbol.resolve(Some(public), true).import,
+                Some((path, qualifier)),
+                "{symbol:?}",
             );
         }
     }
 
     #[test]
-    fn record_getters_preserve_generic_receiver_arguments() {
-        let source = generate_record_models(
-            r#"type placeholder = string;
-            /// @nexus.type-parameter
-            type value-t = placeholder;
-            /// @nexus.type-parameter
-            type other-t = placeholder;
-            record pair {
-                value: value-t,
-                other: option<other-t>,
-                history: list<value-t>,
-                tuple-value: tuple<value-t, other-t>,
-                result-value: result<value-t, other-t>,
-            }
-            read: func(request: pair) -> pair;"#,
-        )
-        .unwrap();
-        for (getter, go_type) in [
-            ("GetValue", "ValueT"),
-            ("GetOther", "*OtherT"),
-            ("GetHistory", "[]ValueT"),
+    fn unexported_names_lowercase_leading_initialisms() {
+        for (name, expected) in [
+            ("ID", "id"),
+            ("IDToken", "idToken"),
+            ("URLValue", "urlValue"),
+            ("UserID", "userID"),
+            ("GetUser", "getUser"),
+            ("Type", "type_"),
+            ("", ""),
+            ("SystemNexus_ID", "systemnexus_id"),
         ] {
-            assert!(
-                source.contains(&format!(
-                    "func (m Pair[ValueT, OtherT]) {getter}() {go_type}"
-                )),
-                "{source}"
-            );
+            assert_eq!(super::go_unexported_name(name), expected, "{name}");
         }
-        // Tuple and result helpers use grouped constraints in their declarations.
-        assert!(
-            source.contains("func (m tuple2[T1, T2]) GetFirst() T1"),
-            "{source}"
-        );
-        assert!(
-            source.contains("func (m result[T, E]) GetError() E"),
-            "{source}"
-        );
     }
 
     #[test]
-    fn record_getters_reject_field_method_collisions() {
-        let error =
-            generate_record_models(
-                "record request { id: string, get-id: string }\nread: func(request: request) -> request;",
-            )
-            .unwrap_err();
-        let Error::UnsupportedGoType { context, reason } = error else {
-            panic!("unexpected error: {error}");
+    fn external_workflow_references_preserve_generation_mode() {
+        assert_eq!(
+            SdkSymbol::Context.resolve(None, false).import,
+            Some((WORKFLOW, "workflow")),
+        );
+        assert_eq!(
+            SdkSymbol::Context.resolve(None, true).import,
+            Some((INTERNAL, "internal")),
+        );
+        assert_eq!(SdkSymbol::find(INTERNAL, "Custom"), None);
+        assert_eq!(SdkSymbol::find("example.org/internal", "Future"), None);
+    }
+
+    #[test]
+    fn workflow_import_alias_applies_to_sdk_references_and_authored_types() {
+        let package = super::GoPackageContext {
+            package_name: "example".to_string(),
+            workflow_interceptors: false,
+            import_path: None,
+            workflow_package_alias: "temporalworkflow",
+            has_serialization_context: false,
+            support_package: None,
+            facade: None,
+            facade_exports: BTreeMap::new(),
         };
-        assert!(context.contains("Request"), "{context}");
-        assert!(reason.contains("getter `GetID` for field `ID`"), "{reason}");
-        assert!(reason.contains("field `GetID`"), "{reason}");
-        assert!(reason.contains("rename"), "{reason}");
+        assert_eq!(
+            package.import_alias("go.temporal.io/sdk/workflow"),
+            "temporalworkflow"
+        );
+        assert_eq!(package.workflow_context_type(), "temporalworkflow.Context");
+        assert_eq!(
+            package.new_nexus_client(),
+            "temporalworkflow.NewNexusClient"
+        );
+        assert_eq!(
+            package.go_type_expr("go.temporal.io/sdk/workflow:func(workflow.Context) error"),
+            "func(temporalworkflow.Context) error"
+        );
+        assert_eq!(
+            package.alias_workflow_expr(
+                r#"workflow.Helper("workflow.Context", `workflow.Future`, request.workflow.Value)"#
+            ),
+            r#"temporalworkflow.Helper("workflow.Context", `workflow.Future`, request.workflow.Value)"#
+        );
+        let self_package = super::GoPackageContext {
+            package_name: "workflow".to_string(),
+            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            ..package
+        };
+        assert_eq!(self_package.workflow_context_type(), "Context");
+        assert_eq!(self_package.new_nexus_client(), "NewNexusClient");
+    }
+
+    #[test]
+    fn system_nexus_declaration_names_preserve_visibility() {
+        assert_eq!(super::go_declaration_name("Request"), "Request");
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            ..Default::default()
+        });
+        assert_eq!(super::go_declaration_name("Request"), "SystemNexus_Request");
+        assert_eq!(super::go_declaration_name("call"), "systemnexus_call");
+        assert_eq!(
+            super::go_unexported_name("SystemNexus_Request"),
+            "systemnexus_request"
+        );
+    }
+
+    #[test]
+    fn same_package_support_resolves_local_references() {
+        let package = super::GoPackageContext {
+            package_name: "internal".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
+            has_serialization_context: false,
+            support_package: Some("go.temporal.io/sdk/internal".to_string()),
+            facade: None,
+            facade_exports: BTreeMap::new(),
+            workflow_interceptors: false,
+        };
+        assert_eq!(
+            package.support_reference("DurationToProto"),
+            "DurationToProto"
+        );
+        assert_eq!(
+            package.function_name_extractor("WorkflowFunctionName"),
+            "WorkflowFunctionName"
+        );
+        assert_eq!(
+            package.go_type_expr("internal.GetWorkflowInfo(ctx).Namespace"),
+            "GetWorkflowInfo(ctx).Namespace"
+        );
+        let value = super::PlannedValueType::Scalar(super::PlannedScalarType::String);
+        for name in [
+            "SearchAttributes",
+            "VersioningOverride",
+            "internal.SearchAttributes",
+            "internal.VersioningOverride",
+        ] {
+            assert!(!super::type_needs_pointer_when_optional(
+                &value, name, &package
+            ));
+        }
+        assert!(super::type_needs_pointer_when_optional(
+            &value, "Request", &package
+        ));
     }
 
     #[test]
     fn record_getters_skip_private_fields() {
         let model = super::RenderedModel {
             name: "Request".to_string(),
+            type_parameters: Vec::new(),
             fields: ["ID", "iD"]
                 .into_iter()
                 .map(|name| super::RenderedField {
                     name: name.to_string(),
                     doc: None,
                     go_type: "string".to_string(),
+                    default_punning_zero: None,
                     required: true,
                     sourced: name == "iD",
                 })
@@ -5807,239 +6881,57 @@ mod tests {
         assert!(!source.contains("// Get"), "{source}");
     }
 
-    fn generate_context_operation(
-        endpoint: &str,
-        native_type: &str,
-        annotated: bool,
-        owned_request: bool,
-        system_nexus: bool,
-    ) -> Result<BTreeMap<PathBuf, String>> {
-        let temp = tempfile::tempdir().unwrap();
-        let input = temp.path().join("context.wit");
-        let annotation = if annotated {
-            "/// @nexus.serialization-context go=\"requestContext\""
-        } else {
-            ""
-        };
-        let declaration = if owned_request {
-            r#"/// @nexus.proto "test.Request"
-            record request { retry-policy: option<retry-policy> }"#
-        } else {
-            "type request = retry-policy;"
-        };
-        std::fs::write(
-            &input,
-            format!(
-                r#"package test:context@1.0.0;
-                world system {{ export sample-service; }}
-                /// @nexus.endpoint "{endpoint}"
-                interface sample-service {{
-                    type placeholder = string;
-                    /// @nexus.proto "test.RetryPolicy"
-                    /// @nexus.type go="go.temporal.io/sdk/{native_type}"
-                    type retry-policy = placeholder;
-                    {declaration}
-                    {annotation}
-                    send: func(request: request) -> retry-policy;
-                }}"#
-            ),
-        )
-        .unwrap();
-        let descriptor = temp.path().join("wire.bin");
-        let descriptors = FileDescriptorSet {
-            file: vec![FileDescriptorProto {
-                name: Some("wire.proto".to_string()),
-                package: Some("test".to_string()),
-                syntax: Some("proto3".to_string()),
-                options: Some(FileOptions {
-                    go_package: Some("example.com/wire;wire".to_string()),
-                    ..Default::default()
-                }),
-                message_type: vec![
-                    DescriptorProto {
-                        name: Some("RetryPolicy".to_string()),
-                        ..Default::default()
-                    },
-                    DescriptorProto {
-                        name: Some("Request".to_string()),
-                        field: vec![FieldDescriptorProto {
-                            name: Some("retry_policy".to_string()),
-                            number: Some(1),
-                            label: Some(Label::Optional as i32),
-                            r#type: Some(Type::Message as i32),
-                            type_name: Some(".test.RetryPolicy".to_string()),
-                            ..Default::default()
-                        }],
-                        ..Default::default()
-                    },
-                ],
-                ..Default::default()
-            }],
-        };
-        std::fs::write(&descriptor, descriptors.encode_to_vec()).unwrap();
-        let output = temp.path().join("generated");
-        generate_to_file(&GenerateRequest {
-            config: crate::nexgen_config::NexgenConfig {
-                mode: crate::generator::GenerationMode::NativeApi,
-                system_nexus,
-            },
-            language: crate::language::Language::Go,
-            input_paths: vec![input],
-            support_package: Some("example.com/nexgen/support".to_string()),
-            descriptor_paths: vec![descriptor],
-            output_path: output.clone(),
-            format: false,
-            java_package_name: None,
-            ts_date_time_types: Default::default(),
-        })?;
-        Ok(std::fs::read_dir(output)
-            .unwrap()
-            .map(|entry| {
-                let entry = entry.unwrap();
-                (
-                    PathBuf::from(entry.file_name()),
-                    std::fs::read_to_string(entry.path()).unwrap(),
-                )
-            })
-            .collect())
-    }
-
     #[test]
-    fn system_nexus_configuration_controls_clients_and_converters() {
-        for endpoint in ["__temporal_system", "temporal-system", "sample-service"] {
-            for annotated in [false, true] {
-                for system_nexus in [false, true] {
-                    let files = generate_context_operation(
-                        endpoint,
-                        "temporal.RetryPolicy",
-                        annotated,
-                        true,
-                        system_nexus,
-                    )
-                    .unwrap();
-                    let source = &files[&PathBuf::from("sampleservice.go")];
-                    if system_nexus {
-                        assert!(
-                            source.contains("internal.NewSystemNexusClient("),
-                            "{source}"
-                        );
-                        assert!(!source.contains("workflow.NewNexusClient("), "{source}");
-                        assert!(
-                            source.contains("commonconverter.NewSystemNexusTransferTypeConverter("),
-                            "{source}"
-                        );
-                        assert!(
-                            source.contains("cfg *commonconverter.SystemNexusConfig"),
-                            "{source}"
-                        );
-                        assert_eq!(
-                            source.contains("// --- Registry ---"),
-                            annotated,
-                            "{source}"
-                        );
-                    } else {
-                        assert!(
-                            source.contains(&format!("workflow.NewNexusClient(\"{endpoint}\",")),
-                            "{source}"
-                        );
-                        assert!(!source.contains("NewSystemNexusClient"), "{source}");
-                        assert!(
-                            source.contains("converter.NewTransferTypeConverter("),
-                            "{source}"
-                        );
-                        assert!(!source.contains("go.temporal.io/sdk/internal"), "{source}");
-                        assert!(!source.contains("SystemNexusConfig"), "{source}");
-                        assert!(!source.contains("// --- Registry ---"), "{source}");
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn serialization_context_rejects_external_operation_inputs() {
-        for endpoint in ["__temporal_system", "temporal-system"] {
-            for native_type in ["temporal.RetryPolicy", "*temporal.RetryPolicy"] {
-                let error = generate_context_operation(endpoint, native_type, true, false, true)
-                    .unwrap_err();
-                let Error::UnsupportedGoProtoConversion { context, reason } = error else {
-                    panic!("unexpected error: {error}");
-                };
-                assert!(context.contains("Send"), "{context}");
-                assert!(context.contains(native_type), "{context}");
-                assert!(reason.contains("TransferTypeConverter"), "{reason}");
-                assert!(reason.contains("locally owned request model"), "{reason}");
-            }
-        }
-    }
-
-    #[test]
-    fn external_inputs_keep_eager_conversion_without_system_policy() {
-        for (endpoint, annotated) in [
-            ("sample-service", true),
-            ("temporal-system", false),
-            ("__temporal_system", false),
+    fn serialization_context_helpers_reject_invalid_go_identifiers() {
+        for helper in [
+            "_",
+            "break",
+            "default",
+            "func",
+            "interface",
+            "select",
+            "case",
+            "defer",
+            "go",
+            "map",
+            "struct",
+            "chan",
+            "else",
+            "goto",
+            "package",
+            "switch",
+            "const",
+            "fallthrough",
+            "if",
+            "range",
+            "type",
+            "continue",
+            "for",
+            "import",
+            "return",
+            "var",
+            "helpers._",
+            "helpers.func",
+            "_.Context",
+            "type.Context",
+            "helpers.nested.Context",
+            "requestContext()",
+            "helpers/Context",
+            "1context",
+            "helpers.1context",
+            "request-context",
         ] {
-            let files = generate_context_operation(
-                endpoint,
-                "temporal.RetryPolicy",
-                annotated,
-                false,
-                false,
-            )
-            .unwrap();
-            let source = &files[&PathBuf::from("sampleservice.go")];
-            assert!(
-                source.contains("requestProto, err := support.RetryPolicyToProto(&request)"),
-                "{source}"
-            );
-            assert!(
-                source.contains("c.ExecuteOperation(ctx, \"Send\", requestProto,"),
-                "{source}"
-            );
-            assert!(
-                source.contains("support.RetryPolicyFromProto(&result)"),
-                "{source}"
-            );
+            let error =
+                super::validate_go_serialization_context_helper(helper, "Send").expect_err(helper);
+            let Error::InvalidWitDirective {
+                directive, reason, ..
+            } = error
+            else {
+                panic!("unexpected error: {error}");
+            };
+            assert_eq!(directive, "@nexus.serialization-context");
+            assert!(reason.contains(helper), "{helper}: {reason}");
         }
-    }
-
-    #[test]
-    fn system_policy_supports_generated_request_with_nested_external_type() {
-        let files =
-            generate_context_operation("temporal-system", "temporal.RetryPolicy", true, true, true)
-                .unwrap();
-        let source = &files[&PathBuf::from("sampleservice.go")];
-        assert!(
-            source.contains("c.ExecuteOperation(ctx, \"Send\", request,"),
-            "{source}"
-        );
-        assert!(source.contains("TransferTypeConverter()"), "{source}");
-        assert!(
-            source.contains(
-                "func (m request) GetRetryPolicy() *temporal.RetryPolicy {\n\treturn m.RetryPolicy\n}"
-            ),
-            "{source}"
-        );
-        assert!(
-            source.contains("func requestToProto(cfg *commonconverter.SystemNexusConfig, m *"),
-            "{source}"
-        );
-        assert!(
-            source.contains(
-                "commonconverter.NewSystemNexusTransferTypeConverter(\n\t\trequestToProto,\n\t\trequestFromProto,\n"
-            ),
-            "{source}"
-        );
-        assert!(!source.contains("func(cfg *"), "{source}");
-        assert!(
-            source.contains("support.RetryPolicyToProto(cfg.DataConverter, m.RetryPolicy)"),
-            "{source}"
-        );
-        assert!(
-            source.contains("support.RetryPolicyFromProto(dc, &result)"),
-            "{source}"
-        );
     }
 
     #[test]
@@ -6051,23 +6943,31 @@ mod tests {
         let package = super::GoPackageContext {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
+            facade: None,
+            facade_exports: BTreeMap::new(),
+            workflow_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
             "NewSystemNexusTransferTypeConverter"
         );
-        assert_eq!(package.system_nexus_config_type(), "SystemNexusConfig");
+        assert_eq!(package.system_nexus_context_type(), "SystemNexusContext");
         assert_eq!(
             package.transfer_type_converter_type(),
             "TransferTypeConverter"
         );
         let package = super::GoPackageContext {
-            package_name: "workflow".to_string(),
-            import_path: Some("go.temporal.io/sdk/workflow".to_string()),
+            package_name: "internal".to_string(),
+            import_path: Some("go.temporal.io/sdk/internal".to_string()),
+            workflow_package_alias: "workflow",
             has_serialization_context: false,
             support_package: None,
+            facade: None,
+            facade_exports: BTreeMap::new(),
+            workflow_interceptors: false,
         };
         assert_eq!(
             package.new_transfer_type_converter(),
@@ -6075,8 +6975,8 @@ mod tests {
         );
         assert_eq!(package.workflow_context_type(), "Context");
         assert_eq!(
-            package.system_nexus_config_type(),
-            "commonconverter.SystemNexusConfig"
+            package.system_nexus_context_type(),
+            "commonconverter.SystemNexusContext"
         );
     }
 
@@ -6113,9 +7013,29 @@ mod tests {
             let (imports, rendered) = super::parse_go_expr(authored);
             assert_eq!(rendered, expected);
             assert_eq!(
-                imports,
+                imports
+                    .into_keys()
+                    .collect::<std::collections::BTreeSet<_>>(),
                 paths.into_iter().map(str::to_string).collect(),
                 "{authored}"
+            );
+        }
+    }
+
+    #[test]
+    fn composite_type_imports_preserve_package_aliases() {
+        for authored in [
+            "map[string]*go.temporal.io/api/common/v1:common.Payload",
+            "go.temporal.io/api/common/v1:map[string]*common.Payload",
+        ] {
+            let (imports, expression) = super::parse_go_expr(authored);
+            assert_eq!(expression, "map[string]*common.Payload");
+            assert_eq!(
+                imports,
+                std::collections::BTreeMap::from([(
+                    "go.temporal.io/api/common/v1".to_string(),
+                    "common".to_string(),
+                )]),
             );
         }
     }

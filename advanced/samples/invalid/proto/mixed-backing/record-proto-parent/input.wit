@@ -1,0 +1,15 @@
+package test:mixed-records@1.0.0;
+world system { export models; }
+interface models {
+  record timestamp {
+    seconds: option<s64>,
+    nanos: option<s32>,
+  }
+
+  /// @nexus.proto "temporal.api.namespace.v1.BadBinaryInfo"
+  record bad-binary {
+    reason: string,
+    operator: string,
+    create-time: option<timestamp>,
+  }
+}

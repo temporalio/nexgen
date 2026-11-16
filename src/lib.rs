@@ -16,7 +16,7 @@ use std::process::Command;
 
 use descriptors::DescriptorIndex;
 use error::Result;
-use generator::{GenerateFilesOptions, GeneratedFiles, GeneratedOutputLayout, GenerationMode};
+use generator::{GenerateFilesOptions, GeneratedFiles, GeneratedOutputLayout};
 use language::Language;
 use spec::{ApiSpecTree, CompilerPass};
 
@@ -43,10 +43,13 @@ pub struct GenerateRequest {
     /// TypeScript-only: the in-memory representation for materialized temporal
     /// `format` fields. `Default` is `TsDateTimeTypes::String`.
     pub ts_date_time_types: generator::TsDateTimeTypes,
+    /// C#-only: the root namespace for generated types. Each input module's
+    /// types live in a namespace below it. Ignored for other languages.
+    pub dotnet_namespace: Option<String>,
 }
 
 pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
-    let _config_scope = nexgen_config::scope(request.config);
+    let _config_scope = nexgen_config::scope(request.config.clone());
     // A resolved output path with no name at all (the filesystem root, or
     // `..` past it) is never a real output directory: Go and Java derive
     // package names from its basename, and for every language it means the
@@ -60,7 +63,8 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         });
     }
 
-    if parser::is_wit_input(&request.input_paths)?
+    let wit_input = parser::is_wit_input(&request.input_paths)?;
+    if wit_input
         && matches!(
             request.language,
             Language::Dotnet
@@ -74,6 +78,18 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         return Err(error::Error::MissingSupportPackage {
             language: request.language,
         });
+    }
+
+    // WIT input names its own C# namespace; JSON Schema input has none, and a
+    // guessed default would move every type whenever the input set changed.
+    if !wit_input
+        && request.language == Language::Dotnet
+        && request
+            .dotnet_namespace
+            .as_deref()
+            .is_none_or(str::is_empty)
+    {
+        return Err(error::Error::DotnetNamespaceMissing);
     }
 
     let tree = parser::load_api_spec_tree_for_language_with_inputs(
@@ -94,6 +110,11 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
         },
         ts_date_time_types: request.ts_date_time_types,
         support_package: request.support_package.clone(),
+        dotnet_namespace: if request.language == Language::Dotnet {
+            request.dotnet_namespace.clone()
+        } else {
+            None
+        },
     };
     let generated = compile_tree_to_files(request.language, tree, &descriptors, options)?;
     print_warnings(&generated);
@@ -101,11 +122,7 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
     write_generated_files(&request.output_path, &generated)?;
 
     if request.format {
-        if request.language == Language::Java {
-            generator::java::format::format(&request.output_path, &generated)?;
-        } else {
-            format_generated_file(request.language, &request.output_path)?;
-        }
+        format_generated_files(request.language, &request.output_path)?;
     }
 
     Ok(())
@@ -120,7 +137,7 @@ pub(crate) fn compile_tree_to_files(
     descriptors: &DescriptorIndex,
     options: GenerateFilesOptions,
 ) -> Result<GeneratedFiles> {
-    let mode = nexgen_config::current().mode;
+    generator::validate_targets(language)?;
     // parse (frontend) -> validate authored intent -> select target metadata
     let authored_tree =
         planning::AuthoredValidationPass::new(descriptors, language).apply(authored_tree)?;
@@ -130,21 +147,18 @@ pub(crate) fn compile_tree_to_files(
     let selected_tree = planning::SelectedValidationPass.apply(selected_tree)?;
 
     // selected IR -> resource bindings -> operation relationships -> lowered
-    // operation results -> planned types -> reachability-pruned planned IR
-    let resource_bound_tree = planning::ResourceResolutionPass::new(
-        descriptors,
-        match mode {
-            GenerationMode::NativeApi => planning::PlanningMode::NativeApi,
-            GenerationMode::DefinitionsOnly => planning::PlanningMode::DefinitionsOnly,
-        },
-    )
-    .apply(selected_tree)?;
+    // operation results -> planned types -> reachability-pruned planned IR ->
+    // checked client polls
+    let resource_bound_tree =
+        planning::ResourceResolutionPass::new(descriptors, nexgen_config::current().targets)
+            .apply(selected_tree)?;
     let operation_bound_tree = planning::OperationBindingPass::new().apply(resource_bound_tree)?;
     let operation_lowered_tree =
         planning::OperationLoweringPass::new().apply(operation_bound_tree)?;
     let type_planning = planning::TypePlanningPass::new(&operation_lowered_tree, descriptors);
     let planned_tree = type_planning.apply(operation_lowered_tree)?;
     let planned_tree = planning::ReachabilityPass::new().apply(planned_tree)?;
+    let planned_tree = planning::PollValidationPass.apply(planned_tree)?;
 
     // planned IR -> emitted JSON names -> render target-language files
     let name_resolution = planning::EmittedNameResolutionPass::new(language, &planned_tree)?;
@@ -238,22 +252,32 @@ fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
     Ok(package_name.to_string())
 }
 
-fn format_generated_file(language: Language, output_path: &Path) -> Result<()> {
-    let (program, args) = formatter_command(language, output_path)?;
-    let command = format_formatter_command(program, &args);
-    let status = Command::new(program)
-        .args(&args)
+/// Format files at `output_path` using the target language's formatter from `PATH`.
+///
+/// Supports Go, Java, Python, and TypeScript. Directory output may include
+/// handwritten files; formatting is not restricted to files emitted by Nexgen.
+/// The caller is responsible for making the formatter available.
+pub fn format_generated_files(language: Language, output_path: &Path) -> Result<()> {
+    if let Some(mut command) = formatter_command(language, output_path)? {
+        run_formatter(&mut command, output_path)?;
+    }
+    Ok(())
+}
+
+fn run_formatter(command: &mut Command, output_path: &Path) -> Result<()> {
+    let description = format!("{command:?}");
+    let status = command
         .status()
         .map_err(|source| error::Error::RunFormatter {
             path: output_path.to_path_buf(),
-            command: command.clone(),
+            command: description.clone(),
             source,
         })?;
 
     if !status.success() {
         return Err(error::Error::FormatterFailed {
             path: output_path.to_path_buf(),
-            command,
+            command: description,
             status,
         });
     }
@@ -323,35 +347,32 @@ fn write_generated_files(output_path: &Path, generated: &GeneratedFiles) -> Resu
     Ok(())
 }
 
-fn formatter_command(
-    language: Language,
-    output_path: &Path,
-) -> Result<(&'static str, Vec<String>)> {
-    let output_path = output_path.to_string_lossy().into_owned();
+fn formatter_command(language: Language, output_path: &Path) -> Result<Option<Command>> {
     match language {
-        Language::Go => Ok(("gofmt", vec!["-w".to_string(), output_path])),
-        Language::Python => Ok((
-            "ruff",
-            vec![
-                "format".to_string(),
-                "--line-length".to_string(),
-                "88".to_string(),
-                output_path,
-            ],
-        )),
-        // Let the generated package choose its own Prettier configuration. In
-        // particular, the TypeScript SDK uses Prettier's default width while
-        // Nexgen's standalone examples configure a wider width themselves.
-        Language::TypeScript => Ok(("prettier", vec!["--write".to_string(), output_path])),
+        Language::Java => generator::java::format::command(output_path),
+        Language::Go => {
+            let mut command = Command::new("gofmt");
+            command.arg("-w").arg(output_path);
+            Ok(Some(command))
+        }
+        Language::Python => {
+            let mut command = Command::new("ruff");
+            command
+                .args(["format", "--line-length", "88"])
+                .arg(output_path);
+            Ok(Some(command))
+        }
+        // Let the generated package choose its own oxfmt configuration.
+        Language::TypeScript => {
+            let mut command = Command::new("oxfmt");
+            // oxfmt rejects paths containing `..`.
+            command
+                .arg("--write")
+                .arg(absolute_output_path(output_path)?);
+            Ok(Some(command))
+        }
         _ => Err(error::Error::UnsupportedLanguage { language }),
     }
-}
-
-fn format_formatter_command(program: &str, args: &[String]) -> String {
-    std::iter::once(program)
-        .chain(args.iter().map(String::as_str))
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 #[cfg(test)]
@@ -360,8 +381,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        GenerateRequest, format_formatter_command, formatter_command, generate_to_file,
-        output_dir_name, resolve_java_package,
+        GenerateRequest, formatter_command, generate_to_file, output_dir_name, resolve_java_package,
     };
     use crate::language::Language;
 
@@ -376,6 +396,7 @@ mod tests {
             format: false,
             java_package_name: java_package_name.map(str::to_string),
             ts_date_time_types: Default::default(),
+            dotnet_namespace: None,
         }
     }
 
@@ -399,6 +420,22 @@ mod tests {
     }
 
     #[test]
+    fn json_schema_csharp_requires_a_namespace() {
+        let input =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples/schemas/chat.nexusrpc.yaml");
+        for namespace in [None, Some(String::new())] {
+            let mut request = java_request("/tmp/example", None);
+            request.language = Language::Dotnet;
+            request.input_paths = vec![input.clone()];
+            request.dotnet_namespace = namespace;
+            assert!(matches!(
+                generate_to_file(&request).unwrap_err(),
+                crate::error::Error::DotnetNamespaceMissing
+            ));
+        }
+    }
+
+    #[test]
     fn json_schema_does_not_require_a_support_package() {
         let temp = tempfile::tempdir().unwrap();
         let input =
@@ -417,6 +454,7 @@ mod tests {
             if language == Language::Java {
                 request.java_package_name = Some("java".into());
             }
+            request.dotnet_namespace = Some("Example.Chat".to_string());
             generate_to_file(&request).unwrap();
             assert!(request.output_path.exists());
         }
@@ -424,23 +462,50 @@ mod tests {
 
     #[test]
     fn chooses_python_formatter_command() {
-        let (program, args) = formatter_command(Language::Python, Path::new("output")).unwrap();
-        assert_eq!(program, "ruff");
-        assert_eq!(args, vec!["format", "--line-length", "88", "output"]);
+        let command = formatter_command(Language::Python, Path::new("output"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(command.get_program(), "ruff");
         assert_eq!(
-            format_formatter_command(program, &args),
-            "ruff format --line-length 88 output"
+            command.get_args().collect::<Vec<_>>(),
+            ["format", "--line-length", "88", "output"]
         );
     }
 
     #[test]
     fn chooses_typescript_formatter_command() {
-        let (program, args) = formatter_command(Language::TypeScript, Path::new("output")).unwrap();
-        assert_eq!(program, "prettier");
-        assert_eq!(args, vec!["--write", "output"]);
+        let command = formatter_command(Language::TypeScript, Path::new("nested/../output"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(command.get_program(), "oxfmt");
         assert_eq!(
-            format_formatter_command(program, &args),
-            "prettier --write output"
+            command.get_args().collect::<Vec<_>>(),
+            [
+                std::ffi::OsStr::new("--write"),
+                std::env::current_dir().unwrap().join("output").as_os_str(),
+            ]
+        );
+    }
+
+    #[test]
+    fn chooses_go_formatter_command() {
+        let command = formatter_command(Language::Go, Path::new("output with spaces"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(command.get_program(), "gofmt");
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["-w", "output with spaces"]
+        );
+    }
+
+    #[test]
+    fn java_without_java_files_needs_no_formatter() {
+        let output = tempfile::tempdir().unwrap();
+        assert!(
+            formatter_command(Language::Java, output.path())
+                .unwrap()
+                .is_none()
         );
     }
 

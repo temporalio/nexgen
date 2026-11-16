@@ -1,0 +1,10 @@
+languages = ["python"]
+targets = ["workflow"]
+
+[error]
+kind = "generated-file-source-conflict"
+contains = [
+  "operations",
+  "collide.py",
+  "is produced by both Python operation `FirstService.Collide` and Python operation `SecondService.Collide`; rename operation `Collide` in service `FirstService` so it generates a different Python path; or rename operation `Collide` in service `SecondService` so it generates a different Python path",
+]

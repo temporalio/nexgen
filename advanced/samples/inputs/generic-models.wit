@@ -21,11 +21,34 @@ interface generic-model-service {
     value: context-t,
   }
 
+  /// @nexus.generic "context-t"
+  record context-ref {
+    id: string,
+  }
+
+  record getter-probe {
+    value: context-t,
+    other: option<context-t>,
+    history: list<context-t>,
+    tuple-value: tuple<context-t, context-t>,
+    result-value: result<context-t, context-t>,
+    /// @nexus.type go="map[string]int32"
+    lookup: list<tuple<string, u32>>,
+    /// @nexus.type go="time.Duration"
+    elapsed: u64,
+    /// @nexus.source targets="workflow" go="WorkflowNamespace(ctx)"
+    namespace: string,
+    /// @nexus.source targets="workflow" go="RequestType(ctx)"
+    %type: string,
+  }
+
   record generic-request {
     context: context-t,
     contexts: list<context-t>,
     by-name: map<string, context-t>,
     nested: inner,
+    probe: option<getter-probe>,
+    reference: option<context-ref>,
   }
 
   record operation-completion-success {
@@ -45,6 +68,15 @@ interface generic-model-service {
     context: context-t,
     completion: operation-completion-result,
     metadata: option<metadata-t>,
+    pair: option<getter-pair>,
+  }
+
+  record getter-pair {
+    value: context-t,
+    other: option<output-t>,
+    history: list<context-t>,
+    tuple-value: tuple<context-t, output-t>,
+    result-value: result<context-t, output-t>,
   }
 
   complete: func(request: generic-request) -> generic-response;

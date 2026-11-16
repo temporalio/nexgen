@@ -37,6 +37,38 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  public static wit.functionexecution.ExecuteFunctionResult executeCallback(
+      wit.functionexecution.ExecuteCallbackRequest.FunctionFunction function,
+      String name,
+      Boolean enabled,
+      wit.functionexecution.ExecuteCallbackOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.functionexecution.ExecuteCallbackRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteCallbackRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    requestBuilder.setName(java.util.Objects.requireNonNull(name, "name"));
+    requestBuilder.setEnabled(java.util.Objects.requireNonNull(enabled, "enabled"));
+    wit.functionexecution.ExecuteCallbackRequest request = requestBuilder.build();
+    return executeExecuteCallback(request);
+  }
+
+  static wit.functionexecution.ExecuteFunctionResult executeExecuteCallback(
+      wit.functionexecution.ExecuteCallbackRequest request) {
+    wit.functionexecution.ExecuteFunctionResult result =
+        (wit.functionexecution.ExecuteFunctionResult)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "FunctionExecution",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("function-execution")
+                        .build())
+                .execute(
+                    "ExecuteCallback",
+                    wit.functionexecution.ExecuteFunctionResult.class,
+                    wit.functionexecution.ExecuteFunctionResult.class,
+                    request);
+    return result;
+  }
+
   public static wit.functionexecution.ExecuteCountedFunctionResult executeCountedFunction(
       wit.functionexecution.ExecuteCountedFunctionRequest.FunctionFunction function,
       String name,
@@ -161,6 +193,53 @@ public final class FunctionExecutionOperations {
                     "ExecuteNamedVarargsFunction",
                     wit.functionexecution.ExecuteNamedVarargsFunctionResult.class,
                     wit.functionexecution.ExecuteNamedVarargsFunctionResult.class,
+                    request);
+    return result;
+  }
+
+  public static wit.functionexecution.ExecuteFunctionResult executeDescriptors(
+      wit.functionexecution.NexgenRuntime.FunctionReference<
+              wit.functionexecution.ExecuteDescriptorsRequest.FunctionFunction, String>
+          function,
+      java.util.List<String> args,
+      wit.functionexecution.ExecuteDescriptorsRequest.DurationsFunction durations,
+      java.util.List<String> durationValues,
+      wit.functionexecution.ExecuteDescriptorsRequest.CallbackFunction callback,
+      java.util.List<String> callbackValues,
+      wit.functionexecution.ExecuteDescriptorsRequest.CallableFunction callable,
+      java.util.List<String> callableValues,
+      wit.functionexecution.ExecuteDescriptorsOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.functionexecution.ExecuteDescriptorsRequest.Builder requestBuilder =
+        wit.functionexecution.ExecuteDescriptorsRequest.newBuilder();
+    requestBuilder.setFunction(java.util.Objects.requireNonNull(function, "function"));
+    requestBuilder.setArgs(java.util.Objects.requireNonNull(args, "args"));
+    requestBuilder.setDurations(java.util.Objects.requireNonNull(durations, "durations"));
+    requestBuilder.setDurationValues(
+        java.util.Objects.requireNonNull(durationValues, "durationValues"));
+    requestBuilder.setCallback(java.util.Objects.requireNonNull(callback, "callback"));
+    requestBuilder.setCallbackValues(
+        java.util.Objects.requireNonNull(callbackValues, "callbackValues"));
+    requestBuilder.setCallable(java.util.Objects.requireNonNull(callable, "callable"));
+    requestBuilder.setCallableValues(
+        java.util.Objects.requireNonNull(callableValues, "callableValues"));
+    wit.functionexecution.ExecuteDescriptorsRequest request = requestBuilder.build();
+    return executeExecuteDescriptors(request);
+  }
+
+  static wit.functionexecution.ExecuteFunctionResult executeExecuteDescriptors(
+      wit.functionexecution.ExecuteDescriptorsRequest request) {
+    wit.functionexecution.ExecuteFunctionResult result =
+        (wit.functionexecution.ExecuteFunctionResult)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "FunctionExecution",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("function-execution")
+                        .build())
+                .execute(
+                    "ExecuteDescriptors",
+                    wit.functionexecution.ExecuteFunctionResult.class,
+                    wit.functionexecution.ExecuteFunctionResult.class,
                     request);
     return result;
   }

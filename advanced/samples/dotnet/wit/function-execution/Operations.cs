@@ -33,6 +33,14 @@ namespace Nexgen.FunctionExecution
         }
 
         [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteCallbackAsync(ExecuteCallbackRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteCallback(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        [GeneratedCode("nexgen", null)]
         public static async Task<ExecuteCountedFunctionResult> ExecuteCountedFunctionAsync(ExecuteCountedFunctionRequest request)
         {
             var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
@@ -61,6 +69,14 @@ namespace Nexgen.FunctionExecution
         {
             var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
             var result = await client.ExecuteNexusOperationAsync<ExecuteNamedVarargsFunctionResult>(svc => svc.ExecuteNamedVarargsFunction(request)).ConfigureAwait(true);
+            return result;
+        }
+
+        [GeneratedCode("nexgen", null)]
+        public static async Task<ExecuteFunctionResult> ExecuteDescriptorsAsync(ExecuteDescriptorsRequest request)
+        {
+            var client = Workflow.CreateNexusWorkflowClient<IFunctionExecution>(FunctionExecutionEndpoint);
+            var result = await client.ExecuteNexusOperationAsync<ExecuteFunctionResult>(svc => svc.ExecuteDescriptors(request)).ConfigureAwait(true);
             return result;
         }
 

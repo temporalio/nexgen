@@ -1,0 +1,11 @@
+package test:removed-source-import;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record request {
+    /// @nexus.source go="Namespace(ctx)" python-support-import=true
+    namespace: option<string>,
+  }
+}

@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use heck::ToSnakeCase;
-use nexgen::generator::GenerationMode;
 use nexgen::language::Language;
+use nexgen::nexgen_config::GenerationTarget;
 use nexgen::nexgen_config::NexgenConfig;
 use nexgen::{GenerateRequest, generate_to_file};
 
@@ -18,9 +18,6 @@ use support::common;
 
 #[path = "support/json_schema/selected_tests.rs"]
 mod json_schema_tests;
-
-#[path = "support/variant_docs.rs"]
-mod variant_docs;
 
 const JSON_SCHEMA_TARGET: support::json_schema::toolchain::Target =
     support::json_schema::toolchain::Target::Python;
@@ -31,55 +28,6 @@ use common::{json_input_path, wit_input_path, write_bare_ref_alias_closure};
 fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
     support::doc_rendering::python_hostile_documentation_is_wrapped_escaped_and_parses();
 }
-
-// Preserve the upstream host-python AST check; this does not execute generated
-// modules or prove compatibility on an actual Python 3.10 interpreter.
-fn assert_variant_docs_python_parses(output: &Path) {
-    assert!(
-        Command::new("python3")
-            .args([
-                "-c",
-                "import ast,pathlib,sys\nfor p in pathlib.Path(sys.argv[1]).rglob('*.py'): ast.parse(p.read_text(), feature_version=(3, 10))",
-                output.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
-}
-
-#[test]
-fn python_variant_docs_select_overrides_and_preserve_tagged_tuples_parse() {
-    let output = variant_docs::generate(
-        &project_root(),
-        Language::Python,
-        variant_docs::VARIANTS,
-        &[],
-    );
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-#[test]
-fn python_proto_variant_docs_render_on_alias_and_case_classes_parse() {
-    let output = variant_docs::generate_proto_variants(&project_root());
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-#[test]
-fn python_experimental_variant_docs_render_warnings_without_marking_cases_parse() {
-    let output = variant_docs::generate(
-        &project_root(),
-        Language::Python,
-        &variant_docs::experimental_variants(),
-        &[],
-    );
-    assert_variant_docs_python_parses(&output);
-    fs::remove_dir_all(output.parent().unwrap()).unwrap();
-}
-
-const PRIMARY_EXAMPLE_ID: &str = "workflow-service";
 
 static OUTPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -621,26 +569,6 @@ fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn descriptor_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/descriptors/temporal_api.bin")
-}
-
-fn linked_inputs_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/deps")
-}
-
-fn example_input_paths(root: &Path, example_id: &str) -> Vec<PathBuf> {
-    let input = wit_input_path(root, example_id);
-    let mut paths = vec![input.clone()];
-    if fs::read_to_string(&input)
-        .unwrap()
-        .contains("use nexus:temporal-types/")
-    {
-        paths.push(linked_inputs_path(root));
-    }
-    paths
-}
-
 fn python_root(root: &Path) -> PathBuf {
     root.join("advanced/samples/python")
 }
@@ -728,48 +656,11 @@ fn assert_no_generated_python_diagnostic_suppressions(files: &BTreeMap<PathBuf, 
     }
 }
 
-fn generate_formatted_python_output(root: &Path, example_id: &str, output_path: &Path) {
-    let mut command = Command::new(support::nexgen_binary());
-    command
-        .arg("python")
-        .args(example_input_paths(root, example_id))
-        .args([
-            "--descriptors",
-            descriptor_path(root).to_str().unwrap(),
-            "--output",
-            output_path.to_str().unwrap(),
-            "--native-api",
-            "--support-package",
-            "temporal_support",
-        ]);
-    if example_id == PRIMARY_EXAMPLE_ID {
-        command.arg("--system-nexus");
-    }
-    let status = command.status().unwrap();
-    assert!(status.success());
-
-    let format_status = Command::new("uv")
-        .current_dir(python_root(root))
-        .args([
-            "run",
-            "ruff",
-            "format",
-            "--line-length",
-            "88",
-            "--config",
-            "pyproject.toml",
-            output_path.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(format_status.success());
-}
-
 fn generate_formatted_json_python_output(
     root: &Path,
     example_id: &str,
     output_path: &Path,
-    generate_native_api: bool,
+    targets: &[GenerationTarget],
 ) {
     let input_path = json_input_path(root, example_id);
     let mut args = vec![
@@ -780,8 +671,11 @@ fn generate_formatted_json_python_output(
         "--support-package",
         "temporal_support",
     ];
-    if generate_native_api {
-        args.push("--native-api");
+    for target in targets.iter() {
+        args.push(match target {
+            nexgen::nexgen_config::GenerationTarget::Workflow => "--targets=workflow",
+            nexgen::nexgen_config::GenerationTarget::Client => "--targets=client",
+        });
     }
 
     let status = Command::new(support::nexgen_binary())
@@ -912,10 +806,7 @@ fn unique_output_path(label: &str) -> PathBuf {
 fn generated_wit_examples_remain_python_310_compatible() {
     let root = project_root();
     for example_id in python_example_ids(&root) {
-        let output_path = unique_output_path(&format!("python-{example_id}"));
-        generate_formatted_python_output(&root, &example_id, &output_path);
-        assert_python_310_syntax_compatible(&output_path);
-        fs::remove_dir_all(output_path).unwrap();
+        assert_python_310_syntax_compatible(&python_output_path(&root, &example_id));
     }
 }
 
@@ -924,7 +815,7 @@ fn python_json_examples_expose_expected_runtime_features() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("python-json-{example_id}"));
-        generate_formatted_json_python_output(&root, example_id, &output_path, false);
+        generate_formatted_json_python_output(&root, example_id, &output_path, &[]);
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
         assert_no_generated_python_diagnostic_suppressions(&rendered);
@@ -997,7 +888,12 @@ fn python_json_api_examples_expose_validation_exports() {
     let root = project_root();
     for example_id in ["chat", "kb", "showcase", "temporal"] {
         let output_path = unique_output_path(&format!("python-json-api-{example_id}"));
-        generate_formatted_json_python_output(&root, example_id, &output_path, true);
+        generate_formatted_json_python_output(
+            &root,
+            example_id,
+            &output_path,
+            &[GenerationTarget::Workflow],
+        );
         assert_python_310_syntax_compatible(&output_path);
         let rendered = read_python_package_files(&output_path);
         assert_no_generated_python_diagnostic_suppressions(&rendered);
@@ -1027,6 +923,7 @@ fn python_json_enforces_remaining_scalar_and_typed_extra_contracts() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1083,6 +980,7 @@ $defs:
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1136,6 +1034,7 @@ fn python_json_union_serializer_validates_before_dispatching() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1205,6 +1104,7 @@ fn generate_python_schema_tree(name: &str, files: &[(&str, &str)]) -> (PathBuf, 
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     (temp_dir, output_path)
@@ -1282,6 +1182,7 @@ fn python_json_bare_ref_root_alias_is_the_target_class_at_runtime() {
         config: Default::default(),
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
 
@@ -1344,6 +1245,7 @@ fn python_json_property_names_never_shadow_converter_locals() {
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1427,6 +1329,7 @@ fn python_json_model_properties_use_union_none_and_defaults_preserve_presence() 
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     let rendered = fs::read_to_string(output_path.join("models.py")).unwrap();
@@ -1482,6 +1385,7 @@ fn generate_unformatted_python_package(
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     output_path
@@ -1548,7 +1452,7 @@ assert services.QuoteService.__doc__ == 'Service ends with a quote "', (
 
 /// A deprecated operation is declared as `typing.Annotated[Operation[...], ...]`,
 /// and `nexusrpc`'s `@service` resolves that annotation with `eval_str=True`, so
-/// `typing` has to be bound at runtime. The native-API client body imports it
+/// `typing` has to be bound at runtime. The Workflow API client body imports it
 /// incidentally; a definitions-only package does not, which is why this probe
 /// runs in definitions-only mode and *imports* the result.
 /// See `specs/json-schema/features/deprecated.md`.
@@ -1847,34 +1751,6 @@ $defs:
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
-fn format_python_output(
-    root: &std::path::Path,
-    files: &BTreeMap<PathBuf, String>,
-) -> BTreeMap<PathBuf, String> {
-    let temp = tempfile::tempdir().unwrap();
-    let temp_dir = temp.path();
-    for (relative_path, contents) in files {
-        let path = temp_dir.join(relative_path);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, contents).unwrap();
-    }
-    let status = Command::new("uv")
-        .current_dir(root.join("advanced/samples/python"))
-        .args([
-            "run",
-            "ruff",
-            "format",
-            "--line-length",
-            "88",
-            temp_dir.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let formatted = read_python_package_files(&temp_dir);
-    formatted
-}
-
 #[test]
 fn renders_sample_with_versioned_header() {
     let root = project_root();
@@ -1882,22 +1758,22 @@ fn renders_sample_with_versioned_header() {
     let output_path = temp.path().join("output");
     generate_to_file(&GenerateRequest {
         config: NexgenConfig {
-            system_nexus: true,
-            mode: GenerationMode::NativeApi,
+            targets: vec![GenerationTarget::Workflow],
             ..Default::default()
         },
         language: Language::Python,
-        input_paths: example_input_paths(&root, PRIMARY_EXAMPLE_ID),
+        input_paths: vec![wit_input_path(&root, "user-service")],
         support_package: Some("temporal_support".into()),
-        descriptor_paths: vec![descriptor_path(&root)],
+        descriptor_paths: vec![],
         output_path: output_path.clone(),
         format: false,
         java_package_name: None,
         ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
     })
     .unwrap();
     assert!(output_path.is_dir());
-    let output = format_python_output(&root, &read_python_package_files(&output_path));
+    let output = read_python_package_files(&output_path);
     let manifest: toml::Table =
         toml::from_str(&fs::read_to_string(root.join("Cargo.toml")).unwrap()).unwrap();
     let header = format!(

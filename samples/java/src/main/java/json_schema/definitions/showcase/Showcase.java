@@ -1569,10 +1569,10 @@ public final class Showcase {
 
   /**
    * Integer const; always 1. Also exercises the single-`const` value override:
-   * `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived name plus a
-   * per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the wire value stays `1`.
-   * TS/Python are inert here (no const override keyword — the value is emitted as a plain literal
-   * type).
+   * `x-go-const-name`/`x-java-const-name`/`x-cs-const-name` rename the emitted constant to the
+   * derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`, C#
+   * `RevisionCs`) while the wire value stays `1`. TS/Python are inert here (no const override
+   * keyword — the value is emitted as a plain literal type).
    */
   public Revision getRevision() {
     return revision;
@@ -1585,9 +1585,10 @@ public final class Showcase {
 
   /**
    * Closed string value set. Also exercises the enum value-constant override:
-   * `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant to the value
-   * name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`) while the wire value stays
-   * `active`. TS/Python are inert here (no enum override keyword).
+   * `x-go-enum-names`/`x-java-enum-names`/`x-cs-enum-names` rename the `active` value's emitted
+   * constant to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`, C#
+   * `ActiveCs`) while the wire value stays `active`. TS/Python are inert here (no enum override
+   * keyword).
    */
   public Status getStatus() {
     return status;
@@ -1756,11 +1757,11 @@ public final class Showcase {
 
   /**
    * Deprecated legacy identifier; prefer `requestId`. Exercises the native deprecation marker (Go
-   * // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated). Also exercises
-   * the property-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch): the emitted
-   * member identifier is renamed to the derived name plus a per-language suffix (Go `LegacyIdGo`,
-   * TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`) while the wire name stays
-   * `legacyId` (json tag / alias / @JsonProperty).
+   * // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP 702 @deprecated, C# [Obsolete]).
+   * Also exercises the property-level `x-&lt;lang&gt;-name` override (the Stage 4 escape hatch):
+   * the emitted member identifier is renamed to the derived name plus a per-language suffix (Go
+   * `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`, Java `legacyIdJava`, C# `LegacyIdCs`)
+   * while the wire name stays `legacyId` (json tag / alias / @JsonProperty).
    *
    * @deprecated This field is deprecated.
    */

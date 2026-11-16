@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- Run on the oldest supported runtime (net7.0) and on the oldest and
+         newest LTS runtimes (net8.0, net10.0). -->
+    <TargetFrameworks>net7.0;net8.0;net10.0</TargetFrameworks>
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <IsTestProject>true</IsTestProject>
@@ -8,14 +10,20 @@
 
   <ItemGroup>
     <ProjectReference Include="../Nexgen.DotNetExamples.csproj" />
+    <!-- The stream output takes Temporalio.Workflows, which the workflow-service output also has. -->
+    <ProjectReference Include="../Nexgen.DotNetStreamService.csproj" Aliases="Streams" />
+    <!-- Its stand-in declares SDK types that Temporalio also has. -->
+    <ProjectReference Include="../Nexgen.DotNetStreamServiceSystemNexus.csproj" Aliases="SystemNexusStreams" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The System Nexus project compiles the stand-in. -->
+    <Compile Remove="SystemNexusStandIn/**" />
     <Compile Include="../wit/workflow-service/Models.cs" Link="GeneratedWorkflowService/Models.cs" />
     <Compile Include="../wit/workflow-service/Operations.cs" Link="GeneratedWorkflowService/Operations.cs" />
     <Compile Include="../wit/workflow-service/Services.cs" Link="GeneratedWorkflowService/Services.cs" />
     <Compile Include="../TemporalSupport/*.cs" Link="TemporalSupport/%(Filename)%(Extension)" />
-    <Compile Include="../wit/type-roundtrip/Models.cs" Link="GeneratedTypeRoundtrip/Models.cs" />
+    <Compile Include="../wit/proto-backed-showcase/Models.cs" Link="GeneratedProtoBackedShowcase/Models.cs" />
     <Compile Include="../wit/notification-service/Models.cs" Link="GeneratedNotificationService/Models.cs" />
     <Compile Include="../wit/proto-oneof/Models.cs" Link="GeneratedProtoOneof/Models.cs" />
     <Compile Include="../wit/proto-generic/Models.cs" Link="GeneratedProtoGeneric/Models.cs" />

@@ -13,6 +13,7 @@ import wit.user_service as user_service
 import wit.user_service.models as user_service_models
 import wit.user_service.services as user_service_services
 from wit.user_service._resources import User
+from wit.user_service._resources._resource_data import UserData
 
 APP_ROOT = Path(__file__).resolve().parent
 OUTPUT_PATH = APP_ROOT.parent / "wit" / "user_service"
@@ -30,8 +31,8 @@ UPDATE_EMAIL_OPERATION = UPDATE_EMAIL_OPERATION_INFO.operation
 def user_resource(
     *,
     email: str,
-) -> User:
-    return User(
+) -> UserData:
+    return UserData(
         user_id="user-123",
         email=email,
     )
@@ -47,7 +48,7 @@ class UserServiceHandler:
         self,
         _ctx: StartOperationContext,
         input: user_service_models.GetUserRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("GetUser", input))
         assert input.user_id == "user-123"
         return user_resource(email="old@example.com")
@@ -57,20 +58,32 @@ class UserServiceHandler:
         self,
         _ctx: StartOperationContext,
         input: user_service_models.UpdateEmailRequest,
-    ) -> User:
+    ) -> UserData:
         self.calls.append(("UpdateEmail", input))
         assert input.user_id == "user-123"
         assert input.email == "new@example.com"
         return user_resource(email=input.email)
 
+    @sync_operation
+    async def notify(
+        self,
+        _ctx: StartOperationContext,
+        input: user_service_models.NotifyRequest,
+    ) -> None:
+        self.calls.append(("Notify", input))
+
 
 @workflow.defn
 class UserServiceCallerWorkflow:
     @workflow.run
-    async def run(self) -> User:
+    async def run(self) -> UserData:
         service = user_service.UserServiceClient("user-service")
         user = await service.get_user(user_id="user-123")
-        return await user.update_email("new@example.com")
+        await user.notify(channels=[], sender="ops")
+        updated = await user.update_email("new@example.com")
+        assert isinstance(updated, User)
+        # A handle isn't data, so the Workflow returns its identity fields.
+        return UserData(user_id=updated.user_id, email=updated.email)
 
 
 def test_generated_metadata() -> None:
@@ -113,17 +126,23 @@ async def test_get_user_returns_user_resource(env: WorkflowEnvironment) -> None:
         finally:
             await env.delete_nexus_endpoint(endpoint)
 
-    assert isinstance(user, User)
+    assert isinstance(user, UserData)
     assert user.user_id == "user-123"
     assert user.email == "new@example.com"
 
-    assert len(service_handler.calls) == 2
+    assert len(service_handler.calls) == 3
     get_user_operation, get_user_request = service_handler.calls[0]
     assert get_user_operation == "GetUser"
     assert isinstance(get_user_request, user_service_models.GetUserRequest)
     assert get_user_request.user_id == "user-123"
 
-    update_operation, update_request = service_handler.calls[1]
+    notify_operation, notify_request = service_handler.calls[1]
+    assert notify_operation == "Notify"
+    assert notify_request == user_service_models.NotifyRequest(
+        user_id="user-123", reason=None, channels=[], sender="ops"
+    )
+
+    update_operation, update_request = service_handler.calls[2]
     assert update_operation == "UpdateEmail"
     assert isinstance(update_request, user_service_models.UpdateEmailRequest)
     assert update_request.user_id == "user-123"

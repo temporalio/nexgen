@@ -1,0 +1,14 @@
+package test:missing-enum-case;
+
+world system {
+  export models;
+}
+
+interface models {
+  /// @nexus.proto "temporal.api.enums.v1.Severity"
+  enum alert-level {
+    severity-unspecified,
+    severity-high,
+    severity-medium,
+  }
+}

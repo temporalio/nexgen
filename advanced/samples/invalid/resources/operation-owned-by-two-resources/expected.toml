@@ -1,0 +1,7 @@
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource-method"
+contains = [
+  "resource method `UserService.ArchivedUser.update-name` is invalid: bound operation `UpdateName` is already owned by resource `ActiveUser`",
+]

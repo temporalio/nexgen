@@ -1,6 +1,6 @@
 # Loader → Generator pipeline
 
-A set of JSON Schema files becomes model code in four languages. The loader is
+A set of JSON Schema files becomes model code in five languages. The loader is
 language-agnostic: it parses, enforces the strict subset, and lowers everything
 to one shared type model. The generator emits that model for each target. The
 per-file document concerns the Parse step decides first — the two file modes and
@@ -59,9 +59,10 @@ flowchart TD
       TS["TypeScript"]
       PY["Python"]
       JV["Java"]
+      CS["C#"]
     end
 
-    OUT["Package per language — nested tree (Py/TS/Java), flat (Go)<br/>Models + shared Validators + definitions/aggregator"]
+    OUT["Package per language — nested tree (Py/TS/Java/C#), flat (Go)<br/>Models + shared Validators + definitions/aggregator"]
 
     F --> LOADER --> IR --> GEN --> OUT
 ```

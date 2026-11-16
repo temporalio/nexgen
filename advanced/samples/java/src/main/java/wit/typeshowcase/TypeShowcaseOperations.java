@@ -5,6 +5,7 @@ package wit.typeshowcase;
 public final class TypeShowcaseOperations {
   private TypeShowcaseOperations() {}
 
+  /** Get a user. */
   public static wit.typeshowcase.User getUser(wit.typeshowcase.GetUserOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.GetUserRequest.Builder requestBuilder =
@@ -146,5 +147,85 @@ public final class TypeShowcaseOperations {
                         .build())
                 .execute("Deactivate", Void.class, Void.class, request);
     return;
+  }
+
+  public static void updateLabels(wit.typeshowcase.UpdateLabelsOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.typeshowcase.UpdateLabelsRequest.Builder requestBuilder =
+        wit.typeshowcase.UpdateLabelsRequest.newBuilder();
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setTags(options.getTags());
+    requestBuilder.setMetadata(options.getMetadata());
+    if (options.getExtraTags() != null) requestBuilder.setExtraTags(options.getExtraTags());
+    if (options.getExtraMetadata() != null)
+      requestBuilder.setExtraMetadata(options.getExtraMetadata());
+    wit.typeshowcase.UpdateLabelsRequest request = requestBuilder.build();
+    executeUpdateLabels(request);
+  }
+
+  static void executeUpdateLabels(wit.typeshowcase.UpdateLabelsRequest request) {
+    Void result =
+        (Void)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "TypeShowcase",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("type-showcase")
+                        .build())
+                .execute("UpdateLabels", Void.class, Void.class, request);
+    return;
+  }
+
+  public static void updateNotificationSettings(
+      wit.typeshowcase.UpdateNotificationSettingsOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.typeshowcase.UpdateNotificationSettingsRequest.Builder requestBuilder =
+        wit.typeshowcase.UpdateNotificationSettingsRequest.newBuilder();
+    requestBuilder.setUserId(options.getUserId());
+    requestBuilder.setEmailEnabled(options.getEmailEnabled());
+    requestBuilder.setSmsEnabled(options.getSmsEnabled());
+    wit.typeshowcase.UpdateNotificationSettingsRequest request = requestBuilder.build();
+    executeUpdateNotificationSettings(request);
+  }
+
+  static void executeUpdateNotificationSettings(
+      wit.typeshowcase.UpdateNotificationSettingsRequest request) {
+    Void result =
+        (Void)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "TypeShowcase",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("type-showcase")
+                        .build())
+                .execute("UpdateNotificationSettings", Void.class, Void.class, request);
+    return;
+  }
+
+  public static wit.typeshowcase.SyncSettings getSyncSettings(
+      wit.typeshowcase.GetSyncSettingsOptions options) {
+    java.util.Objects.requireNonNull(options, "options");
+    wit.typeshowcase.GetSyncSettingsRequest.Builder requestBuilder =
+        wit.typeshowcase.GetSyncSettingsRequest.newBuilder();
+    requestBuilder.setUserId(options.getUserId());
+    if (options.getRegion() != null) requestBuilder.setRegion(options.getRegion());
+    if (options.getCheckpoint() != null) requestBuilder.setCheckpoint(options.getCheckpoint());
+    wit.typeshowcase.GetSyncSettingsRequest request = requestBuilder.build();
+    return executeGetSyncSettings(request);
+  }
+
+  static wit.typeshowcase.SyncSettings executeGetSyncSettings(
+      wit.typeshowcase.GetSyncSettingsRequest request) {
+    wit.typeshowcase.SyncSettings result =
+        (wit.typeshowcase.SyncSettings)
+            io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
+                    "TypeShowcase",
+                    io.temporal.workflow.NexusServiceOptions.newBuilder()
+                        .setEndpoint("type-showcase")
+                        .build())
+                .execute(
+                    "GetSyncSettings",
+                    wit.typeshowcase.SyncSettings.class,
+                    wit.typeshowcase.SyncSettings.class,
+                    request);
+    return result;
   }
 }

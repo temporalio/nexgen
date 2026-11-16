@@ -99,6 +99,7 @@ matrix is authoritative; summarized here:
 | TypeScript | the member's **own**-key presence test over `raw` (an inherited `Object.prototype` member is not a wire value); absent or `null` → push `Violation{path:name, reason:"required"}`, throw one `PayloadValidationError` application failure.                                                                                                                                                                         |
 | Python     | in `from_transfer_type` (**PRINCIPLES Python §3**): an absent or `null` key for a required non-nullable member → `Violation(path=name, reason="required")`, appended and the field left unset, so its siblings are still checked; collected into the single `PayloadValidationError` application failure.                                                                                                          |
 | Java       | in the per-POJO collecting deserializer (PRINCIPLES Java §5): a missing tree node for a required member → `Violation{path:name, reason:"required"}`, and an explicit `null` on a non-nullable member the distinct `explicit null not allowed`, decided by a per-field branch over the node's `isNull()` (Java §4) rather than a per-field binder. Collected into one `PayloadValidationError` application failure. |
+| C#         | `Converter.Parse`: a missing member → `Violation{path:name, reason:"required"}`, and an explicit `null` on a non-nullable member the distinct `explicit null not allowed`, decided per field over `JsonElement.ValueKind`. A required member is also a `required` property, so leaving it out at a construction site is a compile error; `Validate` rejects a required reference left `null`.                      |
 
 Required + explicit `null`: for a required **non-nullable** member, rejected
 (may not be `null`) — same machinery as the optional-non-nullable null rejection
@@ -154,7 +155,7 @@ raw-object/tree entry on the wire).
 - **[[properties]]**: orthogonal — `properties` types the member, `required`
   makes it mandatory. Required name must exist in `properties` (else reject).
 - **[[nullability]]**: orthogonal (P8). `required` controls presence; the
-  `oneOf` null pattern controls null-acceptance. All four combinations are
+  `oneOf` null pattern controls null-acceptance. All five combinations are
   legal, including required+nullable. Optional is the default (name absent from
   `required`).
 - **[[additionalProperties]]**: independent — a closed struct still honors

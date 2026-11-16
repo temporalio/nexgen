@@ -1,0 +1,20 @@
+package test:conflict@1.0.0;
+
+world system {
+  export conflict-models;
+}
+
+interface conflict-models {
+  type placeholder = string;
+
+  /// @nexus.type-parameter
+  type output-t = placeholder;
+
+  /// @nexus.type-parameter
+  type output = placeholder;
+
+  record pair {
+    first: output-t,
+    second: output,
+  }
+}

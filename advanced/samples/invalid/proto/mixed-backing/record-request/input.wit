@@ -1,0 +1,23 @@
+package test:integers@1.0.0;
+
+world system { export counters; }
+
+interface counters {
+  /// @nexus.proto "google.protobuf.Timestamp"
+  record timestamp {
+    seconds: option<s64>,
+    nanos: option<s32>,
+  }
+
+  resource counter {
+    constructor();
+    touch: func(seconds: option<s64>, nanos: option<s32>);
+  }
+
+  record touch-request {
+    seconds: option<s64>,
+    at: timestamp,
+  }
+
+  touch: func(request: touch-request);
+}

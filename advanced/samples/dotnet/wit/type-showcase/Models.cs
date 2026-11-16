@@ -45,19 +45,65 @@ namespace Nexgen.TypeShowcase
         Deactivate = 1 << 2,
     }
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+    [GeneratedCode("nexgen", null)]
+    public abstract record ExperimentalTarget
+    {
+        private ExperimentalTarget() { }
+
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Second : ExperimentalTarget;
+    }
+
+    /// <summary>
+    /// Dotnet variant &lt;doc&gt; &amp; more.
+    /// </summary>
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public abstract record NotificationTarget
     {
         private NotificationTarget() { }
 
+        /// <summary>
+        /// Dotnet payload &lt;doc&gt; &amp; more.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Email(string Value) : NotificationTarget;
 
+        /// <summary>
+        /// XML characters remain valid in docs: &lt;tag attr="value"&gt; &amp; 'quoted'.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record Sms(string Value) : NotificationTarget;
 
+        /// <summary>
+        /// Default empty case.
+        /// </summary>
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         public sealed record None : NotificationTarget;
+
+        /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Undocumented : NotificationTarget;
+    }
+
+    /// <summary>
+    /// Default-only documentation on a single-case variant.
+    /// </summary>
+    [GeneratedCode("nexgen", null)]
+    public abstract record SingleTarget
+    {
+        private SingleTarget() { }
+
+        /// <summary>
+        /// Only case.
+        /// </summary>
+        [GeneratedCode("nexgen", null)]
+        public sealed record Only : SingleTarget;
     }
 
     [GeneratedCode("nexgen", null)]
@@ -76,6 +122,22 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record GetSyncSettingsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GetSyncSettingsRequest"/> class.
+        /// </summary>
+        public GetSyncSettingsRequest(string userId)
+        {
+            UserId = userId;
+        }
+
+        public string UserId { get; init; }
+        public SyncSettings? Settings { get; init; }
+    }
+
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
+    [GeneratedCode("nexgen", null)]
     public record GetUserRequest
     {
         /// <summary>
@@ -91,6 +153,22 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record NotificationSettings
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NotificationSettings"/> class.
+        /// </summary>
+        public NotificationSettings(bool emailEnabled, bool smsEnabled)
+        {
+            EmailEnabled = emailEnabled;
+            SmsEnabled = smsEnabled;
+        }
+
+        public bool EmailEnabled { get; init; }
+        public bool SmsEnabled { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record PostalAddress
     {
         /// <summary>
@@ -103,6 +181,9 @@ namespace Nexgen.TypeShowcase
             Country = country;
         }
 
+        /// <summary>
+        /// Street with &lt;tag&gt; &amp; "quotes".
+        /// </summary>
         public string Street { get; init; }
         public string City { get; init; }
         public string Country { get; init; }
@@ -157,22 +238,36 @@ namespace Nexgen.TypeShowcase
         public UserProfile Profile { get; init; }
     }
 
+    /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
     [GeneratedCode("nexgen", null)]
     public record SyncReport
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SyncReport"/> class.
         /// </summary>
-        public SyncReport(IReadOnlyList<(double, double)> route, IReadOnlyList<NexusResult<string, string>> attempts, IReadOnlyDictionary<string, NexusResult<string, string>> regionStatus)
+        public SyncReport(IReadOnlyList<(double, double)> route, IReadOnlyList<NexusResult<string, string>> attempts, IReadOnlyDictionary<string, NexusResult<string, string>> regionStatus, uint itemCount, ulong byteCount, long clockSkewMs)
         {
             Route = route;
             Attempts = attempts;
             RegionStatus = regionStatus;
+            ItemCount = itemCount;
+            ByteCount = byteCount;
+            ClockSkewMs = clockSkewMs;
         }
 
         public IReadOnlyList<(double, double)> Route { get; init; }
         public IReadOnlyList<NexusResult<string, string>> Attempts { get; init; }
         public IReadOnlyDictionary<string, NexusResult<string, string>> RegionStatus { get; init; }
+        public uint ItemCount { get; init; }
+        public ulong ByteCount { get; init; }
+        public long ClockSkewMs { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record SyncSettings
+    {
+        public string? Region { get; init; }
+        public string? Checkpoint { get; init; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -192,6 +287,42 @@ namespace Nexgen.TypeShowcase
     }
 
     [GeneratedCode("nexgen", null)]
+    public record UpdateLabelsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateLabelsRequest"/> class.
+        /// </summary>
+        public UpdateLabelsRequest(string userId, IReadOnlyList<string> tags, IReadOnlyDictionary<string, string> metadata)
+        {
+            UserId = userId;
+            Tags = tags;
+            Metadata = metadata;
+        }
+
+        public string UserId { get; init; }
+        public IReadOnlyList<string> Tags { get; init; }
+        public IReadOnlyDictionary<string, string> Metadata { get; init; }
+        public IReadOnlyList<string>? ExtraTags { get; init; }
+        public IReadOnlyDictionary<string, string>? ExtraMetadata { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
+    public record UpdateNotificationSettingsRequest
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UpdateNotificationSettingsRequest"/> class.
+        /// </summary>
+        public UpdateNotificationSettingsRequest(string userId, NotificationSettings settings)
+        {
+            UserId = userId;
+            Settings = settings;
+        }
+
+        public string UserId { get; init; }
+        public NotificationSettings Settings { get; init; }
+    }
+
+    [GeneratedCode("nexgen", null)]
     public record UserProfile
     {
         /// <summary>
@@ -206,12 +337,20 @@ namespace Nexgen.TypeShowcase
             NotificationTarget = notificationTarget;
         }
 
+        /// <summary>
+        /// A very long field doc that has to be wrapped because it exceeds the generated comment line width by a comfortable margin for testing.
+        /// </summary>
         public IReadOnlyList<string> Tags { get; init; }
+        /// <summary>
+        /// Default metadata.
+        /// </summary>
         public IReadOnlyDictionary<string, string> Metadata { get; init; }
         public UserCapability Capabilities { get; init; }
         public NexusResult<string, string> SyncState { get; init; }
         public NotificationTarget NotificationTarget { get; init; }
         public PostalAddress? Address { get; init; }
+        public SingleTarget? SingleTarget { get; init; }
+        public ExperimentalTarget? ExperimentalTarget { get; init; }
     }
 
 }

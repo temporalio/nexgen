@@ -16,17 +16,17 @@ import (
 // Fetch the showcase payload. Also exercises the service-level `x-<lang>-name`
 // override: the emitted service code identifier is renamed to the derived name plus a
 // per-language suffix (Go var `ShowcaseServiceGo`, TS const `showcaseServiceTs`, Python
-// class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`) while the wire
-// service name / `@Service` / `ServiceName` string stays
-// `example.showcase.v1.ShowcaseService`.
+// class `ShowcaseServicePy`, Java interface `ShowcaseServiceJava`, C# interface
+// `IShowcaseServiceCs`) while the wire service name / `@Service` / `ServiceName` string
+// stays `example.showcase.v1.ShowcaseService`.
 var ShowcaseServiceGo = struct {
 	ServiceName string
 	// Fetch a showcase by id. Also exercises the operation-level `x-<lang>-name` override:
 	// the emitted operation code identifier is renamed to the derived name plus a
 	// per-language suffix (Go `GetShowcaseGo`, TS `getShowcaseTs`, Python
-	// `get_showcase_py`, Java `getShowcaseJava`) while the wire operation name stays
-	// `GetShowcase` and the synthesized I/O type stays `GetShowcaseInput` (derived from
-	// the operation key, not the override).
+	// `get_showcase_py`, Java `getShowcaseJava`, C# `GetShowcaseCs`) while the wire
+	// operation name stays `GetShowcase` and the synthesized I/O type stays
+	// `GetShowcaseInput` (derived from the operation key, not the override).
 	GetShowcaseGo nexus.OperationReference[GetShowcaseInput, Showcase]
 }{
 	ServiceName:   "example.showcase.v1.ShowcaseService",
@@ -52,10 +52,10 @@ type ShowcaseKind string
 const ShowcaseKindShowcase ShowcaseKind = "showcase"
 
 // ShowcaseRevision Integer const; always 1. Also exercises the single-`const` value
-// override: `x-go-const-name`/`x-java-const-name` rename the emitted constant to the
-// derived name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while
-// the wire value stays `1`. TS/Python are inert here (no const override keyword — the
-// value is emitted as a plain literal type).
+// override: `x-go-const-name`/`x-java-const-name`/`x-cs-const-name` rename the emitted
+// constant to the derived name plus a per-language suffix (Go `RevisionGo`, Java
+// `REVISION_JAVA`, C# `RevisionCs`) while the wire value stays `1`. TS/Python are inert
+// here (no const override keyword — the value is emitted as a plain literal type).
 type ShowcaseRevision int64
 
 // RevisionGo is the ShowcaseRevision value 1.
@@ -68,10 +68,10 @@ type ShowcaseEnabled bool
 const ShowcaseEnabledTrue ShowcaseEnabled = true
 
 // ShowcaseStatus Closed string value set. Also exercises the enum value-constant
-// override: `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted
-// constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
-// `ACTIVE_JAVA`) while the wire value stays `active`. TS/Python are inert here (no enum
-// override keyword).
+// override: `x-go-enum-names`/`x-java-enum-names`/`x-cs-enum-names` rename the `active`
+// value's emitted constant to the value name plus a per-language suffix (Go `ActiveGo`,
+// Java `ACTIVE_JAVA`, C# `ActiveCs`) while the wire value stays `active`. TS/Python are
+// inert here (no enum override keyword).
 type ShowcaseStatus string
 
 const (
@@ -1504,8 +1504,8 @@ func (m Circle) MarshalJSON() ([]byte, error) {
 // carry 1 to 3 members (minProperties/maxProperties on a declared-property object).
 // Also exercises the type-level `x-<lang>-name` override (the Stage 4 escape hatch):
 // the emitted type is renamed to the derived name plus a per-language suffix (Go
-// `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`) at its
-// declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
+// `ContactGo`, TS `ContactTs`, Python `ContactPy`, Java `ContactJava`, C# `ContactCs`)
+// at its declaration and at every `$ref`, while the wire `$ref` name stays `Contact`.
 type ContactGo struct {
 	// Email corresponds to the "email" JSON property.
 	Email *string `json:"email,omitempty"`
@@ -2311,18 +2311,19 @@ type Showcase struct {
 	// Kind Discriminator; always "showcase".
 	Kind ShowcaseKind `json:"kind"`
 	// Revision Integer const; always 1. Also exercises the single-`const` value override:
-	// `x-go-const-name`/`x-java-const-name` rename the emitted constant to the derived
-	// name plus a per-language suffix (Go `RevisionGo`, Java `REVISION_JAVA`) while the
-	// wire value stays `1`. TS/Python are inert here (no const override keyword — the
-	// value is emitted as a plain literal type).
+	// `x-go-const-name`/`x-java-const-name`/`x-cs-const-name` rename the emitted constant
+	// to the derived name plus a per-language suffix (Go `RevisionGo`, Java
+	// `REVISION_JAVA`, C# `RevisionCs`) while the wire value stays `1`. TS/Python are
+	// inert here (no const override keyword — the value is emitted as a plain literal
+	// type).
 	Revision ShowcaseRevision `json:"revision"`
 	// Enabled Boolean const; always true.
 	Enabled ShowcaseEnabled `json:"enabled"`
 	// Status Closed string value set. Also exercises the enum value-constant override:
-	// `x-go-enum-names`/`x-java-enum-names` rename the `active` value's emitted constant
-	// to the value name plus a per-language suffix (Go `ActiveGo`, Java `ACTIVE_JAVA`)
-	// while the wire value stays `active`. TS/Python are inert here (no enum override
-	// keyword).
+	// `x-go-enum-names`/`x-java-enum-names`/`x-cs-enum-names` rename the `active` value's
+	// emitted constant to the value name plus a per-language suffix (Go `ActiveGo`, Java
+	// `ACTIVE_JAVA`, C# `ActiveCs`) while the wire value stays `active`. TS/Python are
+	// inert here (no enum override keyword).
 	Status ShowcaseStatus `json:"status"`
 	// Tier Closed integer value set.
 	Tier ShowcaseTier `json:"tier"`
@@ -2390,11 +2391,11 @@ type Showcase struct {
 	Debug *bool `json:"debug,omitempty"`
 	// LegacyIdGo Deprecated legacy identifier; prefer `requestId`. Exercises the native
 	// deprecation marker (Go // Deprecated:, TS @deprecated, Java @Deprecated, Python PEP
-	// 702 @deprecated). Also exercises the property-level `x-<lang>-name` override (the
-	// Stage 4 escape hatch): the emitted member identifier is renamed to the derived name
-	// plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python `legacy_id_py`,
-	// Java `legacyIdJava`) while the wire name stays `legacyId` (json tag / alias /
-	// @JsonProperty).
+	// 702 @deprecated, C# [Obsolete]). Also exercises the property-level `x-<lang>-name`
+	// override (the Stage 4 escape hatch): the emitted member identifier is renamed to the
+	// derived name plus a per-language suffix (Go `LegacyIdGo`, TS `legacyIdTs`, Python
+	// `legacy_id_py`, Java `legacyIdJava`, C# `LegacyIdCs`) while the wire name stays
+	// `legacyId` (json tag / alias / @JsonProperty).
 	//
 	// Deprecated: This field is deprecated.
 	LegacyIdGo *string `json:"legacyId,omitempty"`
@@ -4377,8 +4378,8 @@ func (m ShowcaseDetailObject) MarshalJSON() ([]byte, error) {
 // `ShowcaseLedger` and its inline member shape `ShowcaseLedgerValue`, so both the map
 // and its members are ordinary named models. Also exercises the member-name override on
 // a hoisted property — `x-<lang>-name` keeps naming the *member* (Go `LedgerGo`, TS
-// `ledgerTs`, Python `ledger_py`, Java `ledgerJava`) while the type keeps its
-// position-derived name.
+// `ledgerTs`, Python `ledger_py`, Java `ledgerJava`, C# `LedgerCs`) while the type
+// keeps its position-derived name.
 type ShowcaseLedger struct {
 	// AdditionalProperties holds every member of this map-shaped object.
 	AdditionalProperties map[string]ShowcaseLedgerValue

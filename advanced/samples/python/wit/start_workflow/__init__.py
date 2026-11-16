@@ -11,10 +11,14 @@ from . import services as _services
 from .operations.start_workflow import start_workflow
 from ._resources.started_workflow import restart_workflow
 from ._resources.started_workflow import cancel_workflow
+from .operations.signal_with_start import signal_with_start
+from ._resources.started_workflow import get_started_workflow
 
 __all__ = [
     "cancel_workflow",
+    "get_started_workflow",
     "restart_workflow",
+    "signal_with_start",
     "start_workflow",
 ]
 
@@ -41,7 +45,9 @@ class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
         )
 
 
-__nexus_operation_registry__ = {
+__nexus_operation_registry__: dict[
+    tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]
+] = {
     (
         "StartWorkflowService",
         "StartWorkflow",
@@ -59,5 +65,11 @@ __nexus_operation_registry__ = {
         "CancelWorkflow",
     ): _NexusOperationInfo(
         operation=_services.StartWorkflowService.cancel_workflow,
+    ),
+    (
+        "StartWorkflowService",
+        "SignalWithStart",
+    ): _NexusOperationInfo(
+        operation=_services.StartWorkflowService.signal_with_start,
     ),
 }

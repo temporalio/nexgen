@@ -97,7 +97,8 @@ the contradictory pair names the contradiction and both keywords.
 
 ## Type mapping
 
-None — rejected before any type is emitted.
+None — rejected before any type is emitted. The reject is the shared loader's,
+so C# fails the same way as every other target, with the same diagnostic.
 
 ## Validator mapping
 

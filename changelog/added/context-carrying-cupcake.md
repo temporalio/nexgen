@@ -1,2 +1,0 @@
-Go system Nexus code generation supports `@nexus.serialization-context` helpers and emits an operation registry keyed by wire service and operation names, allowing the SDK to select the serialization context for an operation's nested user payloads.
-Generated Go model types expose value-receiver getters for exported fields, allowing support packages to consume models through interfaces without importing the generated package.

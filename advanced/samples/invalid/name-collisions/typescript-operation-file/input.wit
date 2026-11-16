@@ -1,0 +1,18 @@
+package temporal:collision@1.0.0;
+
+world system {
+  export first-service;
+  export second-service;
+}
+
+/// @nexus.endpoint "first"
+interface first-service {
+  record first-request { value: string }
+  collide: func(request: first-request);
+}
+
+/// @nexus.endpoint "second"
+interface second-service {
+  record second-request { value: string }
+  collide: func(request: second-request);
+}

@@ -6,12 +6,13 @@ use prost_types::FileOptions;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
-    AliasTypeSpec, ApiSpec, ApiSpecTransform, EnumValueSpec, ExternalTypeSourceSpec,
-    ExternalTypeSpec, ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec,
-    FunctionFieldSpec, FunctionResultSpec, JsonModelSpec, ModulePath, OperationSpec,
-    RecordFieldVisibility, RecordSpec, ResourceFieldSpec, SelectedFamily, SelectedResourceType,
-    SelectedTextSpec, ServiceSpec, Symbol, TypeDeclSpec, TypeFamily, TypeReplacementSpec, TypeSpec,
+    AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
+    ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
+    FunctionResultSpec, JsonModelSpec, ModulePath, OperationSpec, RecordSpec, ResourceFieldSpec,
+    SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol, TypeDeclSpec,
+    TypeFamily, TypeReplacementSpec, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass};
 
@@ -19,8 +20,10 @@ mod authored_validation;
 mod emitted_names;
 mod operation_binding;
 mod operation_lowering;
+mod poll_validation;
 mod proto;
 mod reachability;
+mod record_backing;
 mod resource_resolution;
 mod selected_validation;
 mod selection;
@@ -33,12 +36,13 @@ pub(crate) use operation_binding::{
     OperationBindingPass, OperationBoundFamily, OperationBoundOperation, OperationBoundResource,
 };
 pub(crate) use operation_lowering::{OperationLoweredFamily, OperationLoweringPass};
+pub(crate) use poll_validation::PollValidationPass;
 pub(crate) use proto::{message_model_name, relative_descriptor_name};
 pub(crate) use reachability::ReachabilityPass;
 pub(crate) use resource_resolution::{
-    RequestPlan, RequestPlanSource, ResolvedResourceBindingSource, ResolvedResourceMethodBinding,
-    ResolvedResourceReturnSpec, ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily,
-    ResourceResolutionPass,
+    RequestPlan, RequestPlanField, RequestPlanSource, ResolvedResourceBindingSource,
+    ResolvedResourceHolder, ResolvedResourceMethodBinding, ResolvedResourceReturnSpec,
+    ResolvedResourceSpec, ResourceBoundData, ResourceBoundFamily, ResourceResolutionPass,
 };
 pub(crate) use selected_validation::SelectedValidationPass;
 pub(crate) use selection::LanguageSelectionPass;
@@ -50,6 +54,7 @@ pub(crate) use type_planning::TypePlanningPass;
 pub(crate) struct PlannedFamily;
 
 impl TypeFamily for PlannedFamily {
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = PlannedSpecData;
     type Record = PlannedRecordType;
     type Enum = PlannedEnumType;
@@ -90,6 +95,24 @@ pub(crate) fn operation_input_model(
     }
 }
 
+pub(crate) fn flattened_list_field<'a>(
+    api_plan: &'a PlannedSpec,
+    item: &PlannedType,
+) -> Option<(&'a str, &'a crate::spec::RecordFieldSpec<PlannedFamily>)> {
+    let TypeSpec::Record(record) = item else {
+        return None;
+    };
+    let record = api_plan.record(&record.full_name)?;
+    let mut fields = record.fields.iter().filter(|(_, field)| {
+        !field
+            .origin
+            .as_ref()
+            .is_some_and(crate::spec::FieldPolicy::is_omitted)
+    });
+    let (key, field) = fields.next().filter(|_| record.flatten_in_api)?;
+    fields.next().is_none().then_some((key.as_str(), field))
+}
+
 pub(crate) fn planned_type_is_model_shaped(planned_type: &PlannedType) -> bool {
     matches!(
         planned_type,
@@ -109,16 +132,29 @@ pub(crate) fn operation_output_direct_result(operation: &OperationSpec<PlannedFa
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PlanningMode {
-    NativeApi,
-    DefinitionsOnly,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedOperationResourceReturn {
     pub(crate) resource_type_name: String,
     pub(crate) bindings: Vec<PlannedOperationResourceFieldBinding>,
+    pub(crate) holder: Option<PlannedResourceHolder>,
+}
+
+/// The result record that holds the returned resource, by model and field names. Its other
+/// fields have the same names in the wire record.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PlannedResourceHolder {
+    pub(crate) record_full_name: String,
+    pub(crate) model_name: String,
+    /// The record's fields in order. The resource field holds the resource.
+    pub(crate) fields: Vec<PlannedResourceHolderField>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PlannedResourceHolderField {
+    pub(crate) name: String,
+    pub(crate) proto_name: String,
+    pub(crate) required: bool,
+    pub(crate) resource: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -131,9 +167,13 @@ pub(crate) struct PlannedOperationResourceFieldBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResource {
     pub(crate) name: String,
+    pub(crate) doc: Option<String>,
     pub(crate) type_name: String,
+    pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
+    /// The method the end of an `async with` block calls, from `@nexus.close`.
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -147,9 +187,40 @@ pub(crate) struct PlannedResourceField {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResourceMethod {
     pub(crate) name: String,
+    pub(crate) doc: Option<String>,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
+    pub(crate) varargs: Option<String>,
+    /// Targets whose resource class leaves this method out, from `@nexus.api-omit`.
+    pub(crate) api_omitted: BTreeSet<GenerationTarget>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
+}
+
+impl PlannedResource {
+    /// The methods of the resource class of `target`.
+    pub(crate) fn methods_for(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = &PlannedResourceMethod> {
+        self.methods
+            .iter()
+            .filter(move |method| !method.omitted_for(target))
+    }
+
+    /// A target without the close method has nothing to call at the end of a scope, so its
+    /// resource is not a context manager.
+    pub(crate) fn close_for(&self, target: GenerationTarget) -> Option<&str> {
+        let close = self.close.as_deref()?;
+        self.methods_for(target)
+            .any(|method| method.name == close)
+            .then_some(close)
+    }
+}
+
+impl PlannedResourceMethod {
+    pub(crate) fn omitted_for(&self, target: GenerationTarget) -> bool {
+        self.api_omitted.contains(&target)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -160,7 +231,10 @@ pub(crate) struct PlannedResourceMethodResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PlannedResourceMethodResultKind {
-    Resource { type_name: String },
+    Resource {
+        type_name: String,
+        type_parameters: Vec<crate::spec::TypeParameterSpec>,
+    },
     Value(PlannedType),
 }
 
@@ -193,7 +267,6 @@ pub(crate) struct PlannedRecordData {
 pub(crate) struct PlannedFieldData {
     pub(crate) has_presence: Option<bool>,
     pub(crate) wire_binding: Option<PlannedWireFieldBinding>,
-    pub(crate) default_enum_value: Option<EnumValueSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -217,6 +290,8 @@ pub(crate) struct PlannedWireVariantMember {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct PlannedOperationData {
     pub(crate) output_resource_return: Option<PlannedOperationResourceReturn>,
+    /// A request value can't give its type at runtime, so the call passes these types.
+    pub(crate) runtime_type_parameters: Vec<crate::spec::TypeParameterSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -324,5 +399,57 @@ impl PlannedProtoType {
             PlannedProtoType::Message(message) => &message.proto.full_name,
             PlannedProtoType::Enum(enumeration) => &enumeration.proto.full_name,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn method(name: &str, api_omitted: &[GenerationTarget]) -> PlannedResourceMethod {
+        PlannedResourceMethod {
+            name: name.to_string(),
+            doc: None,
+            params: Vec::new(),
+            result: None,
+            varargs: None,
+            api_omitted: api_omitted.iter().copied().collect(),
+            binding: PlannedResourceMethodBindingSpec::Stub,
+        }
+    }
+
+    fn method_names(resource: &PlannedResource, target: GenerationTarget) -> Vec<&str> {
+        resource
+            .methods_for(target)
+            .map(|method| method.name.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn a_target_drops_the_methods_and_the_close_that_it_omits() {
+        let resource = PlannedResource {
+            name: "stream".to_string(),
+            doc: None,
+            type_name: "Stream".to_string(),
+            type_parameters: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![
+                method("append", &[GenerationTarget::Workflow]),
+                method("close", &[GenerationTarget::Workflow]),
+                method("read", &[]),
+            ],
+            close: Some("close".to_string()),
+        };
+
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Workflow),
+            ["read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Client),
+            ["append", "close", "read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Client), Some("close"));
     }
 }

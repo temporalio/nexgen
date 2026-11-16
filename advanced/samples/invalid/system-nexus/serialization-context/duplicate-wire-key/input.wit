@@ -1,0 +1,28 @@
+package temporal:duplicate-context-keys@1.0.0;
+
+world system { export first-service; export second-service; }
+
+interface shared-types {
+  /// @nexus.proto "temporal.api.common.v1.WorkflowType"
+  record context-request { name: string }
+}
+
+/// @nexus.endpoint "__temporal_system"
+/// @nexus.service-name "SameWireService"
+interface first-service {
+  use shared-types.{context-request};
+  /// @nexus.operation name="SameWireOperation"
+  /// @nexus.serialization-context go="requestContext"
+  first: func(request: context-request);
+}
+
+/// @nexus.endpoint "ordinary-endpoint"
+/// @nexus.service-name "SameWireService"
+interface second-service {
+  use shared-types.{context-request};
+  /// @nexus.operation name="SameWireOperation"
+  /// @nexus.serialization-context go="otherContext"
+  second: func(request: context-request);
+  /// @nexus.serialization-context go="otherContext"
+  ordinary-only: func(request: context-request);
+}

@@ -69,6 +69,12 @@ func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 			return functionexecution.ExecuteNamedVarargsFunctionResult{Value: "named-varargs"}, nil
 		})
 
+	executeCallback := nexus.NewSyncOperation("ExecuteCallback",
+		func(ctx context.Context, input any, opts nexus.StartOperationOptions) (functionexecution.ExecuteFunctionResult, error) {
+			s.calls = append(s.calls, nexusCall{"ExecuteCallback", input})
+			return functionexecution.ExecuteFunctionResult{Value: "callback"}, nil
+		})
+
 	service := nexus.NewService(functionExecutionServiceName)
 	s.NoError(service.Register(
 		executeFunction,
@@ -76,6 +82,7 @@ func (s *FunctionExecutionIntegrationSuite) SetupTest() {
 		executeNamedFunction,
 		executeVarargsFunction,
 		executeNamedVarargsFunction,
+		executeCallback,
 	))
 	s.env.RegisterNexusService(service)
 }
@@ -157,4 +164,24 @@ func (s *FunctionExecutionIntegrationSuite) TestFunctionArgumentForms() {
 	s.Equal([]string{"one", "two"}, stringSliceField(s.calls[3].Input, "Args"))
 	s.Equal("named-varargs-function", stringField(s.calls[4].Input, "Function"))
 	s.Equal("validVarargsFunction", stringField(s.calls[5].Input, "Function"))
+}
+
+func (s *FunctionExecutionIntegrationSuite) TestSecondaryCallback() {
+	s.env.ExecuteWorkflow(func(ctx workflow.Context) (functionexecution.ExecuteFunctionResult, error) {
+		var result functionexecution.ExecuteFunctionResult
+		err := functionexecution.ExecuteCallback(
+			ctx, functionexecution.ExecuteCallbackOptions{}, validFunction, "one", true,
+		).Get(ctx, &result)
+		return result, err
+	})
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+	var result functionexecution.ExecuteFunctionResult
+	s.NoError(s.env.GetWorkflowResult(&result))
+	s.Equal("callback", result.Value)
+	s.Require().Len(s.calls, 1)
+	input := s.calls[0].Input
+	s.Equal("validFunction", stringField(input, "Function"))
+	s.Equal("one", stringField(input, "Name"))
+	s.Equal(true, field(input, "Enabled"))
 }

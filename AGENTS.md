@@ -28,6 +28,37 @@
   cargo test --all-features
   ```
 
+## Compiler rejection tests
+
+- Test compiler rejections with file-backed fixtures in
+  `advanced/samples/invalid/<category>/<case>/`, rather than embedding input
+  text in Rust tests. Add the input and an `expected.toml` that asserts the
+  typed error kind and meaningful diagnostic text establishing the intended
+  failure. Prefer a single string in `error.contains` when possible; use
+  multiple fragments when one substring cannot establish the intended failure.
+  See the [fixture guide](advanced/samples/invalid/README.md).
+- Use the default language set for shared compiler rules. Restrict `languages`
+  only when the rejection is target-specific.
+- Descriptors are opt-in: use `descriptors = "temporal"` for the standard
+  Temporal set, or a path list for custom descriptors. Omit the field when
+  descriptors are not needed.
+- Run `cargo test --all-features --test compiler_failures` for focused checks.
+  The Rust stage of `cargo validate` also runs this suite. Reserve inline unit
+  tests for internal invariants rather than end-to-end rejection scenarios.
+
+## Generation tests
+
+- Do not add tests that validate generated code by comparing output strings,
+  searching for substrings, or counting occurrences in generated source.
+- For new generation scenarios, extend an existing sample or add a new one.
+  Regenerate its checked-in outputs and add target-language tests that compile
+  and exercise the generated API, conversions, or runtime behavior.
+- Rely on sample regeneration and native sample validation for output already
+  covered by a sample. Do not add duplicate source or file-existence checks.
+- Test internal compiler decisions and invariants directly through the owning
+  parser, pass, planner, or backend helper and its actual data, rather than
+  inferring those decisions from emitted source.
+
 ## Stacked pull requests
 
 When asked to create a stack of pull requests, use the

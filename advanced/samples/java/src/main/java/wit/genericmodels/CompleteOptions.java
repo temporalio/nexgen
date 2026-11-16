@@ -7,6 +7,8 @@ public final class CompleteOptions<ContextT> {
   private final java.util.List<ContextT> contexts;
   private final java.util.Map<String, ContextT> byName;
   private final wit.genericmodels.Inner<ContextT> nested;
+  private final wit.genericmodels.GetterProbe<ContextT> probe;
+  private final wit.genericmodels.ContextRef<ContextT> reference;
   private final java.lang.reflect.Type resultType;
 
   private CompleteOptions(
@@ -14,11 +16,15 @@ public final class CompleteOptions<ContextT> {
       java.util.List<ContextT> contexts,
       java.util.Map<String, ContextT> byName,
       wit.genericmodels.Inner<ContextT> nested,
+      wit.genericmodels.GetterProbe<ContextT> probe,
+      wit.genericmodels.ContextRef<ContextT> reference,
       java.lang.reflect.Type resultType) {
     this.context = java.util.Objects.requireNonNull(context, "context");
     this.contexts = java.util.Objects.requireNonNull(contexts, "contexts");
     this.byName = java.util.Objects.requireNonNull(byName, "byName");
     this.nested = java.util.Objects.requireNonNull(nested, "nested");
+    this.probe = probe;
+    this.reference = reference;
     this.resultType = java.util.Objects.requireNonNull(resultType, "resultType");
   }
 
@@ -36,6 +42,14 @@ public final class CompleteOptions<ContextT> {
 
   public wit.genericmodels.Inner<ContextT> getNested() {
     return nested;
+  }
+
+  public wit.genericmodels.GetterProbe<ContextT> getProbe() {
+    return probe;
+  }
+
+  public wit.genericmodels.ContextRef<ContextT> getReference() {
+    return reference;
   }
 
   public java.lang.reflect.Type getResultType() {
@@ -63,6 +77,8 @@ public final class CompleteOptions<ContextT> {
       this.contexts = value.contexts;
       this.byName = value.byName;
       this.nested = value.nested;
+      this.probe = value.probe;
+      this.reference = value.reference;
       this.resultType = value.resultType;
     }
 
@@ -94,6 +110,20 @@ public final class CompleteOptions<ContextT> {
       return this;
     }
 
+    private wit.genericmodels.GetterProbe<ContextT> probe = null;
+
+    public Builder<ContextT> setProbe(wit.genericmodels.GetterProbe<ContextT> value) {
+      this.probe = value;
+      return this;
+    }
+
+    private wit.genericmodels.ContextRef<ContextT> reference = null;
+
+    public Builder<ContextT> setReference(wit.genericmodels.ContextRef<ContextT> value) {
+      this.reference = value;
+      return this;
+    }
+
     private java.lang.reflect.Type resultType = null;
 
     public Builder<ContextT> setResultType(java.lang.reflect.Type value) {
@@ -102,7 +132,8 @@ public final class CompleteOptions<ContextT> {
     }
 
     public CompleteOptions<ContextT> build() {
-      return new CompleteOptions<ContextT>(context, contexts, byName, nested, resultType);
+      return new CompleteOptions<ContextT>(
+          context, contexts, byName, nested, probe, reference, resultType);
     }
   }
 }

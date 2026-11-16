@@ -7,14 +7,16 @@ use crate::generator::ExternalModelBackend;
 use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
-    ResolvedFieldType, RootPackageImports, WireValueConversion, python_authored_type_annotation,
-    python_string_literal, render_python_docstring,
+    ResolvedFieldType, RootPackageImports, WireValueConversion, phantom_type_variable,
+    python_authored_type_annotation, python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
     PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
+use crate::spec::{
+    EnumSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
+};
 
 #[derive(Debug)]
 struct RenderedWireRead {
@@ -28,9 +30,11 @@ struct RenderedWireWrite {
 }
 
 enum WireReadPolicy {
-    Required { missing_error: String },
+    Required {
+        missing_error: String,
+        check_empty: bool,
+    },
     Optional,
-    Default { default_expr: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +67,7 @@ struct ProtoField {
 #[derive(Debug, Default)]
 pub(in crate::generator) struct ModelBackend {
     variant_names: BTreeSet<String>,
+    enum_fields: BTreeMap<String, ResolvedFieldType>,
 }
 
 impl ExternalModelBackend for ModelBackend {
@@ -71,6 +76,12 @@ impl ExternalModelBackend for ModelBackend {
 
     fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
         self.variant_names = oneof_variant_names(api_plan);
+        self.enum_fields = api_plan
+            .enums()
+            .filter_map(|(name, model)| {
+                generated_enum_field_type(model).map(|field| (name.to_string(), field))
+            })
+            .collect();
         Ok(())
     }
 
@@ -100,7 +111,8 @@ impl ExternalModelBackend for ModelBackend {
         model_type: &PlannedType,
         planned_record: Option<&RecordSpec<PlannedFamily>>,
     ) -> Option<WireValueConversion> {
-        enum_wire_conversion(model_type)
+        self.enum_field_type(model_type)
+            .and_then(|field| field.wire_conversion)
             .or_else(|| message_override_conversion(model_type))
             .or_else(|| {
                 planned_record.and_then(|record| generated_wire_conversion(model_type, record))
@@ -423,6 +435,9 @@ impl ModelBackend {
         &self,
         value_type: &PlannedType,
     ) -> Option<ResolvedFieldType> {
+        if let PlannedType::Enum(enumeration) = value_type {
+            return self.enum_fields.get(&enumeration.full_name).cloned();
+        }
         enum_field_type(value_type)
     }
 }
@@ -562,6 +577,40 @@ pub(in crate::generator) struct PythonProtoEnumConversion {
     pub(in crate::generator) to_proto: String,
 }
 
+fn generated_enum_field_type(model: &EnumSpec<PlannedFamily>) -> Option<ResolvedFieldType> {
+    let PlannedProtoType::Enum(proto) = model.source.as_ref()?.proto_type()? else {
+        return None;
+    };
+    let reference = enum_python_ref(&proto.proto)?;
+    let mut imports = PythonImports::default();
+    imports.module_imports.insert(reference.module_path);
+    let from_proto = if model.values.iter().any(|value| value.fallback) {
+        enum_from_proto_function_name(&model.name)
+    } else {
+        model.name.clone()
+    };
+    Some(ResolvedFieldType {
+        annotation: model.name.clone(),
+        imports,
+        kind: ResolvedFieldKind::Enum,
+        wire_conversion: Some(WireValueConversion {
+            annotation: model.name.clone(),
+            from_wire: format!("{from_proto}({{wire}})"),
+            to_wire: format!("{}({{value}})", reference.type_ref),
+            imports: PythonImports::default(),
+            supports_unpacked_input: false,
+        }),
+    })
+}
+
+/// The models module function that decodes a proto value as an enum with a fallback case.
+///
+/// The fallback applies to decoded wire values only. Code that builds the enum from an `int`
+/// still gets a `ValueError` for a value that the enum doesn't know.
+pub(in crate::generator) fn enum_from_proto_function_name(enum_name: &str) -> String {
+    format!("_{}_from_proto", enum_name.to_snake_case())
+}
+
 pub(in crate::generator) fn enum_value(value_type: &PlannedType) -> Option<PythonProtoEnumValue> {
     let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(enum_type))) =
         value_type
@@ -615,6 +664,7 @@ fn enum_wire_conversion(value_type: &PlannedType) -> Option<WireValueConversion>
 }
 
 fn field_read(
+    model_name: &str,
     proto_name: &str,
     attr_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
@@ -642,13 +692,18 @@ fn field_read(
         },
     };
 
-    match policy {
-        WireReadPolicy::Required { missing_error } => {
+    let mut read = match policy {
+        WireReadPolicy::Required {
+            missing_error,
+            check_empty,
+        } => {
             let mut setup_lines = Vec::new();
             if field_has_proto_presence(field) {
                 setup_lines.push(format!("if not value.HasField(\"{proto_name}\"):"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
-            } else if matches!(&field.field_type, PlannedType::String | PlannedType::Bytes) {
+            } else if check_empty
+                && matches!(&field.field_type, PlannedType::String | PlannedType::Bytes)
+            {
                 setup_lines.push(format!("if not value.{proto_name}:"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             }
@@ -662,11 +717,14 @@ fn field_read(
             setup_lines: Vec::new(),
             expr: optional_from_proto_expr(field, resolved_value_type, proto_name, value_expr),
         },
-        WireReadPolicy::Default { default_expr } => RenderedWireRead {
-            setup_lines: Vec::new(),
-            expr: defaulted_from_proto_expr(field, proto_name, value_expr, default_expr),
-        },
+    };
+    if generic_carrier == Some(ProtoGenericCarrier::Payloads) {
+        let mut checks =
+            payloads_cardinality_check(&proto_expr, &format!("{model_name}.{attr_name}"));
+        checks.append(&mut read.setup_lines);
+        read.setup_lines = checks;
     }
+    read
 }
 
 fn field_write(
@@ -709,11 +767,23 @@ fn generic_carrier_from_proto_expr(
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
         ProtoGenericCarrier::Payloads => format!(
-            "_support.payloads_from_proto({proto_expr}, [{}])[0]",
+            "(_support.payloads_from_proto({proto_expr}, [{}])[0] if {proto_expr}.payloads else None)",
             concrete_type_hint(&resolved_type.annotation, type_arguments)
         ),
     };
     format!("typing.cast({}, {converted})", resolved_type.annotation)
+}
+
+fn payloads_cardinality_check(proto_expr: &str, owner: &str) -> Vec<String> {
+    vec![
+        format!("if len({proto_expr}.payloads) > 1:"),
+        format!(
+            "    raise ValueError(f{})",
+            python_string_literal(&format!(
+                "expected at most one payload in {owner}, found {{len({proto_expr}.payloads)}}"
+            ))
+        ),
+    ]
 }
 
 fn concrete_type_hint(annotation: &str, type_arguments: &[(String, String)]) -> String {
@@ -753,7 +823,18 @@ fn runtime_type_arguments(model: &RenderedModel) -> Vec<(String, String)> {
             .strip_suffix('T')
             .filter(|stem| !stem.is_empty())
             .unwrap_or(parameter);
-        let base_name = format!("{}_type", stem.to_snake_case());
+        let base_name = format!(
+            "{}{}_type",
+            if model
+                .phantom_type_parameters
+                .contains(&phantom_type_variable(parameter))
+            {
+                "_"
+            } else {
+                ""
+            },
+            stem.to_snake_case()
+        );
         let mut name = base_name.clone();
         let mut suffix = 1;
         while arguments
@@ -849,19 +930,6 @@ fn no_presence_default_value_present_expr(
             _ => None,
         },
         _ => None,
-    }
-}
-
-fn defaulted_from_proto_expr(
-    field: &RecordFieldSpec<PlannedFamily>,
-    proto_name: &str,
-    value_expr: String,
-    default_expr: String,
-) -> String {
-    if field_has_proto_presence(field) {
-        format!("{value_expr} if value.HasField(\"{proto_name}\") else {default_expr}")
-    } else {
-        value_expr
     }
 }
 
@@ -1113,7 +1181,7 @@ fn render_record_wire_block(
     let proto_fields = planned_model
         .fields
         .values()
-        .filter(|field| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .map(|field| ModelBackend::analyze_field(api_plan, planned_model, field, resolve_type))
         .collect::<Result<Vec<_>>>()?;
     let type_arguments = runtime_type_arguments(model);
@@ -1151,9 +1219,16 @@ fn render_record_wire_block(
         output.push_str("    ) -> ");
         output.push_str(&converter_model_annotation);
         output.push_str(":\n");
+        // A parameterized hint, such as a Workflow input's `StreamRef[Turn]`, builds a ref that
+        // keeps its type arguments in `__orig_class__`.
+        let constructor = if model.phantom_type_parameters.is_empty() {
+            model.name.as_str()
+        } else {
+            "type_hint"
+        };
         if model.fields.is_empty() {
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("()\n");
         } else {
             if !type_arguments.is_empty() {
@@ -1182,9 +1257,7 @@ fn render_record_wire_block(
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| {
-                    field.visibility != crate::spec::RecordFieldVisibility::Omitted
-                })
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1192,13 +1265,14 @@ fn render_record_wire_block(
                 let read = proto_field.oneof.as_ref().map_or_else(
                     || {
                         field_read(
+                            &model.name,
                             field_name,
                             &rendered_field.attr_name,
                             planned_field,
                             &rendered_field.wire_value_type,
                             proto_field.generic_carrier,
                             &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
+                            field_read_policy(&model.name, planned_field, rendered_field),
                         )
                     },
                     |oneof| {
@@ -1222,14 +1296,12 @@ fn render_record_wire_block(
             }
 
             output.push_str("        return ");
-            output.push_str(&model.name);
+            output.push_str(constructor);
             output.push_str("(\n");
             for (((field_name, planned_field), rendered_field), proto_field) in planned_model
                 .fields
                 .iter()
-                .filter(|(_, field)| {
-                    field.visibility != crate::spec::RecordFieldVisibility::Omitted
-                })
+                .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
                 .map(|(name, field)| (name.as_str(), field))
                 .zip(model.fields.iter())
                 .zip(proto_fields.iter())
@@ -1237,13 +1309,14 @@ fn render_record_wire_block(
                 let read = proto_field.oneof.as_ref().map_or_else(
                     || {
                         field_read(
+                            &model.name,
                             field_name,
                             &rendered_field.attr_name,
                             planned_field,
                             &rendered_field.wire_value_type,
                             proto_field.generic_carrier,
                             &type_arguments,
-                            field_read_policy(&model.name, rendered_field),
+                            field_read_policy(&model.name, planned_field, rendered_field),
                         )
                     },
                     |oneof| {
@@ -1295,7 +1368,7 @@ fn render_record_wire_block(
         for (((field_name, planned_field), rendered_field), proto_field) in planned_model
             .fields
             .iter()
-            .filter(|(_, field)| field.visibility != crate::spec::RecordFieldVisibility::Omitted)
+            .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
             .map(|(name, field)| (name.as_str(), field))
             .zip(model.fields.iter())
             .zip(proto_fields.iter())
@@ -1357,25 +1430,25 @@ fn render_record_wire_block(
     }))
 }
 
-fn field_read_policy(model_name: &str, rendered_field: &RenderedField) -> WireReadPolicy {
+fn field_read_policy(
+    model_name: &str,
+    planned_field: &RecordFieldSpec<PlannedFamily>,
+    rendered_field: &RenderedField,
+) -> WireReadPolicy {
     match &rendered_field.default_kind {
         PythonFieldDefaultKind::Required => {
             let missing_error = python_string_literal(&format!(
                 "missing required field {model_name}.{}",
                 rendered_field.attr_name
             ));
-            WireReadPolicy::Required { missing_error }
+            WireReadPolicy::Required {
+                missing_error,
+                // The source fills the field when the API builds a request. The wire value of a
+                // handler's request can still be empty, and decode accepts it as it is.
+                check_empty: !planned_field.has_source(),
+            }
         }
         PythonFieldDefaultKind::None => WireReadPolicy::Optional,
-        PythonFieldDefaultKind::EmptyDict => WireReadPolicy::Default {
-            default_expr: "{}".to_string(),
-        },
-        PythonFieldDefaultKind::EmptyList => WireReadPolicy::Default {
-            default_expr: "[]".to_string(),
-        },
-        PythonFieldDefaultKind::Expression(default_expr) => WireReadPolicy::Default {
-            default_expr: default_expr.clone(),
-        },
     }
 }
 
@@ -1396,12 +1469,7 @@ fn field_write_for_rendered_field(
             ),
         );
     }
-    let optional_guard = matches!(
-        rendered_field.default_kind,
-        PythonFieldDefaultKind::None
-            | PythonFieldDefaultKind::EmptyDict
-            | PythonFieldDefaultKind::EmptyList
-    );
+    let optional_guard = matches!(rendered_field.default_kind, PythonFieldDefaultKind::None);
     let converter = planned_field
         .function
         .as_ref()
@@ -1410,7 +1478,7 @@ fn field_write_for_rendered_field(
             !matches!(
                 planned_field.field_type,
                 PlannedType::Map(_, _) | PlannedType::List(_)
-            ) && planned_field.default_value.is_none()
+            )
         });
     match converter {
         Some(converter) => function_field_write(
@@ -1461,6 +1529,16 @@ fn oneof_field_read(
             "    case {}:",
             python_string_literal(&case.proto_name)
         ));
+        if case.generic_carrier == Some(ProtoGenericCarrier::Payloads) {
+            setup_lines.extend(
+                payloads_cardinality_check(
+                    &format!("value.{}", case.proto_name),
+                    &format!("{model_name}.{attr_name}"),
+                )
+                .into_iter()
+                .map(|line| format!("        {line}")),
+            );
+        }
         setup_lines.push(format!(
             "        {local_var} = {}({})",
             case.class_name,

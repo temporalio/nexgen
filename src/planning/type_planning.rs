@@ -325,9 +325,8 @@ fn collect_symbol_module_import(
 
 use super::*;
 use crate::spec::{
-    EnumValueSpec, FunctionTypeDescriptorSpec, OperationOutputTransformSpec, ResourceResultSpec,
+    FunctionTypeDescriptorSpec, OperationOutputTransformSpec, OperationPollSpec, ResourceResultSpec,
 };
-use heck::ToShoutySnakeCase;
 
 pub(super) struct TypePlanningContext<'a> {
     pub(super) spec: ApiSpec<OperationLoweredFamily>,
@@ -358,6 +357,12 @@ struct TypePlanningMapper<'a, 'descriptors> {
 }
 
 impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMapper<'_, '_> {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) -> PlannedSpecData {
         self.planner.spec_data.clone()
     }
@@ -452,9 +457,12 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
             .cloned()
             .unwrap_or_else(|| PlannedResource {
                 name: name.to_string(),
+                doc: None,
                 type_name: name.to_upper_camel_case(),
+                type_parameters: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
+                close: None,
             })
     }
 
@@ -475,18 +483,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
         let Some(record) = self.source_spec.record(record_full_name).cloned() else {
             return PlannedFieldData::default();
         };
-        let mut data =
-            proto::planned_record_field_data(&record, field_name, self.planner).unwrap_or_default();
-        if let Some(field) = record.fields.get(field_name)
-            && let Some(default) = &field.default_value
-        {
-            data.default_enum_value = self.planner.resolve_default_enum_value(
-                self.source_spec,
-                &field.field_type,
-                &default.enum_case,
-            );
-        }
-        data
+        proto::planned_record_field_data(&record, field_name, self.planner).unwrap_or_default()
     }
 
     fn map_text(&mut self, text: SelectedTextSpec) -> SelectedTextSpec {
@@ -519,7 +516,49 @@ impl<'a> TypePlanningContext<'a> {
             planner: self,
         });
         self.resolve_planned_record_field_types(&source_spec, &mut planned_spec);
+        self.resolve_planned_variant_case_types(&source_spec, &mut planned_spec);
         planned_spec
+    }
+
+    // `map_names` keeps a oneof case payload as its proto type. Re-plan a bound record or enum.
+    fn resolve_planned_variant_case_types(
+        &mut self,
+        source_spec: &ApiSpec<OperationLoweredFamily>,
+        planned_spec: &mut PlannedSpec,
+    ) {
+        for (variant_name, planned_entry) in &mut planned_spec.types {
+            let TypeDeclSpec::Variant(planned_variant) = &mut planned_entry.declaration else {
+                continue;
+            };
+            let Some(source_variant) = source_spec.variant(variant_name).filter(|variant| {
+                variant
+                    .source
+                    .as_ref()
+                    .is_some_and(|source| source.proto_oneof().is_some())
+            }) else {
+                continue;
+            };
+            for (case, source_case) in planned_variant.cases.iter_mut().zip(&source_variant.cases) {
+                let Some(payload) = source_case.payload.as_ref() else {
+                    continue;
+                };
+                let TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) =
+                    payload.without_option()
+                else {
+                    continue;
+                };
+                if self.spec.record_for_proto(proto_name.as_str()).is_none()
+                    && self.spec.enum_for_proto(proto_name.as_str()).is_none()
+                {
+                    continue;
+                }
+                let record = self.planned_type_from_authored(payload);
+                case.payload = Some(match payload {
+                    TypeSpec::Option(_) => TypeSpec::Option(Box::new(record)),
+                    _ => record,
+                });
+            }
+        }
     }
 
     fn resolve_planned_record_field_types(
@@ -547,40 +586,6 @@ impl<'a> TypePlanningContext<'a> {
                             )
                         });
             }
-        }
-    }
-
-    fn resolve_default_enum_value(
-        &self,
-        source_spec: &ApiSpec<OperationLoweredFamily>,
-        field_type: &TypeSpec<OperationLoweredFamily>,
-        case_name: &str,
-    ) -> Option<EnumValueSpec> {
-        match field_type.without_option() {
-            TypeSpec::Enum(enum_name) => source_spec
-                .enum_decl(enum_name.as_str())?
-                .values
-                .iter()
-                .find(|value| value.wire_name == case_name)
-                .cloned(),
-            TypeSpec::External(ExternalTypeSpec::Proto(enum_name)) => {
-                let enumeration = self.descriptors.enumeration(enum_name.as_str())?;
-                let expected = case_name.to_shouty_snake_case();
-                let value = enumeration.descriptor.value.iter().find(|value| {
-                    value.name.as_deref().is_some_and(|name| {
-                        name == expected || name.ends_with(&format!("_{expected}"))
-                    })
-                })?;
-                Some(EnumValueSpec {
-                    wire_name: value.name.clone()?,
-                    name: case_name.to_upper_camel_case(),
-                    number: value.number?,
-                })
-            }
-            TypeSpec::External(ExternalTypeSpec::Alias(alias)) => {
-                self.resolve_default_enum_value(source_spec, alias.target.as_ref(), case_name)
-            }
-            _ => None,
         }
     }
 
@@ -655,9 +660,21 @@ impl<'a> TypePlanningContext<'a> {
                 }
             }),
             serialization_context: operation.serialization_context.clone(),
+            context_propagation_header: operation.context_propagation_header.clone(),
+            poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
+                next: poll.next.clone(),
+                targets: poll.targets.clone(),
+                items: poll.items.clone(),
+                resume: poll.resume.clone(),
+            }),
+            api_omitted: operation.api_omitted.clone(),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
+                    &self.spec,
                     operation.data.output_resource_return.as_ref(),
+                ),
+                runtime_type_parameters: operation_runtime_type_parameters(
+                    &self.spec, service, operation,
                 ),
             },
         })
@@ -835,6 +852,7 @@ impl<'a> TypePlanningContext<'a> {
 
                 Ok(PlannedResourceMethod {
                     name: method.name.clone(),
+                    doc: method.doc.value().map(str::to_string),
                     params: method
                         .params
                         .iter()
@@ -843,7 +861,9 @@ impl<'a> TypePlanningContext<'a> {
                     result: method
                         .result
                         .as_ref()
-                        .map(|result| self.planned_resource_method_result(result)),
+                        .map(|result| self.planned_resource_method_result(service, result)),
+                    varargs: method.varargs.clone(),
+                    api_omitted: method.api_omitted.clone(),
                     binding,
                 })
             })
@@ -851,24 +871,32 @@ impl<'a> TypePlanningContext<'a> {
 
         Ok(PlannedResource {
             name: resource.name.clone(),
+            doc: resource.doc.value().map(str::to_string),
             type_name: resource.name.to_upper_camel_case(),
+            type_parameters: resource.type_parameters.clone(),
             fields: resource
                 .fields
                 .iter()
                 .map(|field| self.planned_resource_field(field))
                 .collect(),
             methods,
+            close: resource.close.clone(),
         })
     }
 
     fn planned_resource_method_result(
         &mut self,
+        service: &ServiceSpec<OperationLoweredFamily>,
         result: &ResourceResultSpec<SelectedFamily>,
     ) -> PlannedResourceMethodResult {
         let optional = matches!(result.result_type, TypeSpec::Option(_));
         let kind = match result.result_type.without_option() {
             TypeSpec::Resource(resource) => PlannedResourceMethodResultKind::Resource {
                 type_name: resource.as_str().to_upper_camel_case(),
+                type_parameters: service
+                    .resource(resource.as_str())
+                    .map(|resource| resource.data.type_parameters().to_vec())
+                    .unwrap_or_default(),
             },
             _ => PlannedResourceMethodResultKind::Value(
                 self.planned_selected_type_from_authored(&result.result_type),
@@ -1271,9 +1299,27 @@ impl<'a> TypePlanningContext<'a> {
 }
 
 fn plan_operation_resource_return(
+    spec: &ApiSpec<OperationLoweredFamily>,
     output_resource_return: Option<&ResolvedResourceReturnSpec>,
 ) -> Option<PlannedOperationResourceReturn> {
     output_resource_return.map(|resource_return| PlannedOperationResourceReturn {
+        holder: resource_return.holder.as_ref().and_then(|holder| {
+            let record = spec.record(&holder.record_name)?;
+            Some(PlannedResourceHolder {
+                record_full_name: record.full_name.clone(),
+                model_name: record.name.clone(),
+                fields: record
+                    .fields
+                    .iter()
+                    .map(|(key, field)| PlannedResourceHolderField {
+                        name: field.name.clone(),
+                        proto_name: key.clone(),
+                        required: field.required,
+                        resource: *key == holder.field_key,
+                    })
+                    .collect(),
+            })
+        }),
         resource_type_name: resource_return.resource_name.to_upper_camel_case(),
         bindings: resource_return
             .bindings
@@ -1285,6 +1331,42 @@ fn plan_operation_resource_return(
             })
             .collect(),
     })
+}
+
+/// A request encodes from its value, so a bound operation takes only its output's type parameters.
+fn operation_runtime_type_parameters(
+    spec: &ApiSpec<OperationLoweredFamily>,
+    service: &ServiceSpec<OperationLoweredFamily>,
+    operation: &OperationSpec<OperationLoweredFamily>,
+) -> Vec<crate::spec::TypeParameterSpec> {
+    if let Some(resource_return) = &operation.data.output_resource_return {
+        return service
+            .resource(&resource_return.resource_name)
+            .map(|resource| resource.data.type_parameters().to_vec())
+            .unwrap_or_default();
+    }
+    let bound = service.resources.iter().any(|resource| {
+        !resource.data.type_parameters().is_empty()
+            && resource.data.resolved.as_ref().is_some_and(|resolved| {
+                resolved.methods.iter().any(|method| {
+                    matches!(
+                        &method.binding,
+                        ResolvedResourceMethodBinding::Operation { operation_name, .. }
+                            if *operation_name == operation.name
+                    )
+                })
+            })
+    });
+    if !bound {
+        return Vec::new();
+    }
+    operation
+        .output_type()
+        .map(|output| spec.type_parameters_through_protos(output))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect()
 }
 
 pub(crate) struct TypePlanningPass<'a> {
@@ -1343,6 +1425,12 @@ impl CompilerPass<OperationLoweredFamily, PlannedFamily> for TypePlanningPass<'_
 struct SelectedToOperationLoweredMapper;
 
 impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOperationLoweredMapper {
+    fn map_origin(
+        &mut self,
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
+        origin
+    }
     fn map_spec_data(&mut self, _data: ()) {}
     fn map_record(&mut self, value: Symbol) -> Symbol {
         value
@@ -1399,7 +1487,7 @@ impl TypePlanningContext<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
     use super::*;
@@ -1408,6 +1496,110 @@ mod tests {
     use crate::spec::{
         ExternalTypeSpec, ExternalVariantSourceSpec, LanguageStringSpec, ModulePath, ProtoOneofSpec,
     };
+
+    #[test]
+    fn proto_enum_model_identity_survives_planning_and_drives_reachability() {
+        let wit = r#"package test:enums;
+world system { export alerts; }
+/// @nexus.endpoint "alerts"
+interface alerts {
+  /// @nexus.proto "temporal.api.enums.v1.Severity"
+  enum alert-level {
+    severity-unspecified, severity-high, severity-medium, severity-low,
+  }
+  enum unused-level { unused }
+  /// @nexus.proto "temporal.api.version.v1.Alert"
+  record alert { message: string, severity: option<alert-level> }
+  raise: func(request: alert) -> alert;
+}
+"#;
+        let authored = crate::parser::parse_api_spec_from_wit_for_language(
+            Language::Python,
+            wit,
+            PathBuf::from("enum-models.wit"),
+        )
+        .unwrap();
+        let planned = plan_single_leaf(authored);
+        let record = planned
+            .records()
+            .map(|(_, record)| record)
+            .find(|record| record.name == "Alert")
+            .unwrap();
+        let field = &record.fields["severity"];
+        let TypeSpec::Enum(model) = &field.field_type else {
+            panic!(
+                "model field must be a native enum reference: {:?}",
+                field.field_type
+            );
+        };
+        assert_eq!(model.name, "AlertLevel");
+        let model_name = model.full_name.clone();
+        let Some(PlannedWireFieldBinding::Value { wire_type, .. }) = &field.data.wire_binding
+        else {
+            panic!("field must retain a separate wire binding");
+        };
+        assert!(matches!(wire_type,
+            TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(proto)))
+                if proto.proto.full_name == "temporal.api.enums.v1.Severity"
+        ));
+        let tree = ApiSpecTree {
+            root: ApiSpecNode::Leaf(ApiSpecLeaf {
+                module_path: Default::default(),
+                source_root: Default::default(),
+                source_path: Default::default(),
+                spec: planned,
+            }),
+        };
+        let reachable = super::super::ReachabilityPass::new().apply(tree).unwrap();
+        let ApiSpecNode::Leaf(leaf) = reachable.root else {
+            panic!("single leaf");
+        };
+        assert!(leaf.spec.enum_decl(&model_name).is_some());
+        assert!(
+            !leaf
+                .spec
+                .enums()
+                .any(|(_, enumeration)| enumeration.name == "UnusedLevel")
+        );
+    }
+
+    #[test]
+    fn descriptor_only_proto_enum_remains_external() {
+        let spec = proto_operation_spec("temporal.api.common.v1.RetryPolicy");
+        let descriptors = DescriptorIndex::load(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("advanced/samples/descriptors/temporal_api.bin"),
+        )
+        .unwrap();
+        let mut planner = TypePlanningContext::new(
+            super::super::select_spec(spec, Language::Python)
+                .map_names(SelectedToOperationLoweredMapper),
+            Default::default(),
+            &descriptors,
+        )
+        .unwrap();
+        let planned = proto::planned_value_type_from_authored_proto(
+            "temporal.api.enums.v1.Severity",
+            &mut planner,
+        );
+        let TypeSpec::External(ExternalTypeSpec::Proto(PlannedProtoType::Enum(enumeration))) =
+            planned
+        else {
+            panic!("descriptor-only enum must retain its protobuf binding");
+        };
+        assert_eq!(
+            enumeration.proto.full_name,
+            "temporal.api.enums.v1.Severity"
+        );
+        assert_eq!(
+            enumeration
+                .proto
+                .file_options
+                .as_ref()
+                .and_then(|options| options.go_package.as_deref()),
+            Some("go.temporal.io/api/enums/v1;enums")
+        );
+    }
 
     #[test]
     fn descriptor_proto_refs_remain_external_models() {
@@ -1667,12 +1859,9 @@ mod tests {
                 spec: super::super::select_spec(spec, Language::Python),
             }),
         };
-        let resource_resolved = super::super::ResourceResolutionPass::new(
-            &descriptors,
-            super::super::PlanningMode::DefinitionsOnly,
-        )
-        .apply(authored_tree)
-        .unwrap();
+        let resource_resolved = super::super::ResourceResolutionPass::new(&descriptors, vec![])
+            .apply(authored_tree)
+            .unwrap();
         let operation_bound = super::super::OperationBindingPass::new()
             .apply(resource_resolved)
             .unwrap();
@@ -1699,6 +1888,7 @@ mod tests {
                 wire_name: "ExampleService".to_string(),
                 doc: LanguageStringSpec::default(),
                 namespace: LanguageStringSpec::default(),
+                facade: LanguageStringSpec::default(),
                 operations_class: LanguageStringSpec::default(),
                 endpoint: Some("example".to_string()),
                 experimental: false,
@@ -1720,6 +1910,9 @@ mod tests {
                     )))),
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
+                    context_propagation_header: LanguageStringSpec::default(),
+                    poll: None,
+                    api_omitted: BTreeSet::new(),
                     data: (),
                 }],
                 resources: Vec::new(),

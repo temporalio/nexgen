@@ -12,17 +12,17 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResource, PlannedResourceField, PlannedSpec,
     PlannedType, PlannedWireFieldBinding,
 };
-use crate::spec::{ExternalTypeSpec, RecordFieldVisibility, RecordSpec};
+use crate::spec::{ExternalTypeSpec, FieldPolicy, RecordSpec};
 
 use crate::generator::go::{
-    GoPackageContext, PlannedEnumType, PlannedFieldKind, PlannedMessageSource, PlannedMessageType,
-    PlannedOperationOutput, PlannedOperationResourceReturn, PlannedScalarType, PlannedTypeInfo,
-    PlannedValueType, RenderedModel, RenderedService, go_authored_type_annotation, go_field_name,
-    go_replacement_type_name, go_string_literal, go_unexported_name, new_nexus_client_expr,
-    operation_output, planned_field, planned_field_kind, planned_message_type,
+    GoPackageContext, OperationExecution, PlannedEnumType, PlannedFieldKind, PlannedMessageSource,
+    PlannedMessageType, PlannedOperationOutput, PlannedOperationResourceReturn, PlannedScalarType,
+    PlannedTypeInfo, PlannedValueType, RenderedField, RenderedModel, RenderedService,
+    go_authored_type_annotation, go_declaration_name, go_field_name, go_replacement_type_name,
+    go_unexported_name, operation_output, planned_field, planned_field_kind, planned_message_type,
     public_default_punning_zero_for_field, record_for_message, record_for_model_key,
-    render_operation_future_adapter, render_operation_future_return_type,
-    resolve_resource_field_kind, split_go_type_decl_name,
+    render_operation_execution, render_operation_future_adapter, resolve_resource_field_kind,
+    split_go_type_decl_name,
 };
 
 #[derive(Debug, Default)]
@@ -108,6 +108,8 @@ pub(in crate::generator) struct ModelBackend {
     support_package: Option<String>,
     imports: RefCell<GoImportCollector>,
     proto_models: BTreeMap<String, PlannedTypeInfo>,
+    /// Final local type identifiers, populated after Go visibility is applied.
+    model_names: BTreeMap<String, String>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
     /// Models that appear as a top-level Nexus operation input or output, and
     /// therefore need a [`converter.TransferTypeConverter`] so the SDK performs
@@ -133,6 +135,7 @@ impl ModelBackend {
                 "strings",
                 "time",
                 "workflow",
+                "temporalworkflow",
                 "converter",
                 "commonconverter",
                 "internal",
@@ -149,6 +152,7 @@ impl ModelBackend {
             support_package,
             imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
+            model_names: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
         }
@@ -158,8 +162,20 @@ impl ModelBackend {
         self.imports.borrow()
     }
 
+    fn model_name(&self, message: &PlannedMessageType) -> String {
+        match self.model_names.get(&message.info.full_name) {
+            Some(name) => {
+                let (_, arguments) = split_go_type_decl_name(&message.model_name);
+                format!("{name}{arguments}")
+            }
+            None => message.model_name.clone(),
+        }
+    }
+
     fn register_support_import(&self) {
-        if let Some(path) = &self.support_package {
+        if let Some(path) = &self.support_package
+            && !self.package.is_self_import(path)
+        {
             self.imports
                 .borrow_mut()
                 .by_path
@@ -168,12 +184,8 @@ impl ModelBackend {
     }
 
     pub(in crate::generator) fn support_converter(&self, name: String) -> String {
-        if self.support_package.is_some() {
-            self.register_support_import();
-            format!("support.{name}")
-        } else {
-            name
-        }
+        self.register_support_import();
+        self.package.support_reference(&name)
     }
 
     pub(in crate::generator) fn message_proto_type(
@@ -196,7 +208,7 @@ impl ModelBackend {
             PlannedValueType::Scalar(scalar) => Ok(go_scalar_type_expr(scalar).to_string()),
             PlannedValueType::Enum(enum_type) => {
                 let info = enum_type
-                    .info
+                    .wire_info
                     .as_ref()
                     .ok_or_else(|| "the enum has no proto descriptor info".to_string())?;
                 self.proto_type(info).ok_or_else(|| {
@@ -333,7 +345,7 @@ impl ExternalModelBackend<PlannedValueType> for ModelBackend {
                 if let Some(authored_type) = &message.authored_type {
                     return Some(go_authored_type_annotation(authored_type));
                 }
-                Some(message.model_name.clone())
+                Some(self.model_name(message))
             }
             _ => None,
         }
@@ -473,11 +485,12 @@ fn go_enum_conversion(
         enum_type
             .name
             .clone()
+            .map(|name| go_declaration_name(&name))
             .ok_or_else(|| "the enum has no generated Go name".to_string())?
     };
 
     let info = enum_type
-        .info
+        .wire_info
         .as_ref()
         .ok_or_else(|| "the enum has no proto descriptor info".to_string())?;
     let proto_type = backend.proto_type(info).ok_or_else(|| {
@@ -557,14 +570,14 @@ fn go_message_conversion(
     }
 
     if message.source == PlannedMessageSource::Proto {
-        let base = go_unexported_name(&message.model_name);
+        let base = go_unexported_name(&backend.model_name(message));
         let from_proto = format!("{base}FromProto");
         let to_proto = format!("{base}ToProto");
         let config_arg = if crate::nexgen_config::current().system_nexus {
             let config = config.map(str::to_string).unwrap_or_else(|| {
                 format!(
                     "&{}{{DataConverter: dc}}",
-                    backend.package.system_nexus_config_type()
+                    backend.package.system_nexus_context_type()
                 )
             });
             format!("{config}, ")
@@ -577,7 +590,7 @@ fn go_message_conversion(
             from_proto: Box::new(move |expr, out| {
                 format!("{from_proto}({from_config}{expr}, {out})")
             }),
-            decoded_model_type: Some(message.model_name.clone()),
+            decoded_model_type: Some(backend.model_name(message)),
             to_proto: Box::new(move |expr| format!("{to_proto}({config_arg}{expr})")),
             fallible: true,
             to_proto_takes_pointer: true,
@@ -772,10 +785,6 @@ pub(in crate::generator) struct OperationBinding {
     /// converter, and the model is passed to `ExecuteOperation` as-is.
     input_to_proto: Option<String>,
 
-    /// Assignments that populate the request model's `@nexus.source` fields
-    /// from their source expressions, emitted at the top of the operation
-    /// function where `dc` is prepared from the workflow context.
-    input_sourced_assignments: Vec<String>,
     /// Proto type expression for the response, or `None` for void operations.
     output_proto_type: Option<String>,
     /// Go type of the generated model the response decodes into directly,
@@ -801,6 +810,9 @@ struct RenderedResourceReturn {
     local_lines: Vec<String>,
     field_initializers: Vec<RenderedResourceFieldInitializer>,
     requires_data_converter: bool,
+    /// The result record that holds the resource: its type, the resource field, and each
+    /// other field with its value.
+    holder: Option<(String, String, Vec<(String, String)>)>,
 }
 
 #[derive(Debug)]
@@ -835,10 +847,17 @@ impl ModelBackend {
     /// visibility is applied so conversion logic can reference final model
     /// names without threading backend state through type resolution.
     pub(in crate::generator) fn populate_model_wire_conversions(
-        &self,
+        &mut self,
         api_plan: &PlannedSpec,
         models: &IndexMap<String, RenderedModel>,
     ) -> Result<()> {
+        self.model_names = models
+            .iter()
+            .map(|(key, model)| {
+                let (name, _) = split_go_type_decl_name(&model.name);
+                (key.clone(), name.to_string())
+            })
+            .collect();
         let full_names: Vec<String> = models.keys().cloned().collect();
         for full_name in full_names {
             let Some(proto_info) = self.model_proto_info(&full_name) else {
@@ -863,13 +882,10 @@ impl ModelBackend {
                     reason: "its proto descriptor has no `go_package` option".to_string(),
                 })?;
 
-            let native_field_types: Vec<String> = models
-                .get(&full_name)
-                .map(|model| model.fields.iter().map(|f| f.go_type.clone()).collect())
-                .unwrap_or_default();
+            let native_fields = &models[&full_name].fields;
             let field_conversions = match planned_record {
                 Some(planned_model) => {
-                    build_field_conversions(planned_model, &native_field_types, api_plan, self)?
+                    build_field_conversions(planned_model, native_fields, api_plan, self)?
                 }
                 None => Vec::new(),
             };
@@ -962,7 +978,6 @@ impl ModelBackend {
                         planned_service.name.as_str(),
                         resource_return,
                         resource,
-                        record_for_message(api_plan, &input),
                         api_plan,
                         self,
                         &self.package,
@@ -1030,22 +1045,8 @@ impl ModelBackend {
                     PlannedOperationOutput::None => (None, None, None, false),
                 };
 
-                let input_sourced_assignments = record_for_message(api_plan, &input)
-                    .map(|planned_model| {
-                        planned_model
-                            .sourced_fields()
-                            .map(|(field_name, _, source_expr)| {
-                                let source_expr = self.support_converter(source_expr.to_string());
-                                format!("request.{} = {source_expr}", go_field_name(field_name))
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
                 rendered_op.wire_binding = Some(OperationBinding {
                     input_to_proto,
-
-                    input_sourced_assignments,
                     output_proto_type,
                     output_model_type,
                     output_from_proto,
@@ -1065,7 +1066,7 @@ fn validate_record_conversion(record: &RecordSpec<PlannedFamily>) -> Result<()> 
     for (field_name, field) in record
         .fields
         .iter()
-        .filter(|(_, field)| field.visibility != RecordFieldVisibility::Omitted)
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
         match &field.data.wire_binding {
             Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
@@ -1105,36 +1106,20 @@ fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
     )
 }
 
-/// Renders an operation function using transfer converters where available,
+/// Renders an operation body using transfer converters where available,
 /// with eager conversion for externally owned models and transformed results.
-pub(in crate::generator) fn render_operation_function_proto(
+pub(in crate::generator) fn render_operation_body_proto(
     output: &mut String,
-    service: &crate::generator::go::RenderedService<'_>,
+    service: &RenderedService<'_>,
     operation: &crate::generator::go::RenderedOperation<'_>,
     binding: &OperationBinding,
     package: &GoPackageContext,
+    execution: OperationExecution,
 ) {
-    let operation_name = go_string_literal(operation.wire_name);
-
-    output.push_str("func ");
-    output.push_str(&operation.func_name);
-    output.push_str("(ctx ");
-    output.push_str(&package.workflow_context_type());
-    output.push_str(", request ");
-    output.push_str(&operation.input_type);
-    output.push_str(") ");
-    render_operation_future_return_type(output, package);
-    output.push_str(" {\n");
-
     if binding.requires_data_converter() {
         output.push_str("\tdc := ");
         output.push_str(&package.workflow_data_converter());
         output.push_str("(ctx)\n");
-    }
-    for assignment in &binding.input_sourced_assignments {
-        output.push('\t');
-        output.push_str(assignment);
-        output.push('\n');
     }
 
     let input_arg = match binding.input_to_proto.as_deref() {
@@ -1153,23 +1138,10 @@ pub(in crate::generator) fn render_operation_function_proto(
         }
         None => "request",
     };
-    let endpoint = service
-        .endpoint
-        .as_deref()
-        .expect("operations require endpoint");
-    output.push_str("\tc := ");
-    output.push_str(&new_nexus_client_expr(endpoint, service.wire_name, package));
-    output.push('\n');
-    output.push_str("\tfut := c.ExecuteOperation(ctx, ");
-    output.push_str(&operation_name);
-    output.push_str(", ");
-    output.push_str(input_arg);
-    output.push_str(", ");
-    output.push_str(&package.nexus_operation_options());
-    output.push_str(")\n");
+    render_operation_execution(output, service, operation, input_arg, package, execution);
 
     if let (Some(transform_expr), Some(transform_type)) = (
-        operation.output_transform_expr,
+        operation.output_transform_expr.as_deref(),
         operation.output_transform_type.as_ref(),
     ) {
         render_operation_future_adapter(output, package, transform_type, false, |output| {
@@ -1254,7 +1226,7 @@ pub(in crate::generator) fn render_operation_function_proto(
         render_operation_future_adapter(
             output,
             package,
-            &resource_return.resource_type_name,
+            &go_declaration_name(&resource_return.resource_type_name),
             false,
             |output| {
                 output.push_str("\t\tvar result ");
@@ -1265,26 +1237,46 @@ pub(in crate::generator) fn render_operation_function_proto(
                 output.push_str("\t\t\treturn\n");
                 output.push_str("\t\t}\n");
                 for line in &resource_return.local_lines {
+                    // The lines run in the future's goroutine, which sets the error.
+                    if line.trim() == "return nil, err" {
+                        let indent = &line[..line.len() - line.trim_start().len()];
+                        output.push_str(&format!(
+                            "\t\t{indent}resultSettable.SetError(err)\n\t\t{indent}return\n"
+                        ));
+                        continue;
+                    }
                     output.push_str("\t\t");
                     output.push_str(line);
                     output.push('\n');
                 }
-                output.push_str("\t\tvalue := New");
-                output.push_str(&resource_return.resource_type_name);
-                output.push('(');
+                let mut resource = format!(
+                    "{}(",
+                    go_declaration_name(&format!("New{}", resource_return.resource_type_name))
+                );
                 for (index, initializer) in resource_return.field_initializers.iter().enumerate() {
                     if index > 0 {
-                        output.push_str(", ");
+                        resource.push_str(", ");
                     }
-                    output.push_str(&initializer.expr);
+                    resource.push_str(&initializer.expr);
                 }
-                output.push_str(")\n");
+                resource.push(')');
+                output.push_str("\t\tvalue := ");
+                match &resource_return.holder {
+                    Some((type_name, resource_field, fields)) => {
+                        output.push_str(&format!("{type_name}{{{resource_field}: {resource}"));
+                        for (name, expr) in fields {
+                            output.push_str(&format!(", {name}: {expr}"));
+                        }
+                        output.push('}');
+                    }
+                    None => output.push_str(&resource),
+                }
+                output.push('\n');
             },
         );
     } else {
         output.push_str("\treturn fut\n");
     }
-    output.push_str("}\n");
 }
 
 /// Computes the backend binding for an operation message: the wire type
@@ -1323,7 +1315,6 @@ fn build_rendered_resource_return(
     service_name: &str,
     resource_return: &PlannedOperationResourceReturn,
     resource: &PlannedResource,
-    input_record: Option<&RecordSpec<PlannedFamily>>,
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
     package: &GoPackageContext,
@@ -1348,15 +1339,13 @@ fn build_rendered_resource_return(
         let (mut expr, constructor_needs_pointer_unpack) = match &binding.source {
             ResolvedResourceBindingSource::RequestField {
                 field_name,
-                proto_field_name,
-                hidden,
+                proto_field_name: _,
+                origin,
             } => {
                 // Sourced request fields live on the generated model as
                 // unexported fields (populated at the call site), so they read
                 // the same way as public fields.
-                let is_sourced = input_record
-                    .is_some_and(|record| record.field_source(proto_field_name).is_some());
-                if *hidden && !is_sourced {
+                if origin.as_ref().is_some_and(FieldPolicy::is_omitted) {
                     return Err(Error::UnsupportedGoProtoConversion {
                         context: format!(
                             "resource return field `{}.{}`",
@@ -1415,11 +1404,71 @@ fn build_rendered_resource_return(
         field_initializers.push(RenderedResourceFieldInitializer { expr });
     }
 
+    let holder = match &resource_return.holder {
+        Some(holder) => {
+            let record = api_plan
+                .record(&holder.record_full_name)
+                .expect("the plan has the holder record");
+            let mut resource_field = String::new();
+            let mut fields = Vec::new();
+            for field in &holder.fields {
+                if field.resource {
+                    resource_field = go_field_name(&field.name);
+                    continue;
+                }
+                let planned = &record.fields[&field.proto_name];
+                let resource_field = PlannedResourceField {
+                    name: field.name.clone(),
+                    optional: !field.required,
+                    kind: planned.field_type.clone(),
+                    function: None,
+                };
+                let (lines, expr, uses_data_converter) = resource_return_proto_field_source(
+                    &resource_field,
+                    "result",
+                    &field.proto_name,
+                    api_plan,
+                    backend,
+                    package,
+                )
+                .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                    context: format!("result record field `{}.{}`", holder.model_name, field.name),
+                    reason,
+                })?;
+                requires_data_converter |= uses_data_converter;
+                local_lines.extend(lines);
+                // An optional scalar field of the record is a pointer, and the zero value
+                // means unset, as in the record's model.
+                let field_kind = planned_field_kind(&resource_field.kind, api_plan);
+                let field_type = resolve_resource_field_kind(&field_kind, true, package);
+                let expr = match public_default_punning_zero_for_field(&field_kind, &field_type) {
+                    Some(zero) if !field.required => {
+                        let local = format!("held{}", go_field_name(&field.name));
+                        local_lines.push(format!("var {local} {field_type}"));
+                        local_lines.push(format!("if value := {expr}; value != {zero} {{"));
+                        local_lines.push(format!("\t{local} = &value"));
+                        local_lines.push("}".to_string());
+                        local
+                    }
+                    _ => expr,
+                };
+                fields.push((go_field_name(&field.name), expr));
+            }
+            Some((
+                go_declaration_name(&holder.model_name),
+                resource_field,
+                fields,
+            ))
+        }
+        None => None,
+    };
+
     Ok(RenderedResourceReturn {
         resource_type_name: resource_return.resource_type_name.clone(),
         local_lines,
         field_initializers,
         requires_data_converter,
+        holder,
     })
 }
 
@@ -1724,7 +1773,7 @@ fn resource_return_local_name(field_name: &str) -> String {
 /// appended last, matching the order the Go backend renders them in.
 fn build_field_conversions(
     planned_model: &RecordSpec<PlannedFamily>,
-    native_field_types: &[String],
+    native_fields: &[RenderedField],
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
 ) -> Result<Vec<RenderedFieldConversion>> {
@@ -1733,52 +1782,78 @@ fn build_field_conversions(
         .chain(
             planned_model
                 .sourced_fields()
-                .map(|(field_name, field, _)| (field_name, field)),
+                .map(|(name, field, _)| (name, field)),
         )
         .enumerate()
         .map(|(index, (field_name, field))| {
             let planned_field = planned_field(planned_model, field_name, field, api_plan);
-            let native_go_type = native_field_types
-                .get(index)
-                .map(String::as_str)
-                .unwrap_or("");
-            build_field_conversion(&planned_field, native_go_type, api_plan, backend).map_err(
-                |reason| Error::UnsupportedGoProtoConversion {
+            build_field_conversion(&planned_field, &native_fields[index], api_plan, backend)
+                .map_err(|reason| Error::UnsupportedGoProtoConversion {
                     context: format!(
                         "field `{}.{}`",
                         planned_model.name, planned_field.authored_name
                     ),
                     reason,
-                },
-            )
+                })
         })
         .collect()
 }
 
 fn build_field_conversion(
     field: &crate::generator::go::PlannedField,
-    native_go_type: &str,
+    native_field: &RenderedField,
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
 ) -> GoConversionResult<RenderedFieldConversion> {
     let proto_field = go_proto_field_name(&field.proto_name);
     let go_field = go_field_name(&field.authored_name);
     let receiver = format!("m.{go_field}");
+    let native_go_type = &native_field.go_type;
 
     match &field.kind {
         PlannedFieldKind::Singular(value) => {
             let conversion =
                 go_value_conversion(value, api_plan, backend, &backend.package, Some("cfg"))?;
             let field_is_pointer = native_go_type.starts_with('*');
-            let default_expr = default_enum_proto_expr(field, backend)?;
-            let to_lines = singular_to_proto_lines(
-                &conversion,
-                &receiver,
-                &proto_field,
-                field_is_pointer,
-                default_expr.as_deref(),
-                "return nil, err",
-            );
+            let flattened_type = field
+                .flattened_annotation_override
+                .as_ref()
+                .and_then(|annotation| annotation.value());
+            // Payload converters accept any; pass the pointed-to API value,
+            // and preserve nil as an absent payload rather than encoding it.
+            let to_lines = if let Some(zero) = &native_field.default_punning_zero {
+                let lines = singular_to_proto_lines(
+                    &conversion,
+                    &receiver,
+                    &proto_field,
+                    false,
+                    "return nil, err",
+                );
+                std::iter::once(format!("if {receiver} != {zero} {{"))
+                    .chain(lines.into_iter().map(|line| format!("\t{line}")))
+                    .chain(std::iter::once("}".to_string()))
+                    .collect()
+            } else if flattened_type.is_some() && field_is_pointer {
+                let lines = singular_to_proto_lines(
+                    &conversion,
+                    &format!("(*{receiver})"),
+                    &proto_field,
+                    false,
+                    "return nil, err",
+                );
+                std::iter::once(format!("if {receiver} != nil {{"))
+                    .chain(lines.into_iter().map(|line| format!("\t{line}")))
+                    .chain(std::iter::once("}".to_string()))
+                    .collect()
+            } else {
+                singular_to_proto_lines(
+                    &conversion,
+                    &receiver,
+                    &proto_field,
+                    field_is_pointer,
+                    "return nil, err",
+                )
+            };
             let mut from_lines = singular_from_proto_lines(
                 &conversion,
                 &proto_field,
@@ -1786,13 +1861,12 @@ fn build_field_conversion(
                 field_is_pointer,
                 "return err",
             );
-            if field
-                .flattened_annotation_override
-                .as_ref()
-                .and_then(|annotation| annotation.value())
-                .is_some()
-                && !conversion.from_proto_returns_pointer
-            {
+            if flattened_type.is_some() && !conversion.from_proto_returns_pointer {
+                let decoded_type = if field_is_pointer {
+                    native_go_type.trim_start_matches('*')
+                } else {
+                    native_go_type
+                };
                 from_lines = vec![
                     format!("if proto.Get{proto_field}() != nil {{"),
                     format!(
@@ -1802,13 +1876,16 @@ fn build_field_conversion(
                     "\tif err != nil {".to_string(),
                     "\t\treturn err".to_string(),
                     "\t}".to_string(),
-                    format!("\ttyped, ok := converted.({native_go_type})"),
+                    format!("\ttyped, ok := converted.({decoded_type})"),
                     "\tif !ok {".to_string(),
                     format!(
                         "\t\treturn fmt.Errorf(\"nexgen decoded field {go_field} has unexpected type %T\", converted)"
                     ),
                     "\t}".to_string(),
-                    format!("\tout.{go_field} = typed"),
+                    format!(
+                        "\tout.{go_field} = {}typed",
+                        if field_is_pointer { "&" } else { "" }
+                    ),
                     "}".to_string(),
                 ];
             }
@@ -1893,24 +1970,6 @@ fn render_model_transfer_type_converter(
     output.push_str("\t)\n}\n");
 }
 
-fn default_enum_proto_expr(
-    field: &crate::generator::go::PlannedField,
-    backend: &ModelBackend,
-) -> GoConversionResult<Option<String>> {
-    let Some(default) = &field.default_value else {
-        return Ok(None);
-    };
-    let PlannedFieldKind::Singular(value) = &field.kind else {
-        return Err("a default can only be applied to a singular enum field".to_string());
-    };
-    let enum_value = field
-        .default_enum_value
-        .as_ref()
-        .ok_or_else(|| format!("default enum case `{}` was not resolved", default.enum_case))?;
-    let proto_type = backend.value_proto_type(value)?;
-    Ok(Some(format!("{proto_type}({})", enum_value.number)))
-}
-
 /// `ToProto` lines for a singular field.
 ///
 /// `field_is_pointer` indicates whether the native struct field is rendered as
@@ -1922,7 +1981,6 @@ fn singular_to_proto_lines(
     receiver: &str,
     proto_field: &str,
     field_is_pointer: bool,
-    default_expr: Option<&str>,
     error_return: &str,
 ) -> Vec<String> {
     let assign = |converted: &str| format!("message.{proto_field} = {converted}");
@@ -1978,10 +2036,6 @@ fn singular_to_proto_lines(
                         format!("\t{}", assign(&converted)),
                     ]
                 };
-                if let Some(default_expr) = default_expr {
-                    lines.push("} else {".to_string());
-                    lines.push(format!("\t{}", assign(default_expr)));
-                }
                 lines.push("}".to_string());
                 lines
             } else {
@@ -2305,7 +2359,7 @@ fn render_model_converters(
     output.push_str("ToProto(");
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
-        output.push_str(&package.system_nexus_config_type());
+        output.push_str(&package.system_nexus_context_type());
         output.push_str(", ");
     }
     output.push_str("m *");
@@ -2332,7 +2386,7 @@ fn render_model_converters(
     output.push_str("FromProto(");
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
-        output.push_str(&package.system_nexus_config_type());
+        output.push_str(&package.system_nexus_context_type());
         output.push_str(", ");
     }
     output.push_str("proto ");

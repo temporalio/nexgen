@@ -32,9 +32,7 @@ class SignalWithStartWorkflowRequest:
     execution_timeout: datetime.timedelta | None = None
     run_timeout: datetime.timedelta | None = None
     task_timeout: datetime.timedelta | None = None
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (
-        temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
-    )
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = None
     retry_policy: temporalio.common.RetryPolicy | None = None
     cron_schedule: str | None = None
@@ -44,7 +42,7 @@ class SignalWithStartWorkflowRequest:
     versioning_override: temporalio.common.VersioningOverride | None = None
     start_delay: datetime.timedelta | None = None
     user_metadata: UserMetadata | None = None
-    namespace: str = dataclasses.field(default_factory=_support.workflow_namespace)
+    namespace: str
     headers: collections.abc.Mapping[str, typing.Any] | None = None
 
 
@@ -85,6 +83,10 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
                 "missing required field SignalWithStartWorkflowRequest.signal"
             )
         signal = value.signal_name
+        id_reuse_policy = _support.workflow_id_reuse_policy_from_proto(
+            value.workflow_id_reuse_policy
+        )
+        namespace = value.namespace
         return SignalWithStartWorkflowRequest(
             workflow=workflow,
             args=_support.payloads_from_proto(value.input)
@@ -107,9 +109,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             task_timeout=_support.duration_from_proto(value.workflow_task_timeout)
             if value.HasField("workflow_task_timeout")
             else None,
-            id_reuse_policy=_support.workflow_id_reuse_policy_from_proto(
-                value.workflow_id_reuse_policy
-            ),
+            id_reuse_policy=id_reuse_policy,
             id_conflict_policy=_support.workflow_id_conflict_policy_from_proto(
                 value.workflow_id_conflict_policy
             )
@@ -143,7 +143,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             )
             if value.HasField("user_metadata")
             else None,
-            namespace=value.namespace,
+            namespace=namespace,
             headers=_support.header_from_proto(value.header)
             if value.HasField("header")
             else None,
@@ -283,8 +283,8 @@ class SignalWithStartWorkflowResponse:
         This API is experimental and subject to change.
     """
 
-    run_id: str | None = None
-    started: bool | None = None
+    run_id: str
+    started: bool
 
 
 class _SignalWithStartWorkflowResponseTransferTypeConverter(
@@ -306,9 +306,15 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
         value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
         type_hint: type[SignalWithStartWorkflowResponse],
     ) -> SignalWithStartWorkflowResponse:
+        if not value.run_id:
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowResponse.run_id"
+            )
+        run_id = value.run_id
+        started = value.started
         return SignalWithStartWorkflowResponse(
-            run_id=value.run_id if bool(value.run_id) else None,
-            started=value.started if bool(value.started) else None,
+            run_id=run_id,
+            started=started,
         )
 
     @typing_extensions.override
@@ -317,10 +323,8 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
         value: SignalWithStartWorkflowResponse,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
         message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse()
-        if value.run_id is not None:
-            message.run_id = value.run_id
-        if value.started is not None:
-            message.started = value.started
+        message.run_id = value.run_id
+        message.started = value.started
         return message
 
 

@@ -1,6 +1,6 @@
 [package]
 name = "nexgen"
-version = "0.2.9"
+version = "0.2.12"
 edition = "2024"
 description = "Generate language-specific Nexus operation bindings from WIT"
 license = "MIT"
@@ -26,13 +26,22 @@ resolver = "2"
 name = "nexgen"
 path = "src/main.rs"
 
+[[test]]
+name = "compiler_failures"
+required-features = ["advanced", "test-support"]
+
 [features]
-# Exposes the CLI surface that is not covered by README.md: the `dotnet`
-# generate target, the WIT/proto-oriented generate flags (`--descriptors`,
-# `--format`, `--native-api`), and the maintenance subcommands
-# (`add-rpc`, `add-message`, `debug-wit-dir`). See advanced/README.md. Off by
-# default so the published binary only offers the documented JSON Schema workflow.
+# Exposes the CLI surface that is not covered by README.md:
+# - The WIT/proto-oriented generate flags (`--support-file`,
+#   `--descriptors`, `--format`, `--targets`)
+# - The maintenance subcommands (`add-rpc`, `add-message`, `debug-wit-dir`)
+#
+# See advanced/README.md. Off by default so the published binary
+# only offers the documented JSON Schema workflow.
 advanced = []
+# Derives payload-free compiler error kinds for the rejection fixture suite.
+# Kept separate from advanced so ordinary CLI builds do not depend on Strum.
+test-support = ["dep:strum"]
 
 [lints.rust]
 warnings = "deny"
@@ -48,6 +57,10 @@ regex-syntax = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9"
+strum = { version = "0.28", features = ["derive"], optional = true }
 tempfile = "3.23"
 thiserror = "2.0"
 wit_parser_crate = { package = "wit-parser", version = "0.252" }
+
+[dev-dependencies]
+toml = "1.1"
