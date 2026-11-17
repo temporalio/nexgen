@@ -167,11 +167,24 @@ async def test_workflow_apis_call_the_stream_service(
     model_types: types.ModuleType,
 ) -> None:
     ref = model_types.StreamRef(id="workflow-stream")
-    replies = {
+    pages = [
+        model_types.ReadRecordsResponse(
+            records=[
+                model_types.StreamRecord(body="a", offset=_offset(2)),
+                model_types.StreamRecord(body="b", offset=_offset(3)),
+            ],
+            last_offset=_offset(3),
+            done=False,
+        ),
+        model_types.ReadRecordsResponse(records=[], done=True),
+    ]
+    replies: dict[str, typing.Any] = {
         "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
         "AppendRecords": model_types.AppendRecordsResponse(
             first_offset=_offset(2), last_offset=_offset(3)
         ),
+        # Each read gets the next page.
+        "ReadRecords": iter(pages),
         "CloseStream": model_types.CloseStreamResponse(),
     }
     calls: list[tuple[str, typing.Any]] = []
@@ -189,7 +202,8 @@ async def test_workflow_apis_call_the_stream_service(
             future: asyncio.Future[typing.Any] = (
                 asyncio.get_running_loop().create_future()
             )
-            future.set_result(replies[operation])
+            reply = replies[operation]
+            future.set_result(next(reply) if operation == "ReadRecords" else reply)
             return future
 
     def create_client(*, service: str, endpoint: str) -> NexusClient:
@@ -204,6 +218,9 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
     assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
+    read = stream.iter_read_items(from_offset=_offset(1))
+    assert [record.body async for record in read] == ["a", "b"]
+    assert read.next_request is None
     await stream.close()
     # The Workflow API fills the request id, and the Producer from its default.
     producer = model_types.Producer(
@@ -223,6 +240,15 @@ async def test_workflow_apis_call_the_stream_service(
             model_types.AppendRecordsRequest(
                 ref=ref, records=records, producer=producer, sequence=3
             ),
+        ),
+        # Each page is a new Nexus operation from the Workflow.
+        (
+            "ReadRecords",
+            model_types.ReadRecordsRequest(ref=ref, from_offset=_offset(1)),
+        ),
+        (
+            "ReadRecords",
+            model_types.ReadRecordsRequest(ref=ref, from_offset=_offset(3)),
         ),
         ("CloseStream", model_types.CloseStreamRequest(ref=ref, producer=producer)),
     ]
@@ -529,13 +555,26 @@ def test_api_omit_hides_the_public_operation_functions(
     assert "get_stream" in api.__all__
     stream = api.get_stream(ref=model_types.StreamRef(id="s-1"), body_type=str)
     assert all(
-        callable(getattr(stream, method)) for method in ("append", "close", "describe")
+        callable(getattr(stream, method))
+        for method in (
+            "append",
+            "close",
+            "read",
+            "iter_read",
+            "iter_read_items",
+            "describe",
+        )
     )
     # Every operation stays registered, so the service still serves all five.
     assert len(api.__nexus_operation_registry__) == 5
     # The private helpers that the resource methods call stay in the resource module.
     resources = importlib.import_module(api.__name__ + "._resources.stream")
-    for helper in ("_append_records", "_close_stream", "_describe_stream"):
+    for helper in (
+        "_append_records",
+        "_close_stream",
+        "_read_records",
+        "_describe_stream",
+    ):
         assert hasattr(resources, helper)
     assert not hasattr(resources, "append_records")
 
@@ -545,18 +584,12 @@ def test_api_omit_hides_the_public_operation_functions(
     [(workflow_only, workflow_models), (both_workflow, both_models)],
     ids=["workflow", "both"],
 )
-async def test_a_workflow_stream_can_not_read(
+async def test_a_workflow_stream_closes_at_the_end_of_async_with(
     monkeypatch: pytest.MonkeyPatch,
     api: types.ModuleType,
     model_types: types.ModuleType,
 ) -> None:
     ref = model_types.StreamRef(id="s-1")
-    stream = api.get_stream(ref=ref, body_type=str)
-    # `read` is api-omitted for the Workflow target, with its helper.
-    assert not hasattr(stream, "read")
-    resources = importlib.import_module(api.__name__ + "._resources.stream")
-    assert not hasattr(resources, "_read_records")
-
     calls: list[tuple[str, typing.Any]] = []
 
     class NexusClient:
@@ -591,10 +624,6 @@ async def test_a_workflow_stream_can_not_read(
         assert [name for name, _ in calls] == ["CreateStream"]
     assert [name for name, _ in calls] == ["CreateStream", "CloseStream"]
     assert calls[-1][1].producer.id == "wf:r2"
-
-    if typing.TYPE_CHECKING:
-        typed = workflow_only.get_stream(ref=workflow_models.StreamRef[str](id="s-1"))
-        _ = typed.read  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
 
 
 @pytest.mark.parametrize(

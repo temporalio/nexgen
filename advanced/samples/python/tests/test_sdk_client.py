@@ -32,6 +32,7 @@ from wit.stream_service.both._resource_context_manager import ResourceContextMan
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
 from wit.stream_service.both.client._poll import PollIterator
 from wit.stream_service.both.workflow import _resources as workflow_resources
+from wit.stream_service.both.workflow._poll import PollIterator as WorkflowPollIterator
 from wit.stream_service.client.client import (
     StreamServiceClientExtension as ClientOnlyExtension,
 )
@@ -917,25 +918,72 @@ async def test_without_a_resume_helper_the_next_request_reads_the_page_again() -
     assert seen == [(1, "first"), (2, "second"), (3, None)]
 
 
-def test_only_the_client_target_has_the_read_poll() -> None:
-    # The Workflow `Stream` omits `read`, so the workflow module has no read helper at all.
-    assert not hasattr(workflow_stream_module, "read_records")
-    assert not hasattr(workflow_stream_module, "_read_records")
+def test_both_streams_read_and_poll() -> None:
+    # The poll lists no targets, so both `Stream` classes get the iterators. Only a resource
+    # method has them in the Workflow target, so its package has no standalone iterator.
     assert not hasattr(workflow_stream_module, "iter_read_records")
     assert not hasattr(workflow_package, "iter_read_records")
-    assert not hasattr(workflow_stream_module.Stream, "iter_read")
-    assert not hasattr(workflow_stream_module.Stream, "iter_read_items")
-    assert hasattr(Stream, "iter_read")
-    assert hasattr(Stream, "iter_read_items")
-
-
-def test_only_the_client_stream_reads() -> None:
-    # `read` is api-omitted for the Workflow target only. Both targets append and close.
-    assert hasattr(Stream, "read")
-    assert not hasattr(workflow_stream_module.Stream, "read")
-    for name in ("append", "close", "__aenter__", "__aexit__"):
+    for name in (
+        "append",
+        "close",
+        "read",
+        "iter_read",
+        "iter_read_items",
+        "__aenter__",
+        "__aexit__",
+    ):
         assert hasattr(Stream, name)
         assert hasattr(workflow_stream_module.Stream, name)
+
+
+async def test_each_workflow_page_is_the_call_of_the_workflow_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = StreamRef[str](id="s1")
+    pages = [
+        ReadRecordsResponse[str](
+            records=[_record(1), _record(2)], last_offset=_offset(2), done=False
+        ),
+        ReadRecordsResponse[str](records=[], last_offset=_offset(2), done=False),
+    ]
+    calls: list[tuple[ReadRecordsRequest[typing.Any], type[typing.Any]]] = []
+
+    async def read_records(
+        request: ReadRecordsRequest[typing.Any], body_type: type[typing.Any]
+    ) -> collections.abc.Awaitable[ReadRecordsResponse[typing.Any]]:
+        calls.append((request, body_type))
+        future: asyncio.Future[ReadRecordsResponse[typing.Any]] = (
+            asyncio.get_running_loop().create_future()
+        )
+        future.set_result(pages[(len(calls) - 1) % len(pages)])
+        return future
+
+    # `read` and the iterators start the operation through this one helper.
+    monkeypatch.setattr(workflow_stream_module, "_read_records", read_records)
+    stream = workflow_stream_module.Stream(ref=ref, created=None)
+
+    assert await stream.read(from_offset=_offset(1)) == pages[0]
+    calls.clear()
+    read = stream.iter_read_items(from_offset=_offset(1))
+    seen = [
+        (record.offset, read.next_request and read.next_request.from_offset)
+        async for record in read
+    ]
+
+    _ = assert_type(
+        read, WorkflowPollIterator[ReadRecordsRequest[str], StreamRecord[str]]
+    )
+    # The resume helper gives the request after each Record, and the page helper stops at the
+    # empty page that didn't move.
+    assert seen == [(_offset(1), _offset(1)), (_offset(2), _offset(2))]
+    assert read.next_request is None
+    assert calls == [
+        (ReadRecordsRequest(ref=ref, from_offset=_offset(1)), str),
+        (ReadRecordsRequest(ref=ref, from_offset=_offset(2)), str),
+    ]
+    # The Workflow iterator takes no RPC options, since Workflow code has no RPC.
+    if typing.TYPE_CHECKING:
+        _ = stream.iter_read(rpc_timeout=None)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
 
 
 async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:

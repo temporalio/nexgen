@@ -34,6 +34,7 @@ vi.mock("../wit/stream-service/workflow/operations/close-stream.ts", () => ({
     return { result: async () => ({}) };
   },
 }));
+vi.mock("../wit/stream-service/workflow/operations/read-records.ts", () => ({}));
 vi.mock("../wit/stream-service/workflow/operations/describe-stream.ts", () => ({}));
 
 function _offset(n: number): Uint8Array {
@@ -175,14 +176,13 @@ describe("stream-service generated output", () => {
     ).toEqual(["a", "b"]);
   });
 
-  test("gives the Workflow Stream append and close and no read", async () => {
+  test("gives the Workflow Stream append, close and read", async () => {
     const { Stream } = await loadWorkflowStream();
 
-    // `read` is api-omitted for the Workflow target, so Workflow code appends and closes.
     expect("append" in Stream.prototype).toBe(true);
     expect("close" in Stream.prototype).toBe(true);
+    expect("read" in Stream.prototype).toBe(true);
     expect("describe" in Stream.prototype).toBe(true);
-    expect("read" in Stream.prototype).toBe(false);
   });
 
   test("passes the arguments of a Workflow append and close to their operations", async () => {

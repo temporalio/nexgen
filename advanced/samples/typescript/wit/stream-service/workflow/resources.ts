@@ -5,10 +5,12 @@ import type {
   StreamRef,
   AppendRecordsResponse,
   Producer,
+  ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";
 import { appendRecords } from "./operations/append-records";
 import { closeStream } from "./operations/close-stream";
+import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
 export class Stream<BodyT = unknown> {
@@ -46,6 +48,23 @@ export class Stream<BodyT = unknown> {
     const request = { ref: this.ref, producer: producer };
     const handle = await closeStream(request);
     await handle.result();
+  }
+
+  public async read(
+    fromOffset?: Uint8Array,
+    maxRecords?: number,
+    wait?: common.Duration,
+    maxBytes?: number,
+  ): Promise<ReadRecordsResponse<BodyT>> {
+    const request = {
+      ref: this.ref,
+      fromOffset: fromOffset,
+      maxRecords: maxRecords,
+      wait: wait,
+      maxBytes: maxBytes,
+    };
+    const handle = await readRecords(request, this.bodyType);
+    return await handle.result();
   }
 
   public async describe(): Promise<DescribeStreamResponse> {
