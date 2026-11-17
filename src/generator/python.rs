@@ -6822,13 +6822,10 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         }
         output.push_str("),\n        )\n");
     }
-    // The generic hook gets each operation outside the generated set. Then a plugin
-    // outside the SDK can serve its own System Nexus service.
-    output.push_str("    return await interceptor.start_system_nexus_operation(input)\n");
+    output.push_str("    raise ValueError(f\"unsupported System Nexus operation: {input.service}/{input.operation_name}\")\n");
 
     output.push_str("\n\nclass _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):\n");
     output.push_str("    @abc.abstractmethod\n    def _next_system_nexus_interceptor(\n        self,\n    ) -> _SystemNexusWorkflowOutboundInterceptorBase:\n        ...\n");
-    output.push_str("\n    @abc.abstractmethod\n    async def start_system_nexus_operation(\n        self,\n        input: StartNexusOperationInput[_InputT, _OutputT],\n    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n        \"\"\"Intercept a System Nexus operation through the generic hook.\"\"\"\n        ...\n");
     for (_service, operation) in &operations {
         let output_type = system_nexus_type_expr(&operation.descriptor_output_ref);
         let generic_output = system_nexus_generic_output(operation);
@@ -6853,7 +6850,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
     }
 
     output.push_str("\n\nclass _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):\n");
-    output.push_str("    @abc.abstractmethod\n    async def _intercept_system_nexus_operation(\n        self,\n        input: StartNexusOperationInput[_InputT, _OutputT],\n    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n        ...\n");
+    output.push_str("    @abc.abstractmethod\n    async def _schedule_system_nexus_operation(\n        self,\n        input: StartNexusOperationInput[_InputT, _OutputT],\n    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:\n        ...\n");
     for (service, operation) in operations {
         let output_type = system_nexus_type_expr(&operation.descriptor_output_ref);
         output.push_str("\n    async def start_");
@@ -6870,7 +6867,7 @@ fn render_system_nexus_interceptor(services: &[RenderedService<'_>]) -> String {
         output.push_str("        from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT\n");
         output
             .push_str("        from temporalio.workflow import NexusOperationCancellationType\n\n");
-        output.push_str("        return await self._intercept_system_nexus_operation(\n");
+        output.push_str("        return await self._schedule_system_nexus_operation(\n");
         output.push_str("            StartNexusOperationInput(\n                endpoint=TEMPORAL_SYSTEM_ENDPOINT,\n                service=");
         output.push_str(&python_string_literal(service.wire_name));
         output.push_str(",\n                operation=");

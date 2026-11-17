@@ -2736,7 +2736,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(expected_response);
                 output.push_str(" result.\");\n                }\n");
                 if generic {
-                    render_system_nexus_generic_hook_call(&mut output, "                ");
+                    output.push_str("                throw new System.NotSupportedException(\"System Nexus interception of generic models is not supported in .NET.\");\n");
                 } else {
                     output.push_str("                var handle = outbound.Value.");
                     output.push_str(&csharp_operation_ident(operation));
@@ -2748,9 +2748,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("            }\n");
             }
         }
-        // The generic hook gets each operation outside the generated set. Then a plugin
-        // outside the SDK can serve its own System Nexus service.
-        render_system_nexus_generic_hook_call(&mut output, "            ");
+        output.push_str("            throw new System.ArgumentException($\"Unsupported System Nexus operation: {service}/{operationName}\");\n");
         output.push_str("        }\n\n");
         output.push_str("        internal partial class OutboundImpl\n        {\n");
         for service in &self.api_plan.services {
@@ -2771,9 +2769,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(");
                 output.push_str(&request_type);
-                output.push_str(
-                    " request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<",
-                );
+                output.push_str(" request) => instance.ScheduleSystemNexusOperationAsync<");
                 output.push_str(&response_type);
                 output.push_str(">(new(\n                Service: ");
                 output.push_str(&csharp_string_literal(&service.wire_name));
@@ -2820,23 +2816,6 @@ impl<'a> ApiPlanner<'a> {
 
 const SYSTEM_NEXUS_ARGUMENT_EXCEPTION: &str = "                {\n                    \
     throw new System.ArgumentException(\"System Nexus operation expects a ";
-
-fn render_system_nexus_generic_hook_call(output: &mut String, indent: &str) {
-    for line in [
-        "return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(",
-        "    Service: service,",
-        "    Operation: new(",
-        "        operationName,",
-        "        arg?.GetType() ?? typeof(object),",
-        "        typeof(TResult)),",
-        "    Arg: arg,",
-        "    Headers: null));",
-    ] {
-        output.push_str(indent);
-        output.push_str(line);
-        output.push('\n');
-    }
-}
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,

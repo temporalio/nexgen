@@ -70,20 +70,13 @@ namespace Temporalio.Worker
                 var handle = outbound.Value.SecondOperationAsync(request);
                 return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
             }
-            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                Service: service,
-                Operation: new(
-                    operationName,
-                    arg?.GetType() ?? typeof(object),
-                    typeof(TResult)),
-                Arg: arg,
-                Headers: null));
+            throw new System.ArgumentException($"Unsupported System Nexus operation: {service}/{operationName}");
         }
 
         internal partial class OutboundImpl
         {
             [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<Response>> FirstOperationAsync(Request request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<Response>(new(
+            public override Task<NexusWorkflowOperationHandle<Response>> FirstOperationAsync(Request request) => instance.ScheduleSystemNexusOperationAsync<Response>(new(
                 Service: "InterceptorService",
                 Operation: new(
                     "FirstOperation",
@@ -93,7 +86,7 @@ namespace Temporalio.Worker
                 Headers: null));
 
             [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<Response>> SecondOperationAsync(Request request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<Response>(new(
+            public override Task<NexusWorkflowOperationHandle<Response>> SecondOperationAsync(Request request) => instance.ScheduleSystemNexusOperationAsync<Response>(new(
                 Service: "InterceptorService",
                 Operation: new(
                     "SecondOperation",

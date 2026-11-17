@@ -4505,8 +4505,8 @@ fn system_nexus_interceptor_input_annotation(operation: &RenderedOperation<'_>) 
 }
 
 /// Renders the operation-specific interception surface consumed by the SDK's
-/// workflow outbound interceptor. It deliberately remains separate from the
-/// generic System Nexus hook, as it does in the other SDKs.
+/// workflow outbound interceptor. The terminal callback schedules directly
+/// without entering another interceptor chain.
 fn render_system_nexus_interceptors_module(
     enums: &[&RenderedEnum],
     flags: &[&RenderedFlags],
@@ -4578,9 +4578,9 @@ fn render_system_nexus_interceptors_module(
             body.push_str(input);
             body.push_str(") as Promise<nexus.NexusOperationHandle<unknown>>;\n");
         }
-        body.push_str("        default:\n          return next(input);\n      }\n");
+        body.push_str("        default:\n          throw new TypeError(`Unsupported System Nexus operation: ${service}/${operation}`);\n      }\n");
     }
-    body.push_str("    default:\n      return next(input);\n  }\n}\n");
+    body.push_str("    default:\n      throw new TypeError(`Unsupported System Nexus operation: ${service}/${operation}`);\n  }\n}\n");
     let mut imports = String::new();
     imports.push_str("import { composeInterceptors } from '../../../interceptor-composition';\n");
     render_typescript_namespace_imports(

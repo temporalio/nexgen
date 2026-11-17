@@ -22,6 +22,8 @@ import pytest
 import wit.workflow_service as workflow_service
 import wit.workflow_service.models as workflow_service_models
 from wit.workflow_service._system_nexus_interceptor import (
+    _start_system_nexus_operation,
+    _SystemNexusWorkflowOutboundInterceptorBase,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
 )
 
@@ -37,12 +39,21 @@ SIGNAL_WITH_START_OPERATION_INFO = workflow_service.__nexus_operation_registry__
 SIGNAL_WITH_START_OPERATION = SIGNAL_WITH_START_OPERATION_INFO.operation
 
 
-class CapturingSystemNexusTerminal(_SystemNexusWorkflowOutboundInterceptorTerminal):
+class CapturingSystemNexusTerminal(
+    _SystemNexusWorkflowOutboundInterceptorTerminal,
+    _SystemNexusWorkflowOutboundInterceptorBase,
+):
     def __init__(self) -> None:
         self.input: StartNexusOperationInput[typing.Any, typing.Any] | None = None
 
     @override
-    async def _intercept_system_nexus_operation(
+    def _next_system_nexus_interceptor(
+        self,
+    ) -> _SystemNexusWorkflowOutboundInterceptorBase:
+        raise AssertionError("the terminal must schedule without forwarding")
+
+    @override
+    async def _schedule_system_nexus_operation(
         self,
         input: StartNexusOperationInput[typing.Any, typing.Any],
     ) -> workflow.NexusOperationHandle[typing.Any]:
@@ -76,7 +87,7 @@ HIGH_ARITY_SIGNAL_INPUT = [
 ]
 
 
-async def test_generated_system_nexus_terminal_enters_interception_boundary() -> None:
+async def test_generated_system_nexus_terminal_schedules_directly() -> None:
     terminal = CapturingSystemNexusTerminal()
     request = workflow_service_models.SignalWithStartWorkflowRequest(
         workflow="workflow",
@@ -94,6 +105,37 @@ async def test_generated_system_nexus_terminal_enters_interception_boundary() ->
     assert terminal.input.service == "temporal.api.workflowservice.v1.WorkflowService"
     assert terminal.input.operation_name == "SignalWithStartWorkflowExecution"
     assert terminal.input.input is request
+
+
+@pytest.mark.parametrize(
+    ("service", "operation"),
+    [
+        ("temporal.api.workflowservice.v1.WorkflowService", "UnknownOperation"),
+        ("unknown.Service", "SignalWithStartWorkflowExecution"),
+    ],
+)
+async def test_unknown_system_nexus_operations_fail(
+    service: str, operation: str
+) -> None:
+    terminal = CapturingSystemNexusTerminal()
+    input: StartNexusOperationInput[typing.Any, typing.Any] = StartNexusOperationInput(
+        endpoint="__temporal_system",
+        service=service,
+        operation=operation,
+        input=None,
+        output_type=None,
+        schedule_to_close_timeout=None,
+        schedule_to_start_timeout=None,
+        start_to_close_timeout=None,
+        cancellation_type=workflow.NexusOperationCancellationType.WAIT_COMPLETED,
+        headers=None,
+        summary=None,
+    )
+
+    with pytest.raises(ValueError, match=f"{service}/{operation}"):
+        _ = await _start_system_nexus_operation(terminal, input)
+
+    assert terminal.input is None
 
 
 @workflow.defn

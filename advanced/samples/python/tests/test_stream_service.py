@@ -463,14 +463,7 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
             return self
 
         @override
-        async def start_system_nexus_operation(
-            self,
-            input: StartNexusOperationInput[typing.Any, typing.Any],
-        ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
-            raise AssertionError("a read goes through its typed hook")
-
-        @override
-        async def _intercept_system_nexus_operation(
+        async def _schedule_system_nexus_operation(
             self,
             input: StartNexusOperationInput[typing.Any, typing.Any],
         ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
@@ -489,13 +482,6 @@ async def test_system_nexus_dispatch_decodes_a_read_with_its_type_argument() -> 
             self,
         ) -> _SystemNexusWorkflowOutboundInterceptorBase:
             return self.next
-
-        @override
-        async def start_system_nexus_operation(
-            self,
-            input: StartNexusOperationInput[typing.Any, typing.Any],
-        ) -> temporalio.workflow.NexusOperationHandle[typing.Any]:
-            return await self.next.start_system_nexus_operation(input)
 
     _ = await _start_system_nexus_operation(
         PassThrough(Root()),

@@ -19,10 +19,6 @@ namespace Temporalio.Worker.Interceptors
     public partial class WorkflowOutboundInterceptor
     {
         protected WorkflowOutboundInterceptor Next => throw new NotSupportedException();
-
-        public virtual Task<NexusWorkflowOperationHandle<TResult>>
-            ScheduleSystemNexusOperationAsync<TResult>(ScheduleSystemNexusOperationInput input) =>
-            throw new NotSupportedException();
     }
 }
 
@@ -44,6 +40,13 @@ namespace Temporalio.Worker
             string service, string operationName, object? arg) =>
             StartSystemNexusOperationAsync<TResult>(service, operationName, arg);
 
+        private Task<NexusWorkflowOperationHandle<TResult>> ScheduleSystemNexusOperationAsync<TResult>(
+            Interceptors.ScheduleSystemNexusOperationInput input)
+        {
+            Root.Scheduled.Add(input);
+            return Task.FromResult<NexusWorkflowOperationHandle<TResult>>(null!);
+        }
+
         internal partial class OutboundImpl : Interceptors.WorkflowOutboundInterceptor
         {
             private readonly WorkflowInstance instance;
@@ -51,14 +54,6 @@ namespace Temporalio.Worker
             public OutboundImpl(WorkflowInstance instance) => this.instance = instance;
 
             public List<Interceptors.ScheduleSystemNexusOperationInput> Scheduled { get; } = new();
-
-            public override Task<NexusWorkflowOperationHandle<TResult>>
-                ScheduleSystemNexusOperationAsync<TResult>(
-                    Interceptors.ScheduleSystemNexusOperationInput input)
-            {
-                Scheduled.Add(input);
-                return Task.FromResult<NexusWorkflowOperationHandle<TResult>>(null!);
-            }
         }
     }
 }

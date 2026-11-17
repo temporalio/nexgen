@@ -336,6 +336,22 @@ serialization-context helpers named in your WIT. For `@nexus.source`, write
 `TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the support
 namespace to the call. Verify that the project compiles with `dotnet build`.
 
+### System Nexus interception in Python, .NET, and TypeScript
+
+With `--system-nexus`, workflow operations use their operation-specific outbound
+interceptor chain and then schedule directly. SDK integrations must not enter a
+second, generic System Nexus or ordinary Nexus interceptor chain.
+
+Python terminal implementations provide `_schedule_system_nexus_operation`. .NET
+integrations provide `WorkflowInstance.ScheduleSystemNexusOperationAsync` for
+generated terminal methods to call directly. TypeScript integrations pass a
+direct scheduling callback to `dispatchSystemNexusSpecificInterceptors`.
+
+Dispatch rejects services and operations outside the generated bindings. .NET
+also rejects operations with generic request or response models because their
+operation-specific interception is not yet supported. See
+[nexgen issue #414](https://github.com/temporalio/nexgen/issues/414).
+
 ---
 
 ## Type Mappings
