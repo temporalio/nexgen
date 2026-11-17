@@ -1,0 +1,11 @@
+package test:conflict-unused;
+
+world system { export models; }
+
+interface models {
+  record unused {
+    /// @nexus.source python="value()"
+    /// @nexus.omit
+    value: string,
+  }
+}

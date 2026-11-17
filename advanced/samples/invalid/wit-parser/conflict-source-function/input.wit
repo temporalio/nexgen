@@ -1,0 +1,12 @@
+package test:conflict-source-function;
+
+world system { export models; }
+
+interface models {
+  record unused {
+    /// @nexus.source python="value()"
+    /// @nexus.function args-field="args" result="object"
+    value: string,
+    args: list<string>,
+  }
+}

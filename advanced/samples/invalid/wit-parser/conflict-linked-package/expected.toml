@@ -1,0 +1,8 @@
+inputs = ["input.wit", "deps"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.omit` on type `types.unused` field `value`",
+  "cannot be combined with `@nexus.flatten-in-api`",
+]

@@ -1,0 +1,9 @@
+package test:conflict-type-parameter-proto;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.proto "example.Value"
+  /// @nexus.type-parameter
+  type unused = string;
+}

@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.proto` on type `models.unused`",
+  "cannot be combined with `@nexus.type-parameter`",
+]

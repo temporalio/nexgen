@@ -1,3 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
-contains = ["cannot be combined with `@nexus.source` for the same target"]
+contains = [
+  "invalid WIT directive `@nexus.source`",
+  "cannot be combined with `@nexus.api-omit` for the same target",
+]

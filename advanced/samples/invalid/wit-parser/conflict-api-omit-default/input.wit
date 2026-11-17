@@ -1,0 +1,11 @@
+package test:conflict-api-omit-default;
+
+world system { export models; }
+
+interface models {
+  record unused {
+    /// @nexus.api-omit targets="workflow"
+    /// @nexus.default python="'value'" targets="client"
+    value: option<string>,
+  }
+}

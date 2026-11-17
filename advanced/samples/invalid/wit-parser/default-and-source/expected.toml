@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["@nexus.default", "namespace", "cannot be combined with `@nexus.source`"]
