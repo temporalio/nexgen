@@ -15,7 +15,7 @@
 //! |---|---|---|
 //! | Go | `go vet` (which type-checks) | — |
 //! | TypeScript | `tsc --noEmit` | a module import |
-//! | Python | `py_compile`, on the declared 3.10 floor too | a module import |
+//! | Python | `py_compile`, on the declared 3.11 floor too | a module import |
 //! | Java | `javac --release 8` | — |
 //!
 //! Unformatted matters: `ruff format` reparses and rewrites, which is why a
@@ -818,7 +818,7 @@ fn check_python(
 
     // The declared floor, not just the interpreter that happens to be installed:
     // an f-string nesting rule relaxed in 3.12 makes a 3.13-clean file a
-    // SyntaxError on 3.10.
+    // SyntaxError on 3.11.
     let mut interpreters: Vec<(String, Vec<String>)> = vec![(
         "py_compile".to_string(),
         vec![
@@ -827,7 +827,7 @@ fn check_python(
                 .into_owned(),
         ],
     )];
-    for version in ["3.10", "3.11"] {
+    for version in ["3.11"] {
         let argv = vec![
             "uv".to_string(),
             "run".to_string(),

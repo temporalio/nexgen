@@ -211,7 +211,7 @@ def test_year_zero_is_a_violation_rather_than_a_value_error() -> None:
         # RFC 3339 allows any number of fractional digits. `isoformat` writes only
         # 3 or 6, and before 3.11 `fromisoformat` parses only what `isoformat`
         # writes -- so every width below except `.123456` used to raise on the
-        # declared 3.10 floor while every other target accepted it.
+        # former 3.10 floor while every other target accepted it.
         (".1", 100000, ".1"),
         (".12", 120000, ".12"),
         (".123", 123000, ".123"),

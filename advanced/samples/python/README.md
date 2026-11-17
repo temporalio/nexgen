@@ -1,6 +1,6 @@
 # Python WIT Examples
 
-`uv`-managed Python 3.10+ example suite for the WIT generator outputs, plus the
+`uv`-managed Python 3.11+ example suite for the WIT generator outputs, plus the
 snapshot-only JSON-Schema **Workflow API** outputs.
 
 - Authored WIT inputs live in `advanced/samples/inputs/*.wit`
