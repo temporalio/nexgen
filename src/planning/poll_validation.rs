@@ -1,7 +1,7 @@
-//! Refuse a client poll on an operation that can't get an iterator, or whose `items` field isn't
-//! a list in the model. The check runs before any generator, so it doesn't depend on the
-//! language. It runs on the planned spec, since an operation that returns a resource is known
-//! only after resource resolution.
+//! Refuse a poll on an operation that can't get an iterator, or whose `items` field isn't a list
+//! in the model. Each generated target that the poll lists gets the same checks. The check runs
+//! before any generator, so it doesn't depend on the language. It runs on the planned spec, since
+//! an operation that returns a resource is known only after resource resolution.
 
 use std::path::Path;
 
@@ -19,24 +19,29 @@ impl CompilerPass<PlannedFamily, PlannedFamily> for PollValidationPass {
         &mut self,
         leaf: ApiSpecLeaf<PlannedFamily>,
     ) -> Result<ApiSpecLeaf<PlannedFamily>> {
-        // Only the client target gets an iterator.
-        if nexgen_config::current()
-            .targets
-            .contains(&GenerationTarget::Client)
-        {
-            validate_client_polls(&leaf.spec, &leaf.source_path)?;
+        // A target that this run doesn't generate gets no iterator, so its poll can't fail.
+        for target in nexgen_config::current().targets {
+            validate_polls(&leaf.spec, &leaf.source_path, target)?;
         }
         Ok(leaf)
     }
 }
 
-fn validate_client_polls(spec: &PlannedSpec, path: &Path) -> Result<()> {
+/// Workflow is a Temporal term, so the diagnostic capitalizes it, as the docs do.
+fn target_label(target: GenerationTarget) -> &'static str {
+    match target {
+        GenerationTarget::Workflow => "Workflow",
+        GenerationTarget::Client => "client",
+    }
+}
+
+fn validate_polls(spec: &PlannedSpec, path: &Path, target: GenerationTarget) -> Result<()> {
     for service in &spec.services {
         for operation in &service.operations {
             let Some(poll) = operation
                 .poll
                 .as_ref()
-                .filter(|poll| poll.targets.contains(&GenerationTarget::Client))
+                .filter(|poll| poll.targets.contains(&target))
             else {
                 continue;
             };
@@ -63,6 +68,7 @@ fn validate_client_polls(spec: &PlannedSpec, path: &Path) -> Result<()> {
             };
             if let Some(reason) = reason {
                 return Err(Error::UnsupportedPoll {
+                    target: target_label(target),
                     path: path.to_path_buf(),
                     operation: format!("{}.{}", service.name, operation.name),
                     reason,

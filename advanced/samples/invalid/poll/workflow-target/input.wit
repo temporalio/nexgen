@@ -2,11 +2,17 @@ package temporal:poll-workflow-target@1.0.0;
 
 world service { export reader; }
 
+// A poll with no `targets` is on every target, so a run of the Workflow target alone checks it.
 /// @nexus.endpoint "reader"
 interface reader {
-  record read-request { offset: option<s64> }
-  record read-response { done: option<bool> }
+  resource cursor {
+    constructor(offset: s64);
+  }
 
-  /// @nexus.poll python="next_read" targets="workflow,client"
-  read: func(request: read-request) -> read-response;
+  type cursor-result = own<cursor>;
+
+  record open-request { offset: s64 }
+
+  /// @nexus.poll python="next_open_request"
+  open: func(request: open-request) -> cursor-result;
 }
