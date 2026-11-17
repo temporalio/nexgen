@@ -2782,7 +2782,7 @@ type or transform expression refers to an otherwise-unavailable module.
 ### @nexus.poll
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.poll python="<support-helper>" targets="client"`, with optional
+`@nexus.poll python="<support-helper>"`, with optional `targets`,
 `items="<field>"` and `python-resume="<support-helper>"`
 
 Generates an `iter_<name>` async iterator on the client extension, and on each
@@ -2791,9 +2791,14 @@ yields the response, and calls `<support-helper>(request, response)` for the
 next request. The helper is a sync function in the `--support-package`. It
 returns `None` to stop.
 
+The Workflow target gets the same iterators on each Workflow resource method
+that binds the operation. Each page is the call of the Workflow method, so the
+loop uses no clock, sleep or thread. Without `targets`, every target that has
+the method gets them, and `targets="client"` keeps them out of Workflow code.
+
 ```wit
 /// @nexus.operation name="ReadRecords"
-/// @nexus.poll python="next_read_request" targets="client"
+/// @nexus.poll python="next_read_request"
 read-records: func(request: read-records-request) -> read-records-response;
 ```
 
@@ -2822,7 +2827,7 @@ field `<field>` of each response. It returns a `PollIterator`, whose
 
 ```wit
 /// @nexus.poll python="next_read_request" items="records"
-///   python-resume="resume_read_request" targets="client"
+///   python-resume="resume_read_request"
 read-records: func(request: read-records-request) -> read-records-response;
 ```
 
@@ -2839,10 +2844,10 @@ The stream sample's full helpers are in
 [`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
 
 - `iter_<name>` yields pages, and `iter_<name>_items` yields the items in them.
-- All pages use one Nexus client. Each page is a new operation with a new random
-  operation ID.
-- Only the Python client target generates the iterator, so `targets` must be
-  `client`.
+- In the client, all pages use one Nexus client. Each page is a new operation
+  with a new random operation ID.
+- Only Python generates the iterators. The Workflow target has no standalone
+  iterator, only the ones on resource methods.
 - nexgen refuses the directive on a resource method, on an operation that it
   can't poll, and when an iterator clashes with another member.
 - nexgen refuses an `items` field that the response doesn't have, a field with
