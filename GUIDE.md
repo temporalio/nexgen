@@ -3006,6 +3006,13 @@ Declared defaults and sources are resolved when calling the workflow operation,
 not by model or options builders. Signal-with-start defaults its task queue to
 the calling workflow's task queue; an explicit option overrides that default.
 
+System Nexus interception generates a typed interface with separate `Base` and
+`Terminal` implementations. `Base` forwards each operation to the next typed
+hook; `Terminal` executes it through the SDK-owned `executeSystemNexusOperation`
+transport. Neither enters ordinary Nexus interceptor hooks. SDK integration
+supplies the next interceptor and terminal transport once, without handwritten
+methods for individual operations.
+
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
 `@nexus.function` to additionally generate typed overloads. Bound method
 references are followed directly by their arguments, using `Functions.FuncN` or

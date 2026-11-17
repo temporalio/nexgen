@@ -1707,8 +1707,9 @@ impl Context<'_> {
     }
     fn interceptors(&self) -> String {
         let mut out = String::from(
-            "/** Generated typed system Nexus hooks. */\npublic interface SystemNexusWorkflowOutboundInterceptor {\n  <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> executeNexusOperation(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input);\n",
+            "/** Generated typed system Nexus hooks, separate from ordinary Nexus interception. */\npublic interface SystemNexusWorkflowOutboundInterceptor {\n",
         );
+        let mut hooks = Vec::new();
         for service in &self.spec.services {
             for op in &service.operations {
                 let output = op
@@ -1726,29 +1727,25 @@ impl Context<'_> {
                 } else {
                     format!("{generic_args} ")
                 };
-                writeln!(out, "  default {generic} io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> execute{}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input) {{ return executeNexusOperation(input); }}", op.name.to_upper_camel_case()).unwrap();
+                let method = format!("execute{}", op.name.to_upper_camel_case());
+                let signature = format!(
+                    "{generic}io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> {method}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input)"
+                );
+                writeln!(out, "  {signature};").unwrap();
+                hooks.push((signature, method));
             }
         }
-        out.push_str("  abstract class Base implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract SystemNexusWorkflowOutboundInterceptor nextSystemNexusInterceptor();\n");
-        for service in &self.spec.services {
-            for op in &service.operations {
-                let output = op
-                    .output
-                    .as_ref()
-                    .map(|t| self.ty(t))
-                    .unwrap_or("Void".into());
-                let generic_args = op
-                    .output
-                    .as_ref()
-                    .map(|t| self.type_args(&self.spec.type_parameters(t)))
-                    .unwrap_or_default();
-                let generic = if generic_args.is_empty() {
-                    String::new()
-                } else {
-                    format!("{generic_args} ")
-                };
-                writeln!(out, "    @Override public {generic} io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> execute{}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input) {{ return nextSystemNexusInterceptor().execute{}(input); }}", op.name.to_upper_camel_case(), op.name.to_upper_camel_case()).unwrap();
-            }
+        out.push_str("  /** Forwards each typed hook to the next interceptor without entering ordinary Nexus hooks. */\n  abstract class Base implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract SystemNexusWorkflowOutboundInterceptor nextSystemNexusInterceptor();\n");
+        for (signature, method) in &hooks {
+            writeln!(out, "    @Override public {signature} {{ return nextSystemNexusInterceptor().{method}(input); }}").unwrap();
+        }
+        out.push_str("  }\n  /** Executes typed hooks through the terminal transport, never through the interceptor chain. */\n  abstract class Terminal implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> executeSystemNexusOperation(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input);\n");
+        for (signature, _) in &hooks {
+            writeln!(
+                out,
+                "    @Override public {signature} {{ return executeSystemNexusOperation(input); }}"
+            )
+            .unwrap();
         }
         out.push_str("  }\n}\n");
         out

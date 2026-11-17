@@ -12,16 +12,16 @@ import wit.multioperationservice.*;
 
 class SystemNexusInterceptorTest {
   @Test
-  void registryDispatchesTypedHooksThroughForwardingBases() {
+  void registryDispatchesTypedHooksThroughDirectImplementations() {
     List<String> calls = new ArrayList<>();
     ExecuteNexusOperationOutput<Response> output = new ExecuteNexusOperationOutput<>(null, null);
     SystemNexusWorkflowOutboundInterceptor terminal =
-        new SystemNexusWorkflowOutboundInterceptor() {
+        new SystemNexusWorkflowOutboundInterceptor.Terminal() {
           @Override
           @SuppressWarnings("unchecked")
-          public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
+          protected <R> ExecuteNexusOperationOutput<R> executeSystemNexusOperation(
               ExecuteNexusOperationInput<R> input) {
-            calls.add("generic:" + input.getOperation());
+            calls.add("transport:" + input.getOperation());
             return (ExecuteNexusOperationOutput<R>) output;
           }
 
@@ -29,27 +29,47 @@ class SystemNexusInterceptorTest {
           public ExecuteNexusOperationOutput<Response> executeFirstOperation(
               ExecuteNexusOperationInput<Response> input) {
             calls.add("typed:first");
-            return executeNexusOperation(input);
+            return super.executeFirstOperation(input);
+          }
+
+          public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
+              ExecuteNexusOperationInput<R> input) {
+            fail("The generated terminal must use the dedicated system transport");
+            return null;
           }
         };
-    SystemNexusWorkflowOutboundInterceptor forwarding =
+    SystemNexusWorkflowOutboundInterceptor base =
         new SystemNexusWorkflowOutboundInterceptor.Base() {
           @Override
           protected SystemNexusWorkflowOutboundInterceptor nextSystemNexusInterceptor() {
             return terminal;
           }
 
-          @Override
           public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
               ExecuteNexusOperationInput<R> input) {
-            fail("Typed forwarding must preserve the next interceptor's typed hook");
+            fail("System forwarding must bypass ordinary Nexus hooks");
             return null;
+          }
+        };
+    SystemNexusWorkflowOutboundInterceptor forwarding =
+        new SystemNexusWorkflowOutboundInterceptor() {
+          @Override
+          public ExecuteNexusOperationOutput<Response> executeFirstOperation(
+              ExecuteNexusOperationInput<Response> input) {
+            return base.executeFirstOperation(input);
+          }
+
+          @Override
+          public ExecuteNexusOperationOutput<Response> executeSecondOperation(
+              ExecuteNexusOperationInput<Response> input) {
+            return base.executeSecondOperation(input);
           }
         };
     assertSame(output, SystemNexusOperations.execute(forwarding, input("FirstOperation")));
     assertSame(output, SystemNexusOperations.execute(forwarding, input("SecondOperation")));
     assertEquals(
-        Arrays.asList("typed:first", "generic:FirstOperation", "generic:SecondOperation"), calls);
+        Arrays.asList("typed:first", "transport:FirstOperation", "transport:SecondOperation"),
+        calls);
     assertThrows(
         IllegalArgumentException.class,
         () -> SystemNexusOperations.execute(forwarding, input("Unknown")));
