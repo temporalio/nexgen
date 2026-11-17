@@ -39,14 +39,7 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a CreateStreamResult<> result.");
                 }
-                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                    Service: service,
-                    Operation: new(
-                        operationName,
-                        arg?.GetType() ?? typeof(object),
-                        typeof(TResult)),
-                    Arg: arg,
-                    Headers: null));
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "AppendRecords")
@@ -60,14 +53,7 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a AppendRecordsResponse result.");
                 }
-                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                    Service: service,
-                    Operation: new(
-                        operationName,
-                        arg?.GetType() ?? typeof(object),
-                        typeof(TResult)),
-                    Arg: arg,
-                    Headers: null));
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "CloseStream")
@@ -81,14 +67,7 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a CloseStreamResponse result.");
                 }
-                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                    Service: service,
-                    Operation: new(
-                        operationName,
-                        arg?.GetType() ?? typeof(object),
-                        typeof(TResult)),
-                    Arg: arg,
-                    Headers: null));
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "ReadRecords")
@@ -103,14 +82,7 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a ReadRecordsResponse<> result.");
                 }
-                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                    Service: service,
-                    Operation: new(
-                        operationName,
-                        arg?.GetType() ?? typeof(object),
-                        typeof(TResult)),
-                    Arg: arg,
-                    Headers: null));
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "DescribeStream")
@@ -124,23 +96,9 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a DescribeStreamResponse result.");
                 }
-                return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                    Service: service,
-                    Operation: new(
-                        operationName,
-                        arg?.GetType() ?? typeof(object),
-                        typeof(TResult)),
-                    Arg: arg,
-                    Headers: null));
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
-            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                Service: service,
-                Operation: new(
-                    operationName,
-                    arg?.GetType() ?? typeof(object),
-                    typeof(TResult)),
-                Arg: arg,
-                Headers: null));
+            throw new System.ArgumentException($"Unsupported System Nexus operation: {service}/{operationName}");
         }
 
         internal partial class OutboundImpl

@@ -1,0 +1,1 @@
+Python and .NET System Nexus interceptor terminals now require direct SDK scheduling instead of a generic System Nexus interceptor chain. Unknown System Nexus operations fail in Python, .NET, and TypeScript; .NET operations with generic request or response models fail until operation-specific interception supports them.

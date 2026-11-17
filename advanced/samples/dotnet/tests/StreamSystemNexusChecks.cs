@@ -1,7 +1,6 @@
 extern alias SystemNexusStreams;
 
-using System.Linq;
-using System.Threading.Tasks;
+using System;
 using Xunit;
 using StreamModels = SystemNexusStreams::Temporalio.Workflows;
 using WorkflowInstance = SystemNexusStreams::Temporalio.Worker.WorkflowInstance;
@@ -14,31 +13,45 @@ namespace Nexgen.DotNetExamples.Tests
 
         public sealed record Turn(string Role);
 
-        // C# generics are invariant, so a check against `<object>` refuses a `Stream<Turn>` call.
         [Fact]
-        public async Task StreamOfTurnCallsKeepTheirTypes()
+        public void GenericModelsFailInsteadOfBypassingInterception()
         {
             var instance = new WorkflowInstance();
             var streamRef = new StreamModels.StreamRef<Turn>("stream-1");
 
-            await instance.StartAsync<StreamModels.AppendRecordsResponse>(
-                StreamService,
-                "AppendRecords",
-                new StreamModels.AppendRecordsRequest<Turn>(
-                    streamRef, new StreamModels.AppendRecord<Turn>[0], null));
-            await instance.StartAsync<StreamModels.ReadRecordsResponse<Turn>>(
-                StreamService, "ReadRecords", new StreamModels.ReadRecordsRequest<Turn>(streamRef));
+            var appendError = Assert.Throws<NotSupportedException>(() =>
+            {
+                _ = instance.StartAsync<StreamModels.AppendRecordsResponse>(
+                    StreamService,
+                    "AppendRecords",
+                    new StreamModels.AppendRecordsRequest<Turn>(
+                        streamRef, new StreamModels.AppendRecord<Turn>[0], null));
+            });
+            var readError = Assert.Throws<NotSupportedException>(() =>
+            {
+                _ = instance.StartAsync<StreamModels.ReadRecordsResponse<Turn>>(
+                    StreamService, "ReadRecords", new StreamModels.ReadRecordsRequest<Turn>(streamRef));
+            });
 
-            Assert.Equal(
-                new[]
-                {
-                    (typeof(StreamModels.AppendRecordsRequest<Turn>),
-                        typeof(StreamModels.AppendRecordsResponse)),
-                    (typeof(StreamModels.ReadRecordsRequest<Turn>),
-                        typeof(StreamModels.ReadRecordsResponse<Turn>)),
-                },
-                instance.Root.Scheduled.Select(
-                    input => (input.Operation.InputType, input.Operation.OutputType)));
+            Assert.Contains("generic models", appendError.Message);
+            Assert.Contains("generic models", readError.Message);
+            Assert.Empty(instance.Root.Scheduled);
+        }
+
+        [Theory]
+        [InlineData(StreamService, "UnknownOperation")]
+        [InlineData("unknown.Service", "ReadRecords")]
+        public void UnknownOperationsFail(string service, string operation)
+        {
+            var instance = new WorkflowInstance();
+
+            var error = Assert.Throws<ArgumentException>(() =>
+            {
+                _ = instance.StartAsync<object>(service, operation, null);
+            });
+
+            Assert.Contains($"{service}/{operation}", error.Message);
+            Assert.Empty(instance.Root.Scheduled);
         }
     }
 }

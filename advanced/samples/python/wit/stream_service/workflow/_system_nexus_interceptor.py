@@ -97,7 +97,9 @@ async def _start_system_nexus_operation(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
             await interceptor.start_describe_stream(typed_input.input),
         )
-    return await interceptor.start_system_nexus_operation(input)
+    raise ValueError(
+        f"unsupported System Nexus operation: {input.service}/{input.operation_name}"
+    )
 
 
 class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
@@ -105,14 +107,6 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
     def _next_system_nexus_interceptor(
         self,
     ) -> _SystemNexusWorkflowOutboundInterceptorBase: ...
-
-    @abc.abstractmethod
-    async def start_system_nexus_operation(
-        self,
-        input: StartNexusOperationInput[_InputT, _OutputT],
-    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:
-        """Intercept a System Nexus operation through the generic hook."""
-        ...
 
     async def start_create_stream(
         self,
@@ -161,7 +155,7 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
 
 class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
     @abc.abstractmethod
-    async def _intercept_system_nexus_operation(
+    async def _schedule_system_nexus_operation(
         self,
         input: StartNexusOperationInput[_InputT, _OutputT],
     ) -> temporalio.workflow.NexusOperationHandle[_OutputT]: ...
@@ -177,7 +171,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -205,7 +199,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -228,7 +222,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -255,7 +249,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -283,7 +277,7 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",

@@ -39,9 +39,13 @@ export function dispatchSystemNexusSpecificInterceptors(
             nexus.NexusOperationHandle<unknown>
           >;
         default:
-          return next(input);
+          throw new TypeError(
+            `Unsupported System Nexus operation: ${service}/${operation}`,
+          );
       }
     default:
-      return next(input);
+      throw new TypeError(
+        `Unsupported System Nexus operation: ${service}/${operation}`,
+      );
   }
 }
