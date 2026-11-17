@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import timedelta
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -10,6 +12,10 @@ from temporalio.testing import WorkflowEnvironment
 
 
 DEV_SERVER_DOWNLOAD_VERSION = "v1.7.1-system-nexus-operations"
+DEV_SERVER_DOWNLOAD_DIR = (
+    Path(__file__).resolve().parents[3] / "target" / "temporal-cli"
+)
+DEV_SERVER_STARTUP_TIMEOUT = timedelta(seconds=60)
 DEV_SERVER_EXTRA_ARGS = [
     "--dynamic-config-value",
     "history.enableSignalWithStartFromWorkflow=true",
@@ -39,9 +45,12 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")
 async def env(env_type: str) -> AsyncIterator[WorkflowEnvironment]:
     if env_type == "local":
+        DEV_SERVER_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
         workflow_environment = await WorkflowEnvironment.start_local(
+            download_dest_dir=str(DEV_SERVER_DOWNLOAD_DIR),
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
             dev_server_extra_args=DEV_SERVER_EXTRA_ARGS,
+            dev_server_startup_timeout=DEV_SERVER_STARTUP_TIMEOUT,
         )
     else:
         workflow_environment = WorkflowEnvironment.from_client(
