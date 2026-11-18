@@ -13,6 +13,9 @@ public final class BadBinaries {
     this.binaries = binaries;
   }
 
+  /**
+   * @return the binaries
+   */
   public java.util.Map<String, wit.protobackedshowcase.BadBinary> getBinaries() {
     return binaries;
   }
@@ -30,6 +33,8 @@ public final class BadBinaries {
   }
 
   public static final class Builder {
+    private java.util.Map<String, wit.protobackedshowcase.BadBinary> binaries = null;
+
     private Builder() {}
 
     private Builder(BadBinaries value) {
@@ -37,8 +42,10 @@ public final class BadBinaries {
       this.binaries = value.binaries;
     }
 
-    private java.util.Map<String, wit.protobackedshowcase.BadBinary> binaries = null;
-
+    /**
+     * @param value the binaries
+     * @return this builder
+     */
     public Builder setBinaries(java.util.Map<String, wit.protobackedshowcase.BadBinary> value) {
       this.binaries = value;
       return this;

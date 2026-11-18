@@ -2,47 +2,54 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class Inner<ContextT> {
-  private final ContextT value;
+public final class Inner<T> {
+  private final T value;
 
   @com.fasterxml.jackson.annotation.JsonCreator
-  public Inner(@com.fasterxml.jackson.annotation.JsonProperty("value") ContextT value) {
+  public Inner(@com.fasterxml.jackson.annotation.JsonProperty("value") T value) {
     this.value = value;
   }
 
-  public ContextT getValue() {
+  /**
+   * @return the value
+   */
+  public T getValue() {
     return value;
   }
 
-  public Builder<ContextT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder(Inner<ContextT> value) {
-    return new Builder<ContextT>(value);
+  public static <T> Builder<T> newBuilder(Inner<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder() {
-    return new Builder<ContextT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<ContextT> {
+  public static final class Builder<T> {
+    private T value = null;
+
     private Builder() {}
 
-    private Builder(Inner<ContextT> value) {
+    private Builder(Inner<T> value) {
       if (value == null) return;
       this.value = value.value;
     }
 
-    private ContextT value = null;
-
-    public Builder<ContextT> setValue(ContextT value) {
+    /**
+     * @param value the value
+     * @return this builder
+     */
+    public Builder<T> setValue(T value) {
       this.value = value;
       return this;
     }
 
-    public Inner<ContextT> build() {
-      return new Inner<ContextT>(value);
+    public Inner<T> build() {
+      return new Inner<T>(value);
     }
   }
 }

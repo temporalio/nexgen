@@ -12,6 +12,9 @@ public final class SignalResultResponse {
     this.started = started;
   }
 
+  /**
+   * @return the started
+   */
   public Boolean getStarted() {
     return started;
   }
@@ -29,6 +32,8 @@ public final class SignalResultResponse {
   }
 
   public static final class Builder {
+    private Boolean started = null;
+
     private Builder() {}
 
     private Builder(SignalResultResponse value) {
@@ -36,8 +41,10 @@ public final class SignalResultResponse {
       this.started = value.started;
     }
 
-    private Boolean started = null;
-
+    /**
+     * @param value the started
+     * @return this builder
+     */
     public Builder setStarted(Boolean value) {
       this.started = value;
       return this;

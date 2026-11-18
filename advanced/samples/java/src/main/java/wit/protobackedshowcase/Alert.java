@@ -16,10 +16,16 @@ public final class Alert {
     this.severity = severity;
   }
 
+  /**
+   * @return the message
+   */
   public String getMessage() {
     return message;
   }
 
+  /**
+   * @return the severity
+   */
   public wit.protobackedshowcase.AlertLevel getSeverity() {
     return severity;
   }
@@ -37,6 +43,9 @@ public final class Alert {
   }
 
   public static final class Builder {
+    private String message = "";
+    private wit.protobackedshowcase.AlertLevel severity = null;
+
     private Builder() {}
 
     private Builder(Alert value) {
@@ -45,15 +54,19 @@ public final class Alert {
       this.severity = value.severity;
     }
 
-    private String message = "";
-
+    /**
+     * @param value the message
+     * @return this builder
+     */
     public Builder setMessage(String value) {
       this.message = value;
       return this;
     }
 
-    private wit.protobackedshowcase.AlertLevel severity = null;
-
+    /**
+     * @param value the severity
+     * @return this builder
+     */
     public Builder setSeverity(wit.protobackedshowcase.AlertLevel value) {
       this.severity = value;
       return this;

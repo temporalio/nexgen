@@ -9,11 +9,7 @@ public final class ExecuteCountedFunctionRequest {
   }
 
   private final FunctionFunction function;
-
-  /** The name argument for the function. */
   private final String name;
-
-  /** The count argument for the function. */
   private final Integer count;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -26,14 +22,27 @@ public final class ExecuteCountedFunctionRequest {
     this.count = count;
   }
 
+  /**
+   * @return the function
+   */
   public FunctionFunction getFunction() {
     return function;
   }
 
+  /**
+   * The name argument for the function.
+   *
+   * @return the name
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * The count argument for the function.
+   *
+   * @return the count
+   */
   public Integer getCount() {
     return count;
   }
@@ -51,6 +60,10 @@ public final class ExecuteCountedFunctionRequest {
   }
 
   public static final class Builder {
+    private FunctionFunction function = null;
+    private String name = "";
+    private Integer count = null;
+
     private Builder() {}
 
     private Builder(ExecuteCountedFunctionRequest value) {
@@ -60,22 +73,32 @@ public final class ExecuteCountedFunctionRequest {
       this.count = value.count;
     }
 
-    private FunctionFunction function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(FunctionFunction value) {
       this.function = value;
       return this;
     }
 
-    private String name = "";
-
+    /**
+     * The name argument for the function.
+     *
+     * @param value the name
+     * @return this builder
+     */
     public Builder setName(String value) {
       this.name = value;
       return this;
     }
 
-    private Integer count = null;
-
+    /**
+     * The count argument for the function.
+     *
+     * @param value the count
+     * @return this builder
+     */
     public Builder setCount(Integer value) {
       this.count = value;
       return this;

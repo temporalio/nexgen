@@ -3,48 +3,54 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(OptionalPayloads.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class OptionalPayloads<OutputT> {
-  private final OutputT details;
+public final class OptionalPayloads<U> {
+  private final U details;
 
   @com.fasterxml.jackson.annotation.JsonCreator
-  public OptionalPayloads(
-      @com.fasterxml.jackson.annotation.JsonProperty("details") OutputT details) {
+  public OptionalPayloads(@com.fasterxml.jackson.annotation.JsonProperty("details") U details) {
     this.details = details;
   }
 
-  public OutputT getDetails() {
+  /**
+   * @return the details
+   */
+  public U getDetails() {
     return details;
   }
 
-  public Builder<OutputT> toBuilder() {
+  public Builder<U> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder(OptionalPayloads<OutputT> value) {
-    return new Builder<OutputT>(value);
+  public static <U> Builder<U> newBuilder(OptionalPayloads<U> value) {
+    return new Builder<U>(value);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder() {
-    return new Builder<OutputT>();
+  public static <U> Builder<U> newBuilder() {
+    return new Builder<U>();
   }
 
-  public static final class Builder<OutputT> {
+  public static final class Builder<U> {
+    private U details = null;
+
     private Builder() {}
 
-    private Builder(OptionalPayloads<OutputT> value) {
+    private Builder(OptionalPayloads<U> value) {
       if (value == null) return;
       this.details = value.details;
     }
 
-    private OutputT details = null;
-
-    public Builder<OutputT> setDetails(OutputT value) {
+    /**
+     * @param value the details
+     * @return this builder
+     */
+    public Builder<U> setDetails(U value) {
       this.details = value;
       return this;
     }
 
-    public OptionalPayloads<OutputT> build() {
-      return new OptionalPayloads<OutputT>(details);
+    public OptionalPayloads<U> build() {
+      return new OptionalPayloads<U>(details);
     }
   }
 
@@ -60,14 +66,14 @@ public final class OptionalPayloads<OutputT> {
     return proto.build();
   }
 
-  public static <OutputT> OptionalPayloads<OutputT> fromProto(
+  public static <U> OptionalPayloads<U> fromProto(
       io.temporal.api.failure.v1.CanceledFailureInfo proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<OutputT> builder = OptionalPayloads.<OutputT>newBuilder();
+    Builder<U> builder = OptionalPayloads.<U>newBuilder();
     if (proto.hasDetails())
       builder.setDetails(
-          (OutputT)
+          (U)
               converter.fromPayloads(
                   0,
                   java.util.Optional.of(proto.getDetails()),

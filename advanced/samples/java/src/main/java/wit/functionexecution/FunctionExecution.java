@@ -3,30 +3,58 @@ package wit.functionexecution;
 
 @io.nexusrpc.Service(name = "FunctionExecution")
 public interface FunctionExecution {
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteFunction")
   wit.functionexecution.ExecuteFunctionResult executeFunction(
       wit.functionexecution.ExecuteFunctionRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteCallback")
   wit.functionexecution.ExecuteFunctionResult executeCallback(
       wit.functionexecution.ExecuteCallbackRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteCountedFunction")
   wit.functionexecution.ExecuteCountedFunctionResult executeCountedFunction(
       wit.functionexecution.ExecuteCountedFunctionRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteNamedFunction")
   wit.functionexecution.ExecuteNamedFunctionResult executeNamedFunction(
       wit.functionexecution.ExecuteNamedFunctionRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteVarargsFunction")
   wit.functionexecution.ExecuteVarargsFunctionResult executeVarargsFunction(
       wit.functionexecution.ExecuteVarargsFunctionRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteNamedVarargsFunction")
   wit.functionexecution.ExecuteNamedVarargsFunctionResult executeNamedVarargsFunction(
       wit.functionexecution.ExecuteNamedVarargsFunctionRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "ExecuteDescriptors")
   wit.functionexecution.ExecuteFunctionResult executeDescriptors(
       wit.functionexecution.ExecuteDescriptorsRequest request);

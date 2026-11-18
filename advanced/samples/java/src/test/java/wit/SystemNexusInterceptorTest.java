@@ -9,6 +9,7 @@ import io.temporal.workflow.NexusOperationOptions;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import wit.multioperationservice.*;
+import wit.multioperationservice.internal.SystemNexusOperations;
 
 class SystemNexusInterceptorTest {
   @Test
@@ -80,11 +81,11 @@ class SystemNexusInterceptorTest {
     wit.workflowservice.SignalWithStartWorkflowRequest request =
         wit.workflowservice.SignalWithStartWorkflowRequest.newBuilder()
             .setNamespace("destination")
-            .setId("target")
+            .setWorkflowId("target")
             .build();
     WorkflowSerializationContext context =
         (WorkflowSerializationContext)
-            wit.workflowservice.SystemNexusOperations.serializationContext(
+            wit.workflowservice.internal.SystemNexusOperations.serializationContext(
                 "temporal.api.workflowservice.v1.WorkflowService",
                 "SignalWithStartWorkflowExecution",
                 request);

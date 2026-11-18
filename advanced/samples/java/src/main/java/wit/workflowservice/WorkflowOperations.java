@@ -15,22 +15,24 @@ public abstract class WorkflowOperations {
         options.getTaskQueue() == null
             ? io.temporal.workflow.Workflow.getInfo().getTaskQueue()
             : options.getTaskQueue());
-    if (options.getExecutionTimeout() != null)
-      builder.setExecutionTimeout(options.getExecutionTimeout());
-    if (options.getRunTimeout() != null) builder.setRunTimeout(options.getRunTimeout());
-    if (options.getTaskTimeout() != null) builder.setTaskTimeout(options.getTaskTimeout());
-    builder.setIdReusePolicy(
-        options.getIdReusePolicy() == null
+    if (options.getWorkflowExecutionTimeout() != null)
+      builder.setWorkflowExecutionTimeout(options.getWorkflowExecutionTimeout());
+    if (options.getWorkflowRunTimeout() != null)
+      builder.setWorkflowRunTimeout(options.getWorkflowRunTimeout());
+    if (options.getWorkflowTaskTimeout() != null)
+      builder.setWorkflowTaskTimeout(options.getWorkflowTaskTimeout());
+    builder.setWorkflowIdReusePolicy(
+        options.getWorkflowIdReusePolicy() == null
             ? io.temporal.api.enums.v1.WorkflowIdReusePolicy
                 .WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-            : options.getIdReusePolicy());
-    if (options.getIdConflictPolicy() != null)
-      builder.setIdConflictPolicy(options.getIdConflictPolicy());
-    if (options.getRetryPolicy() != null) builder.setRetryPolicy(options.getRetryPolicy());
+            : options.getWorkflowIdReusePolicy());
+    if (options.getWorkflowIdConflictPolicy() != null)
+      builder.setWorkflowIdConflictPolicy(options.getWorkflowIdConflictPolicy());
+    if (options.getRetryOptions() != null) builder.setRetryOptions(options.getRetryOptions());
     if (options.getCronSchedule() != null) builder.setCronSchedule(options.getCronSchedule());
     if (options.getMemo() != null) builder.setMemo(options.getMemo());
-    if (options.getSearchAttributes() != null)
-      builder.setSearchAttributes(options.getSearchAttributes());
+    if (options.getTypedSearchAttributes() != null)
+      builder.setTypedSearchAttributes(options.getTypedSearchAttributes());
     if (options.getPriority() != null) builder.setPriority(options.getPriority());
     if (options.getVersioningOverride() != null)
       builder.setVersioningOverride(options.getVersioningOverride());
@@ -41,7 +43,16 @@ public abstract class WorkflowOperations {
     return builder;
   }
 
-  /** Signal a workflow, starting it first if needed. */
+  /**
+   * Signal a workflow, starting it first if needed.
+   *
+   * @param workflow the workflow name
+   * @param args arguments supplied to {@code workflow}
+   * @param signal the signal name
+   * @param signalArgs arguments supplied to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
+   */
   public static io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
       String workflow,
       Object[] args,
@@ -50,7 +61,8 @@ public abstract class WorkflowOperations {
       wit.workflowservice.SignalWithStartWorkflowOptions options) {
     wit.workflowservice.SignalWithStartWorkflowRequest.Builder requestBuilder =
         newSignalWithStartWorkflowRequestBuilder(options);
-    requestBuilder.setId(java.util.Objects.requireNonNull(options.getId(), "id"));
+    requestBuilder.setWorkflowId(
+        java.util.Objects.requireNonNull(options.getWorkflowId(), "workflowId"));
     requestBuilder.setArgs(java.util.Arrays.asList(java.util.Objects.requireNonNull(args, "args")));
     requestBuilder.setWorkflow(java.util.Objects.requireNonNull(workflow, "workflow"));
     requestBuilder.setSignalArgs(
@@ -63,12 +75,14 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param workflow the workflow callable
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowResult> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-      io.temporal.workflow.Functions.Func<WorkflowResult> workflow,
+  public static <R> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func<R> workflow,
       io.temporal.workflow.Functions.Proc signal,
       wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
@@ -78,16 +92,19 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func<WorkflowResult> workflow,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func<R> workflow,
+      io.temporal.workflow.Functions.Proc1<T> signal,
+      T signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow, () -> workflow.apply(), signal, () -> signal.apply(signalArg1), options);
   }
@@ -95,9 +112,10 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param workflow the workflow callable
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
   public static io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
       io.temporal.workflow.Functions.Proc workflow,
@@ -110,14 +128,17 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+  public static <T> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
       io.temporal.workflow.Functions.Proc workflow,
-      io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-      SignalArg1 signalArg1,
+      io.temporal.workflow.Functions.Proc1<T> signal,
+      T signalArg1,
       wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow, () -> workflow.apply(), signal, () -> signal.apply(signalArg1), options);
@@ -126,52 +147,17 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func1<WorkflowArg1, WorkflowResult> workflow,
-          WorkflowArg1 workflowArg1,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
-    return invokeSignalWithStartWorkflow(
-        workflow, () -> workflow.apply(workflowArg1), signal, () -> signal.apply(), options);
-  }
-
-  /**
-   * Signal a workflow, starting it first if needed.
-   *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
-   */
-  public static <SignalArg1, WorkflowArg1, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func1<WorkflowArg1, WorkflowResult> workflow,
-          WorkflowArg1 workflowArg1,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
-    return invokeSignalWithStartWorkflow(
-        workflow,
-        () -> workflow.apply(workflowArg1),
-        signal,
-        () -> signal.apply(signalArg1),
-        options);
-  }
-
-  /**
-   * Signal a workflow, starting it first if needed.
-   *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
-   */
-  public static <WorkflowArg1> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-      io.temporal.workflow.Functions.Proc1<WorkflowArg1> workflow,
-      WorkflowArg1 workflowArg1,
+  public static <R, T> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func1<T, R> workflow,
+      T workflowArg1,
       io.temporal.workflow.Functions.Proc signal,
       wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
@@ -181,17 +167,22 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc1<WorkflowArg1> workflow,
-          WorkflowArg1 workflowArg1,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T, U> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func1<T, R> workflow,
+      T workflowArg1,
+      io.temporal.workflow.Functions.Proc1<U> signal,
+      U signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1),
@@ -203,17 +194,67 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func2<WorkflowArg1, WorkflowArg2, WorkflowResult> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc1<T> workflow,
+      T workflowArg1,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
+    return invokeSignalWithStartWorkflow(
+        workflow, () -> workflow.apply(workflowArg1), signal, () -> signal.apply(), options);
+  }
+
+  /**
+   * Signal a workflow, starting it first if needed.
+   *
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
+   */
+  public static <T, U> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc1<T> workflow,
+      T workflowArg1,
+      io.temporal.workflow.Functions.Proc1<U> signal,
+      U signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
+    return invokeSignalWithStartWorkflow(
+        workflow,
+        () -> workflow.apply(workflowArg1),
+        signal,
+        () -> signal.apply(signalArg1),
+        options);
+  }
+
+  /**
+   * Signal a workflow, starting it first if needed.
+   *
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
+   */
+  public static <R, T, U> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func2<T, U, R> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2),
@@ -225,18 +266,25 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func2<WorkflowArg1, WorkflowArg2, WorkflowResult> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T, U, V> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func2<T, U, R> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      io.temporal.workflow.Functions.Proc1<V> signal,
+      V signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2),
@@ -248,17 +296,21 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc2<WorkflowArg1, WorkflowArg2> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T, U> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc2<T, U> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2),
@@ -270,18 +322,24 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc2<WorkflowArg1, WorkflowArg2> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T, U, V> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc2<T, U> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      io.temporal.workflow.Functions.Proc1<V> signal,
+      V signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2),
@@ -293,20 +351,25 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func3<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T, U, V> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func3<T, U, V, R> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
@@ -318,68 +381,28 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func3<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
-    return invokeSignalWithStartWorkflow(
-        workflow,
-        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
-        signal,
-        () -> signal.apply(signalArg1),
-        options);
-  }
-
-  /**
-   * Signal a workflow, starting it first if needed.
-   *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
-   */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc3<WorkflowArg1, WorkflowArg2, WorkflowArg3> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
-    return invokeSignalWithStartWorkflow(
-        workflow,
-        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
-        signal,
-        () -> signal.apply(),
-        options);
-  }
-
-  /**
-   * Signal a workflow, starting it first if needed.
-   *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
-   */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowArg3>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc3<WorkflowArg1, WorkflowArg2, WorkflowArg3> workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T, U, V, W> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func3<T, U, V, R> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      io.temporal.workflow.Functions.Proc1<W> signal,
+      W signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
@@ -391,24 +414,27 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func4<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T, U, V> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc3<T, U, V> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
-        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4),
+        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
         signal,
         () -> signal.apply(),
         options);
@@ -417,25 +443,30 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowResult>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func4<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T, U, V, W> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc3<T, U, V> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      io.temporal.workflow.Functions.Proc1<W> signal,
+      W signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
-        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4),
+        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3),
         signal,
         () -> signal.apply(signalArg1),
         options);
@@ -444,21 +475,28 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc4<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <R, T, U, V, W> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Func4<T, U, V, W, R> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      W workflowArg4,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4),
@@ -470,21 +508,31 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4>
+  public static <R, T, U, V, W, X>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc4<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
+          io.temporal.workflow.Functions.Func4<T, U, V, W, R> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          io.temporal.workflow.Functions.Proc1<X> signal,
+          X signalArg1,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
@@ -497,26 +545,97 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <
-          WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowResult>
+  public static <T, U, V, W> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc4<T, U, V, W> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      W workflowArg4,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
+    return invokeSignalWithStartWorkflow(
+        workflow,
+        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4),
+        signal,
+        () -> signal.apply(),
+        options);
+  }
+
+  /**
+   * Signal a workflow, starting it first if needed.
+   *
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
+   */
+  public static <T, U, V, W, X> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc4<T, U, V, W> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      W workflowArg4,
+      io.temporal.workflow.Functions.Proc1<X> signal,
+      X signalArg1,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
+    return invokeSignalWithStartWorkflow(
+        workflow,
+        () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4),
+        signal,
+        () -> signal.apply(signalArg1),
+        options);
+  }
+
+  /**
+   * Signal a workflow, starting it first if needed.
+   *
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
+   */
+  public static <R, T, U, V, W, X>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func5<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
+          io.temporal.workflow.Functions.Func5<T, U, V, W, X, R> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
           io.temporal.workflow.Functions.Proc signal,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
@@ -530,34 +649,34 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <
-          SignalArg1,
-          WorkflowArg1,
-          WorkflowArg2,
-          WorkflowArg3,
-          WorkflowArg4,
-          WorkflowArg5,
-          WorkflowResult>
+  public static <R, T, U, V, W, X, Y>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func5<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
+          io.temporal.workflow.Functions.Func5<T, U, V, W, X, R> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          io.temporal.workflow.Functions.Proc1<Y> signal,
+          Y signalArg1,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
@@ -570,22 +689,30 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5>
-      io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc5<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          io.temporal.workflow.Functions.Proc signal,
-          wit.workflowservice.SignalWithStartWorkflowOptions options) {
+  public static <T, U, V, W, X> io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
+      io.temporal.workflow.Functions.Proc5<T, U, V, W, X> workflow,
+      T workflowArg1,
+      U workflowArg2,
+      V workflowArg3,
+      W workflowArg4,
+      X workflowArg5,
+      io.temporal.workflow.Functions.Proc signal,
+      wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
         () -> workflow.apply(workflowArg1, workflowArg2, workflowArg3, workflowArg4, workflowArg5),
@@ -597,22 +724,33 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <SignalArg1, WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5>
+  public static <T, U, V, W, X, Y>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc5<
-                  WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
+          io.temporal.workflow.Functions.Proc5<T, U, V, W, X> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          io.temporal.workflow.Functions.Proc1<Y> signal,
+          Y signalArg1,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
@@ -625,34 +763,33 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 6 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param workflowArg6 argument 6 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <
-          WorkflowArg1,
-          WorkflowArg2,
-          WorkflowArg3,
-          WorkflowArg4,
-          WorkflowArg5,
-          WorkflowArg6,
-          WorkflowResult>
+  public static <R, T, U, V, W, X, Y>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func6<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowArg6,
-                  WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          WorkflowArg6 workflowArg6,
+          io.temporal.workflow.Functions.Func6<T, U, V, W, X, Y, R> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          Y workflowArg6,
           io.temporal.workflow.Functions.Proc signal,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
@@ -668,37 +805,37 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <R> result type of {@code workflow}
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 6 to {@code workflow}
+   * @param <Z> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param workflowArg6 argument 6 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <
-          SignalArg1,
-          WorkflowArg1,
-          WorkflowArg2,
-          WorkflowArg3,
-          WorkflowArg4,
-          WorkflowArg5,
-          WorkflowArg6,
-          WorkflowResult>
+  public static <R, T, U, V, W, X, Y, Z>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Func6<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowArg6,
-                  WorkflowResult>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          WorkflowArg6 workflowArg6,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
+          io.temporal.workflow.Functions.Func6<T, U, V, W, X, Y, R> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          Y workflowArg6,
+          io.temporal.workflow.Functions.Proc1<Z> signal,
+          Z signalArg1,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
@@ -713,26 +850,32 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 6 to {@code workflow}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param workflowArg6 argument 6 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <WorkflowArg1, WorkflowArg2, WorkflowArg3, WorkflowArg4, WorkflowArg5, WorkflowArg6>
+  public static <T, U, V, W, X, Y>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc6<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowArg6>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          WorkflowArg6 workflowArg6,
+          io.temporal.workflow.Functions.Proc6<T, U, V, W, X, Y> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          Y workflowArg6,
           io.temporal.workflow.Functions.Proc signal,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
@@ -748,35 +891,36 @@ public abstract class WorkflowOperations {
   /**
    * Signal a workflow, starting it first if needed.
    *
-   * <p>Pass bound method references followed by their arguments. SDK-owned call extractors probe
-   * these invocations. Supply all other fields through the required options object. Fields with
-   * declared merge-from-function hooks merge explicit values with the named callable's metadata.
+   * @param <T> type of argument 1 to {@code workflow}
+   * @param <U> type of argument 2 to {@code workflow}
+   * @param <V> type of argument 3 to {@code workflow}
+   * @param <W> type of argument 4 to {@code workflow}
+   * @param <X> type of argument 5 to {@code workflow}
+   * @param <Y> type of argument 6 to {@code workflow}
+   * @param <Z> type of argument 1 to {@code signal}
+   * @param workflow the workflow callable
+   * @param workflowArg1 argument 1 passed to {@code workflow}
+   * @param workflowArg2 argument 2 passed to {@code workflow}
+   * @param workflowArg3 argument 3 passed to {@code workflow}
+   * @param workflowArg4 argument 4 passed to {@code workflow}
+   * @param workflowArg5 argument 5 passed to {@code workflow}
+   * @param workflowArg6 argument 6 passed to {@code workflow}
+   * @param signal the signal callable
+   * @param signalArg1 argument 1 passed to {@code signal}
+   * @param options options for this operation; must not be null
+   * @return A workflow handle to the started workflow.
    */
-  public static <
-          SignalArg1,
-          WorkflowArg1,
-          WorkflowArg2,
-          WorkflowArg3,
-          WorkflowArg4,
-          WorkflowArg5,
-          WorkflowArg6>
+  public static <T, U, V, W, X, Y, Z>
       io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflow(
-          io.temporal.workflow.Functions.Proc6<
-                  WorkflowArg1,
-                  WorkflowArg2,
-                  WorkflowArg3,
-                  WorkflowArg4,
-                  WorkflowArg5,
-                  WorkflowArg6>
-              workflow,
-          WorkflowArg1 workflowArg1,
-          WorkflowArg2 workflowArg2,
-          WorkflowArg3 workflowArg3,
-          WorkflowArg4 workflowArg4,
-          WorkflowArg5 workflowArg5,
-          WorkflowArg6 workflowArg6,
-          io.temporal.workflow.Functions.Proc1<SignalArg1> signal,
-          SignalArg1 signalArg1,
+          io.temporal.workflow.Functions.Proc6<T, U, V, W, X, Y> workflow,
+          T workflowArg1,
+          U workflowArg2,
+          V workflowArg3,
+          W workflowArg4,
+          X workflowArg5,
+          Y workflowArg6,
+          io.temporal.workflow.Functions.Proc1<Z> signal,
+          Z signalArg1,
           wit.workflowservice.SignalWithStartWorkflowOptions options) {
     return invokeSignalWithStartWorkflow(
         workflow,
@@ -811,14 +955,14 @@ public abstract class WorkflowOperations {
           requestBuilder.setSignal(capturedName);
           requestBuilder.setSignalArgs(java.util.Arrays.asList(capturedArguments));
         });
-    requestBuilder.setId(
+    requestBuilder.setWorkflowId(
         java.util.Objects.requireNonNull(
             support.TemporalModelConverters.mergeWorkflowIdForStart(
-                workflowMetadata, options.getId()),
-            "id"));
-    requestBuilder.setRetryPolicy(
+                workflowMetadata, options.getWorkflowId()),
+            "workflowId"));
+    requestBuilder.setRetryOptions(
         support.TemporalModelConverters.mergeMethodRetry(
-            workflowMetadata, options.getRetryPolicy()));
+            workflowMetadata, options.getRetryOptions()));
     requestBuilder.setCronSchedule(
         support.TemporalModelConverters.mergeCronSchedule(
             workflowMetadata, options.getCronSchedule()));
@@ -840,10 +984,7 @@ public abstract class WorkflowOperations {
                     wit.workflowservice.SignalWithStartWorkflowResponse.class,
                     wit.workflowservice.SignalWithStartWorkflowResponse.class,
                     request);
-    return io.temporal.workflow.Workflow.newUntypedExternalWorkflowStub(
-        io.temporal.api.common.v1.WorkflowExecution.newBuilder()
-            .setWorkflowId(request.getId())
-            .setRunId(result.getRunId() == null ? "" : result.getRunId())
-            .build());
+    return support.TemporalModelConverters.signalWithStartWorkflowHandle(
+        request.getWorkflowId(), result.getRunId());
   }
 }

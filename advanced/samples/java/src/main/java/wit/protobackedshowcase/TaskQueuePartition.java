@@ -15,10 +15,16 @@ public final class TaskQueuePartition {
     this.ownerHostName = ownerHostName;
   }
 
+  /**
+   * @return the key
+   */
   public String getKey() {
     return key;
   }
 
+  /**
+   * @return the ownerHostName
+   */
   public String getOwnerHostName() {
     return ownerHostName;
   }
@@ -36,6 +42,9 @@ public final class TaskQueuePartition {
   }
 
   public static final class Builder {
+    private String key = "";
+    private String ownerHostName = "";
+
     private Builder() {}
 
     private Builder(TaskQueuePartition value) {
@@ -44,15 +53,19 @@ public final class TaskQueuePartition {
       this.ownerHostName = value.ownerHostName;
     }
 
-    private String key = "";
-
+    /**
+     * @param value the key
+     * @return this builder
+     */
     public Builder setKey(String value) {
       this.key = value;
       return this;
     }
 
-    private String ownerHostName = "";
-
+    /**
+     * @param value the ownerHostName
+     * @return this builder
+     */
     public Builder setOwnerHostName(String value) {
       this.ownerHostName = value;
       return this;

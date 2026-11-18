@@ -5,6 +5,10 @@ package wit.protobackedshowcase;
 public final class ProtoBackedShowcaseServiceOperations {
   private ProtoBackedShowcaseServiceOperations() {}
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.ActivityOptions activityOptionsOperation(
       wit.protobackedshowcase.ActivityOptionsOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -36,6 +40,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.FailureContainer failureOperation(
       wit.protobackedshowcase.FailureOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -63,6 +71,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.WorkflowExecutionInfo workflowExecutionInfoOperation(
       wit.protobackedshowcase.WorkflowExecutionInfoOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -92,6 +104,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.TaskQueuePartitions taskQueuePartitionsOperation(
       wit.protobackedshowcase.TaskQueuePartitionsOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -121,6 +137,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.BadBinaries badBinariesOperation(
       wit.protobackedshowcase.BadBinariesOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -148,6 +168,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.Alert alertOperation(
       wit.protobackedshowcase.AlertOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -176,6 +200,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.CallbackInternal callbackInternalOperation(
       wit.protobackedshowcase.CallbackInternalOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -203,6 +231,10 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.protobackedshowcase.CallbackNexus callbackNexusOperation(
       wit.protobackedshowcase.CallbackNexusOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -231,6 +263,9 @@ public final class ProtoBackedShowcaseServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void namespaceInfoOperation(
       wit.protobackedshowcase.NamespaceInfoOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");

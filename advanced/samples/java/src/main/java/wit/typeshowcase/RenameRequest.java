@@ -14,10 +14,16 @@ public final class RenameRequest {
     this.displayName = displayName;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the displayName
+   */
   public String getDisplayName() {
     return displayName;
   }
@@ -35,6 +41,9 @@ public final class RenameRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private String displayName = "";
+
     private Builder() {}
 
     private Builder(RenameRequest value) {
@@ -43,15 +52,19 @@ public final class RenameRequest {
       this.displayName = value.displayName;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private String displayName = "";
-
+    /**
+     * @param value the displayName
+     * @return this builder
+     */
     public Builder setDisplayName(String value) {
       this.displayName = value;
       return this;

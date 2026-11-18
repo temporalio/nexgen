@@ -14,10 +14,16 @@ public final class NotificationSettings {
     this.smsEnabled = smsEnabled;
   }
 
+  /**
+   * @return the emailEnabled
+   */
   public Boolean getEmailEnabled() {
     return emailEnabled;
   }
 
+  /**
+   * @return the smsEnabled
+   */
   public Boolean getSmsEnabled() {
     return smsEnabled;
   }
@@ -35,6 +41,9 @@ public final class NotificationSettings {
   }
 
   public static final class Builder {
+    private Boolean emailEnabled = false;
+    private Boolean smsEnabled = false;
+
     private Builder() {}
 
     private Builder(NotificationSettings value) {
@@ -43,15 +52,19 @@ public final class NotificationSettings {
       this.smsEnabled = value.smsEnabled;
     }
 
-    private Boolean emailEnabled = false;
-
+    /**
+     * @param value the emailEnabled
+     * @return this builder
+     */
     public Builder setEmailEnabled(Boolean value) {
       this.emailEnabled = value;
       return this;
     }
 
-    private Boolean smsEnabled = false;
-
+    /**
+     * @param value the smsEnabled
+     * @return this builder
+     */
     public Builder setSmsEnabled(Boolean value) {
       this.smsEnabled = value;
       return this;

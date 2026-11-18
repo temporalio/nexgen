@@ -17,10 +17,16 @@ public final class WorkflowExecutionInfo {
     this.parentExecution = parentExecution;
   }
 
+  /**
+   * @return the execution
+   */
   public wit.protobackedshowcase.WorkflowExecution getExecution() {
     return execution;
   }
 
+  /**
+   * @return the parentExecution
+   */
   public wit.protobackedshowcase.WorkflowExecution getParentExecution() {
     return parentExecution;
   }
@@ -38,6 +44,9 @@ public final class WorkflowExecutionInfo {
   }
 
   public static final class Builder {
+    private wit.protobackedshowcase.WorkflowExecution execution = null;
+    private wit.protobackedshowcase.WorkflowExecution parentExecution = null;
+
     private Builder() {}
 
     private Builder(WorkflowExecutionInfo value) {
@@ -46,15 +55,19 @@ public final class WorkflowExecutionInfo {
       this.parentExecution = value.parentExecution;
     }
 
-    private wit.protobackedshowcase.WorkflowExecution execution = null;
-
+    /**
+     * @param value the execution
+     * @return this builder
+     */
     public Builder setExecution(wit.protobackedshowcase.WorkflowExecution value) {
       this.execution = value;
       return this;
     }
 
-    private wit.protobackedshowcase.WorkflowExecution parentExecution = null;
-
+    /**
+     * @param value the parentExecution
+     * @return this builder
+     */
     public Builder setParentExecution(wit.protobackedshowcase.WorkflowExecution value) {
       this.parentExecution = value;
       return this;

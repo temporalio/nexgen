@@ -5,7 +5,12 @@ package wit.typeshowcase;
 public final class TypeShowcaseOperations {
   private TypeShowcaseOperations() {}
 
-  /** Get a user. */
+  /**
+   * Get a user.
+   *
+   * @param options options for this operation; must not be null
+   * @return The matching user.
+   */
   public static wit.typeshowcase.User getUser(wit.typeshowcase.GetUserOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.GetUserRequest.Builder requestBuilder =
@@ -30,6 +35,10 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.typeshowcase.User updateEmail(wit.typeshowcase.UpdateEmailOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.UpdateEmailRequest.Builder requestBuilder =
@@ -56,6 +65,10 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.typeshowcase.User rename(wit.typeshowcase.RenameOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.RenameRequest.Builder requestBuilder =
@@ -79,6 +92,10 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.typeshowcase.User setProfile(wit.typeshowcase.SetProfileOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.SetProfileRequest.Builder requestBuilder =
@@ -105,6 +122,9 @@ public final class TypeShowcaseOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void recordSync(wit.typeshowcase.RecordSyncOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.RecordSyncRequest.Builder requestBuilder =
@@ -127,6 +147,9 @@ public final class TypeShowcaseOperations {
     return;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void deactivate(wit.typeshowcase.DeactivateOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.DeactivateRequest.Builder requestBuilder =
@@ -149,6 +172,9 @@ public final class TypeShowcaseOperations {
     return;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void updateLabels(wit.typeshowcase.UpdateLabelsOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.typeshowcase.UpdateLabelsRequest.Builder requestBuilder =
@@ -175,6 +201,9 @@ public final class TypeShowcaseOperations {
     return;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void updateNotificationSettings(
       wit.typeshowcase.UpdateNotificationSettingsOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -200,6 +229,10 @@ public final class TypeShowcaseOperations {
     return;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.typeshowcase.SyncSettings getSyncSettings(
       wit.typeshowcase.GetSyncSettingsOptions options) {
     java.util.Objects.requireNonNull(options, "options");

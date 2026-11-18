@@ -2,12 +2,12 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class GetterProbe<ContextT> {
-  private final ContextT value;
-  private final ContextT other;
-  private final java.util.List<ContextT> history;
-  private final wit.genericmodels.NexgenRuntime.Tuple2<ContextT, ContextT> tupleValue;
-  private final wit.genericmodels.NexgenRuntime.Result<ContextT, ContextT> resultValue;
+public final class GetterProbe<T> {
+  private final T value;
+  private final T other;
+  private final java.util.List<T> history;
+  private final wit.genericmodels.NexgenRuntime.Tuple2<T, T> tupleValue;
+  private final wit.genericmodels.NexgenRuntime.Result<T, T> resultValue;
   private final java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> lookup;
   private final Long elapsed;
   private final String namespace;
@@ -15,13 +15,13 @@ public final class GetterProbe<ContextT> {
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GetterProbe(
-      @com.fasterxml.jackson.annotation.JsonProperty("value") ContextT value,
-      @com.fasterxml.jackson.annotation.JsonProperty("other") ContextT other,
-      @com.fasterxml.jackson.annotation.JsonProperty("history") java.util.List<ContextT> history,
+      @com.fasterxml.jackson.annotation.JsonProperty("value") T value,
+      @com.fasterxml.jackson.annotation.JsonProperty("other") T other,
+      @com.fasterxml.jackson.annotation.JsonProperty("history") java.util.List<T> history,
       @com.fasterxml.jackson.annotation.JsonProperty("tupleValue")
-          wit.genericmodels.NexgenRuntime.Tuple2<ContextT, ContextT> tupleValue,
+          wit.genericmodels.NexgenRuntime.Tuple2<T, T> tupleValue,
       @com.fasterxml.jackson.annotation.JsonProperty("resultValue")
-          wit.genericmodels.NexgenRuntime.Result<ContextT, ContextT> resultValue,
+          wit.genericmodels.NexgenRuntime.Result<T, T> resultValue,
       @com.fasterxml.jackson.annotation.JsonProperty("lookup")
           java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> lookup,
       @com.fasterxml.jackson.annotation.JsonProperty("elapsed") Long elapsed,
@@ -38,58 +38,96 @@ public final class GetterProbe<ContextT> {
     this.type = type;
   }
 
-  public ContextT getValue() {
+  /**
+   * @return the value
+   */
+  public T getValue() {
     return value;
   }
 
-  public ContextT getOther() {
+  /**
+   * @return the other
+   */
+  public T getOther() {
     return other;
   }
 
-  public java.util.List<ContextT> getHistory() {
+  /**
+   * @return the history
+   */
+  public java.util.List<T> getHistory() {
     return history;
   }
 
-  public wit.genericmodels.NexgenRuntime.Tuple2<ContextT, ContextT> getTupleValue() {
+  /**
+   * @return the tupleValue
+   */
+  public wit.genericmodels.NexgenRuntime.Tuple2<T, T> getTupleValue() {
     return tupleValue;
   }
 
-  public wit.genericmodels.NexgenRuntime.Result<ContextT, ContextT> getResultValue() {
+  /**
+   * @return the resultValue
+   */
+  public wit.genericmodels.NexgenRuntime.Result<T, T> getResultValue() {
     return resultValue;
   }
 
+  /**
+   * @return the lookup
+   */
   public java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> getLookup() {
     return lookup;
   }
 
+  /**
+   * @return the elapsed
+   */
   public Long getElapsed() {
     return elapsed;
   }
 
+  /**
+   * @return the namespace
+   */
   public String getNamespace() {
     return namespace;
   }
 
+  /**
+   * @return the type
+   */
   public String getType() {
     return type;
   }
 
-  public Builder<ContextT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder(GetterProbe<ContextT> value) {
-    return new Builder<ContextT>(value);
+  public static <T> Builder<T> newBuilder(GetterProbe<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder() {
-    return new Builder<ContextT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<ContextT> {
+  public static final class Builder<T> {
+    private T value = null;
+    private T other = null;
+    private java.util.List<T> history = java.util.Collections.emptyList();
+    private wit.genericmodels.NexgenRuntime.Tuple2<T, T> tupleValue = null;
+    private wit.genericmodels.NexgenRuntime.Result<T, T> resultValue = null;
+    private java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> lookup =
+        java.util.Collections.emptyList();
+    private Long elapsed = null;
+    private String namespace = "";
+    private String type = "";
+
     private Builder() {}
 
-    private Builder(GetterProbe<ContextT> value) {
+    private Builder(GetterProbe<T> value) {
       if (value == null) return;
       this.value = value.value;
       this.other = value.other;
@@ -102,75 +140,90 @@ public final class GetterProbe<ContextT> {
       this.type = value.type;
     }
 
-    private ContextT value = null;
-
-    public Builder<ContextT> setValue(ContextT value) {
+    /**
+     * @param value the value
+     * @return this builder
+     */
+    public Builder<T> setValue(T value) {
       this.value = value;
       return this;
     }
 
-    private ContextT other = null;
-
-    public Builder<ContextT> setOther(ContextT value) {
+    /**
+     * @param value the other
+     * @return this builder
+     */
+    public Builder<T> setOther(T value) {
       this.other = value;
       return this;
     }
 
-    private java.util.List<ContextT> history = java.util.Collections.emptyList();
-
-    public Builder<ContextT> setHistory(java.util.List<ContextT> value) {
+    /**
+     * @param value the history
+     * @return this builder
+     */
+    public Builder<T> setHistory(java.util.List<T> value) {
       this.history = value;
       return this;
     }
 
-    private wit.genericmodels.NexgenRuntime.Tuple2<ContextT, ContextT> tupleValue = null;
-
-    public Builder<ContextT> setTupleValue(
-        wit.genericmodels.NexgenRuntime.Tuple2<ContextT, ContextT> value) {
+    /**
+     * @param value the tupleValue
+     * @return this builder
+     */
+    public Builder<T> setTupleValue(wit.genericmodels.NexgenRuntime.Tuple2<T, T> value) {
       this.tupleValue = value;
       return this;
     }
 
-    private wit.genericmodels.NexgenRuntime.Result<ContextT, ContextT> resultValue = null;
-
-    public Builder<ContextT> setResultValue(
-        wit.genericmodels.NexgenRuntime.Result<ContextT, ContextT> value) {
+    /**
+     * @param value the resultValue
+     * @return this builder
+     */
+    public Builder<T> setResultValue(wit.genericmodels.NexgenRuntime.Result<T, T> value) {
       this.resultValue = value;
       return this;
     }
 
-    private java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> lookup =
-        java.util.Collections.emptyList();
-
-    public Builder<ContextT> setLookup(
+    /**
+     * @param value the lookup
+     * @return this builder
+     */
+    public Builder<T> setLookup(
         java.util.List<wit.genericmodels.NexgenRuntime.Tuple2<String, Integer>> value) {
       this.lookup = value;
       return this;
     }
 
-    private Long elapsed = null;
-
-    public Builder<ContextT> setElapsed(Long value) {
+    /**
+     * @param value the elapsed
+     * @return this builder
+     */
+    public Builder<T> setElapsed(Long value) {
       this.elapsed = value;
       return this;
     }
 
-    private String namespace = "";
-
-    public Builder<ContextT> setNamespace(String value) {
+    /**
+     * @param value the namespace
+     * @return this builder
+     */
+    public Builder<T> setNamespace(String value) {
       this.namespace = value;
       return this;
     }
 
-    private String type = "";
-
-    public Builder<ContextT> setType(String value) {
+    /**
+     * @param value the type
+     * @return this builder
+     */
+    public Builder<T> setType(String value) {
       this.type = value;
       return this;
     }
 
-    public GetterProbe<ContextT> build() {
-      return new GetterProbe<ContextT>(
+    public GetterProbe<T> build() {
+      return new GetterProbe<T>(
           value, other, history, tupleValue, resultValue, lookup, elapsed, namespace, type);
     }
   }

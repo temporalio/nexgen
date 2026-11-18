@@ -29,26 +29,44 @@ public final class PauseActivityRequest {
     this.requestId = requestId;
   }
 
+  /**
+   * @return the namespace
+   */
   public String getNamespace() {
     return namespace;
   }
 
+  /**
+   * @return the execution
+   */
   public wit.protooneof.WorkflowExecution getExecution() {
     return execution;
   }
 
+  /**
+   * @return the identity
+   */
   public String getIdentity() {
     return identity;
   }
 
+  /**
+   * @return the activity
+   */
   public wit.protooneof.ActivitySelection getActivity() {
     return activity;
   }
 
+  /**
+   * @return the reason
+   */
   public String getReason() {
     return reason;
   }
 
+  /**
+   * @return the requestId
+   */
   public String getRequestId() {
     return requestId;
   }
@@ -66,6 +84,13 @@ public final class PauseActivityRequest {
   }
 
   public static final class Builder {
+    private String namespace = "";
+    private wit.protooneof.WorkflowExecution execution = null;
+    private String identity = "";
+    private wit.protooneof.ActivitySelection activity = null;
+    private String reason = "";
+    private String requestId = "";
+
     private Builder() {}
 
     private Builder(PauseActivityRequest value) {
@@ -78,43 +103,55 @@ public final class PauseActivityRequest {
       this.requestId = value.requestId;
     }
 
-    private String namespace = "";
-
+    /**
+     * @param value the namespace
+     * @return this builder
+     */
     public Builder setNamespace(String value) {
       this.namespace = value;
       return this;
     }
 
-    private wit.protooneof.WorkflowExecution execution = null;
-
+    /**
+     * @param value the execution
+     * @return this builder
+     */
     public Builder setExecution(wit.protooneof.WorkflowExecution value) {
       this.execution = value;
       return this;
     }
 
-    private String identity = "";
-
+    /**
+     * @param value the identity
+     * @return this builder
+     */
     public Builder setIdentity(String value) {
       this.identity = value;
       return this;
     }
 
-    private wit.protooneof.ActivitySelection activity = null;
-
+    /**
+     * @param value the activity
+     * @return this builder
+     */
     public Builder setActivity(wit.protooneof.ActivitySelection value) {
       this.activity = value;
       return this;
     }
 
-    private String reason = "";
-
+    /**
+     * @param value the reason
+     * @return this builder
+     */
     public Builder setReason(String value) {
       this.reason = value;
       return this;
     }
 
-    private String requestId = "";
-
+    /**
+     * @param value the requestId
+     * @return this builder
+     */
     public Builder setRequestId(String value) {
       this.requestId = value;
       return this;

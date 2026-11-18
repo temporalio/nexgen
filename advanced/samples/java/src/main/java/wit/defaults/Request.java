@@ -37,38 +37,65 @@ public final class Request {
     this.metadata = metadata;
   }
 
+  /**
+   * @return the attempts
+   */
   public Integer getAttempts() {
     return attempts;
   }
 
+  /**
+   * @return the enabled
+   */
   public Boolean getEnabled() {
     return enabled;
   }
 
+  /**
+   * @return the ratio
+   */
   public Double getRatio() {
     return ratio;
   }
 
+  /**
+   * @return the mode
+   */
   public wit.defaults.MyEnum getMode() {
     return mode;
   }
 
+  /**
+   * @return the permissions
+   */
   public java.util.EnumSet<wit.defaults.MyFlags> getPermissions() {
     return permissions;
   }
 
+  /**
+   * @return the namespace
+   */
   public String getNamespace() {
     return namespace;
   }
 
+  /**
+   * @return the aliasLabel
+   */
   public String getAliasLabel() {
     return aliasLabel;
   }
 
+  /**
+   * @return the retry
+   */
   public wit.defaults.RecordWithDefaults getRetry() {
     return retry;
   }
 
+  /**
+   * @return the metadata
+   */
   public wit.defaults.FlattenedRecordWithDefaults getMetadata() {
     return metadata;
   }
@@ -86,6 +113,16 @@ public final class Request {
   }
 
   public static final class Builder {
+    private Integer attempts = null;
+    private Boolean enabled = false;
+    private Double ratio = null;
+    private wit.defaults.MyEnum mode = null;
+    private java.util.EnumSet<wit.defaults.MyFlags> permissions = null;
+    private String namespace = "";
+    private String aliasLabel = "";
+    private wit.defaults.RecordWithDefaults retry = null;
+    private wit.defaults.FlattenedRecordWithDefaults metadata = null;
+
     private Builder() {}
 
     private Builder(Request value) {
@@ -101,69 +138,91 @@ public final class Request {
       this.metadata = value.metadata;
     }
 
-    private Integer attempts = null;
-
+    /**
+     * @param value the attempts
+     * @return this builder
+     */
     public Builder setAttempts(Integer value) {
       this.attempts = value;
       return this;
     }
 
-    private Boolean enabled = false;
-
+    /**
+     * @param value the enabled
+     * @return this builder
+     */
     public Builder setEnabled(Boolean value) {
       this.enabled = value;
       return this;
     }
 
-    private Double ratio = null;
-
+    /**
+     * @param value the ratio
+     * @return this builder
+     */
     public Builder setRatio(Double value) {
       this.ratio = value;
       return this;
     }
 
-    private wit.defaults.MyEnum mode = null;
-
+    /**
+     * @param value the mode
+     * @return this builder
+     */
     public Builder setMode(wit.defaults.MyEnum value) {
       this.mode = value;
       return this;
     }
 
-    private java.util.EnumSet<wit.defaults.MyFlags> permissions = null;
-
+    /**
+     * @param value the permissions
+     * @return this builder
+     */
     public Builder setPermissions(java.util.EnumSet<wit.defaults.MyFlags> value) {
       this.permissions = value;
       return this;
     }
 
-    private String namespace = "";
-
+    /**
+     * @param value the namespace
+     * @return this builder
+     */
     public Builder setNamespace(String value) {
       this.namespace = value;
       return this;
     }
 
-    private String aliasLabel = "";
-
+    /**
+     * @param value the aliasLabel
+     * @return this builder
+     */
     public Builder setAliasLabel(String value) {
       this.aliasLabel = value;
       return this;
     }
 
-    private wit.defaults.RecordWithDefaults retry = null;
-
+    /**
+     * @param value the retry
+     * @return this builder
+     */
     public Builder setRetry(wit.defaults.RecordWithDefaults value) {
       this.retry = value;
       return this;
     }
 
-    private wit.defaults.FlattenedRecordWithDefaults metadata = null;
-
+    /**
+     * @param value the metadata
+     * @return this builder
+     */
     public Builder setMetadata(wit.defaults.FlattenedRecordWithDefaults value) {
       this.metadata = value;
       return this;
     }
 
+    /**
+     * @param value the summary
+     * @return this builder
+     */
     public Builder setSummary(String value) {
       this.metadata =
           wit.defaults.FlattenedRecordWithDefaults.newBuilder(this.metadata)
@@ -172,6 +231,10 @@ public final class Request {
       return this;
     }
 
+    /**
+     * @param value the details
+     * @return this builder
+     */
     public Builder setDetails(String value) {
       this.metadata =
           wit.defaults.FlattenedRecordWithDefaults.newBuilder(this.metadata)

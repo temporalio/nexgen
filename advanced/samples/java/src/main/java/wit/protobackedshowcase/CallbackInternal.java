@@ -11,6 +11,9 @@ public final class CallbackInternal {
     this.data = data;
   }
 
+  /**
+   * @return the data
+   */
   public byte[] getData() {
     return data;
   }
@@ -28,6 +31,8 @@ public final class CallbackInternal {
   }
 
   public static final class Builder {
+    private byte[] data = null;
+
     private Builder() {}
 
     private Builder(CallbackInternal value) {
@@ -35,8 +40,10 @@ public final class CallbackInternal {
       this.data = value.data;
     }
 
-    private byte[] data = null;
-
+    /**
+     * @param value the data
+     * @return this builder
+     */
     public Builder setData(byte[] value) {
       this.data = value;
       return this;

@@ -14,10 +14,16 @@ public final class RecordWithDefaults {
     this.label = label;
   }
 
+  /**
+   * @return the attempts
+   */
   public Integer getAttempts() {
     return attempts;
   }
 
+  /**
+   * @return the label
+   */
   public String getLabel() {
     return label;
   }
@@ -35,6 +41,9 @@ public final class RecordWithDefaults {
   }
 
   public static final class Builder {
+    private Integer attempts = null;
+    private String label = "";
+
     private Builder() {}
 
     private Builder(RecordWithDefaults value) {
@@ -43,15 +52,19 @@ public final class RecordWithDefaults {
       this.label = value.label;
     }
 
-    private Integer attempts = null;
-
+    /**
+     * @param value the attempts
+     * @return this builder
+     */
     public Builder setAttempts(Integer value) {
       this.attempts = value;
       return this;
     }
 
-    private String label = "";
-
+    /**
+     * @param value the label
+     * @return this builder
+     */
     public Builder setLabel(String value) {
       this.label = value;
       return this;

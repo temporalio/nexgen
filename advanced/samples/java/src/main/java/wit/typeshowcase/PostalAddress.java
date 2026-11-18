@@ -3,9 +3,7 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class PostalAddress {
-  /** Street with &lt;tag&gt; &amp; "quotes". */
   private final String street;
-
   private final String city;
   private final String country;
   private final wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> coordinates;
@@ -23,18 +21,32 @@ public final class PostalAddress {
     this.coordinates = coordinates;
   }
 
+  /**
+   * Street with &lt;tag&gt; &amp; "quotes".
+   *
+   * @return the street
+   */
   public String getStreet() {
     return street;
   }
 
+  /**
+   * @return the city
+   */
   public String getCity() {
     return city;
   }
 
+  /**
+   * @return the country
+   */
   public String getCountry() {
     return country;
   }
 
+  /**
+   * @return the coordinates
+   */
   public wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> getCoordinates() {
     return coordinates;
   }
@@ -52,6 +64,11 @@ public final class PostalAddress {
   }
 
   public static final class Builder {
+    private String street = "";
+    private String city = "";
+    private String country = "";
+    private wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> coordinates = null;
+
     private Builder() {}
 
     private Builder(PostalAddress value) {
@@ -62,29 +79,39 @@ public final class PostalAddress {
       this.coordinates = value.coordinates;
     }
 
-    private String street = "";
-
+    /**
+     * Street with &lt;tag&gt; &amp; "quotes".
+     *
+     * @param value the street
+     * @return this builder
+     */
     public Builder setStreet(String value) {
       this.street = value;
       return this;
     }
 
-    private String city = "";
-
+    /**
+     * @param value the city
+     * @return this builder
+     */
     public Builder setCity(String value) {
       this.city = value;
       return this;
     }
 
-    private String country = "";
-
+    /**
+     * @param value the country
+     * @return this builder
+     */
     public Builder setCountry(String value) {
       this.country = value;
       return this;
     }
 
-    private wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> coordinates = null;
-
+    /**
+     * @param value the coordinates
+     * @return this builder
+     */
     public Builder setCoordinates(wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double> value) {
       this.coordinates = value;
       return this;

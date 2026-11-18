@@ -6,10 +6,7 @@ package wit.workflowservice;
     SignalWithStartWorkflowResponse.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class SignalWithStartWorkflowResponse {
-  /** Run ID of the signaled workflow. */
   private final String runId;
-
-  /** Whether the workflow was started. */
   private final Boolean started;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -20,10 +17,20 @@ public final class SignalWithStartWorkflowResponse {
     this.started = started;
   }
 
+  /**
+   * Run ID of the signaled workflow.
+   *
+   * @return the runId
+   */
   public String getRunId() {
     return runId;
   }
 
+  /**
+   * Whether the workflow was started.
+   *
+   * @return the started
+   */
   public Boolean getStarted() {
     return started;
   }
@@ -41,6 +48,9 @@ public final class SignalWithStartWorkflowResponse {
   }
 
   public static final class Builder {
+    private String runId = "";
+    private Boolean started = false;
+
     private Builder() {}
 
     private Builder(SignalWithStartWorkflowResponse value) {
@@ -49,15 +59,23 @@ public final class SignalWithStartWorkflowResponse {
       this.started = value.started;
     }
 
-    private String runId = "";
-
+    /**
+     * Run ID of the signaled workflow.
+     *
+     * @param value the runId
+     * @return this builder
+     */
     public Builder setRunId(String value) {
       this.runId = value;
       return this;
     }
 
-    private Boolean started = false;
-
+    /**
+     * Whether the workflow was started.
+     *
+     * @param value the started
+     * @return this builder
+     */
     public Builder setStarted(Boolean value) {
       this.started = value;
       return this;

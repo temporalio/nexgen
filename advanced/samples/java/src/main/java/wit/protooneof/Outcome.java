@@ -3,49 +3,56 @@ package wit.protooneof;
 
 @io.temporal.common.converter.TransferTypeConvertible(Outcome.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class Outcome<OutputT> {
-  private final wit.protooneof.OutcomeValue<OutputT> value;
+public final class Outcome<T> {
+  private final wit.protooneof.OutcomeValue<T> value;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public Outcome(
       @com.fasterxml.jackson.annotation.JsonProperty("value")
-          wit.protooneof.OutcomeValue<OutputT> value) {
+          wit.protooneof.OutcomeValue<T> value) {
     this.value = value;
   }
 
-  public wit.protooneof.OutcomeValue<OutputT> getValue() {
+  /**
+   * @return the value
+   */
+  public wit.protooneof.OutcomeValue<T> getValue() {
     return value;
   }
 
-  public Builder<OutputT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder(Outcome<OutputT> value) {
-    return new Builder<OutputT>(value);
+  public static <T> Builder<T> newBuilder(Outcome<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder() {
-    return new Builder<OutputT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<OutputT> {
+  public static final class Builder<T> {
+    private wit.protooneof.OutcomeValue<T> value = null;
+
     private Builder() {}
 
-    private Builder(Outcome<OutputT> value) {
+    private Builder(Outcome<T> value) {
       if (value == null) return;
       this.value = value.value;
     }
 
-    private wit.protooneof.OutcomeValue<OutputT> value = null;
-
-    public Builder<OutputT> setValue(wit.protooneof.OutcomeValue<OutputT> value) {
+    /**
+     * @param value the value
+     * @return this builder
+     */
+    public Builder<T> setValue(wit.protooneof.OutcomeValue<T> value) {
       this.value = value;
       return this;
     }
 
-    public Outcome<OutputT> build() {
-      return new Outcome<OutputT>(value);
+    public Outcome<T> build() {
+      return new Outcome<T>(value);
     }
   }
 
@@ -57,7 +64,7 @@ public final class Outcome<OutputT> {
       if (this.value.getTag() == wit.protooneof.OutcomeValue.Tag.SUCCESS)
         proto.setSuccess(
             converter
-                .toPayloads(((OutputT) this.value.getValue()))
+                .toPayloads(((T) this.value.getValue()))
                 .orElse(io.temporal.api.common.v1.Payloads.getDefaultInstance()));
       if (this.value.getTag() == wit.protooneof.OutcomeValue.Tag.FAILURE)
         proto.setFailure(
@@ -67,15 +74,15 @@ public final class Outcome<OutputT> {
     return proto.build();
   }
 
-  public static <OutputT> Outcome<OutputT> fromProto(
+  public static <T> Outcome<T> fromProto(
       io.temporal.api.update.v1.Outcome proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<OutputT> builder = Outcome.<OutputT>newBuilder();
+    Builder<T> builder = Outcome.<T>newBuilder();
     if (proto.hasSuccess())
       builder.setValue(
           wit.protooneof.OutcomeValue.success(
-              (OutputT)
+              (T)
                   converter.fromPayloads(
                       0,
                       java.util.Optional.of(proto.getSuccess()),

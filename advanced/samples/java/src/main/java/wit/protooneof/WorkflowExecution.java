@@ -15,10 +15,16 @@ public final class WorkflowExecution {
     this.runId = runId;
   }
 
+  /**
+   * @return the workflowId
+   */
   public String getWorkflowId() {
     return workflowId;
   }
 
+  /**
+   * @return the runId
+   */
   public String getRunId() {
     return runId;
   }
@@ -36,6 +42,9 @@ public final class WorkflowExecution {
   }
 
   public static final class Builder {
+    private String workflowId = "";
+    private String runId = "";
+
     private Builder() {}
 
     private Builder(WorkflowExecution value) {
@@ -44,15 +53,19 @@ public final class WorkflowExecution {
       this.runId = value.runId;
     }
 
-    private String workflowId = "";
-
+    /**
+     * @param value the workflowId
+     * @return this builder
+     */
     public Builder setWorkflowId(String value) {
       this.workflowId = value;
       return this;
     }
 
-    private String runId = "";
-
+    /**
+     * @param value the runId
+     * @return this builder
+     */
     public Builder setRunId(String value) {
       this.runId = value;
       return this;

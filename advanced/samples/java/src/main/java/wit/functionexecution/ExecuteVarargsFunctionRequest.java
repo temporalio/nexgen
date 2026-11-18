@@ -9,8 +9,6 @@ public final class ExecuteVarargsFunctionRequest {
   }
 
   private final FunctionFunction function;
-
-  /** Arguments for the function. */
   private final java.util.List<String> args;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -21,10 +19,18 @@ public final class ExecuteVarargsFunctionRequest {
     this.args = args;
   }
 
+  /**
+   * @return the function
+   */
   public FunctionFunction getFunction() {
     return function;
   }
 
+  /**
+   * Arguments for the function.
+   *
+   * @return the args
+   */
   public java.util.List<String> getArgs() {
     return args;
   }
@@ -42,6 +48,9 @@ public final class ExecuteVarargsFunctionRequest {
   }
 
   public static final class Builder {
+    private FunctionFunction function = null;
+    private java.util.List<String> args = null;
+
     private Builder() {}
 
     private Builder(ExecuteVarargsFunctionRequest value) {
@@ -50,15 +59,21 @@ public final class ExecuteVarargsFunctionRequest {
       this.args = value.args;
     }
 
-    private FunctionFunction function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(FunctionFunction value) {
       this.function = value;
       return this;
     }
 
-    private java.util.List<String> args = null;
-
+    /**
+     * Arguments for the function.
+     *
+     * @param value the args
+     * @return this builder
+     */
     public Builder setArgs(java.util.List<String> value) {
       this.args = value;
       return this;

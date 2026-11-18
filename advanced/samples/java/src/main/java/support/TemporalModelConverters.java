@@ -33,6 +33,16 @@ public final class TemporalModelConverters {
     return Workflow.getInfo().getNamespace();
   }
 
+  /** Returns a handle bound to the execution reported by signal with start. */
+  public static io.temporal.workflow.ExternalWorkflowStub signalWithStartWorkflowHandle(
+      String workflowId, String runId) {
+    return Workflow.newUntypedExternalWorkflowStub(
+        WorkflowExecution.newBuilder()
+            .setWorkflowId(workflowId)
+            .setRunId(runId == null ? "" : runId)
+            .build());
+  }
+
   /** Captures one typed workflow invocation without starting a child workflow. */
   public static ExternalWorkflowInvocationHandler.ProbeResult captureWorkflowCall(
       Object method, Functions.Proc invocation, BiConsumer<String, Object[]> result) {
@@ -86,7 +96,7 @@ public final class TemporalModelConverters {
 
   public static WorkflowSerializationContext signalWithStartWorkflowSerializationContext(
       SignalWithStartWorkflowRequest request) {
-    return new WorkflowSerializationContext(request.getNamespace(), request.getId());
+    return new WorkflowSerializationContext(request.getNamespace(), request.getWorkflowId());
   }
 
   public static RuntimeException failureFromProto(

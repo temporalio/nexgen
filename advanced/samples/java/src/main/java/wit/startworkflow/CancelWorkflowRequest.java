@@ -19,14 +19,23 @@ public final class CancelWorkflowRequest {
     this.reason = reason;
   }
 
+  /**
+   * @return the namespace
+   */
   public String getNamespace() {
     return namespace;
   }
 
+  /**
+   * @return the workflowExecution
+   */
   public wit.startworkflow.WorkflowExecution getWorkflowExecution() {
     return workflowExecution;
   }
 
+  /**
+   * @return the reason
+   */
   public String getReason() {
     return reason;
   }
@@ -44,6 +53,10 @@ public final class CancelWorkflowRequest {
   }
 
   public static final class Builder {
+    private String namespace = "";
+    private wit.startworkflow.WorkflowExecution workflowExecution = null;
+    private String reason = null;
+
     private Builder() {}
 
     private Builder(CancelWorkflowRequest value) {
@@ -53,22 +66,28 @@ public final class CancelWorkflowRequest {
       this.reason = value.reason;
     }
 
-    private String namespace = "";
-
+    /**
+     * @param value the namespace
+     * @return this builder
+     */
     public Builder setNamespace(String value) {
       this.namespace = value;
       return this;
     }
 
-    private wit.startworkflow.WorkflowExecution workflowExecution = null;
-
+    /**
+     * @param value the workflowExecution
+     * @return this builder
+     */
     public Builder setWorkflowExecution(wit.startworkflow.WorkflowExecution value) {
       this.workflowExecution = value;
       return this;
     }
 
-    private String reason = null;
-
+    /**
+     * @param value the reason
+     * @return this builder
+     */
     public Builder setReason(String value) {
       this.reason = value;
       return this;

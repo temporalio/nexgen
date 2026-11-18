@@ -2301,7 +2301,7 @@ Here the WIT field `workflow` maps to proto field `workflow_type`.
 ### @nexus.name
 
 **Placement:** Record field **Syntax:**
-`@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>"`
+`@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>" java="<name>"`
 
 Overrides the generated field name for individual target languages. Languages
 without an override continue to use the WIT field name.
@@ -2749,6 +2749,11 @@ is emitted as written and has access to `request` and `result` variables.
 Helpers used by the expression must be available to the generated code. Go
 expressions must return `(T, error)`.
 
+In Java, an unqualified helper call such as
+`java="toHandle(request.getWorkflowId(), result.getRunId())"` is resolved
+relative to `--support-package`. Qualified calls and other expressions are
+emitted as written.
+
 ```wit
 /// @nexus.output-transform
 ///   python-type="workflow.ExternalWorkflowHandle[typing.Any]"
@@ -3001,6 +3006,11 @@ parameters in the name-based API and are excluded from options. Sourced and
 omitted fields stay out of the public arguments and options, while flattened
 records expose their fields directly. The operation constructs the request
 internally; no handwritten options class or operation wrapper is required.
+Options implement value equality, hashing, and descriptive string rendering.
+Field documentation is emitted on getters and builder setters; operation Javadoc
+includes parameter, type-parameter, and return documentation. Java type
+parameters use short conventional names without changing the authored WIT
+parameter names.
 
 Declared defaults and sources are resolved when calling the workflow operation,
 not by model or options builders. Signal-with-start defaults its task queue to
@@ -3012,6 +3022,12 @@ hook; `Terminal` executes it through the SDK-owned `executeSystemNexusOperation`
 transport. Neither enters ordinary Nexus interceptor hooks. SDK integration
 supplies the next interceptor and terminal transport once, without handwritten
 methods for individual operations.
+
+System Nexus service and dispatch helpers are emitted in the generated package's
+`internal` subpackage. Options and types in public interceptor signatures remain
+accessible. Helper-only runtimes are package-private when all consumers share a
+package; runtimes exposing value types or serving multiple packages remain
+public.
 
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
 `@nexus.function` to additionally generate typed overloads. Bound method

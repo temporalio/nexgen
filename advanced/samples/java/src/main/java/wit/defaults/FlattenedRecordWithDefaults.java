@@ -14,10 +14,16 @@ public final class FlattenedRecordWithDefaults {
     this.details = details;
   }
 
+  /**
+   * @return the summary
+   */
   public String getSummary() {
     return summary;
   }
 
+  /**
+   * @return the details
+   */
   public String getDetails() {
     return details;
   }
@@ -35,6 +41,9 @@ public final class FlattenedRecordWithDefaults {
   }
 
   public static final class Builder {
+    private String summary = "";
+    private String details = null;
+
     private Builder() {}
 
     private Builder(FlattenedRecordWithDefaults value) {
@@ -43,15 +52,19 @@ public final class FlattenedRecordWithDefaults {
       this.details = value.details;
     }
 
-    private String summary = "";
-
+    /**
+     * @param value the summary
+     * @return this builder
+     */
     public Builder setSummary(String value) {
       this.summary = value;
       return this;
     }
 
-    private String details = null;
-
+    /**
+     * @param value the details
+     * @return this builder
+     */
     public Builder setDetails(String value) {
       this.details = value;
       return this;

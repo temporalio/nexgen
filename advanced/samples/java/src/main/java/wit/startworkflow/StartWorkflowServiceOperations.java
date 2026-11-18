@@ -5,6 +5,10 @@ package wit.startworkflow;
 public final class StartWorkflowServiceOperations {
   private StartWorkflowServiceOperations() {}
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static StartedWorkflow startWorkflow(wit.startworkflow.StartWorkflowOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.startworkflow.StartWorkflowRequest.Builder requestBuilder =
@@ -35,6 +39,10 @@ public final class StartWorkflowServiceOperations {
     return new StartedWorkflow(request.getNamespace(), request.getWorkflowId(), result.getRunId());
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static StartedWorkflow restartWorkflow(wit.startworkflow.RestartWorkflowOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.startworkflow.StartWorkflowRequest.Builder requestBuilder =
@@ -65,6 +73,10 @@ public final class StartWorkflowServiceOperations {
     return new StartedWorkflow(request.getNamespace(), request.getWorkflowId(), result.getRunId());
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.startworkflow.CancelWorkflowResponse cancelWorkflow(
       wit.startworkflow.CancelWorkflowOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -94,6 +106,10 @@ public final class StartWorkflowServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static SignalResult signalWithStart(wit.startworkflow.SignalWithStartOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.startworkflow.CancelWorkflowRequest.Builder requestBuilder =

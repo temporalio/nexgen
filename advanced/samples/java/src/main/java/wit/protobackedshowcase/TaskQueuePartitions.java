@@ -19,11 +19,17 @@ public final class TaskQueuePartitions {
     this.activityTaskQueuePartitions = activityTaskQueuePartitions;
   }
 
+  /**
+   * @return the workflowTaskQueuePartitions
+   */
   public java.util.List<wit.protobackedshowcase.TaskQueuePartition>
       getWorkflowTaskQueuePartitions() {
     return workflowTaskQueuePartitions;
   }
 
+  /**
+   * @return the activityTaskQueuePartitions
+   */
   public java.util.List<wit.protobackedshowcase.TaskQueuePartition>
       getActivityTaskQueuePartitions() {
     return activityTaskQueuePartitions;
@@ -42,6 +48,11 @@ public final class TaskQueuePartitions {
   }
 
   public static final class Builder {
+    private java.util.List<wit.protobackedshowcase.TaskQueuePartition> workflowTaskQueuePartitions =
+        null;
+    private java.util.List<wit.protobackedshowcase.TaskQueuePartition> activityTaskQueuePartitions =
+        java.util.Collections.emptyList();
+
     private Builder() {}
 
     private Builder(TaskQueuePartitions value) {
@@ -50,18 +61,20 @@ public final class TaskQueuePartitions {
       this.activityTaskQueuePartitions = value.activityTaskQueuePartitions;
     }
 
-    private java.util.List<wit.protobackedshowcase.TaskQueuePartition> workflowTaskQueuePartitions =
-        null;
-
+    /**
+     * @param value the workflowTaskQueuePartitions
+     * @return this builder
+     */
     public Builder setWorkflowTaskQueuePartitions(
         java.util.List<wit.protobackedshowcase.TaskQueuePartition> value) {
       this.workflowTaskQueuePartitions = value;
       return this;
     }
 
-    private java.util.List<wit.protobackedshowcase.TaskQueuePartition> activityTaskQueuePartitions =
-        java.util.Collections.emptyList();
-
+    /**
+     * @param value the activityTaskQueuePartitions
+     * @return this builder
+     */
     public Builder setActivityTaskQueuePartitions(
         java.util.List<wit.protobackedshowcase.TaskQueuePartition> value) {
       this.activityTaskQueuePartitions = value;

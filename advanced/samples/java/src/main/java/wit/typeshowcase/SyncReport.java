@@ -30,27 +30,45 @@ public final class SyncReport {
     this.clockSkewMs = clockSkewMs;
   }
 
+  /**
+   * @return the route
+   */
   public java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> getRoute() {
     return route;
   }
 
+  /**
+   * @return the attempts
+   */
   public java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> getAttempts() {
     return attempts;
   }
 
+  /**
+   * @return the regionStatus
+   */
   public java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
       getRegionStatus() {
     return regionStatus;
   }
 
+  /**
+   * @return the itemCount
+   */
   public Integer getItemCount() {
     return itemCount;
   }
 
+  /**
+   * @return the byteCount
+   */
   public Long getByteCount() {
     return byteCount;
   }
 
+  /**
+   * @return the clockSkewMs
+   */
   public Long getClockSkewMs() {
     return clockSkewMs;
   }
@@ -68,6 +86,16 @@ public final class SyncReport {
   }
 
   public static final class Builder {
+    private java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> route =
+        java.util.Collections.emptyList();
+    private java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> attempts =
+        java.util.Collections.emptyList();
+    private java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
+        regionStatus = java.util.Collections.emptyMap();
+    private Integer itemCount = null;
+    private Long byteCount = null;
+    private Long clockSkewMs = 0L;
+
     private Builder() {}
 
     private Builder(SyncReport value) {
@@ -80,49 +108,58 @@ public final class SyncReport {
       this.clockSkewMs = value.clockSkewMs;
     }
 
-    private java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> route =
-        java.util.Collections.emptyList();
-
+    /**
+     * @param value the route
+     * @return this builder
+     */
     public Builder setRoute(
         java.util.List<wit.typeshowcase.NexgenRuntime.Tuple2<Double, Double>> value) {
       this.route = value;
       return this;
     }
 
-    private java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> attempts =
-        java.util.Collections.emptyList();
-
+    /**
+     * @param value the attempts
+     * @return this builder
+     */
     public Builder setAttempts(
         java.util.List<wit.typeshowcase.NexgenRuntime.Result<String, String>> value) {
       this.attempts = value;
       return this;
     }
 
-    private java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>>
-        regionStatus = java.util.Collections.emptyMap();
-
+    /**
+     * @param value the regionStatus
+     * @return this builder
+     */
     public Builder setRegionStatus(
         java.util.Map<String, wit.typeshowcase.NexgenRuntime.Result<String, String>> value) {
       this.regionStatus = value;
       return this;
     }
 
-    private Integer itemCount = null;
-
+    /**
+     * @param value the itemCount
+     * @return this builder
+     */
     public Builder setItemCount(Integer value) {
       this.itemCount = value;
       return this;
     }
 
-    private Long byteCount = null;
-
+    /**
+     * @param value the byteCount
+     * @return this builder
+     */
     public Builder setByteCount(Long value) {
       this.byteCount = value;
       return this;
     }
 
-    private Long clockSkewMs = 0L;
-
+    /**
+     * @param value the clockSkewMs
+     * @return this builder
+     */
     public Builder setClockSkewMs(Long value) {
       this.clockSkewMs = value;
       return this;

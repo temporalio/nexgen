@@ -14,10 +14,16 @@ public final class SyncSettings {
     this.checkpoint = checkpoint;
   }
 
+  /**
+   * @return the region
+   */
   public String getRegion() {
     return region;
   }
 
+  /**
+   * @return the checkpoint
+   */
   public String getCheckpoint() {
     return checkpoint;
   }
@@ -35,6 +41,9 @@ public final class SyncSettings {
   }
 
   public static final class Builder {
+    private String region = null;
+    private String checkpoint = null;
+
     private Builder() {}
 
     private Builder(SyncSettings value) {
@@ -43,15 +52,19 @@ public final class SyncSettings {
       this.checkpoint = value.checkpoint;
     }
 
-    private String region = null;
-
+    /**
+     * @param value the region
+     * @return this builder
+     */
     public Builder setRegion(String value) {
       this.region = value;
       return this;
     }
 
-    private String checkpoint = null;
-
+    /**
+     * @param value the checkpoint
+     * @return this builder
+     */
     public Builder setCheckpoint(String value) {
       this.checkpoint = value;
       return this;

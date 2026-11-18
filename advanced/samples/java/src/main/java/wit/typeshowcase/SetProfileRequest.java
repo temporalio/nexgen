@@ -15,10 +15,16 @@ public final class SetProfileRequest {
     this.profile = profile;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the profile
+   */
   public wit.typeshowcase.UserProfile getProfile() {
     return profile;
   }
@@ -36,6 +42,9 @@ public final class SetProfileRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private wit.typeshowcase.UserProfile profile = null;
+
     private Builder() {}
 
     private Builder(SetProfileRequest value) {
@@ -44,15 +53,19 @@ public final class SetProfileRequest {
       this.profile = value.profile;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private wit.typeshowcase.UserProfile profile = null;
-
+    /**
+     * @param value the profile
+     * @return this builder
+     */
     public Builder setProfile(wit.typeshowcase.UserProfile value) {
       this.profile = value;
       return this;

@@ -5,6 +5,10 @@ package wit.defaults;
 public final class DefaultsServiceOperations {
   private DefaultsServiceOperations() {}
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.defaults.Request submit(wit.defaults.SubmitOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.defaults.Request.Builder requestBuilder = wit.defaults.Request.newBuilder();
@@ -46,6 +50,10 @@ public final class DefaultsServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.defaults.Sender getSender(wit.defaults.GetSenderOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.defaults.GetSenderRequest.Builder requestBuilder =
@@ -68,6 +76,10 @@ public final class DefaultsServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.defaults.Request submitFromSender(
       wit.defaults.SubmitFromSenderOptions options) {
     java.util.Objects.requireNonNull(options, "options");

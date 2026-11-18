@@ -3,7 +3,7 @@ package wit.genericmodels;
 
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
     using = OperationCompletionResult.Deserializer.class)
-public final class OperationCompletionResult<OutputT> {
+public final class OperationCompletionResult<V> {
   public enum Tag {
     @com.fasterxml.jackson.annotation.JsonProperty("success")
     SUCCESS,
@@ -27,14 +27,14 @@ public final class OperationCompletionResult<OutputT> {
     return value;
   }
 
-  public static <OutputT> OperationCompletionResult<OutputT> success(
-      wit.genericmodels.OperationCompletionSuccess<OutputT> value) {
-    return new OperationCompletionResult<OutputT>(Tag.SUCCESS, value);
+  public static <V> OperationCompletionResult<V> success(
+      wit.genericmodels.OperationCompletionSuccess<V> value) {
+    return new OperationCompletionResult<V>(Tag.SUCCESS, value);
   }
 
-  public static <OutputT> OperationCompletionResult<OutputT> failure(
+  public static <V> OperationCompletionResult<V> failure(
       wit.genericmodels.OperationCompletionFailure value) {
-    return new OperationCompletionResult<OutputT>(Tag.FAILURE, value);
+    return new OperationCompletionResult<V>(Tag.FAILURE, value);
   }
 
   public static final class Deserializer

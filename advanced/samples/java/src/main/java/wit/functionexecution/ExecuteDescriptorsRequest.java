@@ -10,8 +10,6 @@ public final class ExecuteDescriptorsRequest {
 
   private final wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       function;
-
-  /** Arguments for the function. */
   private final java.util.List<String> args;
 
   @FunctionalInterface
@@ -20,8 +18,6 @@ public final class ExecuteDescriptorsRequest {
   }
 
   private final DurationsFunction durations;
-
-  /** Arguments for the durations. */
   private final java.util.List<String> durationValues;
 
   @FunctionalInterface
@@ -30,8 +26,6 @@ public final class ExecuteDescriptorsRequest {
   }
 
   private final CallbackFunction callback;
-
-  /** Arguments for the callback. */
   private final java.util.List<String> callbackValues;
 
   @FunctionalInterface
@@ -40,8 +34,6 @@ public final class ExecuteDescriptorsRequest {
   }
 
   private final CallableFunction callable;
-
-  /** Arguments for the callable. */
   private final java.util.List<String> callableValues;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -68,35 +60,67 @@ public final class ExecuteDescriptorsRequest {
     this.callableValues = callableValues;
   }
 
+  /**
+   * @return the function
+   */
   public wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       getFunction() {
     return function;
   }
 
+  /**
+   * Arguments for the function.
+   *
+   * @return the args
+   */
   public java.util.List<String> getArgs() {
     return args;
   }
 
+  /**
+   * @return the durations
+   */
   public DurationsFunction getDurations() {
     return durations;
   }
 
+  /**
+   * Arguments for the durations.
+   *
+   * @return the durationValues
+   */
   public java.util.List<String> getDurationValues() {
     return durationValues;
   }
 
+  /**
+   * @return the callback
+   */
   public CallbackFunction getCallback() {
     return callback;
   }
 
+  /**
+   * Arguments for the callback.
+   *
+   * @return the callbackValues
+   */
   public java.util.List<String> getCallbackValues() {
     return callbackValues;
   }
 
+  /**
+   * @return the callable
+   */
   public CallableFunction getCallable() {
     return callable;
   }
 
+  /**
+   * Arguments for the callable.
+   *
+   * @return the callableValues
+   */
   public java.util.List<String> getCallableValues() {
     return callableValues;
   }
@@ -114,6 +138,16 @@ public final class ExecuteDescriptorsRequest {
   }
 
   public static final class Builder {
+    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
+        function = null;
+    private java.util.List<String> args = null;
+    private DurationsFunction durations = null;
+    private java.util.List<String> durationValues = null;
+    private CallbackFunction callback = null;
+    private java.util.List<String> callbackValues = null;
+    private CallableFunction callable = null;
+    private java.util.List<String> callableValues = null;
+
     private Builder() {}
 
     private Builder(ExecuteDescriptorsRequest value) {
@@ -128,69 +162,100 @@ public final class ExecuteDescriptorsRequest {
       this.callableValues = value.callableValues;
     }
 
-    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
-        function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(
         wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String> value) {
       this.function = value;
       return this;
     }
 
-    private java.util.List<String> args = null;
-
+    /**
+     * Arguments for the function.
+     *
+     * @param value the args
+     * @return this builder
+     */
     public Builder setArgs(java.util.List<String> value) {
       this.args = value;
       return this;
     }
 
-    private DurationsFunction durations = null;
-
+    /**
+     * @param value the durations
+     * @return this builder
+     */
     public Builder setDurations(DurationsFunction value) {
       this.durations = value;
       return this;
     }
 
-    private java.util.List<String> durationValues = null;
-
+    /**
+     * Arguments for the durations.
+     *
+     * @param value the durationValues
+     * @return this builder
+     */
     public Builder setDurationValues(java.util.List<String> value) {
       this.durationValues = value;
       return this;
     }
 
-    private CallbackFunction callback = null;
-
+    /**
+     * @param value the callback
+     * @return this builder
+     */
     public Builder setCallback(CallbackFunction value) {
       this.callback = value;
       return this;
     }
 
-    private java.util.List<String> callbackValues = null;
-
+    /**
+     * Arguments for the callback.
+     *
+     * @param value the callbackValues
+     * @return this builder
+     */
     public Builder setCallbackValues(java.util.List<String> value) {
       this.callbackValues = value;
       return this;
     }
 
-    private CallableFunction callable = null;
-
+    /**
+     * @param value the callable
+     * @return this builder
+     */
     public Builder setCallable(CallableFunction value) {
       this.callable = value;
       return this;
     }
 
-    private java.util.List<String> callableValues = null;
-
+    /**
+     * Arguments for the callable.
+     *
+     * @param value the callableValues
+     * @return this builder
+     */
     public Builder setCallableValues(java.util.List<String> value) {
       this.callableValues = value;
       return this;
     }
 
+    /**
+     * @param value the callable
+     * @return this builder
+     */
     public Builder setFunctionCall(FunctionFunction value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.callable(value);
       return this;
     }
 
+    /**
+     * @param value the callable name
+     * @return this builder
+     */
     public Builder setFunctionName(String value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.named(value);
       return this;

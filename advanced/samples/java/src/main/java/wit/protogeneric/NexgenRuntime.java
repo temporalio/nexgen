@@ -3,7 +3,7 @@ package wit.protogeneric;
 
 /** Shared conversion helpers used by these generated models. */
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class NexgenRuntime {
+final class NexgenRuntime {
   private NexgenRuntime() {}
 
   public static java.lang.reflect.Type parameterized(

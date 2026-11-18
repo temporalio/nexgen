@@ -16,10 +16,16 @@ public final class CallbackNexus {
     this.header = header;
   }
 
+  /**
+   * @return the url
+   */
   public String getUrl() {
     return url;
   }
 
+  /**
+   * @return the header
+   */
   public java.util.Map<String, String> getHeader() {
     return header;
   }
@@ -37,6 +43,9 @@ public final class CallbackNexus {
   }
 
   public static final class Builder {
+    private String url = "";
+    private java.util.Map<String, String> header = java.util.Collections.emptyMap();
+
     private Builder() {}
 
     private Builder(CallbackNexus value) {
@@ -45,15 +54,19 @@ public final class CallbackNexus {
       this.header = value.header;
     }
 
-    private String url = "";
-
+    /**
+     * @param value the url
+     * @return this builder
+     */
     public Builder setUrl(String value) {
       this.url = value;
       return this;
     }
 
-    private java.util.Map<String, String> header = java.util.Collections.emptyMap();
-
+    /**
+     * @param value the header
+     * @return this builder
+     */
     public Builder setHeader(java.util.Map<String, String> value) {
       this.header = value;
       return this;

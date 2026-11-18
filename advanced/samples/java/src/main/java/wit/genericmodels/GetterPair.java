@@ -2,22 +2,22 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class GetterPair<ContextT, OutputT> {
-  private final ContextT value;
-  private final OutputT other;
-  private final java.util.List<ContextT> history;
-  private final wit.genericmodels.NexgenRuntime.Tuple2<ContextT, OutputT> tupleValue;
-  private final wit.genericmodels.NexgenRuntime.Result<ContextT, OutputT> resultValue;
+public final class GetterPair<T, V> {
+  private final T value;
+  private final V other;
+  private final java.util.List<T> history;
+  private final wit.genericmodels.NexgenRuntime.Tuple2<T, V> tupleValue;
+  private final wit.genericmodels.NexgenRuntime.Result<T, V> resultValue;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GetterPair(
-      @com.fasterxml.jackson.annotation.JsonProperty("value") ContextT value,
-      @com.fasterxml.jackson.annotation.JsonProperty("other") OutputT other,
-      @com.fasterxml.jackson.annotation.JsonProperty("history") java.util.List<ContextT> history,
+      @com.fasterxml.jackson.annotation.JsonProperty("value") T value,
+      @com.fasterxml.jackson.annotation.JsonProperty("other") V other,
+      @com.fasterxml.jackson.annotation.JsonProperty("history") java.util.List<T> history,
       @com.fasterxml.jackson.annotation.JsonProperty("tupleValue")
-          wit.genericmodels.NexgenRuntime.Tuple2<ContextT, OutputT> tupleValue,
+          wit.genericmodels.NexgenRuntime.Tuple2<T, V> tupleValue,
       @com.fasterxml.jackson.annotation.JsonProperty("resultValue")
-          wit.genericmodels.NexgenRuntime.Result<ContextT, OutputT> resultValue) {
+          wit.genericmodels.NexgenRuntime.Result<T, V> resultValue) {
     this.value = value;
     this.other = other;
     this.history = history;
@@ -25,43 +25,63 @@ public final class GetterPair<ContextT, OutputT> {
     this.resultValue = resultValue;
   }
 
-  public ContextT getValue() {
+  /**
+   * @return the value
+   */
+  public T getValue() {
     return value;
   }
 
-  public OutputT getOther() {
+  /**
+   * @return the other
+   */
+  public V getOther() {
     return other;
   }
 
-  public java.util.List<ContextT> getHistory() {
+  /**
+   * @return the history
+   */
+  public java.util.List<T> getHistory() {
     return history;
   }
 
-  public wit.genericmodels.NexgenRuntime.Tuple2<ContextT, OutputT> getTupleValue() {
+  /**
+   * @return the tupleValue
+   */
+  public wit.genericmodels.NexgenRuntime.Tuple2<T, V> getTupleValue() {
     return tupleValue;
   }
 
-  public wit.genericmodels.NexgenRuntime.Result<ContextT, OutputT> getResultValue() {
+  /**
+   * @return the resultValue
+   */
+  public wit.genericmodels.NexgenRuntime.Result<T, V> getResultValue() {
     return resultValue;
   }
 
-  public Builder<ContextT, OutputT> toBuilder() {
+  public Builder<T, V> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT, OutputT> Builder<ContextT, OutputT> newBuilder(
-      GetterPair<ContextT, OutputT> value) {
-    return new Builder<ContextT, OutputT>(value);
+  public static <T, V> Builder<T, V> newBuilder(GetterPair<T, V> value) {
+    return new Builder<T, V>(value);
   }
 
-  public static <ContextT, OutputT> Builder<ContextT, OutputT> newBuilder() {
-    return new Builder<ContextT, OutputT>();
+  public static <T, V> Builder<T, V> newBuilder() {
+    return new Builder<T, V>();
   }
 
-  public static final class Builder<ContextT, OutputT> {
+  public static final class Builder<T, V> {
+    private T value = null;
+    private V other = null;
+    private java.util.List<T> history = java.util.Collections.emptyList();
+    private wit.genericmodels.NexgenRuntime.Tuple2<T, V> tupleValue = null;
+    private wit.genericmodels.NexgenRuntime.Result<T, V> resultValue = null;
+
     private Builder() {}
 
-    private Builder(GetterPair<ContextT, OutputT> value) {
+    private Builder(GetterPair<T, V> value) {
       if (value == null) return;
       this.value = value.value;
       this.other = value.other;
@@ -70,45 +90,53 @@ public final class GetterPair<ContextT, OutputT> {
       this.resultValue = value.resultValue;
     }
 
-    private ContextT value = null;
-
-    public Builder<ContextT, OutputT> setValue(ContextT value) {
+    /**
+     * @param value the value
+     * @return this builder
+     */
+    public Builder<T, V> setValue(T value) {
       this.value = value;
       return this;
     }
 
-    private OutputT other = null;
-
-    public Builder<ContextT, OutputT> setOther(OutputT value) {
+    /**
+     * @param value the other
+     * @return this builder
+     */
+    public Builder<T, V> setOther(V value) {
       this.other = value;
       return this;
     }
 
-    private java.util.List<ContextT> history = java.util.Collections.emptyList();
-
-    public Builder<ContextT, OutputT> setHistory(java.util.List<ContextT> value) {
+    /**
+     * @param value the history
+     * @return this builder
+     */
+    public Builder<T, V> setHistory(java.util.List<T> value) {
       this.history = value;
       return this;
     }
 
-    private wit.genericmodels.NexgenRuntime.Tuple2<ContextT, OutputT> tupleValue = null;
-
-    public Builder<ContextT, OutputT> setTupleValue(
-        wit.genericmodels.NexgenRuntime.Tuple2<ContextT, OutputT> value) {
+    /**
+     * @param value the tupleValue
+     * @return this builder
+     */
+    public Builder<T, V> setTupleValue(wit.genericmodels.NexgenRuntime.Tuple2<T, V> value) {
       this.tupleValue = value;
       return this;
     }
 
-    private wit.genericmodels.NexgenRuntime.Result<ContextT, OutputT> resultValue = null;
-
-    public Builder<ContextT, OutputT> setResultValue(
-        wit.genericmodels.NexgenRuntime.Result<ContextT, OutputT> value) {
+    /**
+     * @param value the resultValue
+     * @return this builder
+     */
+    public Builder<T, V> setResultValue(wit.genericmodels.NexgenRuntime.Result<T, V> value) {
       this.resultValue = value;
       return this;
     }
 
-    public GetterPair<ContextT, OutputT> build() {
-      return new GetterPair<ContextT, OutputT>(value, other, history, tupleValue, resultValue);
+    public GetterPair<T, V> build() {
+      return new GetterPair<T, V>(value, other, history, tupleValue, resultValue);
     }
   }
 }

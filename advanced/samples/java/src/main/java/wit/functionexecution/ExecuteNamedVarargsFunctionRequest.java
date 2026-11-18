@@ -10,8 +10,6 @@ public final class ExecuteNamedVarargsFunctionRequest {
 
   private final wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       function;
-
-  /** Arguments for the function. */
   private final java.util.List<String> args;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -23,11 +21,19 @@ public final class ExecuteNamedVarargsFunctionRequest {
     this.args = args;
   }
 
+  /**
+   * @return the function
+   */
   public wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       getFunction() {
     return function;
   }
 
+  /**
+   * Arguments for the function.
+   *
+   * @return the args
+   */
   public java.util.List<String> getArgs() {
     return args;
   }
@@ -45,6 +51,10 @@ public final class ExecuteNamedVarargsFunctionRequest {
   }
 
   public static final class Builder {
+    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
+        function = null;
+    private java.util.List<String> args = null;
+
     private Builder() {}
 
     private Builder(ExecuteNamedVarargsFunctionRequest value) {
@@ -53,27 +63,40 @@ public final class ExecuteNamedVarargsFunctionRequest {
       this.args = value.args;
     }
 
-    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
-        function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(
         wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String> value) {
       this.function = value;
       return this;
     }
 
-    private java.util.List<String> args = null;
-
+    /**
+     * Arguments for the function.
+     *
+     * @param value the args
+     * @return this builder
+     */
     public Builder setArgs(java.util.List<String> value) {
       this.args = value;
       return this;
     }
 
+    /**
+     * @param value the callable
+     * @return this builder
+     */
     public Builder setFunctionCall(FunctionFunction value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.callable(value);
       return this;
     }
 
+    /**
+     * @param value the callable name
+     * @return this builder
+     */
     public Builder setFunctionName(String value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.named(value);
       return this;

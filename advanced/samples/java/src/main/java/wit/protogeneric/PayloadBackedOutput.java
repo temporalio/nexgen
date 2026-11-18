@@ -3,48 +3,54 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(PayloadBackedOutput.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class PayloadBackedOutput<OutputT> {
-  private final OutputT details;
+public final class PayloadBackedOutput<U> {
+  private final U details;
 
   @com.fasterxml.jackson.annotation.JsonCreator
-  public PayloadBackedOutput(
-      @com.fasterxml.jackson.annotation.JsonProperty("details") OutputT details) {
+  public PayloadBackedOutput(@com.fasterxml.jackson.annotation.JsonProperty("details") U details) {
     this.details = details;
   }
 
-  public OutputT getDetails() {
+  /**
+   * @return the details
+   */
+  public U getDetails() {
     return details;
   }
 
-  public Builder<OutputT> toBuilder() {
+  public Builder<U> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder(PayloadBackedOutput<OutputT> value) {
-    return new Builder<OutputT>(value);
+  public static <U> Builder<U> newBuilder(PayloadBackedOutput<U> value) {
+    return new Builder<U>(value);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder() {
-    return new Builder<OutputT>();
+  public static <U> Builder<U> newBuilder() {
+    return new Builder<U>();
   }
 
-  public static final class Builder<OutputT> {
+  public static final class Builder<U> {
+    private U details = null;
+
     private Builder() {}
 
-    private Builder(PayloadBackedOutput<OutputT> value) {
+    private Builder(PayloadBackedOutput<U> value) {
       if (value == null) return;
       this.details = value.details;
     }
 
-    private OutputT details = null;
-
-    public Builder<OutputT> setDetails(OutputT value) {
+    /**
+     * @param value the details
+     * @return this builder
+     */
+    public Builder<U> setDetails(U value) {
       this.details = value;
       return this;
     }
 
-    public PayloadBackedOutput<OutputT> build() {
-      return new PayloadBackedOutput<OutputT>(details);
+    public PayloadBackedOutput<U> build() {
+      return new PayloadBackedOutput<U>(details);
     }
   }
 
@@ -56,13 +62,13 @@ public final class PayloadBackedOutput<OutputT> {
     return proto.build();
   }
 
-  public static <OutputT> PayloadBackedOutput<OutputT> fromProto(
+  public static <U> PayloadBackedOutput<U> fromProto(
       io.temporal.api.compute.v1.ComputeProvider proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<OutputT> builder = PayloadBackedOutput.<OutputT>newBuilder();
+    Builder<U> builder = PayloadBackedOutput.<U>newBuilder();
     builder.setDetails(
-        (OutputT)
+        (U)
             converter.fromPayload(
                 proto.getDetails(),
                 wit.protogeneric.NexgenRuntime.rawType(

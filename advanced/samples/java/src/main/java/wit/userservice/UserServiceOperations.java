@@ -5,6 +5,10 @@ package wit.userservice;
 public final class UserServiceOperations {
   private UserServiceOperations() {}
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.userservice.User getUser(wit.userservice.GetUserOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.userservice.GetUserRequest.Builder requestBuilder =
@@ -29,6 +33,10 @@ public final class UserServiceOperations {
     return result.withEndpoint(endpoint);
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.userservice.User updateEmail(wit.userservice.UpdateEmailOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.userservice.UpdateEmailRequest.Builder requestBuilder =
@@ -54,6 +62,9 @@ public final class UserServiceOperations {
     return result.withEndpoint(endpoint);
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   */
   public static void notify(wit.userservice.NotifyOptions options) {
     java.util.Objects.requireNonNull(options, "options");
     wit.userservice.NotifyRequest.Builder requestBuilder =

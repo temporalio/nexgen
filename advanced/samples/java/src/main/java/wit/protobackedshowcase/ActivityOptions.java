@@ -24,18 +24,30 @@ public final class ActivityOptions {
     this.priority = priority;
   }
 
+  /**
+   * @return the taskQueue
+   */
   public String getTaskQueue() {
     return taskQueue;
   }
 
+  /**
+   * @return the retryPolicy
+   */
   public io.temporal.common.RetryOptions getRetryPolicy() {
     return retryPolicy;
   }
 
+  /**
+   * @return the scheduleToCloseTimeout
+   */
   public java.time.Duration getScheduleToCloseTimeout() {
     return scheduleToCloseTimeout;
   }
 
+  /**
+   * @return the priority
+   */
   public io.temporal.common.Priority getPriority() {
     return priority;
   }
@@ -53,6 +65,11 @@ public final class ActivityOptions {
   }
 
   public static final class Builder {
+    private String taskQueue = null;
+    private io.temporal.common.RetryOptions retryPolicy = null;
+    private java.time.Duration scheduleToCloseTimeout = null;
+    private io.temporal.common.Priority priority = null;
+
     private Builder() {}
 
     private Builder(ActivityOptions value) {
@@ -63,29 +80,37 @@ public final class ActivityOptions {
       this.priority = value.priority;
     }
 
-    private String taskQueue = null;
-
+    /**
+     * @param value the taskQueue
+     * @return this builder
+     */
     public Builder setTaskQueue(String value) {
       this.taskQueue = value;
       return this;
     }
 
-    private io.temporal.common.RetryOptions retryPolicy = null;
-
+    /**
+     * @param value the retryPolicy
+     * @return this builder
+     */
     public Builder setRetryPolicy(io.temporal.common.RetryOptions value) {
       this.retryPolicy = value;
       return this;
     }
 
-    private java.time.Duration scheduleToCloseTimeout = null;
-
+    /**
+     * @param value the scheduleToCloseTimeout
+     * @return this builder
+     */
     public Builder setScheduleToCloseTimeout(java.time.Duration value) {
       this.scheduleToCloseTimeout = value;
       return this;
     }
 
-    private io.temporal.common.Priority priority = null;
-
+    /**
+     * @param value the priority
+     * @return this builder
+     */
     public Builder setPriority(io.temporal.common.Priority value) {
       this.priority = value;
       return this;

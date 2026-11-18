@@ -19,14 +19,23 @@ public final class NamespaceInfo {
     this.state = state;
   }
 
+  /**
+   * @return the name
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * @return the data
+   */
   public java.util.Map<String, String> getData() {
     return data;
   }
 
+  /**
+   * @return the state
+   */
   public wit.protobackedshowcase.NamespaceState getState() {
     return state;
   }
@@ -44,6 +53,10 @@ public final class NamespaceInfo {
   }
 
   public static final class Builder {
+    private String name = null;
+    private java.util.Map<String, String> data = null;
+    private wit.protobackedshowcase.NamespaceState state = null;
+
     private Builder() {}
 
     private Builder(NamespaceInfo value) {
@@ -53,22 +66,28 @@ public final class NamespaceInfo {
       this.state = value.state;
     }
 
-    private String name = null;
-
+    /**
+     * @param value the name
+     * @return this builder
+     */
     public Builder setName(String value) {
       this.name = value;
       return this;
     }
 
-    private java.util.Map<String, String> data = null;
-
+    /**
+     * @param value the data
+     * @return this builder
+     */
     public Builder setData(java.util.Map<String, String> value) {
       this.data = value;
       return this;
     }
 
-    private wit.protobackedshowcase.NamespaceState state = null;
-
+    /**
+     * @param value the state
+     * @return this builder
+     */
     public Builder setState(wit.protobackedshowcase.NamespaceState value) {
       this.state = value;
       return this;

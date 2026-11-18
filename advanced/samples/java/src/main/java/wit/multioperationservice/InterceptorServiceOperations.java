@@ -5,6 +5,10 @@ package wit.multioperationservice;
 public final class InterceptorServiceOperations {
   private InterceptorServiceOperations() {}
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.multioperationservice.Response firstOperation(
       wit.multioperationservice.FirstOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");
@@ -32,6 +36,10 @@ public final class InterceptorServiceOperations {
     return result;
   }
 
+  /**
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.multioperationservice.Response secondOperation(
       wit.multioperationservice.SecondOperationOptions options) {
     java.util.Objects.requireNonNull(options, "options");

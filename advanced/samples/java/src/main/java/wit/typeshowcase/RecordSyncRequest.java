@@ -14,10 +14,16 @@ public final class RecordSyncRequest {
     this.report = report;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the report
+   */
   public wit.typeshowcase.SyncReport getReport() {
     return report;
   }
@@ -35,6 +41,9 @@ public final class RecordSyncRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private wit.typeshowcase.SyncReport report = null;
+
     private Builder() {}
 
     private Builder(RecordSyncRequest value) {
@@ -43,15 +52,19 @@ public final class RecordSyncRequest {
       this.report = value.report;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private wit.typeshowcase.SyncReport report = null;
-
+    /**
+     * @param value the report
+     * @return this builder
+     */
     public Builder setReport(wit.typeshowcase.SyncReport value) {
       this.report = value;
       return this;

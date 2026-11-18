@@ -3,15 +3,8 @@ package wit.typeshowcase;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class UserProfile {
-  /**
-   * A very long field doc that has to be wrapped because it exceeds the generated comment line
-   * width by a comfortable margin for testing.
-   */
   private final java.util.List<String> tags;
-
-  /** Default metadata. */
   private final java.util.Map<String, String> metadata;
-
   private final java.util.EnumSet<wit.typeshowcase.UserCapability> capabilities;
   private final wit.typeshowcase.NexgenRuntime.Result<String, String> syncState;
   private final wit.typeshowcase.NotificationTarget notificationTarget;
@@ -46,34 +39,63 @@ public final class UserProfile {
     this.experimentalTarget = experimentalTarget;
   }
 
+  /**
+   * A very long field doc that has to be wrapped because it exceeds the generated comment line
+   * width by a comfortable margin for testing.
+   *
+   * @return the tags
+   */
   public java.util.List<String> getTags() {
     return tags;
   }
 
+  /**
+   * Default metadata.
+   *
+   * @return the metadata
+   */
   public java.util.Map<String, String> getMetadata() {
     return metadata;
   }
 
+  /**
+   * @return the capabilities
+   */
   public java.util.EnumSet<wit.typeshowcase.UserCapability> getCapabilities() {
     return capabilities;
   }
 
+  /**
+   * @return the syncState
+   */
   public wit.typeshowcase.NexgenRuntime.Result<String, String> getSyncState() {
     return syncState;
   }
 
+  /**
+   * @return the notificationTarget
+   */
   public wit.typeshowcase.NotificationTarget getNotificationTarget() {
     return notificationTarget;
   }
 
+  /**
+   * @return the address
+   */
   public wit.typeshowcase.PostalAddress getAddress() {
     return address;
   }
 
+  /**
+   * @return the singleTarget
+   */
   public wit.typeshowcase.SingleTarget getSingleTarget() {
     return singleTarget;
   }
 
+  /**
+   * @return the experimentalTarget
+   */
   public wit.typeshowcase.ExperimentalTarget getExperimentalTarget() {
     return experimentalTarget;
   }
@@ -91,6 +113,15 @@ public final class UserProfile {
   }
 
   public static final class Builder {
+    private java.util.List<String> tags = java.util.Collections.emptyList();
+    private java.util.Map<String, String> metadata = java.util.Collections.emptyMap();
+    private java.util.EnumSet<wit.typeshowcase.UserCapability> capabilities = null;
+    private wit.typeshowcase.NexgenRuntime.Result<String, String> syncState = null;
+    private wit.typeshowcase.NotificationTarget notificationTarget = null;
+    private wit.typeshowcase.PostalAddress address = null;
+    private wit.typeshowcase.SingleTarget singleTarget = null;
+    private wit.typeshowcase.ExperimentalTarget experimentalTarget = null;
+
     private Builder() {}
 
     private Builder(UserProfile value) {
@@ -105,57 +136,78 @@ public final class UserProfile {
       this.experimentalTarget = value.experimentalTarget;
     }
 
-    private java.util.List<String> tags = java.util.Collections.emptyList();
-
+    /**
+     * A very long field doc that has to be wrapped because it exceeds the generated comment line
+     * width by a comfortable margin for testing.
+     *
+     * @param value the tags
+     * @return this builder
+     */
     public Builder setTags(java.util.List<String> value) {
       this.tags = value;
       return this;
     }
 
-    private java.util.Map<String, String> metadata = java.util.Collections.emptyMap();
-
+    /**
+     * Default metadata.
+     *
+     * @param value the metadata
+     * @return this builder
+     */
     public Builder setMetadata(java.util.Map<String, String> value) {
       this.metadata = value;
       return this;
     }
 
-    private java.util.EnumSet<wit.typeshowcase.UserCapability> capabilities = null;
-
+    /**
+     * @param value the capabilities
+     * @return this builder
+     */
     public Builder setCapabilities(java.util.EnumSet<wit.typeshowcase.UserCapability> value) {
       this.capabilities = value;
       return this;
     }
 
-    private wit.typeshowcase.NexgenRuntime.Result<String, String> syncState = null;
-
+    /**
+     * @param value the syncState
+     * @return this builder
+     */
     public Builder setSyncState(wit.typeshowcase.NexgenRuntime.Result<String, String> value) {
       this.syncState = value;
       return this;
     }
 
-    private wit.typeshowcase.NotificationTarget notificationTarget = null;
-
+    /**
+     * @param value the notificationTarget
+     * @return this builder
+     */
     public Builder setNotificationTarget(wit.typeshowcase.NotificationTarget value) {
       this.notificationTarget = value;
       return this;
     }
 
-    private wit.typeshowcase.PostalAddress address = null;
-
+    /**
+     * @param value the address
+     * @return this builder
+     */
     public Builder setAddress(wit.typeshowcase.PostalAddress value) {
       this.address = value;
       return this;
     }
 
-    private wit.typeshowcase.SingleTarget singleTarget = null;
-
+    /**
+     * @param value the singleTarget
+     * @return this builder
+     */
     public Builder setSingleTarget(wit.typeshowcase.SingleTarget value) {
       this.singleTarget = value;
       return this;
     }
 
-    private wit.typeshowcase.ExperimentalTarget experimentalTarget = null;
-
+    /**
+     * @param value the experimentalTarget
+     * @return this builder
+     */
     public Builder setExperimentalTarget(wit.typeshowcase.ExperimentalTarget value) {
       this.experimentalTarget = value;
       return this;

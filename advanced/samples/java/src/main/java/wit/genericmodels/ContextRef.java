@@ -2,7 +2,7 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class ContextRef<ContextT> {
+public final class ContextRef<T> {
   private final String id;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -10,39 +10,46 @@ public final class ContextRef<ContextT> {
     this.id = id;
   }
 
+  /**
+   * @return the id
+   */
   public String getId() {
     return id;
   }
 
-  public Builder<ContextT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder(ContextRef<ContextT> value) {
-    return new Builder<ContextT>(value);
+  public static <T> Builder<T> newBuilder(ContextRef<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder() {
-    return new Builder<ContextT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<ContextT> {
+  public static final class Builder<T> {
+    private String id = "";
+
     private Builder() {}
 
-    private Builder(ContextRef<ContextT> value) {
+    private Builder(ContextRef<T> value) {
       if (value == null) return;
       this.id = value.id;
     }
 
-    private String id = "";
-
-    public Builder<ContextT> setId(String value) {
+    /**
+     * @param value the id
+     * @return this builder
+     */
+    public Builder<T> setId(String value) {
       this.id = value;
       return this;
     }
 
-    public ContextRef<ContextT> build() {
-      return new ContextRef<ContextT>(id);
+    public ContextRef<T> build() {
+      return new ContextRef<T>(id);
     }
   }
 }

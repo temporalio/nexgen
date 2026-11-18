@@ -14,10 +14,16 @@ public final class GetUserRequest {
     this.consistencyToken = consistencyToken;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the consistencyToken
+   */
   public String getConsistencyToken() {
     return consistencyToken;
   }
@@ -35,6 +41,9 @@ public final class GetUserRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private String consistencyToken = null;
+
     private Builder() {}
 
     private Builder(GetUserRequest value) {
@@ -43,15 +52,19 @@ public final class GetUserRequest {
       this.consistencyToken = value.consistencyToken;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private String consistencyToken = null;
-
+    /**
+     * @param value the consistencyToken
+     * @return this builder
+     */
     public Builder setConsistencyToken(String value) {
       this.consistencyToken = value;
       return this;

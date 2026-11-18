@@ -11,6 +11,9 @@ public final class ExecuteFunctionResult {
     this.value = value;
   }
 
+  /**
+   * @return the value
+   */
   public String getValue() {
     return value;
   }
@@ -28,6 +31,8 @@ public final class ExecuteFunctionResult {
   }
 
   public static final class Builder {
+    private String value = "";
+
     private Builder() {}
 
     private Builder(ExecuteFunctionResult value) {
@@ -35,8 +40,10 @@ public final class ExecuteFunctionResult {
       this.value = value.value;
     }
 
-    private String value = "";
-
+    /**
+     * @param value the value
+     * @return this builder
+     */
     public Builder setValue(String value) {
       this.value = value;
       return this;

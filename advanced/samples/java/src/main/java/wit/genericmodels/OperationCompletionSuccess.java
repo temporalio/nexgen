@@ -2,48 +2,55 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class OperationCompletionSuccess<OutputT> {
-  private final OutputT output;
+public final class OperationCompletionSuccess<V> {
+  private final V output;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public OperationCompletionSuccess(
-      @com.fasterxml.jackson.annotation.JsonProperty("output") OutputT output) {
+      @com.fasterxml.jackson.annotation.JsonProperty("output") V output) {
     this.output = output;
   }
 
-  public OutputT getOutput() {
+  /**
+   * @return the output
+   */
+  public V getOutput() {
     return output;
   }
 
-  public Builder<OutputT> toBuilder() {
+  public Builder<V> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder(OperationCompletionSuccess<OutputT> value) {
-    return new Builder<OutputT>(value);
+  public static <V> Builder<V> newBuilder(OperationCompletionSuccess<V> value) {
+    return new Builder<V>(value);
   }
 
-  public static <OutputT> Builder<OutputT> newBuilder() {
-    return new Builder<OutputT>();
+  public static <V> Builder<V> newBuilder() {
+    return new Builder<V>();
   }
 
-  public static final class Builder<OutputT> {
+  public static final class Builder<V> {
+    private V output = null;
+
     private Builder() {}
 
-    private Builder(OperationCompletionSuccess<OutputT> value) {
+    private Builder(OperationCompletionSuccess<V> value) {
       if (value == null) return;
       this.output = value.output;
     }
 
-    private OutputT output = null;
-
-    public Builder<OutputT> setOutput(OutputT value) {
+    /**
+     * @param value the output
+     * @return this builder
+     */
+    public Builder<V> setOutput(V value) {
       this.output = value;
       return this;
     }
 
-    public OperationCompletionSuccess<OutputT> build() {
-      return new OperationCompletionSuccess<OutputT>(output);
+    public OperationCompletionSuccess<V> build() {
+      return new OperationCompletionSuccess<V>(output);
     }
   }
 }

@@ -2,7 +2,7 @@
 package wit.protooneof;
 
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = OutcomeValue.Deserializer.class)
-public final class OutcomeValue<OutputT> {
+public final class OutcomeValue<T> {
   public enum Tag {
     @com.fasterxml.jackson.annotation.JsonProperty("success")
     SUCCESS,
@@ -26,12 +26,12 @@ public final class OutcomeValue<OutputT> {
     return value;
   }
 
-  public static <OutputT> OutcomeValue<OutputT> success(OutputT value) {
-    return new OutcomeValue<OutputT>(Tag.SUCCESS, value);
+  public static <T> OutcomeValue<T> success(T value) {
+    return new OutcomeValue<T>(Tag.SUCCESS, value);
   }
 
-  public static <OutputT> OutcomeValue<OutputT> failure(RuntimeException value) {
-    return new OutcomeValue<OutputT>(Tag.FAILURE, value);
+  public static <T> OutcomeValue<T> failure(RuntimeException value) {
+    return new OutcomeValue<T>(Tag.FAILURE, value);
   }
 
   public static final class Deserializer

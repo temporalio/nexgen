@@ -25,22 +25,37 @@ public final class UpdateLabelsRequest {
     this.extraMetadata = extraMetadata;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the tags
+   */
   public java.util.List<String> getTags() {
     return tags;
   }
 
+  /**
+   * @return the metadata
+   */
   public java.util.Map<String, String> getMetadata() {
     return metadata;
   }
 
+  /**
+   * @return the extraTags
+   */
   public java.util.List<String> getExtraTags() {
     return extraTags;
   }
 
+  /**
+   * @return the extraMetadata
+   */
   public java.util.Map<String, String> getExtraMetadata() {
     return extraMetadata;
   }
@@ -58,6 +73,12 @@ public final class UpdateLabelsRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private java.util.List<String> tags = java.util.Collections.emptyList();
+    private java.util.Map<String, String> metadata = java.util.Collections.emptyMap();
+    private java.util.List<String> extraTags = null;
+    private java.util.Map<String, String> extraMetadata = null;
+
     private Builder() {}
 
     private Builder(UpdateLabelsRequest value) {
@@ -69,36 +90,46 @@ public final class UpdateLabelsRequest {
       this.extraMetadata = value.extraMetadata;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private java.util.List<String> tags = java.util.Collections.emptyList();
-
+    /**
+     * @param value the tags
+     * @return this builder
+     */
     public Builder setTags(java.util.List<String> value) {
       this.tags = value;
       return this;
     }
 
-    private java.util.Map<String, String> metadata = java.util.Collections.emptyMap();
-
+    /**
+     * @param value the metadata
+     * @return this builder
+     */
     public Builder setMetadata(java.util.Map<String, String> value) {
       this.metadata = value;
       return this;
     }
 
-    private java.util.List<String> extraTags = null;
-
+    /**
+     * @param value the extraTags
+     * @return this builder
+     */
     public Builder setExtraTags(java.util.List<String> value) {
       this.extraTags = value;
       return this;
     }
 
-    private java.util.Map<String, String> extraMetadata = null;
-
+    /**
+     * @param value the extraMetadata
+     * @return this builder
+     */
     public Builder setExtraMetadata(java.util.Map<String, String> value) {
       this.extraMetadata = value;
       return this;

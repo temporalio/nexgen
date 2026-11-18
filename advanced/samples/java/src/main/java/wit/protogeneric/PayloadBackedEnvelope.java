@@ -3,68 +3,78 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(PayloadBackedEnvelope.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class PayloadBackedEnvelope<OutputT, ContextT> {
-  private final wit.protogeneric.PayloadBackedOutput<OutputT> provider;
-  private final wit.protogeneric.PayloadBackedContext<ContextT> scaler;
+public final class PayloadBackedEnvelope<U, T> {
+  private final wit.protogeneric.PayloadBackedOutput<U> provider;
+  private final wit.protogeneric.PayloadBackedContext<T> scaler;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public PayloadBackedEnvelope(
       @com.fasterxml.jackson.annotation.JsonProperty("provider")
-          wit.protogeneric.PayloadBackedOutput<OutputT> provider,
+          wit.protogeneric.PayloadBackedOutput<U> provider,
       @com.fasterxml.jackson.annotation.JsonProperty("scaler")
-          wit.protogeneric.PayloadBackedContext<ContextT> scaler) {
+          wit.protogeneric.PayloadBackedContext<T> scaler) {
     this.provider = provider;
     this.scaler = scaler;
   }
 
-  public wit.protogeneric.PayloadBackedOutput<OutputT> getProvider() {
+  /**
+   * @return the provider
+   */
+  public wit.protogeneric.PayloadBackedOutput<U> getProvider() {
     return provider;
   }
 
-  public wit.protogeneric.PayloadBackedContext<ContextT> getScaler() {
+  /**
+   * @return the scaler
+   */
+  public wit.protogeneric.PayloadBackedContext<T> getScaler() {
     return scaler;
   }
 
-  public Builder<OutputT, ContextT> toBuilder() {
+  public Builder<U, T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT, ContextT> Builder<OutputT, ContextT> newBuilder(
-      PayloadBackedEnvelope<OutputT, ContextT> value) {
-    return new Builder<OutputT, ContextT>(value);
+  public static <U, T> Builder<U, T> newBuilder(PayloadBackedEnvelope<U, T> value) {
+    return new Builder<U, T>(value);
   }
 
-  public static <OutputT, ContextT> Builder<OutputT, ContextT> newBuilder() {
-    return new Builder<OutputT, ContextT>();
+  public static <U, T> Builder<U, T> newBuilder() {
+    return new Builder<U, T>();
   }
 
-  public static final class Builder<OutputT, ContextT> {
+  public static final class Builder<U, T> {
+    private wit.protogeneric.PayloadBackedOutput<U> provider = null;
+    private wit.protogeneric.PayloadBackedContext<T> scaler = null;
+
     private Builder() {}
 
-    private Builder(PayloadBackedEnvelope<OutputT, ContextT> value) {
+    private Builder(PayloadBackedEnvelope<U, T> value) {
       if (value == null) return;
       this.provider = value.provider;
       this.scaler = value.scaler;
     }
 
-    private wit.protogeneric.PayloadBackedOutput<OutputT> provider = null;
-
-    public Builder<OutputT, ContextT> setProvider(
-        wit.protogeneric.PayloadBackedOutput<OutputT> value) {
+    /**
+     * @param value the provider
+     * @return this builder
+     */
+    public Builder<U, T> setProvider(wit.protogeneric.PayloadBackedOutput<U> value) {
       this.provider = value;
       return this;
     }
 
-    private wit.protogeneric.PayloadBackedContext<ContextT> scaler = null;
-
-    public Builder<OutputT, ContextT> setScaler(
-        wit.protogeneric.PayloadBackedContext<ContextT> value) {
+    /**
+     * @param value the scaler
+     * @return this builder
+     */
+    public Builder<U, T> setScaler(wit.protogeneric.PayloadBackedContext<T> value) {
       this.scaler = value;
       return this;
     }
 
-    public PayloadBackedEnvelope<OutputT, ContextT> build() {
-      return new PayloadBackedEnvelope<OutputT, ContextT>(provider, scaler);
+    public PayloadBackedEnvelope<U, T> build() {
+      return new PayloadBackedEnvelope<U, T>(provider, scaler);
     }
   }
 
@@ -77,11 +87,11 @@ public final class PayloadBackedEnvelope<OutputT, ContextT> {
     return proto.build();
   }
 
-  public static <OutputT, ContextT> PayloadBackedEnvelope<OutputT, ContextT> fromProto(
+  public static <U, T> PayloadBackedEnvelope<U, T> fromProto(
       io.temporal.api.compute.v1.ComputeConfigScalingGroup proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<OutputT, ContextT> builder = PayloadBackedEnvelope.<OutputT, ContextT>newBuilder();
+    Builder<U, T> builder = PayloadBackedEnvelope.<U, T>newBuilder();
     builder.setProvider(
         wit.protogeneric.PayloadBackedOutput.fromProto(
             proto.getProvider(),

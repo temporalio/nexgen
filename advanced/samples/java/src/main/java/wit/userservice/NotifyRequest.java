@@ -20,18 +20,30 @@ public final class NotifyRequest {
     this.sender = sender;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the reason
+   */
   public String getReason() {
     return reason;
   }
 
+  /**
+   * @return the channels
+   */
   public java.util.List<String> getChannels() {
     return channels;
   }
 
+  /**
+   * @return the sender
+   */
   public String getSender() {
     return sender;
   }
@@ -49,6 +61,11 @@ public final class NotifyRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private String reason = null;
+    private java.util.List<String> channels = java.util.Collections.emptyList();
+    private String sender = "";
+
     private Builder() {}
 
     private Builder(NotifyRequest value) {
@@ -59,29 +76,37 @@ public final class NotifyRequest {
       this.sender = value.sender;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private String reason = null;
-
+    /**
+     * @param value the reason
+     * @return this builder
+     */
     public Builder setReason(String value) {
       this.reason = value;
       return this;
     }
 
-    private java.util.List<String> channels = java.util.Collections.emptyList();
-
+    /**
+     * @param value the channels
+     * @return this builder
+     */
     public Builder setChannels(java.util.List<String> value) {
       this.channels = value;
       return this;
     }
 
-    private String sender = "";
-
+    /**
+     * @param value the sender
+     * @return this builder
+     */
     public Builder setSender(String value) {
       this.sender = value;
       return this;

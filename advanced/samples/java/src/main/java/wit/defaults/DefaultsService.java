@@ -3,12 +3,24 @@ package wit.defaults;
 
 @io.nexusrpc.Service(name = "DefaultsService")
 public interface DefaultsService {
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "Submit")
   wit.defaults.Request submit(wit.defaults.Request request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "GetSender")
   wit.defaults.Sender getSender(wit.defaults.GetSenderRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "SubmitFromSender")
   wit.defaults.Request submitFromSender(wit.defaults.Request request);
 }

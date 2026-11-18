@@ -15,10 +15,16 @@ public final class BadBinary {
     this.operator = operator;
   }
 
+  /**
+   * @return the reason
+   */
   public String getReason() {
     return reason;
   }
 
+  /**
+   * @return the operator
+   */
   public String getOperator() {
     return operator;
   }
@@ -36,6 +42,9 @@ public final class BadBinary {
   }
 
   public static final class Builder {
+    private String reason = "";
+    private String operator = "";
+
     private Builder() {}
 
     private Builder(BadBinary value) {
@@ -44,15 +53,19 @@ public final class BadBinary {
       this.operator = value.operator;
     }
 
-    private String reason = "";
-
+    /**
+     * @param value the reason
+     * @return this builder
+     */
     public Builder setReason(String value) {
       this.reason = value;
       return this;
     }
 
-    private String operator = "";
-
+    /**
+     * @param value the operator
+     * @return this builder
+     */
     public Builder setOperator(String value) {
       this.operator = value;
       return this;

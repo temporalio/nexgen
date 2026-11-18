@@ -3,7 +3,7 @@ package wit.notificationservice;
 
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
     using = OnCompleteRequestResult.Deserializer.class)
-public final class OnCompleteRequestResult<OutputT> {
+public final class OnCompleteRequestResult<T> {
   public enum Tag {
     @com.fasterxml.jackson.annotation.JsonProperty("success")
     SUCCESS,
@@ -27,12 +27,12 @@ public final class OnCompleteRequestResult<OutputT> {
     return value;
   }
 
-  public static <OutputT> OnCompleteRequestResult<OutputT> success(OutputT value) {
-    return new OnCompleteRequestResult<OutputT>(Tag.SUCCESS, value);
+  public static <T> OnCompleteRequestResult<T> success(T value) {
+    return new OnCompleteRequestResult<T>(Tag.SUCCESS, value);
   }
 
-  public static <OutputT> OnCompleteRequestResult<OutputT> failure(RuntimeException value) {
-    return new OnCompleteRequestResult<OutputT>(Tag.FAILURE, value);
+  public static <T> OnCompleteRequestResult<T> failure(RuntimeException value) {
+    return new OnCompleteRequestResult<T>(Tag.FAILURE, value);
   }
 
   public static final class Deserializer

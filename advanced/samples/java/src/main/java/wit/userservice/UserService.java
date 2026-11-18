@@ -3,12 +3,23 @@ package wit.userservice;
 
 @io.nexusrpc.Service(name = "UserService")
 public interface UserService {
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "GetUser")
   wit.userservice.User getUser(wit.userservice.GetUserRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "UpdateEmail")
   wit.userservice.User updateEmail(wit.userservice.UpdateEmailRequest request);
 
+  /**
+   * @param request the operation request
+   */
   @io.nexusrpc.Operation(name = "Notify")
   void notify(wit.userservice.NotifyRequest request);
 }

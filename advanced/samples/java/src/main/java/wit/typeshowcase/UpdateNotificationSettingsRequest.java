@@ -15,10 +15,16 @@ public final class UpdateNotificationSettingsRequest {
     this.settings = settings;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the settings
+   */
   public wit.typeshowcase.NotificationSettings getSettings() {
     return settings;
   }
@@ -36,6 +42,9 @@ public final class UpdateNotificationSettingsRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private wit.typeshowcase.NotificationSettings settings = null;
+
     private Builder() {}
 
     private Builder(UpdateNotificationSettingsRequest value) {
@@ -44,20 +53,28 @@ public final class UpdateNotificationSettingsRequest {
       this.settings = value.settings;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private wit.typeshowcase.NotificationSettings settings = null;
-
+    /**
+     * @param value the settings
+     * @return this builder
+     */
     public Builder setSettings(wit.typeshowcase.NotificationSettings value) {
       this.settings = value;
       return this;
     }
 
+    /**
+     * @param value the emailEnabled
+     * @return this builder
+     */
     public Builder setEmailEnabled(Boolean value) {
       this.settings =
           wit.typeshowcase.NotificationSettings.newBuilder(this.settings)
@@ -66,6 +83,10 @@ public final class UpdateNotificationSettingsRequest {
       return this;
     }
 
+    /**
+     * @param value the smsEnabled
+     * @return this builder
+     */
     public Builder setSmsEnabled(Boolean value) {
       this.settings =
           wit.typeshowcase.NotificationSettings.newBuilder(this.settings)

@@ -15,10 +15,16 @@ public final class GetSyncSettingsRequest {
     this.settings = settings;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the settings
+   */
   public wit.typeshowcase.SyncSettings getSettings() {
     return settings;
   }
@@ -36,6 +42,9 @@ public final class GetSyncSettingsRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private wit.typeshowcase.SyncSettings settings = null;
+
     private Builder() {}
 
     private Builder(GetSyncSettingsRequest value) {
@@ -44,26 +53,38 @@ public final class GetSyncSettingsRequest {
       this.settings = value.settings;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private wit.typeshowcase.SyncSettings settings = null;
-
+    /**
+     * @param value the settings
+     * @return this builder
+     */
     public Builder setSettings(wit.typeshowcase.SyncSettings value) {
       this.settings = value;
       return this;
     }
 
+    /**
+     * @param value the region
+     * @return this builder
+     */
     public Builder setRegion(String value) {
       this.settings =
           wit.typeshowcase.SyncSettings.newBuilder(this.settings).setRegion(value).build();
       return this;
     }
 
+    /**
+     * @param value the checkpoint
+     * @return this builder
+     */
     public Builder setCheckpoint(String value) {
       this.settings =
           wit.typeshowcase.SyncSettings.newBuilder(this.settings).setCheckpoint(value).build();

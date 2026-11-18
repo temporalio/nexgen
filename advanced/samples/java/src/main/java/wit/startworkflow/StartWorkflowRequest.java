@@ -25,22 +25,37 @@ public final class StartWorkflowRequest {
     this.namespace = namespace;
   }
 
+  /**
+   * @return the workflow
+   */
   public String getWorkflow() {
     return workflow;
   }
 
+  /**
+   * @return the workflowId
+   */
   public String getWorkflowId() {
     return workflowId;
   }
 
+  /**
+   * @return the taskQueue
+   */
   public String getTaskQueue() {
     return taskQueue;
   }
 
+  /**
+   * @return the workflowStartDelay
+   */
   public java.time.Duration getWorkflowStartDelay() {
     return workflowStartDelay;
   }
 
+  /**
+   * @return the namespace
+   */
   public String getNamespace() {
     return namespace;
   }
@@ -58,6 +73,12 @@ public final class StartWorkflowRequest {
   }
 
   public static final class Builder {
+    private String workflow = null;
+    private String workflowId = "";
+    private String taskQueue = null;
+    private java.time.Duration workflowStartDelay = null;
+    private String namespace = "";
+
     private Builder() {}
 
     private Builder(StartWorkflowRequest value) {
@@ -69,36 +90,46 @@ public final class StartWorkflowRequest {
       this.namespace = value.namespace;
     }
 
-    private String workflow = null;
-
+    /**
+     * @param value the workflow
+     * @return this builder
+     */
     public Builder setWorkflow(String value) {
       this.workflow = value;
       return this;
     }
 
-    private String workflowId = "";
-
+    /**
+     * @param value the workflowId
+     * @return this builder
+     */
     public Builder setWorkflowId(String value) {
       this.workflowId = value;
       return this;
     }
 
-    private String taskQueue = null;
-
+    /**
+     * @param value the taskQueue
+     * @return this builder
+     */
     public Builder setTaskQueue(String value) {
       this.taskQueue = value;
       return this;
     }
 
-    private java.time.Duration workflowStartDelay = null;
-
+    /**
+     * @param value the workflowStartDelay
+     * @return this builder
+     */
     public Builder setWorkflowStartDelay(java.time.Duration value) {
       this.workflowStartDelay = value;
       return this;
     }
 
-    private String namespace = "";
-
+    /**
+     * @param value the namespace
+     * @return this builder
+     */
     public Builder setNamespace(String value) {
       this.namespace = value;
       return this;

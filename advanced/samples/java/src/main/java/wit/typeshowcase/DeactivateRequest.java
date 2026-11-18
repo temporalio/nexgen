@@ -14,10 +14,16 @@ public final class DeactivateRequest {
     this.reason = reason;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
 
+  /**
+   * @return the reason
+   */
   public String getReason() {
     return reason;
   }
@@ -35,6 +41,9 @@ public final class DeactivateRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+    private String reason = null;
+
     private Builder() {}
 
     private Builder(DeactivateRequest value) {
@@ -43,15 +52,19 @@ public final class DeactivateRequest {
       this.reason = value.reason;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;
     }
 
-    private String reason = null;
-
+    /**
+     * @param value the reason
+     * @return this builder
+     */
     public Builder setReason(String value) {
       this.reason = value;
       return this;

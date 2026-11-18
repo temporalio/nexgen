@@ -11,6 +11,9 @@ public final class OperationCompletionFailure {
     this.message = message;
   }
 
+  /**
+   * @return the message
+   */
   public String getMessage() {
     return message;
   }
@@ -28,6 +31,8 @@ public final class OperationCompletionFailure {
   }
 
   public static final class Builder {
+    private String message = "";
+
     private Builder() {}
 
     private Builder(OperationCompletionFailure value) {
@@ -35,8 +40,10 @@ public final class OperationCompletionFailure {
       this.message = value.message;
     }
 
-    private String message = "";
-
+    /**
+     * @param value the message
+     * @return this builder
+     */
     public Builder setMessage(String value) {
       this.message = value;
       return this;

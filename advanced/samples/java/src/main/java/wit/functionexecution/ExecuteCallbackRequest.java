@@ -9,11 +9,7 @@ public final class ExecuteCallbackRequest {
   }
 
   private final FunctionFunction function;
-
-  /** The name argument for the function. */
   private final String name;
-
-  /** The enabled argument for the function. */
   private final Boolean enabled;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -26,14 +22,27 @@ public final class ExecuteCallbackRequest {
     this.enabled = enabled;
   }
 
+  /**
+   * @return the function
+   */
   public FunctionFunction getFunction() {
     return function;
   }
 
+  /**
+   * The name argument for the function.
+   *
+   * @return the name
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * The enabled argument for the function.
+   *
+   * @return the enabled
+   */
   public Boolean getEnabled() {
     return enabled;
   }
@@ -51,6 +60,10 @@ public final class ExecuteCallbackRequest {
   }
 
   public static final class Builder {
+    private FunctionFunction function = null;
+    private String name = "";
+    private Boolean enabled = false;
+
     private Builder() {}
 
     private Builder(ExecuteCallbackRequest value) {
@@ -60,22 +73,32 @@ public final class ExecuteCallbackRequest {
       this.enabled = value.enabled;
     }
 
-    private FunctionFunction function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(FunctionFunction value) {
       this.function = value;
       return this;
     }
 
-    private String name = "";
-
+    /**
+     * The name argument for the function.
+     *
+     * @param value the name
+     * @return this builder
+     */
     public Builder setName(String value) {
       this.name = value;
       return this;
     }
 
-    private Boolean enabled = false;
-
+    /**
+     * The enabled argument for the function.
+     *
+     * @param value the enabled
+     * @return this builder
+     */
     public Builder setEnabled(Boolean value) {
       this.enabled = value;
       return this;

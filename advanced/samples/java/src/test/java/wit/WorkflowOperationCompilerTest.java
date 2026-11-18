@@ -182,7 +182,7 @@ class WorkflowOperationCompilerTest {
           String code =
               declarations()
                   + "void check() { SignalWithStartWorkflowOptions options ="
-                  + " SignalWithStartWorkflowOptions.newBuilder().setId(\"id\").setTaskQueue(\"queue\").build();"
+                  + " SignalWithStartWorkflowOptions.newBuilder().setWorkflowId(\"id\").setTaskQueue(\"queue\").build();"
                   + " "
                   + body
                   + " } }";

@@ -3,48 +3,54 @@ package wit.protogeneric;
 
 @io.temporal.common.converter.TransferTypeConvertible(PayloadBackedContext.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class PayloadBackedContext<ContextT> {
-  private final ContextT details;
+public final class PayloadBackedContext<T> {
+  private final T details;
 
   @com.fasterxml.jackson.annotation.JsonCreator
-  public PayloadBackedContext(
-      @com.fasterxml.jackson.annotation.JsonProperty("details") ContextT details) {
+  public PayloadBackedContext(@com.fasterxml.jackson.annotation.JsonProperty("details") T details) {
     this.details = details;
   }
 
-  public ContextT getDetails() {
+  /**
+   * @return the details
+   */
+  public T getDetails() {
     return details;
   }
 
-  public Builder<ContextT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder(PayloadBackedContext<ContextT> value) {
-    return new Builder<ContextT>(value);
+  public static <T> Builder<T> newBuilder(PayloadBackedContext<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder() {
-    return new Builder<ContextT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<ContextT> {
+  public static final class Builder<T> {
+    private T details = null;
+
     private Builder() {}
 
-    private Builder(PayloadBackedContext<ContextT> value) {
+    private Builder(PayloadBackedContext<T> value) {
       if (value == null) return;
       this.details = value.details;
     }
 
-    private ContextT details = null;
-
-    public Builder<ContextT> setDetails(ContextT value) {
+    /**
+     * @param value the details
+     * @return this builder
+     */
+    public Builder<T> setDetails(T value) {
       this.details = value;
       return this;
     }
 
-    public PayloadBackedContext<ContextT> build() {
-      return new PayloadBackedContext<ContextT>(details);
+    public PayloadBackedContext<T> build() {
+      return new PayloadBackedContext<T>(details);
     }
   }
 
@@ -56,13 +62,13 @@ public final class PayloadBackedContext<ContextT> {
     return proto.build();
   }
 
-  public static <ContextT> PayloadBackedContext<ContextT> fromProto(
+  public static <T> PayloadBackedContext<T> fromProto(
       io.temporal.api.compute.v1.ComputeScaler proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<ContextT> builder = PayloadBackedContext.<ContextT>newBuilder();
+    Builder<T> builder = PayloadBackedContext.<T>newBuilder();
     builder.setDetails(
-        (ContextT)
+        (T)
             converter.fromPayload(
                 proto.getDetails(),
                 wit.protogeneric.NexgenRuntime.rawType(

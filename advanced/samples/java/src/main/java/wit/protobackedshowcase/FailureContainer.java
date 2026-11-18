@@ -12,6 +12,9 @@ public final class FailureContainer {
     this.failure = failure;
   }
 
+  /**
+   * @return the failure
+   */
   public RuntimeException getFailure() {
     return failure;
   }
@@ -29,6 +32,8 @@ public final class FailureContainer {
   }
 
   public static final class Builder {
+    private RuntimeException failure = null;
+
     private Builder() {}
 
     private Builder(FailureContainer value) {
@@ -36,8 +41,10 @@ public final class FailureContainer {
       this.failure = value.failure;
     }
 
-    private RuntimeException failure = null;
-
+    /**
+     * @param value the failure
+     * @return this builder
+     */
     public Builder setFailure(RuntimeException value) {
       this.failure = value;
       return this;

@@ -3,8 +3,14 @@ package wit.genericmodels;
 
 @io.nexusrpc.Service(name = "GenericModelService")
 public interface GenericModelService {
+  /**
+   * @param <T> the model type
+   * @param <U> the model type
+   * @param <V> the model type
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "Complete")
-  <ContextT, MetadataT, OutputT>
-      wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> complete(
-          wit.genericmodels.GenericRequest<ContextT> request);
+  <T, U, V> wit.genericmodels.GenericResponse<T, V, U> complete(
+      wit.genericmodels.GenericRequest<T> request);
 }

@@ -10,6 +10,9 @@ public final class GetUserRequest {
     this.userId = userId;
   }
 
+  /**
+   * @return the userId
+   */
   public String getUserId() {
     return userId;
   }
@@ -27,6 +30,8 @@ public final class GetUserRequest {
   }
 
   public static final class Builder {
+    private String userId = "";
+
     private Builder() {}
 
     private Builder(GetUserRequest value) {
@@ -34,8 +39,10 @@ public final class GetUserRequest {
       this.userId = value.userId;
     }
 
-    private String userId = "";
-
+    /**
+     * @param value the userId
+     * @return this builder
+     */
     public Builder setUserId(String value) {
       this.userId = value;
       return this;

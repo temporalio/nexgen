@@ -5,6 +5,13 @@ package wit.functionexecution;
 public final class FunctionExecutionOperations {
   private FunctionExecutionOperations() {}
 
+  /**
+   * @param function the function name
+   * @param name The name argument for the function.
+   * @param enabled The enabled argument for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteFunctionResult executeFunction(
       wit.functionexecution.ExecuteFunctionRequest.FunctionFunction function,
       String name,
@@ -37,6 +44,13 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param name The name argument for the function.
+   * @param enabled The enabled argument for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteFunctionResult executeCallback(
       wit.functionexecution.ExecuteCallbackRequest.FunctionFunction function,
       String name,
@@ -69,6 +83,13 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param name The name argument for the function.
+   * @param count The count argument for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteCountedFunctionResult executeCountedFunction(
       wit.functionexecution.ExecuteCountedFunctionRequest.FunctionFunction function,
       String name,
@@ -101,6 +122,13 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param name The name argument for the function.
+   * @param enabled The enabled argument for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteNamedFunctionResult executeNamedFunction(
       wit.functionexecution.NexgenRuntime.FunctionReference<
               wit.functionexecution.ExecuteNamedFunctionRequest.FunctionFunction, String>
@@ -135,6 +163,12 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param args Arguments for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteVarargsFunctionResult executeVarargsFunction(
       wit.functionexecution.ExecuteVarargsFunctionRequest.FunctionFunction function,
       java.util.List<String> args,
@@ -165,6 +199,12 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param args Arguments for the function.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteNamedVarargsFunctionResult executeNamedVarargsFunction(
       wit.functionexecution.NexgenRuntime.FunctionReference<
               wit.functionexecution.ExecuteNamedVarargsFunctionRequest.FunctionFunction, String>
@@ -197,6 +237,18 @@ public final class FunctionExecutionOperations {
     return result;
   }
 
+  /**
+   * @param function the function name
+   * @param args Arguments for the function.
+   * @param durations the durations name
+   * @param durationValues Arguments for the durations.
+   * @param callback the callback name
+   * @param callbackValues Arguments for the callback.
+   * @param callable the callable name
+   * @param callableValues Arguments for the callable.
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
   public static wit.functionexecution.ExecuteFunctionResult executeDescriptors(
       wit.functionexecution.NexgenRuntime.FunctionReference<
               wit.functionexecution.ExecuteDescriptorsRequest.FunctionFunction, String>

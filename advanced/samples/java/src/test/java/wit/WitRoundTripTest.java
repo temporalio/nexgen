@@ -107,13 +107,13 @@ class WitRoundTripTest {
     wit.workflowservice.SignalWithStartWorkflowRequest original =
         wit.workflowservice.SignalWithStartWorkflowRequest.newBuilder()
             .setNamespace("namespace")
-            .setId("original")
+            .setWorkflowId("original")
             .setStaticSummary("summary")
             .build();
     wit.workflowservice.SignalWithStartWorkflowRequest copy =
-        original.toBuilder().setId("copy").setStaticDetails("details").build();
-    assertEquals("original", original.getId());
-    assertEquals("copy", copy.getId());
+        original.toBuilder().setWorkflowId("copy").setStaticDetails("details").build();
+    assertEquals("original", original.getWorkflowId());
+    assertEquals("copy", copy.getWorkflowId());
     assertEquals("summary", copy.getUserMetadata().getStaticSummary());
     assertEquals("details", copy.getUserMetadata().getStaticDetails());
   }

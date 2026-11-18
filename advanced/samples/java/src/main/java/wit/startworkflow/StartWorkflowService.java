@@ -3,18 +3,34 @@ package wit.startworkflow;
 
 @io.nexusrpc.Service(name = "StartWorkflowService")
 public interface StartWorkflowService {
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "StartWorkflow")
   wit.startworkflow.StartWorkflowResult startWorkflow(
       wit.startworkflow.StartWorkflowRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "RestartWorkflow")
   wit.startworkflow.StartWorkflowResult restartWorkflow(
       wit.startworkflow.StartWorkflowRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "CancelWorkflow")
   wit.startworkflow.CancelWorkflowResponse cancelWorkflow(
       wit.startworkflow.CancelWorkflowRequest request);
 
+  /**
+   * @param request the operation request
+   * @return the operation result
+   */
   @io.nexusrpc.Operation(name = "SignalWithStart")
   wit.startworkflow.SignalResultResponse signalWithStart(
       wit.startworkflow.CancelWorkflowRequest request);

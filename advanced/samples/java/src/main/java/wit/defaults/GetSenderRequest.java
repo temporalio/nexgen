@@ -10,6 +10,9 @@ public final class GetSenderRequest {
     this.token = token;
   }
 
+  /**
+   * @return the token
+   */
   public String getToken() {
     return token;
   }
@@ -27,6 +30,8 @@ public final class GetSenderRequest {
   }
 
   public static final class Builder {
+    private String token = "";
+
     private Builder() {}
 
     private Builder(GetSenderRequest value) {
@@ -34,8 +39,10 @@ public final class GetSenderRequest {
       this.token = value.token;
     }
 
-    private String token = "";
-
+    /**
+     * @param value the token
+     * @return this builder
+     */
     public Builder setToken(String value) {
       this.token = value;
       return this;

@@ -2,59 +2,75 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class GenericResponse<ContextT, OutputT, MetadataT> {
-  private final ContextT context;
-  private final wit.genericmodels.OperationCompletionResult<OutputT> completion;
-  private final MetadataT metadata;
-  private final wit.genericmodels.GetterPair<ContextT, OutputT> pair;
+public final class GenericResponse<T, V, U> {
+  private final T context;
+  private final wit.genericmodels.OperationCompletionResult<V> completion;
+  private final U metadata;
+  private final wit.genericmodels.GetterPair<T, V> pair;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GenericResponse(
-      @com.fasterxml.jackson.annotation.JsonProperty("context") ContextT context,
+      @com.fasterxml.jackson.annotation.JsonProperty("context") T context,
       @com.fasterxml.jackson.annotation.JsonProperty("completion")
-          wit.genericmodels.OperationCompletionResult<OutputT> completion,
-      @com.fasterxml.jackson.annotation.JsonProperty("metadata") MetadataT metadata,
+          wit.genericmodels.OperationCompletionResult<V> completion,
+      @com.fasterxml.jackson.annotation.JsonProperty("metadata") U metadata,
       @com.fasterxml.jackson.annotation.JsonProperty("pair")
-          wit.genericmodels.GetterPair<ContextT, OutputT> pair) {
+          wit.genericmodels.GetterPair<T, V> pair) {
     this.context = context;
     this.completion = completion;
     this.metadata = metadata;
     this.pair = pair;
   }
 
-  public ContextT getContext() {
+  /**
+   * @return the context
+   */
+  public T getContext() {
     return context;
   }
 
-  public wit.genericmodels.OperationCompletionResult<OutputT> getCompletion() {
+  /**
+   * @return the completion
+   */
+  public wit.genericmodels.OperationCompletionResult<V> getCompletion() {
     return completion;
   }
 
-  public MetadataT getMetadata() {
+  /**
+   * @return the metadata
+   */
+  public U getMetadata() {
     return metadata;
   }
 
-  public wit.genericmodels.GetterPair<ContextT, OutputT> getPair() {
+  /**
+   * @return the pair
+   */
+  public wit.genericmodels.GetterPair<T, V> getPair() {
     return pair;
   }
 
-  public Builder<ContextT, OutputT, MetadataT> toBuilder() {
+  public Builder<T, V, U> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT, OutputT, MetadataT> Builder<ContextT, OutputT, MetadataT> newBuilder(
-      GenericResponse<ContextT, OutputT, MetadataT> value) {
-    return new Builder<ContextT, OutputT, MetadataT>(value);
+  public static <T, V, U> Builder<T, V, U> newBuilder(GenericResponse<T, V, U> value) {
+    return new Builder<T, V, U>(value);
   }
 
-  public static <ContextT, OutputT, MetadataT> Builder<ContextT, OutputT, MetadataT> newBuilder() {
-    return new Builder<ContextT, OutputT, MetadataT>();
+  public static <T, V, U> Builder<T, V, U> newBuilder() {
+    return new Builder<T, V, U>();
   }
 
-  public static final class Builder<ContextT, OutputT, MetadataT> {
+  public static final class Builder<T, V, U> {
+    private T context = null;
+    private wit.genericmodels.OperationCompletionResult<V> completion = null;
+    private U metadata = null;
+    private wit.genericmodels.GetterPair<T, V> pair = null;
+
     private Builder() {}
 
-    private Builder(GenericResponse<ContextT, OutputT, MetadataT> value) {
+    private Builder(GenericResponse<T, V, U> value) {
       if (value == null) return;
       this.context = value.context;
       this.completion = value.completion;
@@ -62,38 +78,44 @@ public final class GenericResponse<ContextT, OutputT, MetadataT> {
       this.pair = value.pair;
     }
 
-    private ContextT context = null;
-
-    public Builder<ContextT, OutputT, MetadataT> setContext(ContextT value) {
+    /**
+     * @param value the context
+     * @return this builder
+     */
+    public Builder<T, V, U> setContext(T value) {
       this.context = value;
       return this;
     }
 
-    private wit.genericmodels.OperationCompletionResult<OutputT> completion = null;
-
-    public Builder<ContextT, OutputT, MetadataT> setCompletion(
-        wit.genericmodels.OperationCompletionResult<OutputT> value) {
+    /**
+     * @param value the completion
+     * @return this builder
+     */
+    public Builder<T, V, U> setCompletion(wit.genericmodels.OperationCompletionResult<V> value) {
       this.completion = value;
       return this;
     }
 
-    private MetadataT metadata = null;
-
-    public Builder<ContextT, OutputT, MetadataT> setMetadata(MetadataT value) {
+    /**
+     * @param value the metadata
+     * @return this builder
+     */
+    public Builder<T, V, U> setMetadata(U value) {
       this.metadata = value;
       return this;
     }
 
-    private wit.genericmodels.GetterPair<ContextT, OutputT> pair = null;
-
-    public Builder<ContextT, OutputT, MetadataT> setPair(
-        wit.genericmodels.GetterPair<ContextT, OutputT> value) {
+    /**
+     * @param value the pair
+     * @return this builder
+     */
+    public Builder<T, V, U> setPair(wit.genericmodels.GetterPair<T, V> value) {
       this.pair = value;
       return this;
     }
 
-    public GenericResponse<ContextT, OutputT, MetadataT> build() {
-      return new GenericResponse<ContextT, OutputT, MetadataT>(context, completion, metadata, pair);
+    public GenericResponse<T, V, U> build() {
+      return new GenericResponse<T, V, U>(context, completion, metadata, pair);
     }
   }
 }

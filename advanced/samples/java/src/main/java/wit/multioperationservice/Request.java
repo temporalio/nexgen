@@ -10,6 +10,9 @@ public final class Request {
     this.id = id;
   }
 
+  /**
+   * @return the id
+   */
   public String getId() {
     return id;
   }
@@ -27,6 +30,8 @@ public final class Request {
   }
 
   public static final class Builder {
+    private String id = "";
+
     private Builder() {}
 
     private Builder(Request value) {
@@ -34,8 +39,10 @@ public final class Request {
       this.id = value.id;
     }
 
-    private String id = "";
-
+    /**
+     * @param value the id
+     * @return this builder
+     */
     public Builder setId(String value) {
       this.id = value;
       return this;

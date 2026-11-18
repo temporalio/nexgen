@@ -10,11 +10,7 @@ public final class ExecuteNamedFunctionRequest {
 
   private final wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       function;
-
-  /** The name argument for the function. */
   private final String name;
-
-  /** The enabled argument for the function. */
   private final Boolean enabled;
 
   @com.fasterxml.jackson.annotation.JsonCreator
@@ -28,15 +24,28 @@ public final class ExecuteNamedFunctionRequest {
     this.enabled = enabled;
   }
 
+  /**
+   * @return the function
+   */
   public wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
       getFunction() {
     return function;
   }
 
+  /**
+   * The name argument for the function.
+   *
+   * @return the name
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * The enabled argument for the function.
+   *
+   * @return the enabled
+   */
   public Boolean getEnabled() {
     return enabled;
   }
@@ -54,6 +63,11 @@ public final class ExecuteNamedFunctionRequest {
   }
 
   public static final class Builder {
+    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
+        function = null;
+    private String name = "";
+    private Boolean enabled = false;
+
     private Builder() {}
 
     private Builder(ExecuteNamedFunctionRequest value) {
@@ -63,34 +77,51 @@ public final class ExecuteNamedFunctionRequest {
       this.enabled = value.enabled;
     }
 
-    private wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String>
-        function = null;
-
+    /**
+     * @param value the function
+     * @return this builder
+     */
     public Builder setFunction(
         wit.functionexecution.NexgenRuntime.FunctionReference<FunctionFunction, String> value) {
       this.function = value;
       return this;
     }
 
-    private String name = "";
-
+    /**
+     * The name argument for the function.
+     *
+     * @param value the name
+     * @return this builder
+     */
     public Builder setName(String value) {
       this.name = value;
       return this;
     }
 
-    private Boolean enabled = false;
-
+    /**
+     * The enabled argument for the function.
+     *
+     * @param value the enabled
+     * @return this builder
+     */
     public Builder setEnabled(Boolean value) {
       this.enabled = value;
       return this;
     }
 
+    /**
+     * @param value the callable
+     * @return this builder
+     */
     public Builder setFunctionCall(FunctionFunction value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.callable(value);
       return this;
     }
 
+    /**
+     * @param value the callable name
+     * @return this builder
+     */
     public Builder setFunctionName(String value) {
       this.function = wit.functionexecution.NexgenRuntime.FunctionReference.named(value);
       return this;

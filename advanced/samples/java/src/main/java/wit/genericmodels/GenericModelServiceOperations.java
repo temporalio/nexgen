@@ -5,12 +5,18 @@ package wit.genericmodels;
 public final class GenericModelServiceOperations {
   private GenericModelServiceOperations() {}
 
-  public static <ContextT, MetadataT, OutputT>
-      wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> complete(
-          wit.genericmodels.CompleteOptions<ContextT> options) {
+  /**
+   * @param <T> the model value type
+   * @param <U> the model value type
+   * @param <V> the model value type
+   * @param options options for this operation; must not be null
+   * @return the operation result
+   */
+  public static <T, U, V> wit.genericmodels.GenericResponse<T, V, U> complete(
+      wit.genericmodels.CompleteOptions<T> options) {
     java.util.Objects.requireNonNull(options, "options");
-    wit.genericmodels.GenericRequest.Builder<ContextT> requestBuilder =
-        wit.genericmodels.GenericRequest.<ContextT>newBuilder();
+    wit.genericmodels.GenericRequest.Builder<T> requestBuilder =
+        wit.genericmodels.GenericRequest.<T>newBuilder();
     requestBuilder.setContext(options.getContext());
     requestBuilder.setContexts(options.getContexts());
     requestBuilder.setByName(options.getByName());
@@ -18,15 +24,14 @@ public final class GenericModelServiceOperations {
     if (options.getProbe() != null) requestBuilder.setProbe(options.getProbe());
     if (options.getReference() != null) requestBuilder.setReference(options.getReference());
     java.lang.reflect.Type resultType = options.getResultType();
-    wit.genericmodels.GenericRequest<ContextT> request = requestBuilder.build();
+    wit.genericmodels.GenericRequest<T> request = requestBuilder.build();
     return executeComplete(request, resultType);
   }
 
-  static <ContextT, MetadataT, OutputT>
-      wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> executeComplete(
-          wit.genericmodels.GenericRequest<ContextT> request, java.lang.reflect.Type resultType) {
-    wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT> result =
-        (wit.genericmodels.GenericResponse<ContextT, OutputT, MetadataT>)
+  static <T, U, V> wit.genericmodels.GenericResponse<T, V, U> executeComplete(
+      wit.genericmodels.GenericRequest<T> request, java.lang.reflect.Type resultType) {
+    wit.genericmodels.GenericResponse<T, V, U> result =
+        (wit.genericmodels.GenericResponse<T, V, U>)
             io.temporal.workflow.Workflow.newUntypedNexusServiceStub(
                     "GenericModelService",
                     io.temporal.workflow.NexusServiceOptions.newBuilder()

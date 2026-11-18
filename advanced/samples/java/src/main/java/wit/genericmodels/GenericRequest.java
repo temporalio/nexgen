@@ -2,26 +2,24 @@
 package wit.genericmodels;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class GenericRequest<ContextT> {
-  private final ContextT context;
-  private final java.util.List<ContextT> contexts;
-  private final java.util.Map<String, ContextT> byName;
-  private final wit.genericmodels.Inner<ContextT> nested;
-  private final wit.genericmodels.GetterProbe<ContextT> probe;
-  private final wit.genericmodels.ContextRef<ContextT> reference;
+public final class GenericRequest<T> {
+  private final T context;
+  private final java.util.List<T> contexts;
+  private final java.util.Map<String, T> byName;
+  private final wit.genericmodels.Inner<T> nested;
+  private final wit.genericmodels.GetterProbe<T> probe;
+  private final wit.genericmodels.ContextRef<T> reference;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public GenericRequest(
-      @com.fasterxml.jackson.annotation.JsonProperty("context") ContextT context,
-      @com.fasterxml.jackson.annotation.JsonProperty("contexts") java.util.List<ContextT> contexts,
-      @com.fasterxml.jackson.annotation.JsonProperty("byName")
-          java.util.Map<String, ContextT> byName,
-      @com.fasterxml.jackson.annotation.JsonProperty("nested")
-          wit.genericmodels.Inner<ContextT> nested,
+      @com.fasterxml.jackson.annotation.JsonProperty("context") T context,
+      @com.fasterxml.jackson.annotation.JsonProperty("contexts") java.util.List<T> contexts,
+      @com.fasterxml.jackson.annotation.JsonProperty("byName") java.util.Map<String, T> byName,
+      @com.fasterxml.jackson.annotation.JsonProperty("nested") wit.genericmodels.Inner<T> nested,
       @com.fasterxml.jackson.annotation.JsonProperty("probe")
-          wit.genericmodels.GetterProbe<ContextT> probe,
+          wit.genericmodels.GetterProbe<T> probe,
       @com.fasterxml.jackson.annotation.JsonProperty("reference")
-          wit.genericmodels.ContextRef<ContextT> reference) {
+          wit.genericmodels.ContextRef<T> reference) {
     this.context = context;
     this.contexts = contexts;
     this.byName = byName;
@@ -30,46 +28,71 @@ public final class GenericRequest<ContextT> {
     this.reference = reference;
   }
 
-  public ContextT getContext() {
+  /**
+   * @return the context
+   */
+  public T getContext() {
     return context;
   }
 
-  public java.util.List<ContextT> getContexts() {
+  /**
+   * @return the contexts
+   */
+  public java.util.List<T> getContexts() {
     return contexts;
   }
 
-  public java.util.Map<String, ContextT> getByName() {
+  /**
+   * @return the byName
+   */
+  public java.util.Map<String, T> getByName() {
     return byName;
   }
 
-  public wit.genericmodels.Inner<ContextT> getNested() {
+  /**
+   * @return the nested
+   */
+  public wit.genericmodels.Inner<T> getNested() {
     return nested;
   }
 
-  public wit.genericmodels.GetterProbe<ContextT> getProbe() {
+  /**
+   * @return the probe
+   */
+  public wit.genericmodels.GetterProbe<T> getProbe() {
     return probe;
   }
 
-  public wit.genericmodels.ContextRef<ContextT> getReference() {
+  /**
+   * @return the reference
+   */
+  public wit.genericmodels.ContextRef<T> getReference() {
     return reference;
   }
 
-  public Builder<ContextT> toBuilder() {
+  public Builder<T> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder(GenericRequest<ContextT> value) {
-    return new Builder<ContextT>(value);
+  public static <T> Builder<T> newBuilder(GenericRequest<T> value) {
+    return new Builder<T>(value);
   }
 
-  public static <ContextT> Builder<ContextT> newBuilder() {
-    return new Builder<ContextT>();
+  public static <T> Builder<T> newBuilder() {
+    return new Builder<T>();
   }
 
-  public static final class Builder<ContextT> {
+  public static final class Builder<T> {
+    private T context = null;
+    private java.util.List<T> contexts = java.util.Collections.emptyList();
+    private java.util.Map<String, T> byName = java.util.Collections.emptyMap();
+    private wit.genericmodels.Inner<T> nested = null;
+    private wit.genericmodels.GetterProbe<T> probe = null;
+    private wit.genericmodels.ContextRef<T> reference = null;
+
     private Builder() {}
 
-    private Builder(GenericRequest<ContextT> value) {
+    private Builder(GenericRequest<T> value) {
       if (value == null) return;
       this.context = value.context;
       this.contexts = value.contexts;
@@ -79,50 +102,62 @@ public final class GenericRequest<ContextT> {
       this.reference = value.reference;
     }
 
-    private ContextT context = null;
-
-    public Builder<ContextT> setContext(ContextT value) {
+    /**
+     * @param value the context
+     * @return this builder
+     */
+    public Builder<T> setContext(T value) {
       this.context = value;
       return this;
     }
 
-    private java.util.List<ContextT> contexts = java.util.Collections.emptyList();
-
-    public Builder<ContextT> setContexts(java.util.List<ContextT> value) {
+    /**
+     * @param value the contexts
+     * @return this builder
+     */
+    public Builder<T> setContexts(java.util.List<T> value) {
       this.contexts = value;
       return this;
     }
 
-    private java.util.Map<String, ContextT> byName = java.util.Collections.emptyMap();
-
-    public Builder<ContextT> setByName(java.util.Map<String, ContextT> value) {
+    /**
+     * @param value the byName
+     * @return this builder
+     */
+    public Builder<T> setByName(java.util.Map<String, T> value) {
       this.byName = value;
       return this;
     }
 
-    private wit.genericmodels.Inner<ContextT> nested = null;
-
-    public Builder<ContextT> setNested(wit.genericmodels.Inner<ContextT> value) {
+    /**
+     * @param value the nested
+     * @return this builder
+     */
+    public Builder<T> setNested(wit.genericmodels.Inner<T> value) {
       this.nested = value;
       return this;
     }
 
-    private wit.genericmodels.GetterProbe<ContextT> probe = null;
-
-    public Builder<ContextT> setProbe(wit.genericmodels.GetterProbe<ContextT> value) {
+    /**
+     * @param value the probe
+     * @return this builder
+     */
+    public Builder<T> setProbe(wit.genericmodels.GetterProbe<T> value) {
       this.probe = value;
       return this;
     }
 
-    private wit.genericmodels.ContextRef<ContextT> reference = null;
-
-    public Builder<ContextT> setReference(wit.genericmodels.ContextRef<ContextT> value) {
+    /**
+     * @param value the reference
+     * @return this builder
+     */
+    public Builder<T> setReference(wit.genericmodels.ContextRef<T> value) {
       this.reference = value;
       return this;
     }
 
-    public GenericRequest<ContextT> build() {
-      return new GenericRequest<ContextT>(context, contexts, byName, nested, probe, reference);
+    public GenericRequest<T> build() {
+      return new GenericRequest<T>(context, contexts, byName, nested, probe, reference);
     }
   }
 }

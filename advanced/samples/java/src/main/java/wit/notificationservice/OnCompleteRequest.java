@@ -4,70 +4,85 @@ package wit.notificationservice;
 /** A notification that reports that a source operation completed. */
 @io.temporal.common.converter.TransferTypeConvertible(OnCompleteRequest.Converter.class)
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class OnCompleteRequest<OutputT, SourceContextT> {
-  /** The successful output or failure of the source operation. */
-  private final wit.notificationservice.OnCompleteRequestResult<OutputT> result;
-
-  /** User-supplied data associated with the source invocation. */
-  private final SourceContextT sourceContext;
+public final class OnCompleteRequest<T, U> {
+  private final wit.notificationservice.OnCompleteRequestResult<T> result;
+  private final U sourceContext;
 
   @com.fasterxml.jackson.annotation.JsonCreator
   public OnCompleteRequest(
       @com.fasterxml.jackson.annotation.JsonProperty("result")
-          wit.notificationservice.OnCompleteRequestResult<OutputT> result,
-      @com.fasterxml.jackson.annotation.JsonProperty("sourceContext")
-          SourceContextT sourceContext) {
+          wit.notificationservice.OnCompleteRequestResult<T> result,
+      @com.fasterxml.jackson.annotation.JsonProperty("sourceContext") U sourceContext) {
     this.result = result;
     this.sourceContext = sourceContext;
   }
 
-  public wit.notificationservice.OnCompleteRequestResult<OutputT> getResult() {
+  /**
+   * The successful output or failure of the source operation.
+   *
+   * @return the result
+   */
+  public wit.notificationservice.OnCompleteRequestResult<T> getResult() {
     return result;
   }
 
-  public SourceContextT getSourceContext() {
+  /**
+   * User-supplied data associated with the source invocation.
+   *
+   * @return the sourceContext
+   */
+  public U getSourceContext() {
     return sourceContext;
   }
 
-  public Builder<OutputT, SourceContextT> toBuilder() {
+  public Builder<T, U> toBuilder() {
     return newBuilder(this);
   }
 
-  public static <OutputT, SourceContextT> Builder<OutputT, SourceContextT> newBuilder(
-      OnCompleteRequest<OutputT, SourceContextT> value) {
-    return new Builder<OutputT, SourceContextT>(value);
+  public static <T, U> Builder<T, U> newBuilder(OnCompleteRequest<T, U> value) {
+    return new Builder<T, U>(value);
   }
 
-  public static <OutputT, SourceContextT> Builder<OutputT, SourceContextT> newBuilder() {
-    return new Builder<OutputT, SourceContextT>();
+  public static <T, U> Builder<T, U> newBuilder() {
+    return new Builder<T, U>();
   }
 
-  public static final class Builder<OutputT, SourceContextT> {
+  public static final class Builder<T, U> {
+    private wit.notificationservice.OnCompleteRequestResult<T> result = null;
+    private U sourceContext = null;
+
     private Builder() {}
 
-    private Builder(OnCompleteRequest<OutputT, SourceContextT> value) {
+    private Builder(OnCompleteRequest<T, U> value) {
       if (value == null) return;
       this.result = value.result;
       this.sourceContext = value.sourceContext;
     }
 
-    private wit.notificationservice.OnCompleteRequestResult<OutputT> result = null;
-
-    public Builder<OutputT, SourceContextT> setResult(
-        wit.notificationservice.OnCompleteRequestResult<OutputT> value) {
+    /**
+     * The successful output or failure of the source operation.
+     *
+     * @param value the result
+     * @return this builder
+     */
+    public Builder<T, U> setResult(wit.notificationservice.OnCompleteRequestResult<T> value) {
       this.result = value;
       return this;
     }
 
-    private SourceContextT sourceContext = null;
-
-    public Builder<OutputT, SourceContextT> setSourceContext(SourceContextT value) {
+    /**
+     * User-supplied data associated with the source invocation.
+     *
+     * @param value the sourceContext
+     * @return this builder
+     */
+    public Builder<T, U> setSourceContext(U value) {
       this.sourceContext = value;
       return this;
     }
 
-    public OnCompleteRequest<OutputT, SourceContextT> build() {
-      return new OnCompleteRequest<OutputT, SourceContextT>(result, sourceContext);
+    public OnCompleteRequest<T, U> build() {
+      return new OnCompleteRequest<T, U>(result, sourceContext);
     }
   }
 
@@ -77,7 +92,7 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
         io.temporal.api.notificationservice.v1.OnCompleteRequest.newBuilder();
     if (this.result != null) {
       if (this.result.getTag() == wit.notificationservice.OnCompleteRequestResult.Tag.SUCCESS)
-        proto.setSuccess(converter.toPayload(((OutputT) this.result.getValue())).get());
+        proto.setSuccess(converter.toPayload(((T) this.result.getValue())).get());
       if (this.result.getTag() == wit.notificationservice.OnCompleteRequestResult.Tag.FAILURE)
         proto.setFailure(
             support.TemporalModelConverters.failureToProto(
@@ -87,16 +102,15 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
     return proto.build();
   }
 
-  public static <OutputT, SourceContextT> OnCompleteRequest<OutputT, SourceContextT> fromProto(
+  public static <T, U> OnCompleteRequest<T, U> fromProto(
       io.temporal.api.notificationservice.v1.OnCompleteRequest proto,
       io.temporal.common.converter.DataConverter converter,
       java.lang.reflect.Type modelType) {
-    Builder<OutputT, SourceContextT> builder =
-        OnCompleteRequest.<OutputT, SourceContextT>newBuilder();
+    Builder<T, U> builder = OnCompleteRequest.<T, U>newBuilder();
     if (proto.hasSuccess())
       builder.setResult(
           wit.notificationservice.OnCompleteRequestResult.success(
-              (OutputT)
+              (T)
                   converter.fromPayload(
                       proto.getSuccess(),
                       wit.notificationservice.NexgenRuntime.rawType(
@@ -107,7 +121,7 @@ public final class OnCompleteRequest<OutputT, SourceContextT> {
           wit.notificationservice.OnCompleteRequestResult.failure(
               support.TemporalModelConverters.failureFromProto(converter, proto.getFailure())));
     builder.setSourceContext(
-        (SourceContextT)
+        (U)
             converter.fromPayload(
                 proto.getSourceContext(),
                 wit.notificationservice.NexgenRuntime.rawType(

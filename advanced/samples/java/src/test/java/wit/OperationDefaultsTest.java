@@ -79,7 +79,9 @@ class OperationDefaultsTest {
 
       new Sender("token").submit();
       wit.workflowservice.SignalWithStartWorkflowOptions start =
-          wit.workflowservice.SignalWithStartWorkflowOptions.newBuilder().setId("target").build();
+          wit.workflowservice.SignalWithStartWorkflowOptions.newBuilder()
+              .setWorkflowId("target")
+              .build();
       wit.workflowservice.WorkflowOperations.signalWithStartWorkflow(
           "Target", new Object[0], "signal", new Object[0], start);
       wit.workflowservice.WorkflowOperations.signalWithStartWorkflow(
@@ -87,7 +89,7 @@ class OperationDefaultsTest {
           new Object[0],
           "signal",
           new Object[0],
-          start.toBuilder().setId("explicit-target").setTaskQueue("explicit").build());
+          start.toBuilder().setWorkflowId("explicit-target").setTaskQueue("explicit").build());
       assertNull(start.getTaskQueue());
       return "done";
     }
@@ -110,7 +112,7 @@ class OperationDefaultsTest {
                     wit.workflowservice.SignalWithStartWorkflowRequest request =
                         (wit.workflowservice.SignalWithStartWorkflowRequest) input.getArg();
                     assertEquals(
-                        request.getId().equals("explicit-target")
+                        request.getWorkflowId().equals("explicit-target")
                             ? "explicit"
                             : Workflow.getInfo().getTaskQueue(),
                         request.getTaskQueue());

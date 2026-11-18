@@ -11,6 +11,9 @@ public final class StartWorkflowResult {
     this.runId = runId;
   }
 
+  /**
+   * @return the runId
+   */
   public String getRunId() {
     return runId;
   }
@@ -28,6 +31,8 @@ public final class StartWorkflowResult {
   }
 
   public static final class Builder {
+    private String runId = null;
+
     private Builder() {}
 
     private Builder(StartWorkflowResult value) {
@@ -35,8 +40,10 @@ public final class StartWorkflowResult {
       this.runId = value.runId;
     }
 
-    private String runId = null;
-
+    /**
+     * @param value the runId
+     * @return this builder
+     */
     public Builder setRunId(String value) {
       this.runId = value;
       return this;
