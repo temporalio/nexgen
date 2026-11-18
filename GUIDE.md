@@ -2409,9 +2409,9 @@ the method. Remove such a method instead. Go refuses a method omitted for
 `workflow`.
 
 ```wit
-/// @nexus.operation "append-records"
+/// @nexus.operation "read-records"
 /// @nexus.api-omit targets="workflow"
-append: func(records: list<append-record>) -> append-records-response;
+read: func(from-offset: option<list<u8>>) -> read-records-response;
 ```
 
 ---
