@@ -2119,15 +2119,15 @@ workflow-function fields, the names `TWorkflow` and `TResult` are also reserved.
 A language-specific field-level `@nexus.type` override replaces that field
 occurrence and therefore removes it from generic inference for that target.
 
-Type parameters are not currently supported in proto-backed records except in
-Python, .NET, and TypeScript when a field or oneof member maps to Temporal's
-protobuf `Payload` or `Payloads` carrier. When decoding a parameterized Python
-model, concrete type arguments propagate through nested proto-backed records and
-become type hints for single-value `Payload` and `Payloads` fields. An
-unparameterized model decodes those fields as `typing.Any`. A generic `Payloads`
-carrier with an empty envelope decodes as `None`; more than one payload raises
-`ValueError` with the field name and payload count. Required carrier fields
-still require a wire envelope.
+Type parameters are supported in proto-backed records in Python, .NET,
+TypeScript, and Go when a field or oneof member maps to Temporal's protobuf
+`Payload` or `Payloads` carrier. When decoding a parameterized Python model,
+concrete type arguments propagate through nested proto-backed records and become
+type hints for single-value `Payload` and `Payloads` fields. An unparameterized
+model decodes those fields as `typing.Any`. A generic `Payloads` carrier with an
+empty envelope decodes as `None`; more than one payload raises `ValueError` with
+the field name and payload count. Required carrier fields still require a wire
+envelope.
 
 .NET generic proto-backed records declare an open generic transfer-type
 converter, such as `typeof(Request<,>.TransferTypeConverter)`, which the SDK
@@ -2139,6 +2139,18 @@ with no payload decodes as the default value of the type argument, for example
 for a `NoValue` result. If a `Payloads` carrier holds more than one payload,
 decoding throws `InvalidOperationException` with the field name and the payload
 count. This requires `Temporalio` 1.19.0 or newer.
+
+Go models implement the SDK's `TransferTypeConverter` contract, including
+models-only exports and generic models. Each concrete instantiation decodes
+carrier fields into its concrete type arguments. For example,
+`OnCompleteRequest[converter.RawValue, SourceContext]` preserves the successful
+output as a raw payload while decoding the source context as `SourceContext`.
+Oneof cases use the generated sealed interface and case structs; both values and
+non-nil pointers to case structs can be encoded. Missing required oneofs and
+carrier envelopes return errors. A generic `Payloads` envelope accepts at most
+one payload; an empty envelope leaves the type argument's zero value. Ordinary
+Go callbacks use the default data converter for carrier values. With
+`--system-nexus`, they use the SDK-selected data converter instead.
 
 TypeScript retains model type parameters on the default transfer-converter
 methods. Generic proto-backed models also export a

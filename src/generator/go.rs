@@ -3139,13 +3139,16 @@ fn compute_go_visibility(
 
     // Model-only modules expose declarations directly, without an operation
     // through which the visibility walk could discover them.
-    marker.public_keys.extend(
-        api_plan
-            .types
-            .iter()
-            .filter(|(_, entry)| entry.is_module_export())
-            .map(|(name, _)| name.clone()),
-    );
+    for (name, entry) in &api_plan.types {
+        if !entry.is_module_export() {
+            continue;
+        }
+        if let Some(record) = api_plan.record(name) {
+            marker.mark_message_type(&planned_message_type_for_record(record));
+        } else {
+            marker.public_keys.insert(name.clone());
+        }
+    }
     for service in &api_plan.services {
         for operation in &service.operations {
             marker.mark_operation_public_surface(operation);
