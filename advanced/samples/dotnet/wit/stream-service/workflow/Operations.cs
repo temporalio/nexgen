@@ -41,7 +41,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Append one batch. Workflow code makes the call from a Local Activity.
+    /// Append one batch. For Workflow code, Core makes the call.
     /// </summary>
     [GeneratedCode("nexgen", null)]
     internal class AppendRecordsOptions<TBody>
@@ -163,7 +163,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
         /// <param name="request">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
         [GeneratedCode("nexgen", null)]
@@ -175,7 +175,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
         /// <param name="options">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
         [GeneratedCode("nexgen", null)]

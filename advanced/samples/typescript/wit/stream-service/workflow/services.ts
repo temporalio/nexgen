@@ -39,7 +39,7 @@ export const streamService = nexus.service(
       outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },
     }),
     /**
-     * Append one batch. Workflow code makes the call from a Local Activity.
+     * Append one batch. For Workflow code, Core makes the call.
      */
     appendRecords: nexus.operation<AppendRecordsRequest<any>, AppendRecordsResponse>({
       name: "AppendRecords",

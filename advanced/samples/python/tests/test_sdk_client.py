@@ -288,7 +288,7 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
         stream = client.get_stream(ref=ref)
     _ = assert_type(stream, Stream[object])
 
-    page = await stream.read()
+    page = await stream.read_page()
 
     assert page.records[0].body == {"role": "model"}
 
@@ -670,7 +670,7 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = [page async for page in stream.iter_read(from_offset=_offset(1))]
+    read = [page async for page in stream.read_pages(from_offset=_offset(1))]
 
     assert read == pages
     assert [started.arg for started in answers.started] == [
@@ -695,7 +695,7 @@ async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = [page async for page in stream.iter_read(from_offset=_offset(1), wait=wait)]
+    read = [page async for page in stream.read_pages(from_offset=_offset(1), wait=wait)]
 
     assert read == pages
     assert [started.arg for started in answers.started] == [
@@ -721,7 +721,7 @@ async def test_a_read_from_the_beginning_resumes_after_its_first_last_offset() -
     )
     stream = await client.create_stream(id="s1", body_type=str)
 
-    read = [page async for page in stream.iter_read(wait=wait)]
+    read = [page async for page in stream.read_pages(wait=wait)]
 
     assert read == pages
     assert [started.arg for started in answers.started[1:]] == [
@@ -745,7 +745,7 @@ async def test_a_done_first_page_ends_the_read() -> None:
     client, answers = connect(Client, {"ReadRecords": list(pages)})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = [page async for page in stream.iter_read()]
+    read = [page async for page in stream.read_pages()]
 
     assert read == pages
     assert [started.arg for started in answers.started] == [ReadRecordsRequest(ref=ref)]
@@ -767,7 +767,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    async for page in stream.iter_read(from_offset=_offset(1), wait=wait):
+    async for page in stream.read_pages(from_offset=_offset(1), wait=wait):
         page.last_offset = _offset(9)
 
     assert [started.arg for started in answers.started] == [
@@ -776,7 +776,7 @@ async def test_a_changed_page_does_not_change_the_next_request() -> None:
     ]
 
 
-async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None:
+async def test_read_yields_each_record_and_resumes_after_it() -> None:
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)
     client, answers = connect(
@@ -804,7 +804,7 @@ async def test_iter_read_items_yields_each_record_and_resumes_after_it() -> None
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(from_offset=_offset(10), wait=wait)
+    read = stream.read(from_offset=_offset(10), wait=wait)
     seen: list[tuple[bytes, bytes | None]] = []
     async for record in read:
         seen.append(
@@ -850,13 +850,13 @@ async def test_a_new_read_resumes_from_the_next_request_of_a_stopped_read() -> N
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(from_offset=_offset(1))
+    read = stream.read(from_offset=_offset(1))
     first = await anext(read)
     saved = read.next_request
     assert first.offset == _offset(1)
     assert saved is not None
 
-    resumed = stream.iter_read_items(from_offset=saved.from_offset)
+    resumed = stream.read(from_offset=saved.from_offset)
 
     assert [record.offset async for record in resumed] == [_offset(2)]
     assert [started.arg for started in answers.started] == [
@@ -886,7 +886,7 @@ async def test_a_changed_record_does_not_change_the_next_request() -> None:
     )
     stream = client.get_stream(ref=ref, body_type=str)
 
-    read = stream.iter_read_items(from_offset=_offset(1), wait=wait)
+    read = stream.read(from_offset=_offset(1), wait=wait)
     next_offsets: list[bytes | None] = []
     async for record in read:
         record.offset = _offset(9)
@@ -926,8 +926,8 @@ def test_both_streams_read_and_poll() -> None:
         "append",
         "close",
         "read",
-        "iter_read",
-        "iter_read_items",
+        "read_pages",
+        "read_page",
         "__aenter__",
         "__aexit__",
     ):
@@ -961,9 +961,9 @@ async def test_each_workflow_page_is_the_call_of_the_workflow_read(
     monkeypatch.setattr(workflow_stream_module, "_read_records", read_records)
     stream = workflow_stream_module.Stream(ref=ref, created=None)
 
-    assert await stream.read(from_offset=_offset(1)) == pages[0]
+    assert await stream.read_page(from_offset=_offset(1)) == pages[0]
     calls.clear()
-    read = stream.iter_read_items(from_offset=_offset(1))
+    read = stream.read(from_offset=_offset(1))
     seen = [
         (record.offset, read.next_request and read.next_request.from_offset)
         async for record in read
@@ -981,7 +981,7 @@ async def test_each_workflow_page_is_the_call_of_the_workflow_read(
     ]
     # The Workflow iterator takes no RPC options, since Workflow code has no RPC.
     if typing.TYPE_CHECKING:
-        _ = stream.iter_read(rpc_timeout=None)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+        _ = stream.read_pages(rpc_timeout=None)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
 
 
 async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
@@ -1033,14 +1033,14 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
             ref=ref,
             created=None,
         )
-    page = await stream.read()
+    page = await stream.read_page()
 
     _ = assert_type(stream, Stream[Turn])
     _ = assert_type(page, ReadRecordsResponse[Turn])
     # A poll decodes with the specialization too.
     assert page.records == [record]
-    assert [page.records async for page in stream.iter_read()] == [[record]]
-    assert [item async for item in stream.iter_read_items()] == [record]
+    assert [page.records async for page in stream.read_pages()] == [[record]]
+    assert [item async for item in stream.read()] == [record]
 
 
 def turn_pages() -> Payload:
@@ -1075,7 +1075,7 @@ async def test_a_typed_ref_round_trips_into_a_typed_handle() -> None:
     assert stream.ref == created.ref
     # The ref of a created handle keeps its type argument too.
     assert client.get_stream(created.ref).body_type is Turn
-    [record] = (await stream.read()).records
+    [record] = (await stream.read_page()).records
     assert record == StreamRecord(body=Turn(role="model"), offset=_offset(1))
 
 
@@ -1094,8 +1094,8 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     assert plain_stream.body_type is object
     assert typed_stream.ref is typed
     assert client.get_stream(typed, body_type=Turn).ref is typed
-    [typed_record] = (await typed_stream.read()).records
-    [plain_record] = (await plain_stream.read()).records
+    [typed_record] = (await typed_stream.read_page()).records
+    [plain_record] = (await plain_stream.read_page()).records
     assert typed_record == StreamRecord(body=Turn(role="model"), offset=_offset(1))
     # An unknown payload stays a decoded dict.
     assert plain_record == StreamRecord(body={"role": "model"}, offset=_offset(1))
@@ -1110,8 +1110,8 @@ async def test_a_ref_gives_its_type_argument_to_the_handle() -> None:
     explicit_unknown = client.get_stream(unknown_ref)
     assert explicit_unknown.body_type is object
     assert explicit_unknown.ref is unknown_ref
-    assert (await explicit_unknown.read()).records == (
-        await plain_stream.read()
+    assert (await explicit_unknown.read_page()).records == (
+        await plain_stream.read_page()
     ).records
     specialized = client.get_stream(unknown_ref, body_type=Turn)
     assert specialized.body_type is Turn

@@ -2005,7 +2005,7 @@ impl<'a> ApiPlanner<'a> {
             );
         }
         if let Some(target) = target {
-            render_resource_async_with(output, resource, target);
+            render_resource_async_with(output, resource, bound_operations, target);
         }
         let Some(target) = target else {
             // Identity DTOs have no API methods or client state.
@@ -2142,7 +2142,7 @@ impl<'a> ApiPlanner<'a> {
         let param_exprs = self.resource_method_param_exprs(method);
         let optional_params = resource_method_optional_params(method);
         output.push_str("    async def ");
-        output.push_str(&python_field_name(&method.name));
+        output.push_str(&resource_method_call_name(method, bound_operations, target));
         output.push_str("(\n");
         self.render_resource_method_params(output, method, client);
         output.push_str("    ) -> ");
@@ -2355,26 +2355,23 @@ impl<'a> ApiPlanner<'a> {
         bound_operations: &[ResourceBoundOperation<'_>],
         target: GenerationTarget,
     ) {
-        let PlannedResourceMethodBindingSpec::Operation {
-            operation_name,
-            request_plan,
-            ..
-        } = &method.binding
+        let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } = &method.binding
         else {
             return;
         };
-        let operation = bound_operations
-            .iter()
-            .map(|bound_operation| bound_operation.operation)
-            .find(|operation| operation.name == operation_name)
-            .expect("bound resource operation should be rendered in the same module");
+        let Some(operation) = resource_method_poll(method, bound_operations, target) else {
+            return;
+        };
         let Some(next_expr) = operation.poll_next(target) else {
             return;
         };
         let client = target == GenerationTarget::Client;
-        let method_name = python_field_name(&method.name);
+        let names = resource_poll_names(
+            &python_field_name(&method.name),
+            operation.poll_items.is_some(),
+        );
         output.push_str("\n    async def ");
-        output.push_str(&poll_function_name(&method_name));
+        output.push_str(&names.pages);
         output.push_str("(\n");
         self.render_resource_method_params(output, method, client);
         output.push_str("    ) -> collections.abc.AsyncGenerator[");
@@ -2396,7 +2393,7 @@ impl<'a> ApiPlanner<'a> {
         render_python_docstring(
             output,
             "        ",
-            Some(&poll_function_summary(&method_name, method.doc.as_deref())),
+            Some(&poll_function_summary(&names.page, method.doc.as_deref())),
             &args,
             None,
             operation.experimental,
@@ -2417,11 +2414,11 @@ impl<'a> ApiPlanner<'a> {
         } else {
             render_workflow_poll_loop(output, service, operation, &next_expr);
         }
-        let Some((_, item)) = &operation.poll_items else {
+        let (Some((_, item)), Some(items_name)) = (&operation.poll_items, &names.items) else {
             return;
         };
         output.push_str("\n    def ");
-        output.push_str(&poll_items_function_name(&method_name));
+        output.push_str(items_name);
         output.push_str("(\n");
         self.render_resource_method_params(output, method, client);
         output.push_str("    ) -> PollIterator[");
@@ -2433,7 +2430,7 @@ impl<'a> ApiPlanner<'a> {
             output,
             "        ",
             Some(&poll_items_summary(
-                &method_name,
+                &names.pages,
                 method.doc.as_deref(),
                 operation.poll_resume().is_some(),
             )),
@@ -2456,7 +2453,7 @@ impl<'a> ApiPlanner<'a> {
             output,
             "        ",
             operation,
-            &format!("self.{}({page_args})", poll_function_name(&method_name)),
+            &format!("self.{}({page_args})", names.pages),
             &next_expr,
         );
     }
@@ -7371,10 +7368,11 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
     format!("{}ClientExtension", service.name)
 }
 
-/// Refuses an iterator with the name of another operation, method or field, since one of the two
-/// would hide the other. The iterator name is a Python name, and `@nexus.name` can change it, so
-/// this check stays with the Python generator. `PollValidationPass` refuses a poll of the wrong
-/// shape earlier, for every language. Only the client has iterators outside a resource.
+/// Refuses a name that a poll adds, such as an iterator or the `<name>_page` call of a resource
+/// method, when another operation, method or field has it, since one of the two would hide the
+/// other. The added name is a Python name, and `@nexus.name` can change it, so this check stays
+/// with the Python generator. `PollValidationPass` refuses a poll of the wrong shape earlier, for
+/// every language. Only the client has iterators outside a resource.
 fn validate_poll_names(
     services: &[RenderedService<'_>],
     targets: &[GenerationTarget],
@@ -7436,15 +7434,17 @@ fn validate_poll_names(
                     continue;
                 };
                 let method_name = python_field_name(&method.name);
-                for (iterator_name, iterator) in poll_iterator_names(&method_name, operation) {
+                let added = resource_poll_names(&method_name, operation.poll_items.is_some())
+                    .added(&method_name);
+                for (added_name, what) in added {
                     let conflict = member_names
                         .iter()
-                        .find(|(member_name, _, _)| *member_name == iterator_name);
+                        .find(|(member_name, _, _)| *member_name == added_name);
                     if let Some((_, kind, name)) = conflict {
                         return Err(Error::PythonGeneratedNameConflict {
-                            name: iterator_name,
+                            name: added_name,
                             generated_by: format!(
-                                "the {iterator} of resource method `{}.{}`",
+                                "the {what} of resource method `{}.{}`",
                                 resource.type_name, method.name
                             ),
                             conflicting_declaration: format!(
@@ -10090,7 +10090,7 @@ fn poll_items_function_name(name: &str) -> String {
     format!("iter_{name}_items")
 }
 
-/// The iterators that a poll adds for an operation or method of this name, with what each is.
+/// The iterators that a poll adds for an operation of this name, with what each is.
 fn poll_iterator_names(
     name: &str,
     operation: &RenderedOperation<'_>,
@@ -10102,7 +10102,82 @@ fn poll_iterator_names(
     names
 }
 
-fn poll_items_summary(name: &str, doc: Option<&str>, resume: bool) -> String {
+/// The Python methods of a resource method whose operation polls in a target.
+struct ResourcePollNames {
+    /// The call that sends one request and returns one page.
+    page: String,
+    /// The iterator of the pages.
+    pages: String,
+    /// The iterator of the items, when the poll has `items`.
+    items: Option<String>,
+}
+
+/// Callers reach for the short name first, so it goes to the iterator that they should use. That
+/// is the item iterator when the poll has `items`, and the page iterator when it has none. The one
+/// call is always `<name>_page`.
+fn resource_poll_names(name: &str, items: bool) -> ResourcePollNames {
+    if items {
+        ResourcePollNames {
+            page: format!("{name}_page"),
+            pages: format!("{name}_pages"),
+            items: Some(name.to_string()),
+        }
+    } else {
+        ResourcePollNames {
+            page: format!("{name}_page"),
+            pages: name.to_string(),
+            items: None,
+        }
+    }
+}
+
+impl ResourcePollNames {
+    /// The names that the poll adds next to the resource method's own name, with what each is.
+    fn added(&self, name: &str) -> Vec<(String, &'static str)> {
+        [
+            Some((self.page.clone(), "page call")),
+            Some((self.pages.clone(), "page iterator")),
+            self.items.clone().map(|items| (items, "item iterator")),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|(added, _)| added != name)
+        .collect()
+    }
+}
+
+/// The operation of a resource method, when it polls in this target.
+fn resource_method_poll<'a>(
+    method: &PlannedResourceMethod,
+    bound_operations: &[ResourceBoundOperation<'a>],
+    target: GenerationTarget,
+) -> Option<&'a RenderedOperation<'a>> {
+    let PlannedResourceMethodBindingSpec::Operation { operation_name, .. } = &method.binding else {
+        return None;
+    };
+    bound_operations
+        .iter()
+        .map(|bound_operation| bound_operation.operation)
+        .find(|operation| operation.name == operation_name)
+        .filter(|operation| operation.poll_next(target).is_some())
+}
+
+/// The Python name of the call of a resource method that sends one request. A poll gives the
+/// method's own name to an iterator, so its one call is `<name>_page`.
+fn resource_method_call_name(
+    method: &PlannedResourceMethod,
+    bound_operations: &[ResourceBoundOperation<'_>],
+    target: GenerationTarget,
+) -> String {
+    let name = python_field_name(&method.name);
+    match resource_method_poll(method, bound_operations, target) {
+        Some(operation) => resource_poll_names(&name, operation.poll_items.is_some()).page,
+        None => name,
+    }
+}
+
+/// The summary of an item iterator, which reads the pages of the iterator `pages`.
+fn poll_items_summary(pages: &str, doc: Option<&str>, resume: bool) -> String {
     let next_request = if resume {
         "``next_request`` resumes after the last item that the iterator yielded."
     } else {
@@ -10110,9 +10185,8 @@ fn poll_items_summary(name: &str, doc: Option<&str>, resume: bool) -> String {
          page's last item."
     };
     let summary = format!(
-        "Yield each item of ``{}``, page by page.\n\n{next_request} It is ``None`` after the \
-         last page.",
-        poll_function_name(name)
+        "Yield each item of ``{pages}``, page by page.\n\n{next_request} It is ``None`` after \
+         the last page."
     );
     match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
         Some(doc) => format!("{summary}\n\n{doc}"),
@@ -10192,7 +10266,7 @@ fn render_operation_poll_items_function(
         output,
         target_body_indent(target),
         Some(&poll_items_summary(
-            &operation.attr_name,
+            &poll_function_name(&operation.attr_name),
             operation.doc.as_deref(),
             operation.poll_resume().is_some(),
         )),
@@ -10415,15 +10489,22 @@ fn render_resource_context_manager_import(output: &mut String, body: &str, modul
     }
 }
 
-/// The end of an `async with` block calls the `@nexus.close` method.
+/// The end of an `async with` block calls the `@nexus.close` method once. A poll gives the
+/// method's own name to an iterator, so the block calls `<name>_page`.
 fn render_resource_async_with(
     output: &mut String,
     resource: &PlannedResource,
+    bound_operations: &[ResourceBoundOperation<'_>],
     target: GenerationTarget,
 ) {
     let Some(name) = resource.close_for(target) else {
         return;
     };
+    let method = resource
+        .methods
+        .iter()
+        .find(|method| method.name == name)
+        .expect("the close method should be a method of the resource");
     output.push_str("\n    async def __aenter__(self) -> typing_extensions.Self:\n");
     output.push_str("        return self\n");
     output.push_str("\n    async def __aexit__(\n");
@@ -10434,7 +10515,7 @@ fn render_resource_async_with(
     output.push_str("    ) -> None:\n");
     output.push_str(&format!(
         "        await self.{}()\n",
-        python_field_name(name)
+        resource_method_call_name(method, bound_operations, target)
     ));
 }
 
@@ -12188,5 +12269,38 @@ def ping(request: PingRequest) -> None:
             "async def call(workflow: str) -> None:\n    pass\n",
             "temporalio.workflow",
         ));
+    }
+
+    #[test]
+    fn a_polled_resource_method_gives_its_short_name_to_the_iterator_to_use() {
+        let with_items = super::resource_poll_names("read", true);
+        assert_eq!(
+            (
+                with_items.page.as_str(),
+                with_items.pages.as_str(),
+                with_items.items.as_deref()
+            ),
+            ("read_page", "read_pages", Some("read")),
+        );
+        assert_eq!(
+            with_items.added("read"),
+            [
+                ("read_page".to_string(), "page call"),
+                ("read_pages".to_string(), "page iterator"),
+            ],
+        );
+        let without_items = super::resource_poll_names("read", false);
+        assert_eq!(
+            (
+                without_items.page.as_str(),
+                without_items.pages.as_str(),
+                without_items.items.as_deref()
+            ),
+            ("read_page", "read", None),
+        );
+        assert_eq!(
+            without_items.added("read"),
+            [("read_page".to_string(), "page call")],
+        );
     }
 }
