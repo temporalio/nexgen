@@ -57,10 +57,12 @@ pub enum Error {
     },
 
     #[error(
-        "the client target can't make an iterator for `@nexus.poll` on operation `{operation}` in \
-         `{path}`, since the operation {reason}"
+        "the {target} target can't make an iterator for `@nexus.poll` on operation `{operation}` \
+         in `{path}`, since the operation {reason}"
     )]
     UnsupportedPoll {
+        /// `Workflow` or `client`, as the docs write the target.
+        target: &'static str,
         path: PathBuf,
         operation: String,
         reason: String,

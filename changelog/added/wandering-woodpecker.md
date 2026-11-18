@@ -1,0 +1,1 @@
+`@nexus.poll` also generates the Python `iter_<name>` and `iter_<name>_items` iterators on each Workflow resource method that binds the operation. Each page is the call of the Workflow method. `targets` is optional, and `targets="client"` keeps the iterators out of Workflow code. Both targets import `PollIterator` from one `_poll.py` module next to the models.

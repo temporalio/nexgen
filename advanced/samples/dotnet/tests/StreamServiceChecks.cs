@@ -100,18 +100,11 @@ namespace Nexgen.DotNetExamples.Tests
                 .Distinct();
             Assert.Equal(new[] { "CreateStreamAsync" }, publicOperationMethods);
 
-            // The Stream resource still binds the operations that the Workflow target keeps.
-            foreach (var method in new[] { "AppendAsync", "CloseAsync", "DescribeAsync" })
+            // The Stream resource still binds every operation.
+            foreach (var method in new[] { "AppendAsync", "CloseAsync", "ReadAsync", "DescribeAsync" })
             {
                 Assert.NotNull(typeof(StreamServiceExample.Stream<Turn>).GetMethod(method));
             }
-        }
-
-        // `read` is api-omitted for the Workflow target, so Workflow code can't read a Stream.
-        [Fact]
-        public void WorkflowStreamHasNoRead()
-        {
-            Assert.Null(typeof(StreamServiceExample.Stream<Turn>).GetMethod("ReadAsync"));
         }
     }
 }

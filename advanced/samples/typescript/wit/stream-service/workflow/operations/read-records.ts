@@ -9,8 +9,7 @@ import "../resources";
 import type { Stream } from "../resources";
 
 /**
- * A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local
- * Activity.
+ * A long poll. NOT_FOUND for an uncreated Stream.
  *
  * @param request - Request for the operation.
  */

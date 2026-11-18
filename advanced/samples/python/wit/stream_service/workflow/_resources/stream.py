@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import collections.abc
 import typing
 import typing_extensions
 import temporalio.nexus.system
+import datetime
 import temporalio.workflow
 import types
 
@@ -17,9 +19,13 @@ from ..models import (
     DescribeStreamRequest,
     DescribeStreamResponse,
     Producer,
+    ReadRecordsRequest,
+    ReadRecordsResponse,
+    StreamRecord,
     StreamRef,
 )
 import temporal_support as _support
+from .._poll import PollIterator
 
 
 BodyT = typing.TypeVar("BodyT")
@@ -84,6 +90,103 @@ class Stream(typing.Generic[BodyT]):
         )
         handle = await _close_stream(request)
         await handle
+
+    async def read(
+        self,
+        from_offset: bytes | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> ReadRecordsResponse[BodyT]:
+        """Read one page of Records. The poll iterator reads them all."""
+        request = ReadRecordsRequest(
+            ref=self.ref,
+            from_offset=from_offset,
+            max_records=max_records,
+            wait=wait,
+            max_bytes=max_bytes,
+        )
+        handle = await _read_records(request, self.body_type)
+        return await handle
+
+    async def iter_read(
+        self,
+        from_offset: bytes | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
+        """Yield each response of ``read`` until the poll helper stops.
+
+        Read one page of Records. The poll iterator reads them all.
+
+        Args:
+            from_offset: Read after this offset. Empty is the beginning. A too high
+                offset fails.
+            max_records: About this many Records per page, 1 to 1000.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            ref=self.ref,
+            from_offset=from_offset,
+            max_records=max_records,
+            wait=wait,
+            max_bytes=max_bytes,
+        )
+        while True:
+            handle = await _read_records(request, self.body_type)
+            response = await handle
+            next_request = _support.next_read_request(request, response)
+            yield response
+            if next_request is None:
+                return
+            request = next_request
+
+    def iter_read_items(
+        self,
+        from_offset: bytes | None = None,
+        max_records: int | None = None,
+        wait: datetime.timedelta | None = None,
+        max_bytes: int | None = None,
+    ) -> PollIterator[ReadRecordsRequest[BodyT], StreamRecord[BodyT]]:
+        """Yield each item of ``iter_read``, page by page.
+
+        ``next_request`` resumes after the last item that the iterator yielded. It is
+        ``None`` after the last page.
+
+        Read one page of Records. The poll iterator reads them all.
+
+        Args:
+            from_offset: Read after this offset. Empty is the beginning. A too high
+                offset fails.
+            max_records: About this many Records per page, 1 to 1000.
+            wait: How long to wait for a new Record before an empty answer. At most 60
+                s.
+            max_bytes: The maximum Record bytes in a page. A larger Record is still
+                returned alone.
+        """
+        request = ReadRecordsRequest(
+            ref=self.ref,
+            from_offset=from_offset,
+            max_records=max_records,
+            wait=wait,
+            max_bytes=max_bytes,
+        )
+        return PollIterator(
+            request,
+            self.iter_read(
+                from_offset=from_offset,
+                max_records=max_records,
+                wait=wait,
+                max_bytes=max_bytes,
+            ),
+            lambda response: response.records,
+            _support.next_read_request,
+            _support.resume_read_request,
+        )
 
     async def describe(
         self,
@@ -160,6 +263,21 @@ async def _close_stream(
         operation="CloseStream",
         input=request,
         output_type=CloseStreamResponse,
+    )
+
+
+async def _read_records(
+    request: ReadRecordsRequest[BodyT],
+    body_type: type[BodyT],
+) -> temporalio.workflow.NexusOperationHandle[ReadRecordsResponse[BodyT],]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+    )
+    return await nexus_client.start_operation(
+        operation="ReadRecords",
+        input=request,
+        output_type=ReadRecordsResponse[body_type],
     )
 
 

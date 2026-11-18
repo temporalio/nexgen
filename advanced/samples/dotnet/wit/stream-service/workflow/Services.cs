@@ -34,7 +34,7 @@ namespace Temporalio.Workflows
         CloseStreamResponse CloseStream(CloseStreamRequest<object> request);
 
         /// <summary>
-        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// A long poll. NOT_FOUND for an uncreated Stream.
         /// </summary>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("ReadRecords")]

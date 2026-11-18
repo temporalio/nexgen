@@ -3477,18 +3477,7 @@ fn build_operation_poll(
             )));
         }
     }
-    if directive.value("targets").is_none() {
-        return Err(invalid(
-            "needs `targets=\"client\"`, since only the client target gets an iterator".to_string(),
-        ));
-    }
     let targets = build_origin_targets(directive, path, context, "poll")?;
-    if targets.contains(&GenerationTarget::Workflow) {
-        return Err(invalid(
-            "`targets` includes `workflow`, but only the client target gets an iterator"
-                .to_string(),
-        ));
-    }
     let resume = directive_language_string_for_key(directive, "resume");
     for helper in resume.default.iter().chain(resume.by_language.values()) {
         if !is_valid_support_helper_path(helper) {

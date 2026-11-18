@@ -673,8 +673,8 @@ impl<'a> ApiPlanner<'a> {
         let targets = crate::nexgen_config::current().targets;
         // Two services with operations of the same name also clash on a Workflow package file.
         // Check the client names first, so that the error names the client method.
+        validate_poll_names(services, &targets)?;
         if targets.contains(&GenerationTarget::Client) {
-            validate_client_poll_names(services)?;
             validate_client_names(services)?;
             validate_rpc_option_names(services)?;
         }
@@ -910,6 +910,18 @@ impl<'a> ApiPlanner<'a> {
                 GeneratedFileOrigin::fixed("generated Python resource call"),
             )?;
         }
+        if let Some(source) = render_poll_iterator_module(
+            services,
+            &targets,
+            &operation_model_names,
+            &resource_names,
+        )? {
+            files.insert(
+                "_poll.py",
+                source,
+                GeneratedFileOrigin::fixed("generated Python poll iterator"),
+            )?;
+        }
         if !definition_services.is_empty() {
             files.insert(
                 "services.py",
@@ -1052,36 +1064,6 @@ impl<'a> ApiPlanner<'a> {
             origin(),
         )?;
         files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
-        if let Some(operation) = services
-            .iter()
-            .flat_map(|service| {
-                service
-                    .operations
-                    .iter()
-                    .filter(|operation| client_reaches_operation(service, operation))
-            })
-            .find(|operation| {
-                operation.poll_items.is_some()
-                    && operation.poll_next(GenerationTarget::Client).is_some()
-            })
-        {
-            // The client modules import the iterator next to the models and resources.
-            if let Some(name) = model_names
-                .iter()
-                .chain(resource_names)
-                .find(|name| *name == "PollIterator")
-            {
-                return Err(Error::PythonGeneratedNameConflict {
-                    name: name.clone(),
-                    generated_by: format!("the item iterator of poll `{}`", operation.name),
-                    conflicting_declaration: "a model or resource of the package".to_string(),
-                });
-            }
-            let mut source = String::new();
-            render_generated_file_header(&mut source);
-            source.push_str(PYTHON_POLL_ITERATOR);
-            files.insert(format!("{dir}/_poll.py"), source, origin())?;
-        }
         if !resources.is_empty() {
             files.insert(
                 format!("{dir}/_resources/__init__.py"),
@@ -1280,7 +1262,7 @@ impl<'a> ApiPlanner<'a> {
             );
         }
         render_support_import(&mut output, &body, self.support_package, false);
-        render_poll_iterator_import(&mut output, &body, "._poll");
+        render_poll_iterator_import(&mut output, &body, ".._poll");
         render_resource_context_manager_import(&mut output, &body, ".._resource_context_manager");
         output.push_str("\n\n");
         output.push_str(&body);
@@ -1933,13 +1915,13 @@ impl<'a> ApiPlanner<'a> {
             render_resource_data_import(&mut output, &body, &service.resources, 2);
         }
         render_support_import(&mut output, &body, self.support_package, false);
-        render_poll_iterator_import(&mut output, &body, ".._poll");
         // A target with its own directory is one level below the shared modules.
         let shared = if python_api_directory(target).is_some() {
             "..."
         } else {
             ".."
         };
+        render_poll_iterator_import(&mut output, &body, &format!("{shared}_poll"));
         render_resource_context_manager_import(
             &mut output,
             &body,
@@ -2049,15 +2031,14 @@ impl<'a> ApiPlanner<'a> {
                 bound_operations,
                 target,
             );
-            if target == GenerationTarget::Client {
-                self.render_resource_poll_method(
-                    output,
-                    service,
-                    resource,
-                    method,
-                    bound_operations,
-                );
-            }
+            self.render_resource_poll_method(
+                output,
+                service,
+                resource,
+                method,
+                bound_operations,
+                target,
+            );
         }
     }
 
@@ -2212,6 +2193,7 @@ impl<'a> ApiPlanner<'a> {
                 } else {
                     render_resource_method_operation_body(
                         output,
+                        service,
                         method,
                         operation,
                         &result_annotation,
@@ -2361,8 +2343,9 @@ impl<'a> ApiPlanner<'a> {
             .map(|(_, field)| field.attr_name.clone())
     }
 
-    /// The client iterator of a method whose operation polls. Each page uses the Nexus client of
-    /// the handle, as the other methods do.
+    /// The iterators of a method whose operation polls in this target. A client page uses the
+    /// Nexus client of the handle, as the other client methods do. A Workflow page is the call of
+    /// the Workflow method, so the loop uses nothing that Workflow code can't use.
     fn render_resource_poll_method(
         &self,
         output: &mut String,
@@ -2370,6 +2353,7 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
         method: &PlannedResourceMethod,
         bound_operations: &[ResourceBoundOperation<'_>],
+        target: GenerationTarget,
     ) {
         let PlannedResourceMethodBindingSpec::Operation {
             operation_name,
@@ -2384,20 +2368,21 @@ impl<'a> ApiPlanner<'a> {
             .map(|bound_operation| bound_operation.operation)
             .find(|operation| operation.name == operation_name)
             .expect("bound resource operation should be rendered in the same module");
-        let Some(next_expr) = operation.poll_next(GenerationTarget::Client) else {
+        let Some(next_expr) = operation.poll_next(target) else {
             return;
         };
+        let client = target == GenerationTarget::Client;
         let method_name = python_field_name(&method.name);
         output.push_str("\n    async def ");
         output.push_str(&poll_function_name(&method_name));
         output.push_str("(\n");
-        self.render_resource_method_params(output, method, true);
+        self.render_resource_method_params(output, method, client);
         output.push_str("    ) -> collections.abc.AsyncGenerator[");
         output.push_str(&operation.output_annotation);
         output.push_str(", None]:\n");
         // A parameter fills the request field of the same name, so it gets the doc of that field.
         let field_docs = operation
-            .target_unpacked_input(GenerationTarget::Client)
+            .target_unpacked_input(target)
             .map(|unpacked_input| unpacked_operation_doc_args(unpacked_input, None))
             .unwrap_or_default();
         let args = method
@@ -2421,20 +2406,24 @@ impl<'a> ApiPlanner<'a> {
             &resource_method_optional_params(method),
             request_plan,
             self.api_plan,
-            GenerationTarget::Client,
+            target,
         );
         render_resource_method_request(output, &request_expr);
-        output.push_str("        nexus_client = self.");
-        output.push_str(&resource_client_identifier(resource, "_nexus_client"));
-        output.push('\n');
-        render_client_poll_loop(output, service, operation, &next_expr, "self.");
+        if client {
+            output.push_str("        nexus_client = self.");
+            output.push_str(&resource_client_identifier(resource, "_nexus_client"));
+            output.push('\n');
+            render_client_poll_loop(output, service, operation, &next_expr, "self.");
+        } else {
+            render_workflow_poll_loop(output, service, operation, &next_expr);
+        }
         let Some((_, item)) = &operation.poll_items else {
             return;
         };
         output.push_str("\n    def ");
         output.push_str(&poll_items_function_name(&method_name));
         output.push_str("(\n");
-        self.render_resource_method_params(output, method, true);
+        self.render_resource_method_params(output, method, client);
         output.push_str("    ) -> PollIterator[");
         output.push_str(operation_input_annotation(operation));
         output.push_str(", ");
@@ -2460,7 +2449,7 @@ impl<'a> ApiPlanner<'a> {
                 let name = python_field_name(&param.name);
                 format!("{name}={name}")
             })
-            .chain(std::iter::once(PYTHON_RPC_OPTION_ARGS.to_string()))
+            .chain(client.then(|| PYTHON_RPC_OPTION_ARGS.to_string()))
             .collect::<Vec<_>>()
             .join(", ");
         render_poll_items_return(
@@ -2941,15 +2930,17 @@ impl<'a> ApiPlanner<'a> {
             ),
             _ => output_ref.clone(),
         };
+        // The poll pass checks the items only for the targets that this run generates.
+        let generated_targets = crate::nexgen_config::current().targets;
         let poll_items = operation
             .poll
             .as_ref()
-            .and_then(|poll| poll.items.as_deref())
-            .filter(|_| {
-                crate::nexgen_config::current()
-                    .targets
-                    .contains(&GenerationTarget::Client)
+            .filter(|poll| {
+                poll.targets
+                    .iter()
+                    .any(|target| generated_targets.contains(target))
             })
+            .and_then(|poll| poll.items.as_deref())
             .map(|key| self.resolve_poll_items(operation, key))
             .transpose()?;
         let output_record_type_parameters = match operation.output_type() {
@@ -5602,7 +5593,7 @@ fn requires_support_import(body: &str, sourced_support_import: bool) -> bool {
     sourced_support_import || body.contains("_support.")
 }
 
-/// Imports the client package's `PollIterator`, when the body has an item iterator.
+/// Imports the shared `PollIterator`, when the body has an item iterator.
 fn render_poll_iterator_import(output: &mut String, body: &str, module: &str) {
     if body.contains("PollIterator(") {
         output.push_str("from ");
@@ -7383,8 +7374,12 @@ fn client_extension_class_name(service: &RenderedService<'_>) -> String {
 /// Refuses an iterator with the name of another operation, method or field, since one of the two
 /// would hide the other. The iterator name is a Python name, and `@nexus.name` can change it, so
 /// this check stays with the Python generator. `PollValidationPass` refuses a poll of the wrong
-/// shape earlier, for every language.
-fn validate_client_poll_names(services: &[RenderedService<'_>]) -> Result<()> {
+/// shape earlier, for every language. Only the client has iterators outside a resource.
+fn validate_poll_names(
+    services: &[RenderedService<'_>],
+    targets: &[GenerationTarget],
+) -> Result<()> {
+    let client = targets.contains(&GenerationTarget::Client);
     let operation_names = services
         .iter()
         .flat_map(|service| {
@@ -7398,7 +7393,7 @@ fn validate_client_poll_names(services: &[RenderedService<'_>]) -> Result<()> {
         .collect::<BTreeMap<_, _>>();
     for service in services {
         for operation in &service.operations {
-            if operation.poll_next(GenerationTarget::Client).is_none() {
+            if !client || operation.poll_next(GenerationTarget::Client).is_none() {
                 continue;
             }
             for (iterator_name, iterator) in poll_iterator_names(&operation.attr_name, operation) {
@@ -7434,7 +7429,9 @@ fn validate_client_poll_names(services: &[RenderedService<'_>]) -> Result<()> {
                 };
                 let Some(operation) = service.operations.iter().find(|operation| {
                     operation.name == operation_name
-                        && operation.poll_next(GenerationTarget::Client).is_some()
+                        && targets.iter().any(|&target| {
+                            !method.omitted_for(target) && operation.poll_next(target).is_some()
+                        })
                 }) else {
                     continue;
                 };
@@ -7516,7 +7513,65 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// The item iterator of a poll, in the client package.
+/// The `_poll.py` module next to the models, when a call of any target has an item iterator. The
+/// iterator is the same in each target, so the targets share one module. The client reaches an
+/// operation through its extension or a resource method. The Workflow target has the iterators on
+/// resource methods only.
+fn render_poll_iterator_module(
+    services: &[RenderedService<'_>],
+    targets: &[GenerationTarget],
+    model_names: &[String],
+    resource_names: &[String],
+) -> Result<Option<String>> {
+    let reaches = |service: &RenderedService<'_>,
+                   operation: &RenderedOperation<'_>,
+                   target: GenerationTarget| match target {
+        GenerationTarget::Client => client_reaches_operation(service, operation),
+        GenerationTarget::Workflow => service
+            .resources
+            .iter()
+            .flat_map(|resource| resource.methods_for(target))
+            .any(|method| {
+                matches!(
+                    &method.binding,
+                    PlannedResourceMethodBindingSpec::Operation { operation_name, .. }
+                        if operation_name == operation.name
+                )
+            }),
+    };
+    let Some(operation) = services
+        .iter()
+        .flat_map(|service| {
+            service.operations.iter().filter(move |operation| {
+                operation.poll_items.is_some()
+                    && targets.iter().any(|&target| {
+                        operation.poll_next(target).is_some() && reaches(service, operation, target)
+                    })
+            })
+        })
+        .next()
+    else {
+        return Ok(None);
+    };
+    // The modules of the package import the iterator next to the models and resources.
+    if let Some(name) = model_names
+        .iter()
+        .chain(resource_names)
+        .find(|name| *name == "PollIterator")
+    {
+        return Err(Error::PythonGeneratedNameConflict {
+            name: name.clone(),
+            generated_by: format!("the item iterator of poll `{}`", operation.name),
+            conflicting_declaration: "a model or resource of the package".to_string(),
+        });
+    }
+    let mut source = String::new();
+    render_generated_file_header(&mut source);
+    source.push_str(PYTHON_POLL_ITERATOR);
+    Ok(Some(source))
+}
+
+/// The item iterator of a poll, which every target of the package imports from one module.
 const PYTHON_POLL_ITERATOR: &str = r#"
 import collections
 import collections.abc
@@ -8512,18 +8567,75 @@ fn render_resource_method_inline_operation_body(
         return;
     }
 
-    output.push_str("        handle = await ");
-    render_resource_nexus_start_operation(
-        output,
-        operation,
-        operation_input_wire_expr(operation),
-        "self.",
-    );
+    render_workflow_operation_handle(output, service, operation);
     if result_annotation == "None" {
         output.push_str("        await handle\n");
     } else {
         output.push_str("        return await handle\n");
     }
+}
+
+/// Starts the Workflow call of a method's operation for `request`, and sets `handle`. The method
+/// and its poll iterator both use it, so each page of the iterator is the method's own call. An
+/// inline call needs `nexus_client` from the handle first.
+fn render_workflow_operation_handle(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) {
+    output.push_str("        handle = await ");
+    if service.endpoint.is_none() {
+        render_resource_nexus_start_operation(
+            output,
+            operation,
+            operation_input_wire_expr(operation),
+            "self.",
+        );
+    } else {
+        output.push_str(&request_operation_call(operation));
+    }
+}
+
+/// The call of an operation's private helper with `request`.
+fn request_operation_call(operation: &RenderedOperation<'_>) -> String {
+    format!(
+        "{}(request{})\n",
+        request_operation_function_name(operation),
+        operation.runtime_type_args("self.", operation.unpacked_input.is_none())
+    )
+}
+
+/// The loop of a Workflow poll iterator, after the first request. Each page awaits the call of the
+/// Workflow method, and then the poll helper gives the next request, as in the client loop.
+fn render_workflow_poll_loop(
+    output: &mut String,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+    next_expr: &str,
+) {
+    if service.endpoint.is_none() {
+        output.push_str("        nexus_client = getattr(self, \"_nexus_client\")\n");
+    }
+    output.push_str("        while True:\n");
+    let mut call = String::new();
+    render_workflow_operation_handle(&mut call, service, operation);
+    // The method body is one level less deep than the loop body.
+    for line in call.lines() {
+        if !line.is_empty() {
+            output.push_str("    ");
+        }
+        output.push_str(line);
+        output.push('\n');
+    }
+    output.push_str("            response = await handle\n");
+    // The helper runs first, so a change to the yielded page doesn't change the next request.
+    output.push_str("            next_request = ");
+    output.push_str(next_expr);
+    output.push_str("(request, response)\n");
+    output.push_str("            yield response\n");
+    output.push_str("            if next_request is None:\n");
+    output.push_str("                return\n");
+    output.push_str("            request = next_request\n");
 }
 
 fn render_resource_method_request(output: &mut String, request_expr: &str) {
@@ -8602,6 +8714,7 @@ fn render_resource_from_data(output: &mut String, indent: &str, operation: &Rend
 
 fn render_resource_method_operation_body(
     output: &mut String,
+    service: &RenderedService<'_>,
     method: &PlannedResourceMethod,
     operation: &RenderedOperation<'_>,
     result_annotation: &str,
@@ -8611,11 +8724,7 @@ fn render_resource_method_operation_body(
         return;
     };
 
-    let call = format!(
-        "{}(request{})\n",
-        request_operation_function_name(operation),
-        operation.runtime_type_args("self.", operation.unpacked_input.is_none())
-    );
+    let call = request_operation_call(operation);
     render_resource_method_request(output, request_expr);
     if *direct_return {
         if result_annotation == "None" {
@@ -8626,8 +8735,7 @@ fn render_resource_method_operation_body(
             output.push_str(&call);
         }
     } else {
-        output.push_str("        handle = await ");
-        output.push_str(&call);
+        render_workflow_operation_handle(output, service, operation);
         if result_annotation == "None" {
             output.push_str("        await handle\n");
         } else {

@@ -86,7 +86,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+    /// A long poll. NOT_FOUND for an uncreated Stream.
     /// </summary>
     [GeneratedCode("nexgen", null)]
     internal class ReadRecordsOptions<TBody>
@@ -206,7 +206,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// A long poll. NOT_FOUND for an uncreated Stream.
         /// </summary>
         /// <param name="request">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
@@ -218,7 +218,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// A long poll. NOT_FOUND for an uncreated Stream. Workflow code reads from a Local Activity.
+        /// A long poll. NOT_FOUND for an uncreated Stream.
         /// </summary>
         /// <param name="options">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
