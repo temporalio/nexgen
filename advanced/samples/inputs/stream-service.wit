@@ -296,6 +296,7 @@ interface stream-service {
     /// @nexus.close
     close: func(producer: option<producer>);
 
+    // Workflow code and a client read the same way, with a page read or its poll iterator.
     /// @nexus.doc "Read one page of Records. The poll iterator reads them all."
     /// @nexus.operation "read-records"
     read: func(
@@ -318,7 +319,7 @@ interface stream-service {
   /// @nexus.operation name="CreateStream"
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
-  /// @nexus.doc "Append one batch. Workflow code makes the call from a Local Activity."
+  /// @nexus.doc "Append one batch. For Workflow code, Core makes the call."
   /// @nexus.operation name="AppendRecords"
   /// @nexus.api-omit
   append-records: func(request: append-records-request) -> append-records-response;

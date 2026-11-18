@@ -15,7 +15,7 @@ type AppendRecordsInput<BodyT> =
     : never;
 
 /**
- * Append one batch. Workflow code makes the call from a Local Activity.
+ * Append one batch. For Workflow code, Core makes the call.
  *
  * @param request - Request for the operation.
  */

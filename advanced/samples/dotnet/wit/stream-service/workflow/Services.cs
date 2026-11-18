@@ -23,7 +23,7 @@ namespace Temporalio.Workflows
         CreateStreamResult<object> CreateStream(CreateStreamRequest<object> request);
 
         /// <summary>
-        /// Append one batch. Workflow code makes the call from a Local Activity.
+        /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("AppendRecords")]
