@@ -3039,6 +3039,13 @@ accessible. Helper-only runtimes are package-private when all consumers share a
 package; runtimes exposing value types or serving multiple packages remain
 public.
 
+The shared Temporal `payloads` binding uses `java-from="payloadsFromProto"` to
+delegate inbound sequence conversion to SDK support. Workflow-side Java support
+explicitly throws `UnsupportedOperationException` because the binding does not
+know the argument types or arity needed to decode arbitrary batch codecs.
+Outbound batch encoding is unchanged; receiving workflows decode arguments using
+their declared method signatures.
+
 Protobuf-bound varargs function fields can specify `java-call-extractor` on
 `@nexus.function` to additionally generate typed overloads. Bound method
 references are followed directly by their arguments, using `Functions.FuncN` or

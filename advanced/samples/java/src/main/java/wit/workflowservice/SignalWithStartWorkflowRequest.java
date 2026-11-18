@@ -701,20 +701,14 @@ public final class SignalWithStartWorkflowRequest {
         support.TemporalModelConverters.workflowTypeFromProto(converter, proto.getWorkflowType()));
     if (proto.hasInput())
       builder.setArgs(
-          (java.util.List<Object>)
-              (Object)
-                  wit.workflowservice.NexgenRuntime.decodeSequence(
-                      proto.getInput(), converter, Object.class, Object.class));
+          support.TemporalModelConverters.payloadsFromProto(converter, proto.getInput()));
     builder.setWorkflowId(proto.getWorkflowId());
     builder.setTaskQueue(
         support.TemporalModelConverters.taskQueueFromProto(converter, proto.getTaskQueue()));
     builder.setSignal(proto.getSignalName());
     if (proto.hasSignalInput())
       builder.setSignalArgs(
-          (java.util.List<Object>)
-              (Object)
-                  wit.workflowservice.NexgenRuntime.decodeSequence(
-                      proto.getSignalInput(), converter, Object.class, Object.class));
+          support.TemporalModelConverters.payloadsFromProto(converter, proto.getSignalInput()));
     if (proto.hasWorkflowExecutionTimeout())
       builder.setWorkflowExecutionTimeout(
           support.TemporalModelConverters.durationFromProto(

@@ -12,6 +12,38 @@ import wit.typeshowcase.*;
 
 class WitRoundTripTest {
   @Test
+  void workflowArgumentSequencesEncodeButDoNotAdvertiseDecoding() {
+    wit.workflowservice.SignalWithStartWorkflowRequest request =
+        wit.workflowservice.SignalWithStartWorkflowRequest.newBuilder()
+            .setNamespace("namespace")
+            .setWorkflowId("target")
+            .setWorkflow("Target")
+            .setTaskQueue("queue")
+            .setSignal("signal")
+            .setArgs(Arrays.asList("first", null, "third"))
+            .build();
+    io.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest wire =
+        request.toProto(DefaultDataConverter.STANDARD_INSTANCE);
+    assertArrayEquals(
+        request.getArgs().toArray(),
+        DefaultDataConverter.STANDARD_INSTANCE.fromPayloads(
+            Optional.of(wire.getInput()),
+            new Class<?>[] {String.class, String.class, String.class},
+            new java.lang.reflect.Type[] {String.class, String.class, String.class}));
+    UnsupportedOperationException failure =
+        assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                wit.workflowservice.SignalWithStartWorkflowRequest.fromProto(
+                    wire,
+                    DefaultDataConverter.STANDARD_INSTANCE,
+                    wit.workflowservice.SignalWithStartWorkflowRequest.class));
+    assertEquals(
+        "Decoding payload sequences is not implemented for workflow-side bindings",
+        failure.getMessage());
+  }
+
+  @Test
   void transferConvertersUseTheSdkUserConverterScope() {
     PayloadBackedOutput<String> model =
         PayloadBackedOutput.<String>newBuilder().setDetails("value").build();

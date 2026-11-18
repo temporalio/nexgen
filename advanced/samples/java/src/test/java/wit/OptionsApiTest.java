@@ -73,6 +73,6 @@ class OptionsApiTest {
   @Test
   void helperOnlyRuntimeIsNotPublic() throws Exception {
     assertFalse(
-        Modifier.isPublic(Class.forName("wit.workflowservice.NexgenRuntime").getModifiers()));
+        Modifier.isPublic(Class.forName("wit.protogeneric.NexgenRuntime").getModifiers()));
   }
 }
