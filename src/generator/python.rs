@@ -910,6 +910,18 @@ impl<'a> ApiPlanner<'a> {
                 GeneratedFileOrigin::fixed("generated Python resource call"),
             )?;
         }
+        if let Some(source) = render_poll_iterator_module(
+            services,
+            &targets,
+            &operation_model_names,
+            &resource_names,
+        )? {
+            files.insert(
+                "_poll.py",
+                source,
+                GeneratedFileOrigin::fixed("generated Python poll iterator"),
+            )?;
+        }
         if !definition_services.is_empty() {
             files.insert(
                 "services.py",
@@ -932,18 +944,6 @@ impl<'a> ApiPlanner<'a> {
                 "_resources/__init__.py",
                 render_resources_package_init(services, self.api_plan),
                 GeneratedFileOrigin::fixed("generated Python workflow resources"),
-            )?;
-        }
-        if let Some(source) = render_poll_iterator_module(
-            services,
-            GenerationTarget::Workflow,
-            model_names,
-            resource_names,
-        )? {
-            files.insert(
-                "_poll.py",
-                source,
-                GeneratedFileOrigin::fixed("generated Python workflow poll iterator"),
             )?;
         }
         if services.iter().any(|service| service.endpoint.is_none()) {
@@ -1064,14 +1064,6 @@ impl<'a> ApiPlanner<'a> {
             origin(),
         )?;
         files.insert(format!("{dir}/_extensions.py"), extensions, origin())?;
-        if let Some(source) = render_poll_iterator_module(
-            services,
-            GenerationTarget::Client,
-            model_names,
-            resource_names,
-        )? {
-            files.insert(format!("{dir}/_poll.py"), source, origin())?;
-        }
         if !resources.is_empty() {
             files.insert(
                 format!("{dir}/_resources/__init__.py"),
@@ -1270,7 +1262,7 @@ impl<'a> ApiPlanner<'a> {
             );
         }
         render_support_import(&mut output, &body, self.support_package, false);
-        render_poll_iterator_import(&mut output, &body, "._poll");
+        render_poll_iterator_import(&mut output, &body, ".._poll");
         render_resource_context_manager_import(&mut output, &body, ".._resource_context_manager");
         output.push_str("\n\n");
         output.push_str(&body);
@@ -1923,13 +1915,13 @@ impl<'a> ApiPlanner<'a> {
             render_resource_data_import(&mut output, &body, &service.resources, 2);
         }
         render_support_import(&mut output, &body, self.support_package, false);
-        render_poll_iterator_import(&mut output, &body, ".._poll");
         // A target with its own directory is one level below the shared modules.
         let shared = if python_api_directory(target).is_some() {
             "..."
         } else {
             ".."
         };
+        render_poll_iterator_import(&mut output, &body, &format!("{shared}_poll"));
         render_resource_context_manager_import(
             &mut output,
             &body,
@@ -5601,7 +5593,7 @@ fn requires_support_import(body: &str, sourced_support_import: bool) -> bool {
     sourced_support_import || body.contains("_support.")
 }
 
-/// Imports the `PollIterator` of the target's package, when the body has an item iterator.
+/// Imports the shared `PollIterator`, when the body has an item iterator.
 fn render_poll_iterator_import(output: &mut String, body: &str, module: &str) {
     if body.contains("PollIterator(") {
         output.push_str("from ");
@@ -7521,16 +7513,19 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     Ok(())
 }
 
-/// The `_poll.py` module of a target's package, when one of its calls has an item iterator. The
-/// client reaches an operation through its extension or a resource method. The Workflow target
-/// has the iterators on resource methods only.
+/// The `_poll.py` module next to the models, when a call of any target has an item iterator. The
+/// iterator is the same in each target, so the targets share one module. The client reaches an
+/// operation through its extension or a resource method. The Workflow target has the iterators on
+/// resource methods only.
 fn render_poll_iterator_module(
     services: &[RenderedService<'_>],
-    target: GenerationTarget,
+    targets: &[GenerationTarget],
     model_names: &[String],
     resource_names: &[String],
 ) -> Result<Option<String>> {
-    let reaches = |service: &RenderedService<'_>, operation: &RenderedOperation<'_>| match target {
+    let reaches = |service: &RenderedService<'_>,
+                   operation: &RenderedOperation<'_>,
+                   target: GenerationTarget| match target {
         GenerationTarget::Client => client_reaches_operation(service, operation),
         GenerationTarget::Workflow => service
             .resources
@@ -7547,12 +7542,14 @@ fn render_poll_iterator_module(
     let Some(operation) = services
         .iter()
         .flat_map(|service| {
-            service
-                .operations
-                .iter()
-                .filter(move |operation| reaches(service, operation))
+            service.operations.iter().filter(move |operation| {
+                operation.poll_items.is_some()
+                    && targets.iter().any(|&target| {
+                        operation.poll_next(target).is_some() && reaches(service, operation, target)
+                    })
+            })
         })
-        .find(|operation| operation.poll_items.is_some() && operation.poll_next(target).is_some())
+        .next()
     else {
         return Ok(None);
     };
@@ -7574,7 +7571,7 @@ fn render_poll_iterator_module(
     Ok(Some(source))
 }
 
-/// The item iterator of a poll, in the package of each target that has one.
+/// The item iterator of a poll, which every target of the package imports from one module.
 const PYTHON_POLL_ITERATOR: &str = r#"
 import collections
 import collections.abc

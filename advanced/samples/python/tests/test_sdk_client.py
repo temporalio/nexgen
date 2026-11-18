@@ -28,11 +28,10 @@ from typing_extensions import assert_type, override
 import wit.stream_service.both.models as both_models
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
+from wit.stream_service.both._poll import PollIterator
 from wit.stream_service.both._resource_context_manager import ResourceContextManager
 from wit.stream_service.both.client import Stream, StreamServiceClientExtension
-from wit.stream_service.both.client._poll import PollIterator
 from wit.stream_service.both.workflow import _resources as workflow_resources
-from wit.stream_service.both.workflow._poll import PollIterator as WorkflowPollIterator
 from wit.stream_service.client.client import (
     StreamServiceClientExtension as ClientOnlyExtension,
 )
@@ -970,9 +969,8 @@ async def test_each_workflow_page_is_the_call_of_the_workflow_read(
         async for record in read
     ]
 
-    _ = assert_type(
-        read, WorkflowPollIterator[ReadRecordsRequest[str], StreamRecord[str]]
-    )
+    # The Workflow target imports the one iterator that the client target uses too.
+    _ = assert_type(read, PollIterator[ReadRecordsRequest[str], StreamRecord[str]])
     # The resume helper gives the request after each Record, and the page helper stops at the
     # empty page that didn't move.
     assert seen == [(_offset(1), _offset(1)), (_offset(2), _offset(2))]

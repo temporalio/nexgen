@@ -25,7 +25,7 @@ from ...models import (
     StreamRef,
 )
 import temporal_support as _support
-from .._poll import PollIterator
+from ..._poll import PollIterator
 
 
 BodyT = typing.TypeVar("BodyT")
