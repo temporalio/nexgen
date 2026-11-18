@@ -12,8 +12,8 @@ java {
     }
 }
 
-// Follow temporalio/sdk-java#3213 until a released SDK includes the prerequisites.
-def temporalSdkBranch = 'system-nexus-prerequisites'
+// Follow SDK main until a released SDK includes the prerequisites from #3213.
+def temporalSdkBranch = 'main'
 
 dependencies {
     implementation('io.temporal:temporal-sdk') {
