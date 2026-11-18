@@ -85,7 +85,10 @@ pub fn generate_to_file(request: &GenerateRequest) -> Result<()> {
             .as_deref()
             .is_none_or(str::is_empty)
     {
-        return Err(error::Error::DotnetNamespaceMissing);
+        return Err(error::Error::InvalidOutputNamespace {
+            language: Language::Dotnet,
+            reason: "JSON Schema generation requires `--namespace`, the root namespace for the generated types (for example `--namespace Acme.Payments.Contracts`)".to_string(),
+        });
     }
 
     let tree = parser::load_api_spec_tree_for_language_with_inputs(
@@ -227,17 +230,20 @@ fn normalize_path(path: &Path) -> PathBuf {
 /// directory's name — the Java convention that a package's leaf segment is
 /// its directory. `--package-name` is required for Java.
 fn resolve_java_package(request: &GenerateRequest) -> Result<String> {
-    let package_name = request
-        .java_package_name
-        .as_deref()
-        .ok_or(error::Error::JavaPackageNameMissing)?;
+    let package_name = request.java_package_name.as_deref().ok_or_else(|| {
+        error::Error::InvalidOutputNamespace {
+            language: Language::Java,
+            reason: "code generation requires `--package-name`".to_string(),
+        }
+    })?;
     let output_dir_name = output_dir_name(&request.output_path)?;
     let last_segment = package_name.rsplit('.').next().unwrap_or(package_name);
     if last_segment != output_dir_name {
-        return Err(error::Error::JavaPackageNameMismatch {
-            package_name: package_name.to_string(),
-            last_segment: last_segment.to_string(),
-            output_dir_name,
+        return Err(error::Error::InvalidOutputNamespace {
+            language: Language::Java,
+            reason: format!(
+                "`--package-name {package_name}` must end with the output directory name `{output_dir_name}`, but its last segment is `{last_segment}`; point `--output` at a directory named `{last_segment}` or change the package's last segment to `{output_dir_name}`"
+            ),
         });
     }
     Ok(package_name.to_string())
@@ -420,7 +426,11 @@ mod tests {
             request.dotnet_namespace = namespace;
             assert!(matches!(
                 generate_to_file(&request).unwrap_err(),
-                crate::error::Error::DotnetNamespaceMissing
+                crate::error::Error::InvalidOutputNamespace {
+                    language: Language::Dotnet,
+                    reason,
+                } if reason.contains("requires `--namespace`")
+                    && reason.contains("--namespace Acme.Payments.Contracts")
             ));
         }
     }
@@ -557,13 +567,13 @@ mod tests {
         let request = java_request("/tmp/foo/chat", Some("com.example.wrong"));
         assert!(matches!(
             resolve_java_package(&request).unwrap_err(),
-            crate::error::Error::JavaPackageNameMismatch {
-                package_name,
-                last_segment,
-                output_dir_name,
-            } if package_name == "com.example.wrong"
-                && last_segment == "wrong"
-                && output_dir_name == "chat"
+            crate::error::Error::InvalidOutputNamespace {
+                language: Language::Java,
+                reason,
+            } if reason.contains("`--package-name com.example.wrong`")
+                && reason.contains("output directory name `chat`")
+                && reason.contains("last segment is `wrong`")
+                && reason.contains("point `--output` at a directory named `wrong`")
         ));
     }
 
@@ -572,7 +582,10 @@ mod tests {
         let request = java_request("/tmp/foo/chat", None);
         assert!(matches!(
             resolve_java_package(&request).unwrap_err(),
-            crate::error::Error::JavaPackageNameMissing
+            crate::error::Error::InvalidOutputNamespace {
+                language: Language::Java,
+                reason,
+            } if reason.contains("requires `--package-name`")
         ));
     }
 }

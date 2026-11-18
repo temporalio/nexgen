@@ -100,9 +100,10 @@ pub enum Error {
     },
 
     #[error(
-        "Python generated name `{name}` for {generated_by} conflicts with {conflicting_declaration}"
+        "{language} generated name `{name}` for {generated_by} conflicts with {conflicting_declaration}"
     )]
-    PythonGeneratedNameConflict {
+    GeneratedNameConflict {
+        language: Language,
         name: String,
         generated_by: String,
         conflicting_declaration: String,
@@ -112,9 +113,10 @@ pub enum Error {
     UnsupportedFlatten { operation: String, reason: String },
 
     #[error(
-        ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
+        "{language} type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
     )]
-    DotnetTypeParameterNameConflict {
+    TypeParameterNameConflict {
+        language: Language,
         declaration: String,
         parameter: String,
         name: String,
@@ -217,8 +219,8 @@ pub enum Error {
         field: String,
     },
 
-    #[error("Java code generation does not support protobuf-backed model `{message}`")]
-    UnsupportedJavaProtoModel { message: String },
+    #[error("{language} code generation does not support protobuf-backed model `{message}`")]
+    UnsupportedProtoModel { language: Language, message: String },
 
     #[error("{language} support namespace `{namespace}` is not supported")]
     UnsupportedSupportNamespace {
@@ -376,33 +378,29 @@ pub enum Error {
     #[error("invalid binding for protobuf enum `{enumeration}`: {reason}")]
     InvalidProtoEnumBinding { enumeration: String, reason: String },
 
-    #[error("Go code generation does not support {context}: {reason}")]
-    UnsupportedGoType { context: String, reason: String },
-
-    #[error("Go proto conversion for {context} is not supported: {reason}")]
-    UnsupportedGoProtoConversion { context: String, reason: String },
-
-    #[error(
-        "output directory name `{output_dir_name}` has no ASCII letters, digits, or underscores to build a Go package name from; rename the output directory"
-    )]
-    GoPackageNameEmpty { output_dir_name: String },
-
-    #[error("Java code generation requires `--package-name`")]
-    JavaPackageNameMissing,
-
-    #[error(
-        "C# code generation from JSON Schema requires `--namespace`, the root namespace for the generated types (for example `--namespace Acme.Payments.Contracts`)"
-    )]
-    DotnetNamespaceMissing,
-
-    #[error(
-        "`--package-name {package_name}` must end with the output directory name `{output_dir_name}`, but its last segment is `{last_segment}`; point `--output` at a directory named `{last_segment}` or change the package's last segment to `{output_dir_name}`"
-    )]
-    JavaPackageNameMismatch {
-        package_name: String,
-        last_segment: String,
-        output_dir_name: String,
+    #[error("{language} code generation does not support {context}: {reason}")]
+    UnsupportedType {
+        language: Language,
+        context: String,
+        reason: String,
     },
+
+    #[error("{language} code generation does not support {context}: {reason}")]
+    UnsupportedFeature {
+        language: Language,
+        context: String,
+        reason: String,
+    },
+
+    #[error("{language} proto conversion for {context} is not supported: {reason}")]
+    UnsupportedProtoConversion {
+        language: Language,
+        context: String,
+        reason: String,
+    },
+
+    #[error("invalid {language} output namespace: {reason}")]
+    InvalidOutputNamespace { language: Language, reason: String },
 
     #[error("type override `{type_name}` cannot use `{property}`")]
     UnsupportedTypeOverrideProperty {

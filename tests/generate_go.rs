@@ -428,12 +428,16 @@ fn go_rejects_descriptors_on_fixed_argument_functions_with_go_diagnostic() {
         .downcast_ref::<nexgen::error::Error>()
         .expect("descriptor rejection should preserve the generator error type");
     match error {
-        nexgen::error::Error::UnsupportedGoType { context, reason } => {
+        nexgen::error::Error::UnsupportedFeature {
+            language: nexgen::language::Language::Go,
+            context,
+            reason,
+        } => {
             assert!(context.to_lowercase().contains("signal"), "{error}");
             assert!(reason.contains("fixed"), "{error}");
             assert!(reason.contains("descriptor"), "{error}");
         }
-        other => panic!("expected UnsupportedGoType, got {other:?}"),
+        other => panic!("expected UnsupportedFeature for Go, got {other:?}"),
     }
 }
 

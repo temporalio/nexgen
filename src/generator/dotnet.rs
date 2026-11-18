@@ -4841,7 +4841,8 @@ fn validate_type_parameter_names(api_plan: &PlannedSpec) -> Result<()> {
                     .map(|other: &String| format!("type parameter `{other}`"))
             };
             if let Some(conflicting) = conflicting {
-                return Err(Error::DotnetTypeParameterNameConflict {
+                return Err(Error::TypeParameterNameConflict {
+                    language: Language::Dotnet,
                     declaration: declaration.to_string(),
                     parameter: usage.parameter.name,
                     name,
