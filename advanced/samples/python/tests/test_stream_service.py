@@ -218,7 +218,7 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
     assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
-    read = stream.iter_read_items(from_offset=_offset(1))
+    read = stream.read(from_offset=_offset(1))
     assert [record.body async for record in read] == ["a", "b"]
     assert read.next_request is None
     await stream.close()
@@ -560,8 +560,8 @@ def test_api_omit_hides_the_public_operation_functions(
             "append",
             "close",
             "read",
-            "iter_read",
-            "iter_read_items",
+            "read_pages",
+            "read_page",
             "describe",
         )
     )
