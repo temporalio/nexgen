@@ -889,7 +889,8 @@ impl<'a> ApiPlanner<'a> {
                 .flat_map(|service| &service.operations)
                 .find(|operation| operation.attr_name == "resource_context_manager")
             {
-                return Err(Error::PythonGeneratedNameConflict {
+                return Err(Error::GeneratedNameConflict {
+                    language: Language::Python,
                     name: "resource_context_manager".to_string(),
                     generated_by: format!("the function of operation `{}`", operation.name),
                     conflicting_declaration: "the decorator of a call that returns a closable \
@@ -7396,7 +7397,8 @@ fn validate_poll_names(
             }
             for (iterator_name, iterator) in poll_iterator_names(&operation.attr_name, operation) {
                 if let Some(conflicting_declaration) = operation_names.get(&iterator_name) {
-                    return Err(Error::PythonGeneratedNameConflict {
+                    return Err(Error::GeneratedNameConflict {
+                        language: Language::Python,
                         name: iterator_name,
                         generated_by: format!(
                             "the {iterator} of operation `{}.{}`",
@@ -7441,7 +7443,8 @@ fn validate_poll_names(
                         .iter()
                         .find(|(member_name, _, _)| *member_name == added_name);
                     if let Some((_, kind, name)) = conflict {
-                        return Err(Error::PythonGeneratedNameConflict {
+                        return Err(Error::GeneratedNameConflict {
+                            language: Language::Python,
                             name: added_name,
                             generated_by: format!(
                                 "the {what} of resource method `{}.{}`",
@@ -7479,7 +7482,8 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
             for name in names {
                 // A method of this name replaces the hook that each extension calls.
                 if name == CLIENT_NEXUS_CLIENT_HOOK {
-                    return Err(Error::PythonGeneratedNameConflict {
+                    return Err(Error::GeneratedNameConflict {
+                        language: Language::Python,
                         name,
                         generated_by: "the hook of each client extension".to_string(),
                         conflicting_declaration: format!(
@@ -7503,7 +7507,8 @@ fn validate_client_names(services: &[RenderedService<'_>]) -> Result<()> {
     for resource in services.iter().flat_map(|service| &service.resources) {
         let factory = client_resource_factory_name(resource);
         if let Some(owner) = owners.get(&factory) {
-            return Err(Error::PythonGeneratedNameConflict {
+            return Err(Error::GeneratedNameConflict {
+                language: Language::Python,
                 name: factory,
                 generated_by: format!("the client factory of resource `{}`", resource.type_name),
                 conflicting_declaration: format!("a client method of service `{owner}`"),
@@ -7559,7 +7564,8 @@ fn render_poll_iterator_module(
         .chain(resource_names)
         .find(|name| *name == "PollIterator")
     {
-        return Err(Error::PythonGeneratedNameConflict {
+        return Err(Error::GeneratedNameConflict {
+            language: Language::Python,
             name: name.clone(),
             generated_by: format!("the item iterator of poll `{}`", operation.name),
             conflicting_declaration: "a model or resource of the package".to_string(),
@@ -7652,12 +7658,12 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
 /// parameter with the name of one would make a duplicate argument.
 fn validate_rpc_option_names(services: &[RenderedService<'_>]) -> Result<()> {
     let rpc_option = |name: &str| PYTHON_RPC_OPTIONS.iter().any(|(option, _)| *option == name);
-    let conflict =
-        |name: String, conflicting_declaration: String| Error::PythonGeneratedNameConflict {
-            name,
-            generated_by: "the RPC options of a client call".to_string(),
-            conflicting_declaration,
-        };
+    let conflict = |name: String, conflicting_declaration: String| Error::GeneratedNameConflict {
+        language: Language::Python,
+        name,
+        generated_by: "the RPC options of a client call".to_string(),
+        conflicting_declaration,
+    };
     for service in services {
         for operation in &service.operations {
             let Some(input) = operation.target_unpacked_input(GenerationTarget::Client) else {
@@ -7994,7 +8000,8 @@ fn validate_workflow_factory_names(services: &[RenderedService<'_>]) -> Result<(
             let generated_by = format!("the factory of resource `{}`", resource.type_name);
             if let Some(conflicting_declaration) = names.insert(name.clone(), generated_by.clone())
             {
-                return Err(Error::PythonGeneratedNameConflict {
+                return Err(Error::GeneratedNameConflict {
+                    language: Language::Python,
                     name,
                     generated_by,
                     conflicting_declaration,
@@ -12070,7 +12077,8 @@ fn validate_python_generated_names<'a>(
 
     for generated_name in generated_names {
         if let Some(conflicting_declaration) = declarations.get(&generated_name.name) {
-            return Err(Error::PythonGeneratedNameConflict {
+            return Err(Error::GeneratedNameConflict {
+                language: Language::Python,
                 name: generated_name.name.clone(),
                 generated_by: generated_name.generated_by.clone(),
                 conflicting_declaration: conflicting_declaration.clone(),

@@ -1,7 +1,7 @@
 languages = ["go"]
 
 [error]
-kind = "unsupported-go-type"
+kind = "generated-name-conflict"
 contains = [
-  "Go code generation does not support record model `Request`: getter `GetID` for field `ID` conflicts with field `GetID`; rename the conflicting field",
+  "go generated name `GetID` for the getter of field `Request.ID` conflicts with field `GetID`",
 ]

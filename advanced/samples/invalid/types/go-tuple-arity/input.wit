@@ -1,0 +1,10 @@
+package test:tuple-arity;
+
+world system { export api; }
+
+interface api {
+  record request {
+    values: tuple<u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32>,
+  }
+  read: func(request: request) -> request;
+}

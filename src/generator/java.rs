@@ -45,7 +45,8 @@ pub(crate) fn generate(
             .records()
             .find(|(_, record)| record.data.proto.is_some())
         {
-            return Err(Error::UnsupportedJavaProtoModel {
+            return Err(Error::UnsupportedProtoModel {
+                language: crate::language::Language::Java,
                 message: record
                     .data
                     .proto

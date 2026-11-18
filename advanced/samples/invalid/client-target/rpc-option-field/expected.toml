@@ -3,7 +3,7 @@ system_nexus = true
 targets = ["workflow", "client"]
 
 [error]
-kind = "python-generated-name-conflict"
+kind = "generated-name-conflict"
 contains = [
-  "Python generated name `rpc_timeout` for the RPC options of a client call conflicts with a field of `RunJobRequest`, the request of `RunJob`",
+  "python generated name `rpc_timeout` for the RPC options of a client call conflicts with a field of `RunJobRequest`, the request of `RunJob`",
 ]
