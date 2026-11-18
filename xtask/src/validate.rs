@@ -280,7 +280,7 @@ fn validate_python(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
                 "run",
                 "--isolated",
                 "--python",
-                "3.10",
+                "3.11",
                 "--locked",
                 "python",
                 "-m",

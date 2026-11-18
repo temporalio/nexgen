@@ -732,8 +732,8 @@ for path in sorted(root.rglob("*.py")):
     assert!(status.success());
 }
 
-/// Byte-compiles every module under `package_dir` with a **real** 3.10
-/// interpreter. `ast.parse(..., feature_version=(3, 10))` is not sufficient: it
+/// Byte-compiles every module under `package_dir` with a **real** 3.11
+/// interpreter. `ast.parse(..., feature_version=(3, 11))` is not sufficient: it
 /// accepts a PEP 701 nested same-quote f-string, which is a `SyntaxError` on
 /// every interpreter below 3.12. The generator's own bytes are compiled — never
 /// `ruff`-formatted output, which rewrites the inner quotes and hides the break.
@@ -756,7 +756,7 @@ with tempfile.TemporaryDirectory() as out:
         .args([
             "run",
             "--python",
-            "3.10",
+            "3.11",
             "--no-project",
             "python",
             "-c",
@@ -767,7 +767,7 @@ with tempfile.TemporaryDirectory() as out:
         .unwrap();
     assert!(
         status.success(),
-        "the generated package does not compile on Python 3.10, the declared floor"
+        "the generated package does not compile on Python 3.11, the declared floor"
     );
 }
 
@@ -1498,7 +1498,7 @@ $defs:
 /// Array count bounds interpolate the raw-array expression into an f-string reason.
 /// Reusing the outer quote inside a replacement field is PEP 701 (Python 3.12+),
 /// so the cast target has to be spelled with the other quote or the generator's own
-/// output is a `SyntaxError` on the declared 3.10 floor.
+/// output is a `SyntaxError` on the declared 3.11 floor.
 /// See `specs/json-schema/features/items.md`.
 #[test]
 fn python_json_array_bound_reasons_parse_on_the_declared_floor() {

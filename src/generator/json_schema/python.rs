@@ -2569,7 +2569,7 @@ fn render_py_field_checks(
 // quotes, so the double quotes JSON (and therefore every other target) reports
 // offending values in can appear verbatim. A double-quoted f-string could not
 // carry them: nesting the delimiter inside an f-string only became legal in
-// Python 3.12, and the emitted floor is 3.10.
+// Python 3.12, and the emitted floor is 3.11.
 // ---------------------------------------------------------------------------
 
 /// Escapes text for the *literal* portion of a single-quoted Python f-string.
@@ -2613,7 +2613,7 @@ fn py_indexed_path(path_expr: &str, index_var: &str) -> String {
     match py_literal_text(path_expr) {
         Some(text) => format!("f'{}[{{{index_var}}}]'", py_fstring_text(&text)),
         // Concatenate a new suffix instead of interpolating the already-dynamic
-        // expression. This remains valid on Python 3.10 even when `path_expr`
+        // expression. This remains valid on Python 3.11 even when `path_expr`
         // is itself an f-string from an outer array level.
         None => format!("{path_expr} + f'[{{{index_var}}}]'"),
     }
@@ -5262,7 +5262,7 @@ fn render_py_array_elements(
     // The cast target is single-quoted because `render_py_array_checks`
     // interpolates this expression into `f"..."` reason strings: reusing the
     // outer quote inside an f-string replacement field is PEP 701, which is
-    // Python 3.12+, and the declared floor is 3.10.
+    // Python 3.12+, and the declared floor is 3.11.
     let raw_array = format!("typing.cast('list[typing.Any]', {raw_expr})");
     render_py_array_checks(output, &raw_array, path_expr, schema, &body, false)?;
     Ok(list_local)

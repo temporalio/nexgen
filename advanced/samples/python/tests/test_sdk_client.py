@@ -633,14 +633,19 @@ def test_a_resource_is_not_data_but_its_identity_field_is() -> None:
     stream = client.get_stream(ref=ref, body_type=str)
     converter = temporalio.converter.PayloadConverter.default
 
-    # A handle has calls, so it never crosses the converter in either direction.
+    # A handle has calls, so it cannot be encoded as data.
     with pytest.raises(TypeError, match="not JSON serializable"):
         _ = converter.to_payload(stream)
     payload = converter.to_payload(stream.ref)
-    # A generic alias fails for another reason, so the test decodes to the bare class.
+    # JSON identity data cannot construct a handle. The default converter may
+    # instead encode the identity's protobuf transfer type, which ignores this hint.
+    json_converter = temporalio.converter.JSONPlainPayloadConverter()
+    json_payload = json_converter.to_payload(stream.ref)
+    assert json_payload is not None
+    # A generic alias fails for another reason, so decode to the bare class.
     handle_class: type[workflow_resources.Stream[str]] = workflow_resources.Stream
     with pytest.raises(TypeError, match="Unserializable type"):
-        _ = converter.from_payload(payload, handle_class)
+        _ = json_converter.from_payload(json_payload, handle_class)
     # Code passes the identity field and builds the handle explicitly.
     decoded = converter.from_payload(payload, StreamRef)
     assert decoded == ref

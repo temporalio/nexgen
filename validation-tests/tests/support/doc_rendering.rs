@@ -288,7 +288,7 @@ pub fn python_hostile_documentation_is_wrapped_escaped_and_parses() {
 
     let checker = r#"import ast, pathlib, sys
 for path in pathlib.Path(sys.argv[1]).rglob("*.py"):
-    ast.parse(path.read_text(), filename=str(path), feature_version=(3, 10))
+    ast.parse(path.read_text(), filename=str(path), feature_version=(3, 11))
 "#;
     let status = Command::new("python3")
         .args(["-c", checker, output.to_str().unwrap()])
@@ -296,7 +296,7 @@ for path in pathlib.Path(sys.argv[1]).rglob("*.py"):
         .unwrap();
     assert!(
         status.success(),
-        "hostile Python did not parse as Python 3.10"
+        "hostile Python did not parse as Python 3.11"
     );
     fs::remove_dir_all(output.parent().unwrap()).unwrap();
 }
