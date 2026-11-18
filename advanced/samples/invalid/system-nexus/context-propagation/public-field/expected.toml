@@ -1,4 +1,4 @@
-languages = ["go"]
+languages = ["go", "java"]
 system_nexus = true
 targets = ["workflow"]
 

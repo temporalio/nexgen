@@ -3,6 +3,6 @@ world system { export api; }
 /// @nexus.namespace go="go.temporal.io/sdk/internal"
 interface api {
   record request { headers: string }
-  /// @nexus.context-propagation go="request.headers"
+  /// @nexus.context-propagation go="request.headers" java="request.headers"
   send: func(request: request);
 }

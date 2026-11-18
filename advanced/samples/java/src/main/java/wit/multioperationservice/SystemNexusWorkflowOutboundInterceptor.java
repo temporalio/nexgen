@@ -49,6 +49,7 @@ public interface SystemNexusWorkflowOutboundInterceptor {
   }
 
   /** Executes typed hooks through the terminal transport, never through the interceptor chain. */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   abstract class Terminal implements SystemNexusWorkflowOutboundInterceptor {
     protected abstract <R>
         io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor

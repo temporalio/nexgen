@@ -277,7 +277,7 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[""],
             repeatable: false,
-            languages: Some(&[Language::Go]),
+            languages: Some(&[Language::Go, Language::Java]),
             system_nexus: true,
         },
         Annotation {

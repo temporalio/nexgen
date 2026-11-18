@@ -268,7 +268,10 @@ fn generate_api(
                 .contains(&GenerationTarget::Workflow)
             && !leaf.spec.services.is_empty()
         {
-            insert("SystemNexusWorkflowOutboundInterceptor", ctx.interceptors())?;
+            insert(
+                "SystemNexusWorkflowOutboundInterceptor",
+                ctx.interceptors()?,
+            )?;
             insert("internal/SystemNexusOperations", ctx.registry())?;
         }
     }
@@ -338,6 +341,15 @@ struct Context<'a> {
     variables: &'a Cell<usize>,
     descriptors: &'a crate::descriptors::DescriptorIndex,
     parameter_names: &'a BTreeMap<String, String>,
+}
+
+fn context_propagation_error(operation: &str, reason: &str) -> Error {
+    Error::InvalidWitDirective {
+        path: PathBuf::from("<java-plan>"),
+        context: format!("operation `{operation}`"),
+        directive: "@nexus.context-propagation".into(),
+        reason: reason.into(),
+    }
 }
 
 fn available_type_parameter(preferred: &str, used: &mut BTreeSet<String>) -> String {
@@ -1889,7 +1901,31 @@ impl Context<'_> {
         out.push_str("}\n");
         out
     }
-    fn interceptors(&self) -> String {
+    fn context_propagation_field(
+        &self,
+        operation: &OperationSpec<PlannedFamily>,
+    ) -> Result<Option<&RecordFieldSpec<PlannedFamily>>> {
+        let Some(key) = operation.context_propagation_header.value() else {
+            return Ok(None);
+        };
+        let model = self.operation_input_record(operation).ok_or_else(|| {
+            context_propagation_error(&operation.name, "requires a generated request record")
+        })?;
+        let field = model.fields.get(key).ok_or_else(|| {
+            context_propagation_error(
+                &operation.name,
+                "header field is not present in the request",
+            )
+        })?;
+        if !field.api_omitted_for(GenerationTarget::Workflow) {
+            return Err(context_propagation_error(
+                &operation.name,
+                "header field must use @nexus.api-omit so context propagation owns its value",
+            ));
+        }
+        Ok(Some(field))
+    }
+    fn interceptors(&self) -> Result<String> {
         let mut out = String::from(
             "/** Generated typed system Nexus hooks, separate from ordinary Nexus interception. */\npublic interface SystemNexusWorkflowOutboundInterceptor {\n",
         );
@@ -1916,23 +1952,41 @@ impl Context<'_> {
                     "{generic}io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<{output}> {method}(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<{output}> input)"
                 );
                 writeln!(out, "  {signature};").unwrap();
-                hooks.push((signature, method));
+                let preparation = self.context_propagation_field(op)?.map(|field| {
+                    let model = self.operation_input_record(op).unwrap();
+                    let request_type = self.named(&model.full_name, &model.name);
+                    let accessor = field.name.to_upper_camel_case();
+                    format!(
+                        "    {request_type} request = ({request_type}) input.getArg();\n\
+                         \x20   request = request.toBuilder().set{accessor}(propagateSystemNexusHeaders(request.get{accessor}(), {}.internal.SystemNexusOperations.serializationContext(input.getService(), input.getOperation(), request))).build();\n\
+                         \x20   input = new io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<>(input.getEndpoint(), input.getService(), input.getOperation(), input.getResultClass(), input.getResultType(), request, input.getOptions(), input.getHeaders());\n",
+                        self.package
+                    )
+                });
+                hooks.push((signature, method, preparation));
             }
         }
         out.push_str("  /** Forwards each typed hook to the next interceptor without entering ordinary Nexus hooks. */\n  abstract class Base implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract SystemNexusWorkflowOutboundInterceptor nextSystemNexusInterceptor();\n");
-        for (signature, method) in &hooks {
+        for (signature, method, _) in &hooks {
             writeln!(out, "    @Override public {signature} {{ return nextSystemNexusInterceptor().{method}(input); }}").unwrap();
         }
-        out.push_str("  }\n  /** Executes typed hooks through the terminal transport, never through the interceptor chain. */\n  abstract class Terminal implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> executeSystemNexusOperation(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input);\n");
-        for (signature, _) in &hooks {
+        out.push_str("  }\n  /** Executes typed hooks through the terminal transport, never through the interceptor chain. */\n  @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n  abstract class Terminal implements SystemNexusWorkflowOutboundInterceptor {\n    protected abstract <R> io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationOutput<R> executeSystemNexusOperation(io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor.ExecuteNexusOperationInput<R> input);\n");
+        if hooks
+            .iter()
+            .any(|(_, _, preparation)| preparation.is_some())
+        {
+            out.push_str("    /** Merges workflow context into wire-ready headers using SDK-owned codec policy. */\n    protected abstract java.util.Map<String, io.temporal.api.common.v1.Payload> propagateSystemNexusHeaders(java.util.Map<String, io.temporal.api.common.v1.Payload> headers, io.temporal.payload.context.SerializationContext context);\n");
+        }
+        for (signature, _, preparation) in &hooks {
             writeln!(
                 out,
-                "    @Override public {signature} {{ return executeSystemNexusOperation(input); }}"
+                "    @Override public {signature} {{\n{}    return executeSystemNexusOperation(input);\n    }}",
+                preparation.as_deref().unwrap_or("")
             )
             .unwrap();
         }
         out.push_str("  }\n}\n");
-        out
+        Ok(out)
     }
     fn registry(&self) -> String {
         let mut out = String::from(

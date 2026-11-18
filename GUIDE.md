@@ -1895,7 +1895,7 @@ The catalog currently declares these restrictions:
 | `@nexus.operations-class`               | dotnet, java         | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
-| `@nexus.context-propagation`            | go                   | required                |
+| `@nexus.context-propagation`            | go, java             | required                |
 | `@nexus.merge-from-function`            | java                 | not required by catalog |
 
 <!-- annotation-availability:end -->
@@ -2615,24 +2615,26 @@ signal-with-start-workflow: func(...) -> ...;
 ### @nexus.context-propagation
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.context-propagation go="request.headers"`
+`@nexus.context-propagation go="request.headers" java="request.headers"`
 
-Enables outbound workflow context propagation for a Go System Nexus operation
-generated into `go.temporal.io/sdk/internal`. It requires `--targets workflow`
-and a protobuf-backed request record. The Go backend ignores this directive when
+Enables outbound workflow context propagation for Java and Go System Nexus
+operations. In Go this applies to operations generated into
+`go.temporal.io/sdk/internal` and requires `--targets workflow` and a
+protobuf-backed request record. The Go backend ignores this directive when
 generating into any other package because header injection calls the SDK's
-private helpers. Operations bound to resource methods are not supported because
-those methods bypass the typed interceptor chain.
+private helpers. Go operations bound to resource methods are not supported
+because those methods bypass the typed interceptor chain.
 
-The value is a checked WIT field path, not a Go expression. Its root must be the
-operation's input parameter name, and it must select a direct field of that
-record. Input record aliases are supported; nested paths are not. Nexgen
-resolves the WIT field identity before applying `@nexus.proto-field` and
+The value is a checked WIT field path, not a target-language expression. Its
+root must be the operation's input parameter name, and it must select a direct
+field of that record. Input record aliases are supported; nested paths are not.
+Nexgen resolves the WIT field identity before applying `@nexus.proto-field` and
 `@nexus.name` mappings, so the path uses authored WIT names.
 
 The selected field must use `@nexus.api-omit`. Its Go binding must accept
-`map[string]*commonpb.Payload`; the Go compiler checks that binding. For
-example, using the Temporal `header` binding:
+`map[string]*commonpb.Payload`; its Java binding must accept
+`Map<String, io.temporal.api.common.v1.Payload>`. The target compiler checks
+that binding. For example, using the Temporal `header` binding:
 
 ```wit
 /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
@@ -2642,23 +2644,31 @@ record signal-with-start-workflow-request {
   headers: option<header>,
 }
 
-/// @nexus.context-propagation go="request.headers"
+/// @nexus.context-propagation go="request.headers" java="request.headers"
 signal-with-start-workflow: func(
   request: signal-with-start-workflow-request,
 ) -> signal-with-start-workflow-response;
 ```
 
-The public function creates a fresh header map before the typed interceptor
-chain. Interceptors read and modify it with `interceptor.WorkflowHeader(ctx)`.
-The terminal calls the configured propagators' `InjectFromWorkflow` methods with
-the forwarded context, then assigns the map to the selected request field before
-encoding or scheduling. Injection errors resolve the returned workflow `Future`
-with an error and do not schedule an operation. Interceptor-supplied headers are
-preserved unless a propagator overwrites the same key.
+In Go, the public function creates a fresh header map before the typed
+interceptor chain. Interceptors read and modify it with
+`interceptor.WorkflowHeader(ctx)`. The terminal calls the configured
+propagators' `InjectFromWorkflow` methods with the forwarded context, then
+assigns the map to the selected request field before encoding or scheduling.
+Injection errors resolve the returned workflow `Future` with an error and do not
+schedule an operation. Interceptor-supplied headers are preserved unless a
+propagator overwrites the same key.
+
+In Java, the generated typed terminal copies the intercepted request and invokes
+its SDK-owned `propagateSystemNexusHeaders` helper with the existing header map
+and the operation's serialization context. The helper merges configured context
+propagators using normal SDK precedence and per-producer codec opt-in. Existing
+wire-ready headers are preserved without another conversion or codec layer.
+Operations without the directive do not invoke this helper.
 
 These are Temporal payload headers inside the operation request, not Nexus
 transport headers. The directive does not enable inbound extraction or response
-propagation. Use `go=` in multi-language inputs to keep it inactive for other
+propagation. Use language-qualified arguments to keep it inactive for other
 backends.
 
 ---

@@ -4294,13 +4294,14 @@ interface api {
     context-headers: option<string>,
   }
   type request-alias = request;
-  /// @nexus.context-propagation go="input.context-headers"
+  /// @nexus.context-propagation go="input.context-headers" java="input.context-headers"
   send: func(input: request-alias);
   plain: func(input: request);
 }
 "#;
         for language in [
             Language::Go,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
             Language::Dotnet,
@@ -4311,6 +4312,12 @@ interface api {
                 operations[0]
                     .context_propagation_header
                     .for_language(Language::Go),
+                Some("header"),
+            );
+            assert_eq!(
+                operations[0]
+                    .context_propagation_header
+                    .for_language(Language::Java),
                 Some("header"),
             );
             assert_eq!(
@@ -4330,7 +4337,7 @@ interface api {
                 leaf.spec.services[0].operations[0]
                     .context_propagation_header
                     .value(),
-                (language == Language::Go).then_some("header"),
+                matches!(language, Language::Go | Language::Java).then_some("header"),
             );
         }
     }
