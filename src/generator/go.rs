@@ -777,13 +777,16 @@ impl GoPackageContext {
         indent: &str,
         name: &str,
         doc: Option<&str>,
+        experimental: bool,
     ) {
         if doc.is_some()
+            || experimental
             || self
                 .facade_exports
                 .contains_key(split_go_type_decl_name(name).0)
         {
             render_go_declaration_doc(output, indent, self.documentation_name(name), doc);
+            render_go_experimental_note(output, indent, experimental);
         }
         self.render_exposed_as(output, indent, name);
     }
@@ -2147,6 +2150,7 @@ impl<'a> ApiPlanner<'a> {
             name: operation.name.as_str(),
             wire_name: operation.wire_name.as_str(),
             doc: operation.doc.value(),
+            experimental: operation.experimental,
             return_doc: operation.return_doc.value(),
             input_type,
             model_type_parameters,
@@ -2826,6 +2830,7 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Doc text for the operation (from `@nexus.doc`), rendered as a godoc
     /// comment on the exported wrapper function.
     doc: Option<&'a str>,
+    experimental: bool,
     /// Return-value doc text (from `@nexus.doc returns=`), rendered as a
     /// `Returns:` paragraph in the wrapper's godoc comment.
     return_doc: Option<&'a str>,
@@ -4410,7 +4415,7 @@ fn render_file(
         }
         for (key, model) in private_models {
             output.push('\n');
-            render_model(&mut output, key, model, external_models, false);
+            render_model(&mut output, key, model, external_models, package, api_plan);
         }
     }
 
@@ -4502,13 +4507,7 @@ fn render_file(
         }
         for (key, model) in public_models {
             output.push('\n');
-            package.render_declaration_doc(
-                &mut output,
-                "",
-                &model.name,
-                record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
-            );
-            render_model(&mut output, key, model, external_models, true);
+            render_model(&mut output, key, model, external_models, package, api_plan);
         }
         for service in services {
             if !crate::nexgen_config::current()
@@ -4533,7 +4532,13 @@ fn render_file(
                     package.documentation_name(&operation_name)
                 );
                 output.push('\n');
-                package.render_declaration_doc(&mut output, "", &options_name, Some(&options_doc));
+                package.render_declaration_doc(
+                    &mut output,
+                    "",
+                    &options_name,
+                    Some(&options_doc),
+                    operation.experimental,
+                );
                 if let Some(params) = &operation.unpacked_input {
                     render_options_struct(&mut output, operation, params);
                     output.push('\n');
@@ -4629,6 +4634,12 @@ fn render_go_declaration_doc(output: &mut String, indent: &str, name: &str, doc:
         None => format!("{name}."),
     };
     render_go_doc_comment(output, indent, &text);
+}
+
+fn render_go_experimental_note(output: &mut String, indent: &str, experimental: bool) {
+    if experimental {
+        output.push_str(&format!("{indent}//\n{indent}// NOTE: Experimental\n"));
+    }
 }
 
 /// Renders a Go doc comment (`// ...`), wrapping each paragraph to the
@@ -4744,6 +4755,7 @@ fn render_operation_doc_comment(
         output.push_str("//\n");
         render_go_doc_comment(output, "", &format!("Returns: {return_doc}"));
     }
+    render_go_experimental_note(output, "", operation.experimental);
 }
 
 /// Renders a WIT enum as a Go named integer type with a `const` block.
@@ -4757,7 +4769,7 @@ fn render_operation_doc_comment(
 /// )
 /// ```
 fn render_enum(output: &mut String, enumeration: &RenderedEnum, package: &GoPackageContext) {
-    package.render_declaration_doc(output, "", &enumeration.name, None);
+    package.render_declaration_doc(output, "", &enumeration.name, None, false);
     output.push_str("type ");
     output.push_str(&enumeration.name);
     output.push_str(" int32\n");
@@ -4773,6 +4785,7 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum, package: &GoPack
             "\t",
             &format!("{}{}", enumeration.name, value.name),
             None,
+            false,
         );
         output.push('\t');
         output.push_str(&enumeration.name);
@@ -4798,7 +4811,7 @@ fn render_enum(output: &mut String, enumeration: &RenderedEnum, package: &GoPack
 /// )
 /// ```
 fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageContext) {
-    package.render_declaration_doc(output, "", &flags.name, None);
+    package.render_declaration_doc(output, "", &flags.name, None, false);
     output.push_str("type ");
     output.push_str(&flags.name);
     output.push_str(" int32\n");
@@ -4809,7 +4822,13 @@ fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageC
 
     output.push_str("\nconst (\n");
     for flag in &flags.flags {
-        package.render_declaration_doc(output, "\t", &format!("{}{}", flags.name, flag.name), None);
+        package.render_declaration_doc(
+            output,
+            "\t",
+            &format!("{}{}", flags.name, flag.name),
+            None,
+            false,
+        );
         output.push('\t');
         output.push_str(&flags.name);
         output.push_str(&flag.name);
@@ -4840,27 +4859,13 @@ fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageC
 /// func (NotificationTargetNone) isNotificationTarget() {}
 /// ```
 fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPackageContext) {
-    if let Some(doc) = variant.doc.value() {
-        render_go_declaration_doc(
-            output,
-            "",
-            package.documentation_name(&variant.name),
-            Some(doc),
-        );
-    } else if package.facade_exports.contains_key(&variant.name) {
-        render_go_declaration_doc(output, "", package.documentation_name(&variant.name), None);
-    }
-    if variant.experimental {
-        if variant.doc.value().is_some() {
-            output.push_str("//\n");
-        }
-        render_go_doc_comment(
-            output,
-            "",
-            "WARNING: This API is experimental and may change in the future.",
-        );
-    }
-    package.render_exposed_as(output, "", &variant.name);
+    package.render_declaration_doc(
+        output,
+        "",
+        &variant.name,
+        variant.doc.value(),
+        variant.experimental,
+    );
     output.push_str("type ");
     output.push_str(&go_generic_declaration_name(
         &variant.name,
@@ -4883,7 +4888,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPa
 
     for case in &variant.cases {
         output.push('\n');
-        package.render_declaration_doc(output, "", &case.struct_name, case.doc.value());
+        package.render_declaration_doc(output, "", &case.struct_name, case.doc.value(), false);
         output.push_str("type ");
         output.push_str(&go_generic_declaration_name(
             &case.struct_name,
@@ -4935,8 +4940,17 @@ fn render_model(
     key: &str,
     model: &RenderedModel,
     external_models: &GoExternalModels,
-    public: bool,
+    package: &GoPackageContext,
+    api_plan: &PlannedSpec,
 ) {
+    let record = record_for_model_key(api_plan, key);
+    package.render_declaration_doc(
+        output,
+        "",
+        &model.name,
+        record.and_then(|record| record.doc.value()),
+        record.is_some_and(|record| record.experimental),
+    );
     output.push_str("type ");
     output.push_str(&model.name);
     output.push_str(" struct {\n");
@@ -4944,15 +4958,17 @@ fn render_model(
     if model.fields.is_empty() {
         output.push_str("}\n");
     } else {
+        let public = is_go_exported_type_decl(&model.name);
         for field in &model.fields {
+            let doc = field
+                .doc
+                .as_deref()
+                .map(str::trim)
+                .filter(|doc| !doc.is_empty());
             if public && !field.sourced {
-                render_field_doc_comment(
-                    output,
-                    "\t",
-                    &field.name,
-                    field.doc.as_deref(),
-                    field.required,
-                );
+                render_field_doc_comment(output, "\t", &field.name, doc, field.required);
+            } else if doc.is_some() {
+                render_go_declaration_doc(output, "\t", &field.name, doc);
             }
             output.push('\t');
             output.push_str(&field.name);
@@ -5057,7 +5073,13 @@ fn render_resource(
     visibility: &GoVisibility,
     constructor_returns_value: bool,
 ) {
-    package.render_declaration_doc(output, "", &go_declaration_name(&resource.type_name), None);
+    package.render_declaration_doc(
+        output,
+        "",
+        &go_declaration_name(&resource.type_name),
+        resource.doc.as_deref(),
+        false,
+    );
     output.push_str("type ");
     output.push_str(&go_declaration_name(&resource.type_name));
     output.push_str(" struct {\n");
@@ -5093,6 +5115,7 @@ fn render_resource(
         "",
         &go_declaration_name(&format!("New{}", resource.type_name)),
         None,
+        false,
     );
     output.push_str("func ");
     output.push_str(&go_declaration_name(&format!("New{}", resource.type_name)));
@@ -5301,6 +5324,9 @@ fn render_resource_methods(
     for method in &resource.methods {
         output.push('\n');
         let method_name = go_field_name(&method.name);
+        if let Some(doc) = method.doc.as_deref() {
+            render_go_declaration_doc(output, "", &method_name, Some(doc));
+        }
 
         match &method.binding {
             PlannedResourceMethodBinding::Operation {
