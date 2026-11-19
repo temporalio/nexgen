@@ -8,6 +8,7 @@ of `@nexus` directives.
 ## Contents
 
 - [Quick Start](#quick-start)
+- [Java WIT generation](#java-wit-generation)
 - [Integrating a Support Package](#integrating-a-support-package)
 - [Type Mappings](#type-mappings)
   - [Records](#records)
@@ -100,11 +101,11 @@ JSON Schema `--namespace` option are unaffected.
 
 ## Integrating a Support Package
 
-For **WIT** generation in Go, Python, TypeScript, and .NET, pass one
+For **WIT** generation in Go, Java, Python, TypeScript, and .NET, pass one
 `--support-package` value on the language subcommand, even if that particular
 input does not use support helpers. It identifies code
 **you maintain in your project**; nexgen neither reads it nor copies it into the
-output. Java does not consume user support, and JSON Schema generation does not
+output. Java names a user-owned helper class. JSON Schema generation does not
 require this option (its generated JSON runtime helpers are unrelated).
 
 The package must be importable when the generated code is compiled or run.
@@ -1853,6 +1854,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.output-transform`               | freestanding function                                                                         |
 | `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
+| `@nexus.merge-from-function`            | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
 | `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
@@ -1906,10 +1908,11 @@ The catalog currently declares these restrictions:
 | --------------------------------------- | -------------------- | ----------------------- |
 | `@nexus.namespace`                      | dotnet, go           | not required by catalog |
 | `@nexus.facade`                         | go                   | required                |
-| `@nexus.operations-class`               | dotnet               | required                |
+| `@nexus.operations-class`               | dotnet, java         | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
-| `@nexus.context-propagation`            | go                   | required                |
+| `@nexus.context-propagation`            | go, java             | required                |
+| `@nexus.merge-from-function`            | java                 | not required by catalog |
 
 <!-- annotation-availability:end -->
 
@@ -2314,7 +2317,7 @@ Here the WIT field `workflow` maps to proto field `workflow_type`.
 ### @nexus.name
 
 **Placement:** Record field **Syntax:**
-`@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>"`
+`@nexus.name go="<name>" python="<name>" typescript="<name>" dotnet="<name>" java="<name>"`
 
 Overrides the generated field name for individual target languages. Languages
 without an override continue to use the WIT field name.
@@ -2589,12 +2592,13 @@ signal-with-start-workflow: func(...) -> ...;
 Python emits the docs of a resource and its methods as docstrings. The other
 targets don't emit them yet.
 
-Variant documentation is emitted by Python, TypeScript, Go, and .NET; Java does
-not currently generate WIT variants. Python emits an attribute docstring after
-the variant type alias, comments beside tagged-tuple cases, and class docstrings
-on protobuf oneof-backed cases. TypeScript emits JSDoc on the union and its
-branches; Go emits godoc on the interface and case structs; .NET emits XML
-documentation on the base record and nested case records.
+Variant documentation is emitted by Python, TypeScript, Go, and .NET; Java
+generates tagged variant classes without variant documentation. Python emits an
+attribute docstring after the variant type alias, comments beside tagged-tuple
+cases, and class docstrings on protobuf oneof-backed cases. TypeScript emits
+JSDoc on the union and its branches; Go emits godoc on the interface and case
+structs; .NET emits XML documentation on the base record and nested case
+records.
 
 ```wit
 /// @nexus.doc "Where to send a notification."
@@ -2627,24 +2631,26 @@ signal-with-start-workflow: func(...) -> ...;
 ### @nexus.context-propagation
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.context-propagation go="request.headers"`
+`@nexus.context-propagation go="request.headers" java="request.headers"`
 
-Enables outbound workflow context propagation for a Go System Nexus operation
-generated into `go.temporal.io/sdk/internal`. It requires `--targets workflow`
-and a protobuf-backed request record. The Go backend ignores this directive when
+Enables outbound workflow context propagation for Java and Go System Nexus
+operations. In Go this applies to operations generated into
+`go.temporal.io/sdk/internal` and requires `--targets workflow` and a
+protobuf-backed request record. The Go backend ignores this directive when
 generating into any other package because header injection calls the SDK's
-private helpers. Operations bound to resource methods are not supported because
-those methods bypass the typed interceptor chain.
+private helpers. Go operations bound to resource methods are not supported
+because those methods bypass the typed interceptor chain.
 
-The value is a checked WIT field path, not a Go expression. Its root must be the
-operation's input parameter name, and it must select a direct field of that
-record. Input record aliases are supported; nested paths are not. Nexgen
-resolves the WIT field identity before applying `@nexus.proto-field` and
+The value is a checked WIT field path, not a target-language expression. Its
+root must be the operation's input parameter name, and it must select a direct
+field of that record. Input record aliases are supported; nested paths are not.
+Nexgen resolves the WIT field identity before applying `@nexus.proto-field` and
 `@nexus.name` mappings, so the path uses authored WIT names.
 
 The selected field must use `@nexus.api-omit`. Its Go binding must accept
-`map[string]*commonpb.Payload`; the Go compiler checks that binding. For
-example, using the Temporal `header` binding:
+`map[string]*commonpb.Payload`; its Java binding must accept
+`Map<String, io.temporal.api.common.v1.Payload>`. The target compiler checks
+that binding. For example, using the Temporal `header` binding:
 
 ```wit
 /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
@@ -2654,23 +2660,31 @@ record signal-with-start-workflow-request {
   headers: option<header>,
 }
 
-/// @nexus.context-propagation go="request.headers"
+/// @nexus.context-propagation go="request.headers" java="request.headers"
 signal-with-start-workflow: func(
   request: signal-with-start-workflow-request,
 ) -> signal-with-start-workflow-response;
 ```
 
-The public function creates a fresh header map before the typed interceptor
-chain. Interceptors read and modify it with `interceptor.WorkflowHeader(ctx)`.
-The terminal calls the configured propagators' `InjectFromWorkflow` methods with
-the forwarded context, then assigns the map to the selected request field before
-encoding or scheduling. Injection errors resolve the returned workflow `Future`
-with an error and do not schedule an operation. Interceptor-supplied headers are
-preserved unless a propagator overwrites the same key.
+In Go, the public function creates a fresh header map before the typed
+interceptor chain. Interceptors read and modify it with
+`interceptor.WorkflowHeader(ctx)`. The terminal calls the configured
+propagators' `InjectFromWorkflow` methods with the forwarded context, then
+assigns the map to the selected request field before encoding or scheduling.
+Injection errors resolve the returned workflow `Future` with an error and do not
+schedule an operation. Interceptor-supplied headers are preserved unless a
+propagator overwrites the same key.
+
+In Java, the generated typed terminal copies the intercepted request and invokes
+its SDK-owned `propagateSystemNexusHeaders` helper with the existing header map
+and the operation's serialization context. The helper merges configured context
+propagators using normal SDK precedence and per-producer codec opt-in. Existing
+wire-ready headers are preserved without another conversion or codec layer.
+Operations without the directive do not invoke this helper.
 
 These are Temporal payload headers inside the operation request, not Nexus
 transport headers. The directive does not enable inbound extraction or response
-propagation. Use `go=` in multi-language inputs to keep it inactive for other
+propagation. Use language-qualified arguments to keep it inactive for other
 backends.
 
 ---
@@ -2760,6 +2774,11 @@ Transforms the raw operation result to a different return type. The expression
 is emitted as written and has access to `request` and `result` variables.
 Helpers used by the expression must be available to the generated code. Go
 expressions must return `(T, error)`.
+
+In Java, an unqualified helper call such as
+`java="toHandle(request.getWorkflowId(), result.getRunId())"` is resolved
+relative to `--support-package`. Qualified calls and other expressions are
+emitted as written.
 
 ```wit
 /// @nexus.output-transform
@@ -3011,3 +3030,187 @@ records, and type parameters backed by the supported Payload/Payloads carriers
 are preserved. Linked records are validated but not edited; missing fields there
 must be fixed in the dependency package. Reconciliation completes before the
 output is written, and rerunning it on complete WIT leaves the model unchanged.
+
+## Java WIT generation
+
+Java WIT output targets Java 8. Pass `--package-name` and `--support-package`;
+the latter names a user-owned Java class containing conversion and context
+helpers. `--targets workflow` emits operation wrappers and resource methods, and
+`--system-nexus` additionally emits interceptor hooks, context acquisition, and
+an operation-root manifest for SDK payload visitor generation.
+
+Set `@nexus.operations-class java="WorkflowOperations"` on an interface to emit
+an abstract operations class with a protected constructor. An SDK facade can
+extend it once to expose every generated static operation, including operations
+added later. Use `--package-name io.temporal.workflow` to put the models and
+operations in the SDK's workflow package. Record-input operations take function
+fields and their inputs as parameters. Every other field, including required
+fields, belongs to a required generated `<Operation>Options` object. There is no
+overload omitting options. Options have builders and copy builders, and building
+options validates required fields. Services without a fixed endpoint also put
+their routing endpoint in options. Generic responses take their reflective
+`resultType` through options too. Callable argument lists are explicit
+parameters in the name-based API and are excluded from options. Sourced and
+omitted fields stay out of the public arguments and options, while flattened
+records expose their fields directly. The operation constructs the request
+internally; no handwritten options class or operation wrapper is required.
+Options implement value equality, hashing, and descriptive string rendering.
+Field documentation is emitted on getters and builder setters; operation Javadoc
+includes parameter, type-parameter, and return documentation. Java type
+parameters use short conventional names without changing the authored WIT
+parameter names.
+
+Declared defaults and sources are resolved when calling the workflow operation,
+not by model or options builders. Signal-with-start defaults its task queue to
+the calling workflow's task queue; an explicit option overrides that default.
+
+System Nexus interception generates a typed interface with separate `Base` and
+`Terminal` implementations. `Base` forwards each operation to the next typed
+hook; `Terminal` executes it through the SDK-owned `executeSystemNexusOperation`
+transport. Neither enters ordinary Nexus interceptor hooks. SDK integration
+supplies the next interceptor and terminal transport once, without handwritten
+methods for individual operations.
+
+System Nexus service and dispatch helpers are emitted in the generated package's
+`internal` subpackage. Options and types in public interceptor signatures remain
+accessible. Helper-only runtimes are package-private when all consumers share a
+package; runtimes exposing value types or serving multiple packages remain
+public.
+
+The shared Temporal `payloads` binding uses `java-from="payloadsFromProto"` to
+delegate inbound sequence conversion to SDK support. Workflow-side Java support
+explicitly throws `UnsupportedOperationException` because the binding does not
+know the argument types or arity needed to decode arbitrary batch codecs.
+Outbound batch encoding is unchanged; receiving workflows decode arguments using
+their declared method signatures.
+
+Protobuf-bound varargs function fields can specify `java-call-extractor` on
+`@nexus.function` to additionally generate typed overloads. Bound method
+references are followed directly by their arguments, using `Functions.FuncN` or
+`Functions.ProcN`. The primary callable supports zero through six arguments;
+other callable fields support zero or one. The name-based API covers other
+arities. Result parameters and result annotations come from IDL metadata;
+generic primary callables also have void-returning overloads. The SDK-owned
+extractor receives the bound method reference, a zero-argument invocation, and a
+`BiConsumer<String, Object[]>` receiving its resolved name and arguments. The
+generated method maps these arguments to the request's authored API field names.
+The name-based overload takes an `Object[]` immediately after each callable's
+name. Neither overload exposes callable arguments in options. No operation names
+or composite-operation conventions are encoded in the Java renderer.
+
+Java fields can declare `@nexus.merge-from-function` to merge explicit values
+with metadata from a named callable, as described below. Relationships between
+callable fields and specialized composite-call APIs remain undeclared. Required
+fields remain explicit. SDK hooks own bound-method validation, metadata, and
+probe scoping; no new planning pass or generated runtime scope is added.
+
+Required payload fields serialize null user values through the data converter.
+Optional fields with null values remain absent from the protobuf message.
+
+Records use constructors, getters, and builders. Enums are Java enums, flags are
+`EnumSet` values, variants and results are tagged values, and tuples use
+generated classes. Generic arguments propagate through nested records and
+protobuf payload carriers. Protobuf-backed models declare a Temporal transfer
+converter and expose `toProto` and `fromProto` methods for explicit conversion.
+Transfer converters obtain the active `DataConverter` by calling
+`currentDataConverter()` on the configured support class. The SDK owns converter
+scoping; system Nexus conversion fails when no user converter context is active.
+
+The signal-with-start SDK path serializes the request and deserializes a
+payload-free response. Future responses with embedded user payloads must expose
+generic model parameters and receive concrete Java type information from the
+calling API; they must not rely on decoding an untyped `Object` field.
+
+Use `java`, `java-from`, and `java-to` on `@nexus.type` for native SDK mappings.
+Conversion helpers receive the active `DataConverter` followed by the value.
+Sourced-field helpers remain ordinary calls relative to the support class, while
+serialization-context helpers receive the generated operation request.
+
+`NexgenRuntime` is generated Java runtime code. It is separate from the
+user-owned class selected by `--support-package`; the Rust Java backend emits
+only the shared helpers and value types these bindings use. Bindings requiring
+none do not include a runtime class. Protobuf conversion uses generated Java
+getters/setters directly, without a field-reflection helper layer.
+
+The advanced Java samples follow the SDK's `main` branch selected in their
+`build.gradle`. Gradle's Git source dependencies check out and build its HEAD
+and its SDK project dependencies, so updates to that branch can change the SDK
+used by the samples. The first build needs Git and network access; no separately
+built SDK, directory environment variable, or published snapshot is required.
+
+Generic Java operation results accept a `java.lang.reflect.Type` argument so the
+runtime can preserve their type arguments. Use a Jackson `TypeReference` or an
+equivalent reified type. Model builders provide copy construction and flattened
+setters; named function alternatives have `set…Name` and `set…Call` setters
+alongside the explicit function-reference value.
+
+### @nexus.merge-from-function (Java only)
+
+Declare a merge on a public, non-function request field:
+
+```wit
+/// @nexus.merge-from-function function="workflow" java="mergeMethodRetry"
+retry-policy: option<retry-policy>,
+
+/// @nexus.merge-from-function function="workflow" java="mergeCronSchedule"
+cron-schedule: option<string>,
+```
+
+`function` names a callable field in the same record using its authored WIT
+name, independent of Java name overrides or protobuf field mappings. The source
+must be required and public, with a Java call extractor and metadata type:
+
+```wit
+/// @nexus.function
+///   signature="workflow-call"
+///   args-field="input"
+///   java-call-extractor="captureWorkflowCall"
+///   java-call-metadata-type="example.ProbeResult"
+type workflow-function = placeholder;
+```
+
+The extractor returns that metadata type while supplying the resolved name and
+arguments through its existing callback. Each typed operation probes the source
+once and retains its result for all referencing merge hooks. The selected
+support helper receives `(probeMetadata, explicitFieldValue)` and returns the
+final field value. It runs even when the explicit field value is null. The
+helper owns precedence and defaults; the generator does not understand retry or
+scheduling.
+
+Merging occurs during typed API request construction, after callable extraction.
+Untyped calls, request builders, models, and transfer conversion remain
+unchanged. Only Java generation implements this directive; other languages
+ignore its Java hook. Other language keys are currently rejected. The parser
+validates references and lowers the selected rule into the shared model, which
+existing passes carry to generation; raw WIT directives are not reparsed by the
+generator.
+
+Required fields with a merge hook may be omitted from Java options. Typed
+operations validate the resolved value after the hook runs; name-based
+operations require the explicit value before dispatch. Requiredness in the
+request model and wire mapping is unchanged.
+
+For example, the workflow service's ID field merges from the workflow reference:
+
+```wit
+/// @nexus.merge-from-function function="workflow" java="mergeWorkflowIdForStart"
+id: string,
+```
+
+The SDK helper derives an omitted ID, checks a supplied ID against the workflow
+reference, and rejects a workflow reference pinned to a run ID. The signal
+reference contributes its name and arguments; its execution binding is ignored.
+
+The Java SDK uses the original workflow method's `@MethodRetry` and
+`@CronSchedule` annotations. Retry merging follows
+`RetryOptions.merge(annotation, explicit)`; cron uses the annotation unless an
+explicit non-null value, including an empty string, overrides it. No synthesized
+`WorkflowOptions` is needed.
+
+## Formatting Java Output
+
+`--format` runs `google-java-format` from `PATH` on Java files under the output
+directory, including neighboring handwritten Java files. Install the formatter
+before generating; nexgen does not download it. The repository pins version
+1.24.0 through mise. Sample regeneration uses the shared post-generation
+formatting stage.

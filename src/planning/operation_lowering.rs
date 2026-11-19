@@ -248,6 +248,7 @@ fn resource_result_fields(
                     origin: None,
                     flatten_in_api: false,
                     function: None,
+                    merge_from_function: None,
                     data: (),
                 },
             ))

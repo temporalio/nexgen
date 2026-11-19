@@ -98,7 +98,7 @@ const CATALOG: &[Annotation] = {
             keys: &["value", "import"],
             language_keys: &["", "import"],
             repeatable: false,
-            languages: Some(&[Language::Dotnet]),
+            languages: Some(&[Language::Dotnet, Language::Java]),
             system_nexus: true,
         },
         Annotation {
@@ -277,7 +277,7 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[""],
             repeatable: false,
-            languages: Some(&[Language::Go]),
+            languages: Some(&[Language::Go, Language::Java]),
             system_nexus: true,
         },
         Annotation {
@@ -308,6 +308,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "merge-from-function",
+            sites: &[Field],
+            keys: &["function"],
+            language_keys: &[""],
+            repeatable: false,
+            languages: Some(&[Language::Java]),
+            system_nexus: false,
+        },
+        Annotation {
             name: "function",
             sites: &[Alias, Field],
             keys: &[
@@ -318,6 +327,7 @@ const CATALOG: &[Annotation] = {
                 "converter",
                 "name-extractor",
                 "call-extractor",
+                "call-metadata-type",
                 "result-type-parameter",
                 "value-type",
                 "args-type",
@@ -328,6 +338,7 @@ const CATALOG: &[Annotation] = {
                 "converter",
                 "name-extractor",
                 "call-extractor",
+                "call-metadata-type",
                 "value-type",
                 "args-type",
                 "result",
@@ -567,8 +578,15 @@ pub(super) fn validate_parsed(directives: &[Directive], path: &Path, context: &s
                 && !rule.supports_language(language)
             {
                 return Err(fail(format!(
-                    "argument `{key}` is not supported for {}",
-                    language_key(language)
+                    "argument `{key}` requests {}, but `@nexus.{}` supports only {}",
+                    language_key(language),
+                    rule.name,
+                    rule.languages
+                        .unwrap()
+                        .iter()
+                        .map(|language| language_key(*language))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 )));
             }
         }
@@ -821,7 +839,7 @@ mod tests {
             for language in all_languages() {
                 assert_eq!(
                     rule.supports_language(language),
-                    language == Language::Dotnet
+                    matches!(language, Language::Dotnet | Language::Java)
                 );
             }
             assert!(rule.system_nexus);

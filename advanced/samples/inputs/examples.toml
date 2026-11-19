@@ -21,16 +21,16 @@ descriptors = "temporal"
 
 [proto-generic]
 targets = ["workflow"]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
 descriptors = "temporal"
 
 [proto-oneof]
 targets = ["workflow"]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
 descriptors = "temporal"
 
 [notification-service]
-languages = ["python", "dotnet", "typescript"]
+languages = ["python", "dotnet", "typescript", "java"]
 descriptors = "temporal"
 
 # The Stream service WIT of temporalio/api#895, on the Stream protos of that PR. Its .NET output

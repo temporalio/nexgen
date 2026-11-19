@@ -169,7 +169,11 @@ pub fn build_examples(request: &BuildExamplesRequest) -> Result<()> {
             let wit_request = request_for_languages(request, |language| {
                 matches!(
                     language,
-                    Language::Dotnet | Language::Python | Language::TypeScript | Language::Go
+                    Language::Dotnet
+                        | Language::Python
+                        | Language::TypeScript
+                        | Language::Go
+                        | Language::Java
                 )
             });
             let json_request = request_for_languages(request, |language| {
@@ -242,6 +246,7 @@ fn available_wit_example_ids(
     let languages = if request.languages.is_empty() {
         vec![
             Language::Dotnet,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
             Language::Go,
@@ -291,6 +296,7 @@ fn build_wit_examples(request: &BuildExamplesRequest) -> Result<()> {
     let languages = if use_default_languages {
         vec![
             Language::Dotnet,
+            Language::Java,
             Language::Python,
             Language::TypeScript,
             Language::Go,
@@ -853,7 +859,7 @@ fn sample_support_package(
             );
             Some(relative.to_string_lossy().replace('\\', "/"))
         }
-        Language::Java => None,
+        Language::Java => Some("support.TemporalModelConverters".into()),
         _ => None,
     }
 }
@@ -909,21 +915,25 @@ fn example_output_path(root: &Path, language: Language, id: &Path) -> PathBuf {
         })
         .collect();
     match language {
+        Language::Java => root.join("src/main/java/wit").join(directory),
         Language::Go => root.join(directory),
         _ => root.join("wit").join(directory),
     }
 }
 
 fn example_java_package(id: &Path) -> String {
-    id.iter()
-        .map(|component| {
-            example_directory_name(
-                Language::Java,
-                component.to_str().expect("example names are UTF-8"),
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(".")
+    format!(
+        "wit.{}",
+        id.iter()
+            .map(|component| {
+                example_directory_name(
+                    Language::Java,
+                    component.to_str().expect("example names are UTF-8"),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(".")
+    )
 }
 fn json_example_output_path(
     root: &Path,
@@ -962,7 +972,7 @@ fn json_example_csharp_namespace(id: &str) -> String {
 }
 fn example_directory_name(language: Language, id: &str) -> String {
     match language {
-        Language::Go => id
+        Language::Go | Language::Java => id
             .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
             .collect::<String>()
@@ -1188,7 +1198,7 @@ descriptors = ["streams.bin"]
             ),
             (
                 Language::Java,
-                "advanced/samples/java/wit/some-service/client-only",
+                "advanced/samples/java/src/main/java/wit/someservice/clientonly",
             ),
         ] {
             assert_eq!(
@@ -1198,7 +1208,7 @@ descriptors = ["streams.bin"]
         }
         let java_configuration = Path::new("someService/clientOnly");
         let package = example_java_package(java_configuration);
-        assert_eq!(package, "someService.clientOnly");
+        assert_eq!(package, "wit.someservice.clientonly");
         let output = example_output_path(root, Language::Java, java_configuration);
         assert_eq!(
             output.file_name().unwrap().to_str().unwrap(),

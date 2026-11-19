@@ -877,7 +877,15 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     /// Set by `@nexus.flatten-in-api` on the field.
     pub flatten_in_api: bool,
     pub function: Option<FunctionFieldSpec<F>>,
+    pub merge_from_function: Option<FunctionMergeSpec>,
     pub data: F::FieldData,
+}
+
+/// Merge a field's explicit value with metadata obtained from another callable field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionMergeSpec {
+    pub function: String,
+    pub helper: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1418,6 +1426,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             origin: map.map_origin(self.origin),
             flatten_in_api: self.flatten_in_api,
             function: self.function.map(|function| function.map_names_with(map)),
+            merge_from_function: self.merge_from_function,
             data,
         }
     }
@@ -1434,6 +1443,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             && self.origin.is_none()
             && !self.flatten_in_api
             && self.function.is_none()
+            && self.merge_from_function.is_none()
     }
 }
 
@@ -2274,6 +2284,7 @@ pub struct FunctionFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub converter: Option<String>,
     pub name_extractor: Option<String>,
     pub call_extractor: Option<String>,
+    pub call_metadata_type: Option<String>,
     pub result_type_parameter: Option<String>,
     pub type_descriptor: Option<FunctionTypeDescriptorSpec<F>>,
 }
@@ -2323,6 +2334,7 @@ impl<F: TypeFamily> FunctionFieldSpec<F> {
             converter: self.converter,
             name_extractor: self.name_extractor,
             call_extractor: self.call_extractor,
+            call_metadata_type: self.call_metadata_type,
             result_type_parameter: self.result_type_parameter,
             type_descriptor: self
                 .type_descriptor

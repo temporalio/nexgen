@@ -1,0 +1,1 @@
+Java record-input operations take only function fields and their inputs as direct parameters; all other fields, including required fields and dynamic endpoints, move into a mandatory generated options object whose builder validates required values.

@@ -1,8 +1,0 @@
-languages = ["java"]
-descriptors = "temporal"
-
-[error]
-kind = "unsupported-java-proto-model"
-contains = [
-  "Java code generation does not support protobuf-backed model `temporal.api.common.v1.WorkflowExecution`",
-]

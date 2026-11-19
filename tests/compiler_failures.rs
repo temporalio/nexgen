@@ -51,7 +51,8 @@ fn support_package(language: Language) -> Option<String> {
         Language::TypeScript => Some("./support".into()),
         Language::Go => Some("example.com/support".into()),
         Language::Dotnet => Some("Nexgen.Support".into()),
-        Language::Java | Language::Ruby => None,
+        Language::Java => Some("example.Support".into()),
+        Language::Ruby => None,
     }
 }
 
