@@ -389,7 +389,8 @@ fn matching_requires_the_error_kind_and_every_fragment() {
     assert!(
         check_result(
             &expected,
-            Err(Error::UnsupportedJavaProtoModel {
+            Err(Error::UnsupportedProtoModel {
+                language: Language::Java,
                 message: "Severity severity-low".into()
             })
         )

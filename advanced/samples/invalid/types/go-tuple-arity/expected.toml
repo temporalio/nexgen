@@ -1,0 +1,7 @@
+languages = ["go"]
+
+[error]
+kind = "unsupported-type"
+contains = [
+  "go code generation does not support tuple with 11 element(s): tuples are supported with 1 to 10 elements",
+]

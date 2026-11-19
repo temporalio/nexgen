@@ -884,8 +884,11 @@ impl GoPackageContext {
     fn derive_package_name(output_dir_name: &str) -> Result<String> {
         let package_name = go_package_name(output_dir_name);
         if package_name.is_empty() {
-            return Err(Error::GoPackageNameEmpty {
-                output_dir_name: output_dir_name.to_string(),
+            return Err(Error::InvalidOutputNamespace {
+                language: Language::Go,
+                reason: format!(
+                    "output directory name `{output_dir_name}` has no ASCII letters, digits, or underscores to build a Go package name from; rename the output directory"
+                ),
             });
         }
         Ok(package_name)
@@ -1053,7 +1056,8 @@ fn generate_in_tree(
                 .map(|method| (resource, method))
         })
     {
-        return Err(Error::UnsupportedGoType {
+        return Err(Error::UnsupportedFeature {
+            language: Language::Go,
             context: format!("resource method `{}.{}`", resource.name, method.name),
             reason: "Go doesn't support `@nexus.varargs`".to_string(),
         });
@@ -1070,7 +1074,8 @@ fn generate_in_tree(
                 .map(|method| (resource, method))
         })
     {
-        return Err(Error::UnsupportedGoType {
+        return Err(Error::UnsupportedFeature {
+            language: Language::Go,
             context: format!("resource method `{}.{}`", resource.name, method.name),
             reason: "Go doesn't support `@nexus.api-omit targets=\"workflow\"` on a resource \
                      method"
@@ -1084,7 +1089,8 @@ fn generate_in_tree(
             .find(|(_, field)| field.flatten_in_api)
             .map(|(field_name, _)| (record, field_name))
     }) {
-        return Err(Error::UnsupportedGoType {
+        return Err(Error::UnsupportedFeature {
+            language: Language::Go,
             context: format!("record `{}` field `{field_name}`", record.full_name),
             reason: "Go doesn't flatten the record of one field".to_string(),
         });
@@ -1099,7 +1105,8 @@ fn generate_in_tree(
             })
             .map(|(field_name, _)| (record, field_name))
     }) {
-        return Err(Error::UnsupportedGoType {
+        return Err(Error::UnsupportedFeature {
+            language: Language::Go,
             context: format!("record `{}` field `{field_name}`", record.full_name),
             reason: "Go doesn't flatten a list of a record".to_string(),
         });
@@ -1559,7 +1566,8 @@ impl<'a> ApiPlanner<'a> {
         if self.package.has_serialization_context
             && self.external_models.renders_operation_references()
         {
-            return Err(Error::UnsupportedGoProtoConversion {
+            return Err(Error::UnsupportedProtoConversion {
+                language: Language::Go,
                 context: "Go serialization context".to_string(),
                 reason: "serialization-context requires proto-backed operation wrappers, not operation references".to_string(),
             });
@@ -1620,7 +1628,8 @@ impl<'a> ApiPlanner<'a> {
         self.populate_operation_bindings(&mut services)?;
         for operation in services.iter().flat_map(|service| &service.operations) {
             if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
-                return Err(Error::UnsupportedGoProtoConversion {
+                return Err(Error::UnsupportedProtoConversion {
+                    language: Language::Go,
                     context: format!("operation `{}`", operation.name),
                     reason: "serialization-context requires a proto-backed operation".to_string(),
                 });
@@ -1656,7 +1665,8 @@ impl<'a> ApiPlanner<'a> {
                                         && arg.go_type.starts_with("[]")
                                 }))
                         {
-                            return Err(Error::UnsupportedGoType {
+                            return Err(Error::UnsupportedFeature {
+                                language: Language::Go,
                                 context: format!("function `{}`", param.field_name),
                                 reason: "an explicit Go args descriptor requires one list-backed varargs args field; fixed signatures are unsupported".to_string(),
                             });
@@ -1757,10 +1767,12 @@ impl<'a> ApiPlanner<'a> {
                 .find(|(existing_path, _)| existing_path == path)
             {
                 if existing != alias {
-                    return Err(Error::UnsupportedGoType {
-                        context: format!("import `{path}`"),
-                        reason: format!(
-                            "type annotations use alias `{alias}`, but protobuf bindings use `{existing}`"
+                    return Err(Error::GeneratedNameConflict {
+                        language: Language::Go,
+                        name: path.clone(),
+                        generated_by: format!("type annotations using import alias `{alias}`"),
+                        conflicting_declaration: format!(
+                            "protobuf bindings using import alias `{existing}`"
                         ),
                     });
                 }
@@ -3746,7 +3758,8 @@ fn ensure_generic_tuple(
     models: &mut IndexMap<String, RenderedModel>,
 ) -> Result<String> {
     if arity == 0 || arity > TUPLE_FIELD_NAMES.len() {
-        return Err(Error::UnsupportedGoType {
+        return Err(Error::UnsupportedType {
+            language: Language::Go,
             context: format!("tuple with {arity} element(s)"),
             reason: format!(
                 "tuples are supported with 1 to {} elements",
@@ -5016,12 +5029,11 @@ fn validate_model_getter_names(model: &RenderedModel) -> Result<()> {
         if let Some(previous) =
             occupied.insert(getter.clone(), format!("getter for field `{}`", field.name))
         {
-            return Err(Error::UnsupportedGoType {
-                context: format!("record model `{}`", model.name),
-                reason: format!(
-                    "getter `{getter}` for field `{}` conflicts with {previous}; rename the conflicting field",
-                    field.name
-                ),
+            return Err(Error::GeneratedNameConflict {
+                language: Language::Go,
+                name: getter,
+                generated_by: format!("the getter of field `{}.{}`", model.name, field.name),
+                conflicting_declaration: previous,
             });
         }
     }
@@ -5904,11 +5916,12 @@ fn validate_wrapper_type_parameters(
             format!("generated type parameter `{name}`")
         };
         if let Some(previous) = occupied.insert(name.clone(), source) {
-            return Err(Error::UnsupportedGoType {
-                context: format!("operation `{}` wrapper", operation.name),
-                reason: format!(
-                    "{previous} collides with generated reserved name `{name}` in the Go generic parameter namespace"
-                ),
+            return Err(Error::TypeParameterNameConflict {
+                language: Language::Go,
+                declaration: format!("{} wrapper", operation.name),
+                parameter: name.clone(),
+                name,
+                conflicting: previous,
             });
         }
     }
