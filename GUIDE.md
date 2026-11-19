@@ -2773,11 +2773,9 @@ actual generated request model and returns a
 `temporalio.converter.StorageDriverWorkflowInfo`.
 
 Use this alongside `@nexus.serialization-context` when embedded user payloads
-are sent to another workflow. Keep the request-to-destination mapping in one
-support helper and reuse it when constructing serialization context. The SDK
-preserves the storing client or worker namespace separately from the target
-namespace. Leave `run_id` unset when the request does not identify a particular
-run, including signal-with-start.
+are sent to another workflow. The SDK preserves the storing client or worker
+namespace separately from the target namespace. Leave `run_id` unset when the
+request does not identify a particular run, including signal-with-start.
 
 ```wit
 /// @nexus.serialization-context python="signal_with_start_workflow_serialization_context"
