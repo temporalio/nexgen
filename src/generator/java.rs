@@ -18,10 +18,24 @@ pub(crate) mod format;
 const DEFAULT_PACKAGE: &str = "generated";
 const JAVA_FORMAT_LINE_LENGTH: usize = 88;
 
+fn documentation_name(
+    reference: &crate::documentation::DocReference,
+    spec: &crate::planning::PlannedSpec,
+) -> String {
+    use crate::documentation::ReferenceKind;
+    match reference.kind {
+        ReferenceKind::Type => super::documentation::type_name(reference, spec).to_string(),
+        ReferenceKind::TypeExpression => reference.name.clone(),
+        ReferenceKind::OperationParameter => "input".to_string(),
+        _ => reference.name.to_lower_camel_case(),
+    }
+}
+
 pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
     base_package: Option<&str>,
 ) -> Result<GeneratedFiles> {
+    let tree = super::documentation::prepare_tree(tree, documentation_name);
     let base_package = base_package.unwrap_or(DEFAULT_PACKAGE);
     let root_package = base_package;
 

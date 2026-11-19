@@ -10,12 +10,14 @@ use wit_parser_crate::{
     Resolve, Type, TypeDef, TypeDefKind, TypeId, TypeOwner, WorldId, WorldItem, WorldKey,
 };
 
+use crate::documentation::LanguageDocSpec;
 use crate::error::{Error, Result};
 use crate::language::Language;
 use crate::nexgen_config::GenerationTarget;
 use crate::spec::*;
 
 mod annotations;
+mod documentation;
 
 type PackageOrigins = BTreeMap<PackageId, PathBuf>;
 
@@ -839,6 +841,7 @@ fn build_wit_variant_spec(
     let doc = directive(&directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let doc = documentation::for_type(resolve, type_id, doc, path, &context, language)?;
     let proto_backed = directive(&directives, "proto", path, &context)?.is_some();
     let cases = variant
         .cases
@@ -849,6 +852,8 @@ fn build_wit_variant_spec(
             let doc = directive(&directives, "doc", path, &case_context)?
                 .map(directive_language_string)
                 .unwrap_or_default();
+            let doc =
+                documentation::for_type(resolve, type_id, doc, path, &case_context, language)?;
             let payload = case
                 .ty
                 .as_ref()
@@ -896,9 +901,11 @@ fn build_wit_record_spec(
     let model_doc = directive(&directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let model_doc = documentation::for_type(resolve, type_id, model_doc, path, &context, language)?;
     let proto_backed = directive(&directives, "proto", path, &context)?.is_some();
     let (doc, fields) = build_fields_from_record(
         resolve,
+        type_id,
         type_def.owner,
         record,
         proto_backed,
@@ -1142,17 +1149,15 @@ fn build_external_type_binding(
 
 fn build_fields_from_record(
     resolve: &Resolve,
+    type_id: TypeId,
     owner: TypeOwner,
     record: &Record,
     proto_backed: bool,
-    doc: LanguageStringSpec,
+    doc: LanguageDocSpec,
     path: &Path,
     context: &str,
     language: Language,
-) -> Result<(
-    LanguageStringSpec,
-    indexmap::IndexMap<String, RecordFieldSpec>,
-)> {
+) -> Result<(LanguageDocSpec, indexmap::IndexMap<String, RecordFieldSpec>)> {
     let mut authored_proto_fields = BTreeSet::new();
     let mut fields = indexmap::IndexMap::new();
     for field in &record.fields {
@@ -1251,6 +1256,10 @@ fn build_fields_from_record(
 
         let field_doc = directive(&directives, "doc", path, &field_context)?
             .map(directive_language_string)
+            .map(|doc| {
+                documentation::for_type(resolve, type_id, doc, path, &field_context, language)
+            })
+            .transpose()?
             .filter(|doc| !doc.is_empty());
         let field_type = authored_field_type_for_language(
             resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
@@ -1342,7 +1351,7 @@ fn build_fields_from_record(
                     arg_field.field_name,
                     RecordFieldSpec {
                         name: arg_field.args_name,
-                        doc: Some(arg_doc),
+                        doc: Some(arg_doc.into()),
                         annotation: None,
                         flattened_annotation: None,
                         field_type: authored_field_type_for_language(
@@ -2825,7 +2834,17 @@ fn build_service(
                 FunctionKind::Freestanding | FunctionKind::AsyncFreestanding
             )
         })
-        .map(|(_, function)| build_operation(resolve, function, path, &context, &service_name))
+        .map(|(_, function)| {
+            build_operation(
+                resolve,
+                interface,
+                function,
+                path,
+                &context,
+                &service_name,
+                language,
+            )
+        })
         .collect::<Result<Vec<_>>>()?;
     ensure_unique_wire_operation_names(path, &context, &operations)?;
 
@@ -2844,7 +2863,7 @@ fn build_service(
         name: service_name,
         code_name: LanguageStringSpec::default(),
         wire_name: wire_service_name,
-        doc: LanguageStringSpec::default(),
+        doc: LanguageDocSpec::default(),
         namespace,
         facade,
         operations_class,
@@ -2931,6 +2950,7 @@ fn build_resource(
     let doc = directive(&resource_directives, "doc", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
+    let doc = documentation::for_type(resolve, resource_id, doc, path, &context, language)?;
 
     let constructor = interface.functions.values().find(
         |function| matches!(function.kind, FunctionKind::Constructor(id) if id == resource_id),
@@ -2962,7 +2982,8 @@ fn build_resource(
             FunctionKind::Method(id) | FunctionKind::AsyncMethod(id) if id == resource_id
         )
     }) {
-        let (method, closes) = build_resource_method(resolve, function, path, &context, language)?;
+        let (method, closes) =
+            build_resource_method(resolve, interface, function, path, &context, language)?;
         if closes {
             if close.is_some() {
                 return Err(Error::InvalidWitDirective {
@@ -3005,6 +3026,7 @@ fn build_resource(
 /// The flag says whether this method carries `@nexus.close`. The resource records which one.
 fn build_resource_method(
     resolve: &Resolve,
+    interface: &Interface,
     function: &Function,
     path: &Path,
     resource_context: &str,
@@ -3050,6 +3072,12 @@ fn build_resource_method(
         name: method_name,
         doc: directive(&directives, "doc", path, &context)?
             .map(directive_language_string)
+            .map(|doc| {
+                documentation::for_function(
+                    resolve, interface, function, doc, path, &context, language,
+                )
+            })
+            .transpose()?
             .unwrap_or_default(),
         params,
         result,
@@ -3219,10 +3247,12 @@ fn build_resource_field(
 
 fn build_operation(
     resolve: &Resolve,
+    interface: &Interface,
     function: &Function,
     path: &Path,
     service_context: &str,
     service_name: &str,
+    language: Language,
 ) -> Result<OperationSpec> {
     let operation_name = function.name.to_upper_camel_case();
     let context = format!("{service_context} operation `{operation_name}`");
@@ -3310,9 +3340,21 @@ fn build_operation(
         deprecated: false,
         doc: directive(&directives, "doc", path, &context)?
             .map(directive_language_string)
+            .map(|doc| {
+                documentation::for_function(
+                    resolve, interface, function, doc, path, &context, language,
+                )
+            })
+            .transpose()?
             .unwrap_or_default(),
         return_doc: directive(&directives, "doc", path, &context)?
             .map(directive_returns_language_string)
+            .map(|doc| {
+                documentation::for_function(
+                    resolve, interface, function, doc, path, &context, language,
+                )
+            })
+            .transpose()?
             .unwrap_or_default(),
         input: Some(input),
         output,

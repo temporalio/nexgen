@@ -2,7 +2,7 @@
 
 import * as workflow from "@temporalio/workflow";
 import { defaultsService } from "../services";
-import type { Request, GetSenderRequest } from "../models";
+import type { GetSenderRequest } from "../models";
 import { Sender } from "../resources";
 
 /**

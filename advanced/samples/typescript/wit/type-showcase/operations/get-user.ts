@@ -6,10 +6,10 @@ import type { GetUserRequest } from "../models";
 import { User } from "../resources";
 
 /**
- * Get a user.
+ * Get a User. Use rename to change the display name.
  *
  * @param request - Request for the operation.
- * @returns The matching user.
+ * @returns The matching User.
  * @experimental This API is experimental and subject to change.
  */
 export async function getUser(request: GetUserRequest): Promise<User> {

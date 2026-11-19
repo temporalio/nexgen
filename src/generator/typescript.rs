@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use heck::{ToKebabCase, ToLowerCamelCase, ToUpperCamelCase};
+use heck::{ToKebabCase, ToLowerCamelCase, ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 
 use crate::error::{Error, Result};
@@ -609,8 +609,8 @@ impl<'a> ApiPlanner<'a> {
                 .unwrap_or_else(|| typescript_ident(&operation.name.to_lower_camel_case())),
             experimental: operation.experimental,
             deprecated: operation.deprecated,
-            doc: operation.doc.value().map(str::to_string),
-            return_doc: operation.return_doc.value().map(str::to_string),
+            doc: operation.doc.clone(),
+            return_doc: operation.return_doc.clone(),
             output_operation_annotation,
             service_output_operation_annotation,
             interceptor_output_operation_annotation,
@@ -2219,6 +2219,7 @@ pub(crate) fn generate(
     // §"Type-name derivation"). Only this entry point sees every leaf, so the
     // tree-wide model registry the JSON backend consults for a cross-module
     // `oneOf` branch is populated here, before any leaf renders.
+    let tree = super::documentation::prepare_tree(tree, documentation_name);
     typescript_json::set_tree_json_models(collect_tree_json_models(&tree.root));
     let generated = match &tree.root {
         ApiSpecNode::Leaf(leaf) => generate_leaf(
@@ -2234,6 +2235,23 @@ pub(crate) fn generate(
         files: generated.files.into_files(),
         warnings: generated.warnings,
     })
+}
+
+fn documentation_name(
+    reference: &crate::documentation::DocReference,
+    spec: &PlannedSpec,
+) -> String {
+    use crate::documentation::ReferenceKind;
+    match reference.kind {
+        ReferenceKind::Type => super::documentation::type_name(reference, spec).to_string(),
+        ReferenceKind::TypeExpression => reference.name.clone(),
+        ReferenceKind::OperationParameter => "request".to_string(),
+        ReferenceKind::Function
+        | ReferenceKind::Method
+        | ReferenceKind::Parameter
+        | ReferenceKind::Field => typescript_generated_field_name(&reference.name),
+        ReferenceKind::VariantCase => reference.name.to_snake_case(),
+    }
 }
 
 struct TypeScriptGenerationResult {
@@ -3161,8 +3179,8 @@ struct RenderedOperation<'a> {
     attr_name: String,
     experimental: bool,
     deprecated: bool,
-    doc: Option<String>,
-    return_doc: Option<String>,
+    doc: crate::documentation::SelectedDocSpec,
+    return_doc: crate::documentation::SelectedDocSpec,
     output_operation_annotation: String,
     service_output_operation_annotation: String,
     interceptor_output_operation_annotation: String,
@@ -3989,12 +4007,7 @@ fn render_typescript_requirement_imports(
 }
 
 fn contains_identifier(source: &str, identifier: &str) -> bool {
-    source.match_indices(identifier).any(|(index, _)| {
-        let before = source[..index].chars().next_back();
-        let after = source[index + identifier.len()..].chars().next();
-        !before.is_some_and(is_typescript_identifier_char)
-            && !after.is_some_and(is_typescript_identifier_char)
-    })
+    contains_code_identifier(source, identifier, None)
 }
 
 fn contains_qualified_identifier(source: &str, identifier: &str) -> bool {
@@ -4006,6 +4019,11 @@ fn contains_unqualified_identifier_followed_by(
     identifier: &str,
     following: char,
 ) -> bool {
+    contains_code_identifier(source, identifier, Some(following))
+}
+
+/// Documentation references must not create imports or runtime dependencies.
+fn contains_code_identifier(source: &str, identifier: &str, following: Option<char>) -> bool {
     let chars = source.char_indices().collect::<Vec<_>>();
     let mut index = 0;
     while index < chars.len() {
@@ -4042,7 +4060,9 @@ fn contains_unqualified_identifier_followed_by(
         }
 
         let before = source[..start_byte].chars().next_back();
-        if before.is_some_and(|before| is_typescript_identifier_char(before) || before == '.') {
+        if before.is_some_and(|before| {
+            is_typescript_identifier_char(before) || (following.is_some() && before == '.')
+        }) {
             index += 1;
             continue;
         }
@@ -4056,6 +4076,9 @@ fn contains_unqualified_identifier_followed_by(
             .map(|(byte, _)| *byte)
             .unwrap_or(source.len());
         if &source[start_byte..end_byte] == identifier {
+            let Some(following) = following else {
+                return true;
+            };
             let mut after = end;
             while after < chars.len() && chars[after].1.is_whitespace() {
                 after += 1;
@@ -4273,8 +4296,8 @@ fn render_endpoint_service_operation_method(
             "Request for the operation.".to_string(),
         ));
     }
-    if let Some(return_doc) = &operation.return_doc {
-        doc_tags.push(("@returns".to_string(), return_doc.clone()));
+    if let Some(return_doc) = operation.return_doc.value() {
+        doc_tags.push(("@returns".to_string(), return_doc.to_string()));
     }
     if operation.experimental {
         doc_tags.push((
@@ -4285,7 +4308,7 @@ fn render_endpoint_service_operation_method(
     if operation.deprecated {
         doc_tags.push(("@deprecated".to_string(), String::new()));
     }
-    render_typescript_doc_comment(output, "  ", operation.doc.as_deref(), &doc_tags);
+    render_typescript_doc_comment(output, "  ", operation.doc.value(), &doc_tags);
     let function_type_parameters = operation.function_type_parameters();
     if function_type_parameters.is_empty() {
         output.push_str("  public async ");
@@ -6224,7 +6247,7 @@ fn render_service_definition(output: &mut String, service: &RenderedService<'_>)
     output.push_str("', {\n");
     for operation in &service.operations {
         let operation_doc_tags = declaration_doc_tags(operation.experimental, operation.deprecated);
-        render_typescript_doc_comment(output, "  ", operation.doc.as_deref(), &operation_doc_tags);
+        render_typescript_doc_comment(output, "  ", operation.doc.value(), &operation_doc_tags);
         output.push_str("  ");
         output.push_str(&operation.attr_name);
         output.push_str(": nexus.operation<\n");
@@ -7140,6 +7163,41 @@ fn resource_return_binding_expr_typescript(
     }
 }
 
+fn operation_request_parameter_name(input: &RenderedOperationInput) -> &'static str {
+    if input.sourced_fields.is_empty()
+        && input.default_initialization.is_none()
+        && input.flattened_fields.is_empty()
+    {
+        "request"
+    } else {
+        "requestInput"
+    }
+}
+
+fn operation_function_doc(
+    doc: &crate::documentation::SelectedDocSpec,
+    service: &RenderedService<'_>,
+    operation: &RenderedOperation<'_>,
+) -> Option<String> {
+    use crate::documentation::ReferenceKind;
+    doc.map_names_with(|reference, name| {
+        if reference.kind == ReferenceKind::Function && reference.name == operation.name {
+            typescript_operation_function_name(service, operation)
+        } else if reference.kind == ReferenceKind::OperationParameter
+            && reference.parent == operation.name
+        {
+            operation
+                .input
+                .as_ref()
+                .map(operation_request_parameter_name)
+                .unwrap_or(name)
+                .to_string()
+        } else {
+            name.to_string()
+        }
+    })
+}
+
 fn render_operation_function(
     output: &mut String,
     service: &RenderedService<'_>,
@@ -7161,14 +7219,14 @@ fn render_operation_function(
             "Endpoint for the service.".to_string(),
         ));
     }
-    if operation.input.is_some() {
+    if let Some(input) = &operation.input {
         doc_tags.push((
-            "@param request -".to_string(),
+            format!("@param {} -", operation_request_parameter_name(input)),
             "Request for the operation.".to_string(),
         ));
     }
-    if let Some(return_doc) = &operation.return_doc {
-        doc_tags.push(("@returns".to_string(), return_doc.clone()));
+    if let Some(return_doc) = operation_function_doc(&operation.return_doc, service, operation) {
+        doc_tags.push(("@returns".to_string(), return_doc));
     }
     if operation.experimental {
         doc_tags.push((
@@ -7179,7 +7237,8 @@ fn render_operation_function(
     if operation.deprecated {
         doc_tags.push(("@deprecated".to_string(), String::new()));
     }
-    render_typescript_doc_comment(output, "", operation.doc.as_deref(), &doc_tags);
+    let summary = operation_function_doc(&operation.doc, service, operation);
+    render_typescript_doc_comment(output, "", summary.as_deref(), &doc_tags);
     let function_type_parameters = operation.function_type_parameters();
     if function_type_parameters.is_empty() {
         output.push_str("export async function ");
@@ -7200,16 +7259,9 @@ fn render_operation_function(
         output.push_str("  endpoint: string,\n");
     }
     if let Some(input) = &operation.input {
-        output.push_str(
-            if input.sourced_fields.is_empty()
-                && input.default_initialization.is_none()
-                && input.flattened_fields.is_empty()
-            {
-                "  request: "
-            } else {
-                "  requestInput: "
-            },
-        );
+        output.push_str("  ");
+        output.push_str(operation_request_parameter_name(input));
+        output.push_str(": ");
         if input.api_omitted_fields.is_empty() && input.default_initialization.is_none() {
             output.push_str(&input.annotation);
         } else {
@@ -7772,6 +7824,43 @@ mod tests {
         support_reference,
     };
     use std::path::Path;
+
+    #[test]
+    fn request_parameter_names_follow_input_preparation() {
+        let mut input = super::RenderedOperationInput {
+            operation_annotation: "Request".into(),
+            model_name: Some("Request".into()),
+            type_parameters: Vec::new(),
+            annotation: "Request".into(),
+            api_omitted_fields: Vec::new(),
+            sourced_fields: Vec::new(),
+            flattened_fields: Vec::new(),
+            default_initialization: None,
+            transfer_type_converter: None,
+        };
+        assert_eq!(super::operation_request_parameter_name(&input), "request");
+        input.default_initialization = Some("initialize".into());
+        assert_eq!(
+            super::operation_request_parameter_name(&input),
+            "requestInput"
+        );
+    }
+
+    #[test]
+    fn identifier_dependencies_ignore_documentation_and_literals() {
+        for source in [
+            "/** Stream describes an API. */",
+            "// Stream\nconst value = 1;",
+            "const label = 'Stream';",
+            "const label = `Stream`;",
+            "const upstream = 1;",
+        ] {
+            assert!(!super::contains_identifier(source, "Stream"), "{source}");
+        }
+        for source in ["type Value = Stream;", "return namespace.Stream;"] {
+            assert!(super::contains_identifier(source, "Stream"), "{source}");
+        }
+    }
 
     #[test]
     fn helper_calls_ignore_prose_literals_and_qualified_calls() {

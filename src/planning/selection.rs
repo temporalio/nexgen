@@ -85,6 +85,15 @@ impl ApiSpecTransform<AuthoredFamily, SelectedFamily> for Selector {
                 .map(ToOwned::to_owned),
         }
     }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::LanguageDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        crate::documentation::SelectedDocSpec::new(
+            doc.template_for_language(self.language).cloned(),
+        )
+    }
 }
 
 pub(crate) struct LanguageSelectionPass {

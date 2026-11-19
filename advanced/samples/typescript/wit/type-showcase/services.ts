@@ -20,7 +20,7 @@ import type { User } from "./resources";
  */
 export const typeShowcase = nexus.service("TypeShowcase", {
   /**
-   * Get a user.
+   * Get a User. Use rename to change the display name.
    *
    * @experimental This API is experimental and subject to change.
    */

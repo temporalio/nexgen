@@ -199,6 +199,13 @@ impl ApiSpecTransform<PlannedFamily, PlannedFamily> for EmittedNameMapper<'_> {
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
     }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
+    }
 }
 
 /// Builds the manifest over one leaf's post-reachability API surface. The

@@ -46,6 +46,7 @@ impl TypeFamily for OperationBoundFamily {
     type OperationData = OperationBoundOperation;
     type FieldData = ();
     type Text = SelectedTextSpec;
+    type Doc = crate::documentation::SelectedDocSpec;
 }
 
 pub(crate) struct OperationBindingPass;
@@ -151,5 +152,12 @@ impl ApiSpecTransform<ResourceBoundFamily, OperationBoundFamily> for OperationBi
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
+    }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
     }
 }

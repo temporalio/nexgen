@@ -176,7 +176,7 @@ func (u *User) UpdateEmail(ctx workflow.Context, email string) workflow.Future {
 	return fut
 }
 
-// Rename - Go rename.
+// Rename sets the user's name to displayName.
 func (u *User) Rename(ctx workflow.Context, displayName string) workflow.Future {
 	request := renameRequest{UserID: u.UserID, DisplayName: displayName}
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
@@ -278,7 +278,7 @@ type UserProfile struct {
 	//
 	// Required.
 	Tags []string
-	// Metadata - Go-specific metadata.
+	// Metadata - Default metadata.
 	//
 	// Required.
 	Metadata map[string]string
@@ -467,9 +467,9 @@ type GetUserOptions struct {
 	ConsistencyToken string
 }
 
-// GetUser - Get a user.
+// GetUser - Get a User. Use Rename to change the display name.
 //
-// Returns: The matching user.
+// Returns: The matching User.
 //
 // NOTE: Experimental
 func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {

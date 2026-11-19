@@ -457,7 +457,7 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
             .cloned()
             .unwrap_or_else(|| PlannedResource {
                 name: name.to_string(),
-                doc: None,
+                doc: Default::default(),
                 type_name: name.to_upper_camel_case(),
                 type_parameters: Vec::new(),
                 fields: Vec::new(),
@@ -488,6 +488,13 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
 
     fn map_text(&mut self, text: SelectedTextSpec) -> SelectedTextSpec {
         text
+    }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
     }
 }
 
@@ -852,7 +859,7 @@ impl<'a> TypePlanningContext<'a> {
 
                 Ok(PlannedResourceMethod {
                     name: method.name.clone(),
-                    doc: method.doc.value().map(str::to_string),
+                    doc: method.doc.clone(),
                     params: method
                         .params
                         .iter()
@@ -871,7 +878,7 @@ impl<'a> TypePlanningContext<'a> {
 
         Ok(PlannedResource {
             name: resource.name.clone(),
-            doc: resource.doc.value().map(str::to_string),
+            doc: resource.doc.clone(),
             type_name: resource.name.to_upper_camel_case(),
             type_parameters: resource.type_parameters.clone(),
             fields: resource
@@ -1470,6 +1477,13 @@ impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOper
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
         value
     }
+
+    fn map_doc(
+        &mut self,
+        doc: crate::documentation::SelectedDocSpec,
+    ) -> crate::documentation::SelectedDocSpec {
+        doc
+    }
 }
 
 impl TypePlanningContext<'_> {
@@ -1637,13 +1651,13 @@ interface alerts {
         let mut spec = proto_operation_spec(proto_name);
         let service = &mut spec.services[0];
         service.code_name = text.clone();
-        service.doc = text.clone();
+        service.doc = text.clone().into();
         service.namespace = text.clone();
         service.operations_class = text.clone();
         let operation = &mut service.operations[0];
         operation.code_name = text.clone();
-        operation.doc = text.clone();
-        operation.return_doc = text.clone();
+        operation.doc = text.clone().into();
+        operation.return_doc = text.clone().into();
         operation.serialization_context = text.clone();
         operation.output_transform = Some(OperationOutputTransformSpec {
             type_name: text.clone(),
@@ -1691,20 +1705,17 @@ interface alerts {
         let service = &leaf.spec.services[0];
         for text in [
             &service.code_name,
-            &service.doc,
             &service.namespace,
             &service.operations_class,
         ] {
             assert_eq!(text, &expected);
         }
         let operation = &service.operations[0];
-        for text in [
-            &operation.code_name,
-            &operation.doc,
-            &operation.return_doc,
-            &operation.serialization_context,
-        ] {
+        for text in [&operation.code_name, &operation.serialization_context] {
             assert_eq!(text, &expected);
+        }
+        for doc in [&service.doc, &operation.doc, &operation.return_doc] {
+            assert_eq!(doc.value(), Some("SelectedValue"));
         }
         let transform = operation.output_transform.as_ref().unwrap();
         for text in [
@@ -1885,7 +1896,7 @@ interface alerts {
                 name: "example-service".to_string(),
                 code_name: LanguageStringSpec::default(),
                 wire_name: "ExampleService".to_string(),
-                doc: LanguageStringSpec::default(),
+                doc: Default::default(),
                 namespace: LanguageStringSpec::default(),
                 facade: LanguageStringSpec::default(),
                 operations_class: LanguageStringSpec::default(),
@@ -1899,8 +1910,8 @@ interface alerts {
                     wire_name: "ExampleOperation".to_string(),
                     experimental: false,
                     deprecated: false,
-                    doc: LanguageStringSpec::default(),
-                    return_doc: LanguageStringSpec::default(),
+                    doc: Default::default(),
+                    return_doc: Default::default(),
                     input: Some(TypeSpec::External(ExternalTypeSpec::Proto(Symbol::new(
                         proto_name,
                     )))),

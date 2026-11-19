@@ -113,6 +113,7 @@ pub(crate) fn generate(
     tree: &crate::spec::ApiSpecTree<PlannedFamily>,
     support_package: &str,
 ) -> Result<GeneratedFiles> {
+    let tree = super::documentation::prepare_tree(tree, documentation_name);
     match &tree.root {
         ApiSpecNode::Leaf(leaf) => {
             let generated = generate_leaf(
@@ -320,6 +321,36 @@ fn insert_branch_index_file(
             branch.module_path.as_module_key()
         )),
     )
+}
+
+fn documentation_name(
+    reference: &crate::documentation::DocReference,
+    spec: &PlannedSpec,
+) -> String {
+    use crate::documentation::ReferenceKind;
+    match reference.kind {
+        ReferenceKind::Type => super::documentation::type_name(reference, spec).to_string(),
+        ReferenceKind::TypeExpression => reference.name.clone(),
+        ReferenceKind::OperationParameter => "request".to_string(),
+        ReferenceKind::Function | ReferenceKind::Method => {
+            python_ident(&reference.name.to_snake_case())
+        }
+        ReferenceKind::Field | ReferenceKind::Parameter => python_field_name(&reference.name),
+        ReferenceKind::VariantCase => {
+            if spec
+                .variant(&reference.identity)
+                .is_some_and(|variant| variant.source.is_some())
+            {
+                format!(
+                    "{}{}",
+                    reference.parent,
+                    reference.name.to_upper_camel_case()
+                )
+            } else {
+                reference.name.clone()
+            }
+        }
+    }
 }
 
 fn planned_module_export_model_names(plan: &PlannedSpec) -> BTreeSet<String> {
@@ -1969,7 +2000,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("])");
         }
         output.push_str(":\n");
-        render_python_docstring(output, "    ", resource.doc.as_deref(), &[], None, false);
+        render_python_docstring(output, "    ", resource.doc.value(), &[], None, false);
         let fields = resource
             .fields
             .iter()
@@ -2148,7 +2179,7 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ) -> ");
         output.push_str(&result_annotation);
         output.push_str(":\n");
-        render_python_docstring(output, "        ", method.doc.as_deref(), &[], None, false);
+        render_python_docstring(output, "        ", method.doc.value(), &[], None, false);
 
         match &method.binding {
             PlannedResourceMethodBindingSpec::Operation {
@@ -2393,7 +2424,7 @@ impl<'a> ApiPlanner<'a> {
         render_python_docstring(
             output,
             "        ",
-            Some(&poll_function_summary(&names.page, method.doc.as_deref())),
+            Some(&poll_function_summary(&names.page, method.doc.value())),
             &args,
             None,
             operation.experimental,
@@ -2431,7 +2462,7 @@ impl<'a> ApiPlanner<'a> {
             "        ",
             Some(&poll_items_summary(
                 &names.pages,
-                method.doc.as_deref(),
+                method.doc.value(),
                 operation.poll_resume().is_some(),
             )),
             &args,

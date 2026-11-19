@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+mod documentation;
 pub(crate) mod dotnet;
 pub(crate) mod go;
 pub(crate) mod java;

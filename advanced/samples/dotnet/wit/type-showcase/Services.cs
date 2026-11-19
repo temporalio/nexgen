@@ -19,9 +19,9 @@ namespace Nexgen.TypeShowcase
     internal interface ITypeShowcase
     {
         /// <summary>
-        /// Get a user.
+        /// Get a User. Use RenameAsync to change the display name.
         /// </summary>
-        /// <returns>The matching user.</returns>
+        /// <returns>The matching User.</returns>
         /// <remarks>WARNING: This API is experimental and may change in the future.</remarks>
         [GeneratedCode("nexgen", null)]
         [NexusOperation("GetUser")]

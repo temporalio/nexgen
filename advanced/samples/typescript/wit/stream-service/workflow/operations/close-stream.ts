@@ -15,7 +15,7 @@ type CloseStreamInput<BodyT> =
     : never;
 
 /**
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  */
 export async function closeStream<BodyT>(
   requestInput: CloseStreamInput<BodyT>,

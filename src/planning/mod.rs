@@ -70,6 +70,7 @@ impl TypeFamily for PlannedFamily {
     type OperationData = PlannedOperationData;
     type FieldData = PlannedFieldData;
     type Text = SelectedTextSpec;
+    type Doc = crate::documentation::SelectedDocSpec;
 }
 
 pub(crate) type PlannedSpec = ApiSpec<PlannedFamily>;
@@ -167,7 +168,7 @@ pub(crate) struct PlannedOperationResourceFieldBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResource {
     pub(crate) name: String,
-    pub(crate) doc: Option<String>,
+    pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) type_name: String,
     pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
@@ -187,7 +188,7 @@ pub(crate) struct PlannedResourceField {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedResourceMethod {
     pub(crate) name: String,
-    pub(crate) doc: Option<String>,
+    pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
     pub(crate) varargs: Option<String>,
@@ -409,7 +410,7 @@ mod tests {
     fn method(name: &str, api_omitted: &[GenerationTarget]) -> PlannedResourceMethod {
         PlannedResourceMethod {
             name: name.to_string(),
-            doc: None,
+            doc: Default::default(),
             params: Vec::new(),
             result: None,
             varargs: None,
@@ -429,7 +430,7 @@ mod tests {
     fn a_target_drops_the_methods_and_the_close_that_it_omits() {
         let resource = PlannedResource {
             name: "stream".to_string(),
-            doc: None,
+            doc: Default::default(),
             type_name: "Stream".to_string(),
             type_parameters: Vec::new(),
             fields: Vec::new(),

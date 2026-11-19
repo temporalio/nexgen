@@ -439,7 +439,7 @@ pub(super) fn plan(
             &mut scope,
             &variant.name,
             parameters.clone(),
-            variant.doc.value(),
+            variant.doc.map_names(public_documentation_name).as_deref(),
             variant.experimental,
         );
         for case in &variant.cases {
@@ -447,7 +447,7 @@ pub(super) fn plan(
                 &mut scope,
                 &case.struct_name,
                 parameters.clone(),
-                case.doc.value(),
+                case.doc.map_names(public_documentation_name).as_deref(),
                 false,
             );
         }
@@ -461,7 +461,9 @@ pub(super) fn plan(
             &mut scope,
             &model.name,
             model.type_parameters.clone(),
-            record.and_then(|record| record.doc.value()),
+            record
+                .and_then(|record| record.doc.map_names(public_documentation_name))
+                .as_deref(),
             record.is_some_and(|record| record.experimental),
         );
     }
@@ -471,7 +473,7 @@ pub(super) fn plan(
                 &mut scope,
                 &go_declaration_name(&resource.type_name),
                 Vec::new(),
-                resource.doc.as_deref(),
+                resource.doc.map_names(public_documentation_name).as_deref(),
                 false,
             );
         }
@@ -600,6 +602,7 @@ pub(super) fn plan(
                     public_name(&name),
                     operation,
                     &docs,
+                    true,
                 );
                 for (index, param) in positional.iter().enumerate() {
                     let (name, kind) = wrapper_param_signature(
@@ -633,6 +636,7 @@ pub(super) fn plan(
                     public_name(&name),
                     operation,
                     &[],
+                    true,
                 );
                 for (name, kind) in [
                     ("opts", format!("{}Options", go_declaration_name(&name))),
@@ -663,6 +667,10 @@ pub(super) fn plan(
 
 fn public_name(name: &str) -> &str {
     name.strip_prefix("SystemNexus_").unwrap_or(name)
+}
+
+fn public_documentation_name(name: &str) -> String {
+    public_name(name).to_string()
 }
 
 fn render_plan(plan: &FacadePlan) -> String {

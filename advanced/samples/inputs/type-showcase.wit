@@ -54,7 +54,7 @@ interface type-showcase {
   record user-profile {
     /// @nexus.doc "A very long field doc that has to be wrapped because it exceeds the generated comment line width by a comfortable margin for testing."
     tags: list<string>,
-    /// @nexus.doc "Default metadata." go="Go-specific metadata." python="Python metadata."
+    /// @nexus.doc "Default metadata." python="Python metadata."
     metadata: map<string, string>,
     capabilities: user-capability,
     sync-state: result<string, string>,
@@ -69,7 +69,7 @@ interface type-showcase {
     constructor(user-id: string, email: string, display-name: string, status: user-status, profile: user-profile);
 
     update-email: func(email: string) -> user-result;
-    /// @nexus.doc "Default rename." go="Go rename." python="Python rename."
+    /// @nexus.doc "{@name rename} sets the user's name to {@name display-name}."
     rename: func(display-name: string) -> user-result;
     deactivate: func(reason: option<string>);
     update-labels: func(tags: list<string>, metadata: map<string, string>, extra-tags: option<list<string>>, extra-metadata: option<map<string, string>>);
@@ -151,7 +151,7 @@ interface type-showcase {
     settings: option<sync-settings>,
   }
 
-  /// @nexus.doc "Get a user." returns="The matching user."
+  /// @nexus.doc "Get a {@name user}. Use {@name user.rename} to change the display name." returns="The matching {@name user}."
   /// @nexus.experimental
   get-user: func(request: get-user-request) -> user-result;
   update-email: func(request: update-email-request) -> user-result;

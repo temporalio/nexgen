@@ -17,7 +17,7 @@ type AppendRecordsInput<BodyT> =
 /**
  * Append one batch. For Workflow code, Core makes the call.
  *
- * @param request - Request for the operation.
+ * @param requestInput - Request for the operation.
  */
 export async function appendRecords<BodyT>(
   requestInput: AppendRecordsInput<BodyT>,

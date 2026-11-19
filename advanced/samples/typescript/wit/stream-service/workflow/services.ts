@@ -25,7 +25,6 @@ import type {
   DescribeStreamResponse,
   DescribeStreamRequest,
 } from "./models";
-import type { Stream } from "./resources";
 
 /**
  * @experimental This API is experimental and subject to change.

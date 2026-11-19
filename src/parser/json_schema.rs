@@ -6072,7 +6072,7 @@ fn build_service(
         name: service_name.clone(),
         code_name: language_string_override(language, code_name),
         wire_name: service.fqn.clone().unwrap_or(service_name),
-        doc: language_string(service.description.clone()),
+        doc: language_string(service.description.clone()).into(),
         namespace: LanguageStringSpec::default(),
         facade: LanguageStringSpec::default(),
         operations_class: LanguageStringSpec::default(),
@@ -6179,8 +6179,8 @@ fn build_operation(
             .get("deprecated")
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        doc: language_string(operation.description.clone()),
-        return_doc: LanguageStringSpec::default(),
+        doc: language_string(operation.description.clone()).into(),
+        return_doc: Default::default(),
         input,
         output,
         output_transform: None,
