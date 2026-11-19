@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.13] - 2026-11-19
+
+### Added
+
+- `@nexus.close` marks the method that ends a resource. Python calls it at the end of `async with`.
+- WIT records can explicitly declare generic dependencies with `@nexus.generic "body-t"`, including phantom parameters that add no wire fields. Dependencies propagate through containing models, operations, and resources; resource constructor fields no longer implicitly make records generic.
+- `@nexus.api-omit` on an operation hides that operation's public top-level function and its export for the named `targets` (default is every target). The operation stays registered, stays in the generated service, and stays bindable by resource methods, so it is reached through its resource.
+- In Python, a generic resource's ref takes the resource's type parameters, so `get_stream(ref)` infers the handle's type from a `StreamRef[Turn]` and reads `Turn` bodies. The ref carries its type argument in memory only, so its wire message, equality and repr do not change.
+- `@nexus.api-omit targets="workflow"` or `targets="client"` on a resource method leaves the method out of the resource class of that target, in Python, TypeScript and .NET. The operation stays in the service and in the other target. Without its `@nexus.close` method, the Python resource of that target is not a context manager. nexgen refuses the directive on a method without one target, and Go refuses a method omitted for the Workflow target.
+- `@nexus.poll` also generates the Python poll iterators on each Workflow resource method that binds the operation. Each page is the call of the Workflow method. `targets` is optional, and `targets="client"` keeps the iterators out of Workflow code. Both targets import `PollIterator` from one `_poll.py` module next to the models.
+
+### Changed
+
+- Python sample projects and generation validation now require Python 3.11 or newer, matching the current Temporal Python SDK.
+
+### :boom: Breaking Changes
+
+- A Python resource method `<method>` whose operation has `@nexus.poll` gives its short name to the iterator that callers should use first. With `items`, `<method>` yields each item, `<method>_pages` yields each page, and `<method>_page` sends one request, in place of `iter_<method>_items`, `iter_<method>` and `<method>`. Without `items`, `<method>` yields each page and `<method>_page` sends one request. The client extension keeps `iter_<name>` and `iter_<name>_items`.
+- Python and .NET System Nexus interceptor terminals now require direct SDK scheduling instead of a generic System Nexus interceptor chain. Unknown System Nexus operations fail in Python, .NET, and TypeScript; .NET operations with generic request or response models fail until operation-specific interception supports them.
+
+### Fixed
+
+- In Python, the client target modules import `temporalio.client` only for type checking. An SDK client can inherit the generated extension without a circular import.
+- Go now emits the SDK-style `NOTE: Experimental` on annotated records, variants, workflow functions and their options types, and corresponding facade declarations, even when there is no authored documentation.
+- Go now emits `@nexus.doc` comments on unexported records, their fields, and sourced fields, as well as on resources and resource methods. Go facades also retain authored docs on resource and variant case aliases.
+- A Python resource method with an optional parameter named after a defaulted request field sends the default when the caller passes no value. The default is not evaluated when the caller passes one.
+- Python backend planning now rejects partial or ambiguous declared runtime-type sources on callable generic resources instead of silently disabling ref-based inference.
+- A `list<u8>` case of a variant with `@nexus.proto` is the proto `bytes`, an enum case of a proto oneof is its bound WIT enum, and a resource method parameter named after a proto oneof binds to the record field of that oneof.
+- A `list<u8>` resource method parameter that fills a proto `bytes` field is the proto `bytes`, like that field.
+- Use mise's built-in .NET backend in shared mode so validation can discover all required test runtimes.
+
 ## [0.2.12] - 2026-11-10
 
 ### Added
