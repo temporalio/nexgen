@@ -5,9 +5,7 @@ use std::collections::BTreeSet;
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
 use crate::language::Language;
-use crate::spec::{
-    ApiSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldOrigin, RecordSpec, TypeSpec,
-};
+use crate::spec::{ApiSpec, ExternalTypeSourceSpec, ExternalTypeSpec, RecordSpec, TypeSpec};
 
 #[derive(Clone, Copy)]
 enum BackingOwner<'a> {
@@ -31,10 +29,10 @@ pub(super) fn validate(
 ) -> Result<()> {
     for (_, record) in spec.records() {
         for field in record.fields.values().filter(|field| {
-            matches!(
-                field.origin.for_language(language),
-                None | Some(FieldOrigin::Default { .. } | FieldOrigin::ApiOmitted)
-            )
+            !field
+                .origin
+                .for_language(language)
+                .is_some_and(|policy| policy.is_omitted() || policy.is_sourced())
         }) {
             validate_nested(
                 spec,

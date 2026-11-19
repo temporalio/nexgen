@@ -112,9 +112,6 @@ namespace Temporalio.Worker.Interceptors
 
         public virtual Task<Temporalio.Workflows.NexusWorkflowOperationHandle<TResult>> ScheduleNexusOperationAsync<TResult>(
             ScheduleNexusOperationInput input) => Next.ScheduleNexusOperationAsync<TResult>(input);
-
-        public virtual Task<Temporalio.Workflows.NexusWorkflowOperationHandle<TResult>> ScheduleSystemNexusOperationAsync<TResult>(
-            ScheduleSystemNexusOperationInput<TResult> input) => Next.ScheduleSystemNexusOperationAsync<TResult>(input);
     }
 
     public sealed class TestInterceptor : WorkflowOutboundInterceptor
@@ -132,6 +129,10 @@ namespace Temporalio.Worker
     internal partial class WorkflowInstance
     {
         private readonly Lazy<Temporalio.Worker.Interceptors.WorkflowOutboundInterceptor> outbound = null!;
+
+        private Task<Temporalio.Workflows.NexusWorkflowOperationHandle<TResult>> ScheduleSystemNexusOperationAsync<TResult>(
+            Temporalio.Worker.Interceptors.ScheduleSystemNexusOperationInput<TResult> input) =>
+            throw new NotImplementedException();
 
         internal partial class OutboundImpl : Temporalio.Worker.Interceptors.WorkflowOutboundInterceptor
         {

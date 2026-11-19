@@ -17,13 +17,13 @@ use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedProtoType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, operation_input_model,
+    PlannedSpec, PlannedType, flattened_list_field, operation_input_model,
 };
 use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
     ResolvedResourceBindingSource,
 };
-use crate::spec::FieldOrigin;
+use crate::spec::FieldPolicy;
 use crate::spec::{
     AliasTypeSpec, EnumSpec, ExternalTypeSpec, FlagsSpec, FunctionFieldSpec, IntSpec,
     OperationSpec, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec, VariantSpec,
@@ -516,10 +516,11 @@ impl<'a> ApiPlanner<'a> {
         resource: &PlannedResource,
     ) {
         let type_name = csharp_type_name(&resource.type_name);
+        let generic_type_name = csharp_generic_resource_type(resource);
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
         output.push_str("public class ");
-        output.push_str(&type_name);
+        output.push_str(&generic_type_name);
         output.push_str("\n{\n");
         output.push_str("    public ");
         output.push_str(&type_name);
@@ -553,9 +554,9 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&csharp_service_ident(service));
             output.push_str(">? NexgenClient { get; set; }\n");
             output.push_str("\n    internal static ");
-            output.push_str(&type_name);
+            output.push_str(&generic_type_name);
             output.push_str(" BindClient(");
-            output.push_str(&type_name);
+            output.push_str(&generic_type_name);
             output.push_str(" resource, NexusWorkflowClient<I");
             output.push_str(&csharp_service_ident(service));
             output.push_str("> client)\n    {\n");
@@ -571,10 +572,14 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(" methods require a service endpoint.\");\n");
             output.push_str("    }\n");
         }
-        if !resource.fields.is_empty() && !resource.methods.is_empty() {
+        // A .NET resource method calls the Workflow API, so the Workflow omissions apply.
+        let methods = resource
+            .methods_for(GenerationTarget::Workflow)
+            .collect::<Vec<_>>();
+        if !resource.fields.is_empty() && !methods.is_empty() {
             output.push('\n');
         }
-        for method in &resource.methods {
+        for method in methods {
             self.render_resource_method(output, service, &type_name, method);
         }
         output.push_str("}\n\n");
@@ -945,7 +950,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("> ");
         }
         output.push_str(method_name);
-        self.render_operation_model_type_parameters(output, operation);
+        self.render_operation_method_type_parameters(output, operation);
         output.push('(');
         if has_input {
             output.push_str(input_type);
@@ -963,7 +968,7 @@ impl<'a> ApiPlanner<'a> {
         has_input: bool,
         raw_return: &str,
     ) {
-        if !self.operation_model_parameters(operation).is_empty() {
+        if self.operation_starts_by_name(operation) {
             let service_name = self
                 .api_plan
                 .services
@@ -1076,6 +1081,9 @@ impl<'a> ApiPlanner<'a> {
             }
             has_parameter = true;
             output.push_str(&self.model_field_type(model, field_name, field));
+            if api_omitted_list_item(field).is_some() {
+                output.push('?');
+            }
             output.push(' ');
             output.push_str(&csharp_parameter_name(&field.name));
         }
@@ -1085,6 +1093,9 @@ impl<'a> ApiPlanner<'a> {
             }
             has_parameter = true;
             output.push_str(&self.field_type(field));
+            if api_omitted_list_item(field).is_some() {
+                output.push('?');
+            }
             output.push(' ');
             output.push_str(&csharp_parameter_name(&field.name));
         }
@@ -1094,6 +1105,11 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&field_property_name(field));
             output.push_str(" = ");
             output.push_str(&csharp_parameter_name(&field.name));
+            if let Some(item) = api_omitted_list_item(field) {
+                output.push_str(" ?? System.Array.Empty<");
+                output.push_str(&self.high_level_value_type(item));
+                output.push_str(">()");
+            }
             output.push_str(";\n");
         }
         for (_, field, _) in &sourced_fields {
@@ -1101,6 +1117,12 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(&field_property_name(field));
             output.push_str(" = ");
             output.push_str(&csharp_parameter_name(&field.name));
+            // A target that api-omits the list passes no value, which is an empty list.
+            if let Some(item) = api_omitted_list_item(field) {
+                output.push_str(" ?? System.Array.Empty<");
+                output.push_str(&self.high_level_value_type(item));
+                output.push_str(">()");
+            }
             output.push_str(";\n");
         }
         output.push_str("    }\n\n");
@@ -1155,7 +1177,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("> ");
         }
         output.push_str(method_name);
-        self.render_operation_model_type_parameters(output, operation);
+        self.render_operation_method_type_parameters(output, operation);
         output.push('(');
         let mut has_parameters = false;
         if endpoint_parameter {
@@ -1168,7 +1190,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str(" request");
         }
         output.push_str(")\n    {\n");
-        if !self.operation_model_parameters(operation).is_empty() {
+        if self.operation_starts_by_name(operation) {
             let service_name = self
                 .api_plan
                 .services
@@ -1201,7 +1223,12 @@ impl<'a> ApiPlanner<'a> {
             }
             output.push_str(").ConfigureAwait(true);\n");
             if raw_return != "void" {
-                output.push_str("        return result;\n");
+                self.render_operation_result_return(
+                    output,
+                    operation,
+                    endpoint_parameter,
+                    high_level_return,
+                );
             }
             output.push_str("    }\n\n");
             return;
@@ -1233,6 +1260,23 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("    }\n\n");
             return;
         }
+        self.render_operation_result_return(
+            output,
+            operation,
+            endpoint_parameter,
+            high_level_return,
+        );
+        output.push_str("    }\n\n");
+    }
+
+    /// Named and expression-based SDK calls share the same high-level result conversion.
+    fn render_operation_result_return(
+        &self,
+        output: &mut String,
+        operation: &PlannedOperation,
+        endpoint_parameter: bool,
+        high_level_return: &str,
+    ) {
         if operation.output_transform.is_some() || operation.data.output_resource_return.is_some() {
             let expression =
                 operation_transform_expression(operation, "request", "result", self.api_plan);
@@ -1261,7 +1305,6 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str("        return result;\n");
             }
         }
-        output.push_str("    }\n\n");
     }
 
     fn resource_type_name_for_return_type(&self, return_type: &str) -> Option<String> {
@@ -1302,6 +1345,30 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("        var request = ");
             output.push_str(&request_expr);
             output.push_str(";\n");
+        }
+        if self.operation_starts_by_name(operation) {
+            let service_name = self
+                .api_plan
+                .services
+                .iter()
+                .find(|service| service.operation(&operation.name).is_some())
+                .map(|service| service.wire_name.as_str())
+                .unwrap_or_default();
+            output.push_str("        var client = Workflow.CreateNexusWorkflowClient(");
+            output.push_str(&csharp_string_literal(service_name));
+            output.push_str(", RequireNexgenClient().Options);\n");
+            if raw_return == "void" {
+                output.push_str("        await client.ExecuteNexusOperationAsync(");
+            } else {
+                output.push_str("        return await client.ExecuteNexusOperationAsync<");
+                output.push_str(&raw_return);
+                output.push_str(">(");
+            }
+            output.push_str(&csharp_string_literal(&operation.wire_name));
+            output.push_str(", ");
+            output.push_str(if has_input { "request" } else { "null" });
+            output.push_str(").ConfigureAwait(true);\n");
+            return;
         }
         if raw_return == "void" {
             output.push_str(
@@ -1417,6 +1484,47 @@ impl<'a> ApiPlanner<'a> {
         }
     }
 
+    fn render_operation_method_type_parameters(
+        &self,
+        output: &mut String,
+        operation: &PlannedOperation,
+    ) {
+        let parameters = self.operation_type_parameter_names(operation);
+        if !parameters.is_empty() {
+            output.push('<');
+            output.push_str(&parameters.join(", "));
+            output.push('>');
+        }
+    }
+
+    fn operation_type_parameter_names(&self, operation: &PlannedOperation) -> Vec<String> {
+        let mut names = self
+            .operation_model_parameters(operation)
+            .iter()
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+            .collect::<Vec<_>>();
+        for parameter in &operation.data.runtime_type_parameters {
+            let name = csharp_type_parameter_name(&parameter.name);
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+        names
+    }
+
+    /// The service interface has `object` type arguments, so only a call by name keeps the types.
+    fn operation_starts_by_name(&self, operation: &PlannedOperation) -> bool {
+        !self.operation_model_parameters(operation).is_empty()
+            || operation.output_type().is_some_and(|output| {
+                self.api_plan.type_parameters(output).iter().any(|usage| {
+                    operation
+                        .data
+                        .runtime_type_parameters
+                        .contains(&usage.parameter)
+                })
+            })
+    }
+
     fn dotnet_erased_model_type(&self, model_type: &PlannedType) -> String {
         if let PlannedType::Record(record) = model_type {
             let base = csharp_type_name(&record.model_name);
@@ -1441,12 +1549,13 @@ impl<'a> ApiPlanner<'a> {
             return type_name.to_string();
         }
         if let Some(resource) = &operation.data.output_resource_return {
-            return csharp_type_name(
-                resource
-                    .holder
-                    .as_ref()
-                    .map_or(&resource.resource_type_name, |holder| &holder.model_name),
-            );
+            return match &resource.holder {
+                Some(holder) => csharp_type_name(&holder.model_name),
+                None => csharp_generic_type(
+                    &resource.resource_type_name,
+                    &operation.data.runtime_type_parameters,
+                ),
+            };
         }
         self.operation_output_type(operation)
     }
@@ -1495,9 +1604,11 @@ impl<'a> ApiPlanner<'a> {
                 let input_parameters = self
                     .operation_model_parameters(operation)
                     .into_iter()
-                    .map(|usage| {
-                        let name = csharp_type_parameter_name(&usage.parameter.name);
-                        (usage.parameter.full_name, name)
+                    .map(|usage| usage.parameter)
+                    .chain(operation.data.runtime_type_parameters.iter().cloned())
+                    .map(|parameter| {
+                        let name = csharp_type_parameter_name(&parameter.name);
+                        (parameter.full_name, name)
                     })
                     .collect::<std::collections::BTreeMap<_, _>>();
                 let arguments = parameters
@@ -1548,6 +1659,14 @@ impl<'a> ApiPlanner<'a> {
                 panic!("planned operation output should be proto, record, resource, or none")
             }
         }
+    }
+
+    fn flattened_list_type(&self, kind: &PlannedType) -> Option<String> {
+        let PlannedType::List(item) = kind else {
+            return None;
+        };
+        let (_, field) = flattened_list_field(self.api_plan, item)?;
+        Some(format!("IReadOnlyList<{}>", self.field_type(field)))
     }
 
     fn field_type(&self, field: &RecordFieldSpec<PlannedFamily>) -> String {
@@ -1609,7 +1728,9 @@ impl<'a> ApiPlanner<'a> {
     }
 
     fn resource_field_type(&self, kind: &PlannedType, optional: bool) -> String {
-        let base = self.dotnet_field_kind_type(kind);
+        let base = self
+            .flattened_list_type(kind)
+            .unwrap_or_else(|| self.dotnet_field_kind_type(kind));
         if optional { nullable_type(&base) } else { base }
     }
 
@@ -1618,7 +1739,10 @@ impl<'a> ApiPlanner<'a> {
             return "void".to_string();
         };
         let base = match &result.kind {
-            PlannedResourceMethodResultKind::Resource { type_name } => csharp_type_name(type_name),
+            PlannedResourceMethodResultKind::Resource {
+                type_name,
+                type_parameters,
+            } => csharp_generic_type(type_name, type_parameters),
             PlannedResourceMethodResultKind::Value(kind) => self.dotnet_field_kind_type(kind),
         };
         if result.optional {
@@ -1779,10 +1903,13 @@ impl<'a> ApiPlanner<'a> {
                 nullable_type(&base)
             };
         }
+        let field_type = self
+            .flattened_list_type(&field.field_type)
+            .unwrap_or_else(|| self.field_type(field));
         if field.api_required(GenerationTarget::Workflow) {
-            self.field_type(field)
+            field_type
         } else {
-            nullable_type(&self.field_type(field))
+            nullable_type(&field_type)
         }
     }
 
@@ -1834,7 +1961,13 @@ impl<'a> ApiPlanner<'a> {
         );
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("public class ");
+        // An api-omitted operation keeps its options type for the resource binding, but no longer
+        // exposes it or its convenience method in the public surface.
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal class "
+        } else {
+            "public class "
+        });
         let options_type_name = operation_options_type_name(operation);
         output.push_str(&options_type_name);
         self.render_operation_model_type_parameters(output, operation);
@@ -1990,7 +2123,12 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("    ");
         output.push_str(GENERATED_CODE_ATTRIBUTE);
         output.push('\n');
-        output.push_str("    public ");
+        output.push_str("    ");
+        output.push_str(if operation_public_function_omitted(operation) {
+            "internal "
+        } else {
+            "public "
+        });
         if !instance_method {
             output.push_str("static ");
         }
@@ -2002,7 +2140,7 @@ impl<'a> ApiPlanner<'a> {
             output.push_str("> ");
         }
         output.push_str(method_name);
-        render_flattened_generic_parameters(output, model, overload, self.api_plan);
+        render_flattened_generic_parameters(output, model, overload, self.api_plan, operation);
         output.push('(');
         let mut has_parameters = false;
         if endpoint_parameter {
@@ -2100,6 +2238,25 @@ impl<'a> ApiPlanner<'a> {
             output.push(' ');
             output.push_str(&csharp_parameter_name(&arg_field.name));
         }
+    }
+}
+
+/// Whether `@nexus.api-omit` drops this operation's public convenience method and options type.
+/// The private request helper, the service, and the resource binding stay.
+fn operation_public_function_omitted(operation: &PlannedOperation) -> bool {
+    operation.api_omitted.contains(&GenerationTarget::Workflow)
+}
+
+fn api_omitted_list_item(field: &RecordFieldSpec<PlannedFamily>) -> Option<&PlannedType> {
+    match &field.field_type {
+        PlannedType::List(item)
+            if field.required
+                && (field.api_omitted_for(GenerationTarget::Workflow)
+                    || field.api_omitted_for(GenerationTarget::Client)) =>
+        {
+            Some(item)
+        }
+        _ => None,
     }
 }
 
@@ -2478,6 +2635,9 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("namespace Temporalio.Worker.Interceptors\n{\n\n    public partial class WorkflowOutboundInterceptor\n    {\n");
         for service in &self.api_plan.services {
             for operation in &service.operations {
+                if self.system_nexus_has_generic_model(operation) {
+                    continue;
+                }
                 let request_type = if self.operation_has_input(operation) {
                     self.dotnet_erased_model_type(operation.input_model())
                 } else {
@@ -2519,35 +2679,84 @@ impl<'a> ApiPlanner<'a> {
                 if !self.operation_has_input(operation) {
                     continue;
                 }
+                let generic_request = self.dotnet_open_generic_model_type(operation.input_model());
+                let generic_response = operation
+                    .output_type()
+                    .and_then(|output| self.dotnet_open_generic_model_type(output));
+                let generic = generic_request.is_some() || generic_response.is_some();
                 let request_type = self.dotnet_erased_model_type(operation.input_model());
                 let response_type = self.operation_registry_response_type(operation);
                 output.push_str("            if (service == ");
                 output.push_str(&csharp_string_literal(&service.wire_name));
                 output.push_str(" &&\n                operationName == ");
                 output.push_str(&csharp_string_literal(&operation.wire_name));
-                output.push_str(")\n            {\n                if (arg is not ");
-                output.push_str(&request_type);
-                output.push_str(" request)\n                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
-                output.push_str(&request_type);
+                output.push_str(")\n            {\n");
+                let expected_request = match &generic_request {
+                    Some(definition) => {
+                        output.push_str(
+                            "                \
+                             if (arg is null || !arg.GetType().IsGenericType ||\n",
+                        );
+                        output.push_str(
+                            "                    \
+                             arg.GetType().GetGenericTypeDefinition() != typeof(",
+                        );
+                        output.push_str(definition);
+                        output.push_str("))\n");
+                        definition
+                    }
+                    None => {
+                        output.push_str("                if (arg is not ");
+                        output.push_str(&request_type);
+                        output.push_str(if generic { ")\n" } else { " request)\n" });
+                        &request_type
+                    }
+                };
+                output.push_str(SYSTEM_NEXUS_ARGUMENT_EXCEPTION);
+                output.push_str(expected_request);
                 output.push_str(" request.\", nameof(arg));\n                }\n");
-                output.push_str("                if (typeof(TResult) != typeof(");
-                output.push_str(&response_type);
-                output.push_str("))\n                {\n                    throw new System.ArgumentException(\"System Nexus operation expects a ");
-                output.push_str(&response_type);
-                output.push_str(
-                    " result.\");\n                }\n                var handle = outbound.Value.",
-                );
-                output.push_str(&csharp_operation_ident(operation));
-                output.push_str("Async(request);\n                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n            }\n");
+                let expected_response = match &generic_response {
+                    Some(definition) => {
+                        output.push_str(
+                            "                \
+                             if (!typeof(TResult).IsGenericType ||\n                    \
+                             typeof(TResult).GetGenericTypeDefinition() != typeof(",
+                        );
+                        output.push_str(definition);
+                        output.push_str("))\n");
+                        definition
+                    }
+                    None => {
+                        output.push_str("                if (typeof(TResult) != typeof(");
+                        output.push_str(&response_type);
+                        output.push_str("))\n");
+                        &response_type
+                    }
+                };
+                output.push_str(SYSTEM_NEXUS_ARGUMENT_EXCEPTION);
+                output.push_str(expected_response);
+                output.push_str(" result.\");\n                }\n");
+                if generic {
+                    output.push_str("                throw new System.NotSupportedException(\"System Nexus interception of generic models is not supported in .NET.\");\n");
+                } else {
+                    output.push_str("                var handle = outbound.Value.");
+                    output.push_str(&csharp_operation_ident(operation));
+                    output.push_str(
+                        "Async(request);\n                \
+                         return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;\n",
+                    );
+                }
+                output.push_str("            }\n");
             }
         }
-        // The generic hook gets each operation outside the generated set. Then a plugin
-        // outside the SDK can serve its own System Nexus service.
-        output.push_str("            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(\n                Service: service,\n                Operation: new(\n                    operationName,\n                    arg?.GetType() ?? typeof(object),\n                    typeof(TResult)),\n                Arg: arg,\n                Headers: null));\n        }\n\n");
+        output.push_str("            throw new System.ArgumentException($\"Unsupported System Nexus operation: {service}/{operationName}\");\n");
+        output.push_str("        }\n\n");
         output.push_str("        internal partial class OutboundImpl\n        {\n");
         for service in &self.api_plan.services {
             for operation in &service.operations {
-                if !self.operation_has_input(operation) {
+                if !self.operation_has_input(operation)
+                    || self.system_nexus_has_generic_model(operation)
+                {
                     continue;
                 }
                 let request_type = self.dotnet_erased_model_type(operation.input_model());
@@ -2561,9 +2770,7 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(&csharp_operation_ident(operation));
                 output.push_str("Async(");
                 output.push_str(&request_type);
-                output.push_str(
-                    " request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<",
-                );
+                output.push_str(" request) => instance.ScheduleSystemNexusOperationAsync<");
                 output.push_str(&response_type);
                 output.push_str(">(new(\n                Service: ");
                 output.push_str(&csharp_string_literal(&service.wire_name));
@@ -2581,7 +2788,35 @@ impl<'a> ApiPlanner<'a> {
         output.push_str("        }\n    }\n}\n");
         output
     }
+
+    /// C# generics are invariant, so no typed hook takes each type argument of a generic model.
+    fn system_nexus_has_generic_model(&self, operation: &PlannedOperation) -> bool {
+        (self.operation_has_input(operation)
+            && self
+                .dotnet_open_generic_model_type(operation.input_model())
+                .is_some())
+            || operation
+                .output_type()
+                .is_some_and(|output| self.dotnet_open_generic_model_type(output).is_some())
+    }
+
+    fn dotnet_open_generic_model_type(&self, model_type: &PlannedType) -> Option<String> {
+        let PlannedType::Record(record) = model_type else {
+            return None;
+        };
+        let parameters = self.api_plan.record_type_parameters(&record.full_name);
+        (!parameters.is_empty()).then(|| {
+            format!(
+                "{}<{}>",
+                csharp_type_name(&record.model_name),
+                ",".repeat(parameters.len() - 1)
+            )
+        })
+    }
 }
+
+const SYSTEM_NEXUS_ARGUMENT_EXCEPTION: &str = "                {\n                    \
+    throw new System.ArgumentException(\"System Nexus operation expects a ";
 
 fn generate_tree(
     branch: &ApiSpecBranch<PlannedFamily>,
@@ -3224,12 +3459,19 @@ fn render_flattened_generic_parameters(
     model: &PlannedModel,
     overload: &FlattenedOverload,
     api_plan: &PlannedSpec,
+    operation: &PlannedOperation,
 ) {
     let mut generics = api_plan
         .record_type_parameters(&model.full_name)
         .into_iter()
         .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
         .collect::<Vec<_>>();
+    for parameter in &operation.data.runtime_type_parameters {
+        let name = csharp_type_parameter_name(&parameter.name);
+        if !generics.contains(&name) {
+            generics.push(name);
+        }
+    }
     if !overload.has_expression_functions() && generics.is_empty() {
         return;
     }
@@ -3319,16 +3561,28 @@ fn render_flattened_method_body(
             (field_name, field, initialized)
         })
         .collect::<Vec<_>>();
-    let mut constructor_args = field_exprs
-        .iter()
-        .filter(|(_, field, _)| {
-            field.required && !matches!(field.origin, Some(FieldOrigin::Source { .. }))
+    // The options have no list that the Workflow API omits, so the request gets it empty.
+    let mut constructor_args = model
+        .model_fields()
+        .filter(|(_, field)| field.required)
+        .map(|(name, field)| {
+            match field_exprs
+                .iter()
+                .find(|(field_name, _, _)| *field_name == name)
+            {
+                Some((_, _, expr)) => expr.clone(),
+                None if api_omitted_list_item(field).is_some() => "default".to_string(),
+                None => {
+                    unreachable!("a required model field is an options field or an omitted list")
+                }
+            }
         })
-        .map(|(_, _, expr)| expr.clone())
         .collect::<Vec<_>>();
     constructor_args.extend(model.sourced_fields().map(|(name, field, _)| {
         if let Some(source_expr) = field.source_for(GenerationTarget::Workflow) {
             dotnet_source_expr(source_expr, support_namespace)
+        } else if field.api_omitted_for(GenerationTarget::Workflow) {
+            "default".to_string()
         } else {
             field_exprs
                 .iter()
@@ -3343,9 +3597,7 @@ fn render_flattened_method_body(
     output.push(')');
     let optional_field_exprs = field_exprs
         .iter()
-        .filter(|(_, field, _)| {
-            !field.required && !matches!(field.origin, Some(FieldOrigin::Source { .. }))
-        })
+        .filter(|(_, field, _)| !field.required && !field.has_source())
         .map(|(_, field, expr)| (*field, expr.clone()))
         .collect::<Vec<_>>();
     if optional_field_exprs.is_empty() {
@@ -3367,13 +3619,38 @@ fn render_flattened_method_body(
         output.push('.');
     }
     output.push_str(&csharp_operation_ident(operation));
-    output.push_str("Async(");
+    output.push_str("Async");
+    output.push_str(&flattened_call_type_arguments(operation, model, api_plan));
+    output.push('(');
     if let Some(endpoint_expr) = endpoint_expr {
         output.push_str(endpoint_expr);
         output.push_str(", ");
     }
     output.push_str("request);\n");
     output.push_str("    }\n\n");
+}
+
+/// A runtime type isn't in the request, so C# can't infer it.
+fn flattened_call_type_arguments(
+    operation: &PlannedOperation,
+    model: &PlannedModel,
+    api_plan: &PlannedSpec,
+) -> String {
+    if operation.data.runtime_type_parameters.is_empty() {
+        return String::new();
+    }
+    let mut names = api_plan
+        .record_type_parameters(&model.full_name)
+        .into_iter()
+        .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+        .collect::<Vec<_>>();
+    for parameter in &operation.data.runtime_type_parameters {
+        let name = csharp_type_parameter_name(&parameter.name);
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    format!("<{}>", names.join(", "))
 }
 
 fn flattened_request_field_expr(
@@ -3386,7 +3663,7 @@ fn flattened_request_field_expr(
     options_required: bool,
 ) -> String {
     if let Some(nested_model) = flattened_nested_model(field, api_plan) {
-        nested_model_init_expr(field, nested_model, options_required)
+        nested_model_init_expr(field, nested_model, options_required, api_plan)
     } else if field.function.is_some()
         && matches!(
             overload.function_mode(field_name),
@@ -3411,10 +3688,44 @@ fn flattened_request_field_expr(
             csharp_parameter_name(&field.name)
         }
     } else if field.function.is_none() {
-        option_field_expr(field, options_required)
+        let value = option_field_expr(field, options_required);
+        flattened_list_expr(field, &value, api_plan).unwrap_or(value)
     } else {
         csharp_parameter_name(&field.name)
     }
+}
+
+fn flattened_list_expr(
+    field: &RecordFieldSpec<PlannedFamily>,
+    value: &str,
+    api_plan: &PlannedSpec,
+) -> Option<String> {
+    let PlannedType::List(item) = &field.field_type else {
+        return None;
+    };
+    let (_, nested) = flattened_list_field(api_plan, item)?;
+    let PlannedType::Record(record) = item.as_ref() else {
+        return None;
+    };
+    let type_parameters = api_plan
+        .record_type_parameters(&record.full_name)
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect::<Vec<_>>();
+    let model = csharp_generic_type(&api_plan.record(&record.full_name)?.name, &type_parameters);
+    let construct = if nested.required {
+        format!("new {model}(value)")
+    } else {
+        format!("new {model} {{ {} = value }}", field_property_name(nested))
+    };
+    let wrapped = format!(
+        "System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select({value}, value => {construct}))"
+    );
+    Some(if field.api_required(GenerationTarget::Workflow) {
+        wrapped
+    } else {
+        format!("{value} == null ? null : {wrapped}")
+    })
 }
 
 fn function_name_expression(
@@ -3450,7 +3761,7 @@ fn flattened_nested_model<'a>(
         return None;
     };
     let nested_model = api_plan.record(&record.full_name)?;
-    nested_model.flatten_in_api.then_some(nested_model)
+    (nested_model.flatten_in_api || field.flatten_in_api).then_some(nested_model)
 }
 
 fn render_operation_options_constructor(
@@ -3552,6 +3863,7 @@ fn nested_model_init_expr(
     field: &RecordFieldSpec<PlannedFamily>,
     model: &PlannedModel,
     options_required: bool,
+    api_plan: &PlannedSpec,
 ) -> String {
     let option_fields = model
         .api_fields(GenerationTarget::Workflow)
@@ -3570,7 +3882,14 @@ fn nested_model_init_expr(
         .collect::<Vec<_>>()
         .join(" || ");
     let init_expr = model_init_expr(
-        &csharp_type_name(&model.name),
+        &csharp_generic_type(
+            &csharp_type_name(&model.name),
+            &api_plan
+                .record_type_parameters(&model.full_name)
+                .into_iter()
+                .map(|usage| usage.parameter)
+                .collect::<Vec<_>>(),
+        ),
         option_fields
             .into_iter()
             .map(|(_, nested_field)| {
@@ -3725,6 +4044,25 @@ fn render_resource_method_operation_body(
     output.push_str(&operation_class_name);
     output.push('.');
     output.push_str(&operation_method_name);
+    // A runtime type isn't in the request, so C# can't infer it.
+    if !operation.data.runtime_type_parameters.is_empty() {
+        let mut names = operation
+            .input_type()
+            .map(|input| api_plan.type_parameters(input))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+            .collect::<Vec<_>>();
+        for parameter in &operation.data.runtime_type_parameters {
+            let name = csharp_type_parameter_name(&parameter.name);
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+        output.push('<');
+        output.push_str(&names.join(", "));
+        output.push('>');
+    }
     output.push('(');
     if let Some(endpoint_expr) = endpoint_expr {
         output.push_str(endpoint_expr);
@@ -3911,25 +4249,46 @@ fn resource_method_request_model_init_expr(
                     .iter()
                     .find(|(candidate, _)| candidate.name == field.name)
                     .map(|(_, expression)| expression.clone())
-                    .unwrap_or_else(|| {
-                        if let Some(source_expr) = field.source_for(GenerationTarget::Workflow) {
-                            dotnet_source_expr(source_expr, support_namespace)
-                        } else {
-                            "default".to_string()
-                        }
+                    .unwrap_or_else(|| match field.source_for(GenerationTarget::Workflow) {
+                        Some(source_expr) => dotnet_source_expr(source_expr, support_namespace),
+                        None => "default".to_string(),
                     })
             })
             .collect()
     });
     if type_name_override.is_none() {
-        field_exprs.retain(|(field, _)| !matches!(field.origin, Some(FieldOrigin::Source { .. })));
+        field_exprs.retain(|(field, _)| !field.has_source());
     }
+    let type_arguments = api_plan
+        .record_type_parameters(&model.full_name)
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect::<Vec<_>>();
     Some(model_init_expr(
-        type_name_override.unwrap_or(&csharp_type_name(&model.name)),
+        &csharp_generic_type(
+            type_name_override.unwrap_or(&csharp_type_name(&model.name)),
+            &type_arguments,
+        ),
         field_exprs,
         sourced_field_exprs.unwrap_or_default(),
         options_surface,
     ))
+}
+
+fn csharp_generic_type(type_name: &str, parameters: &[crate::spec::TypeParameterSpec]) -> String {
+    let type_name = csharp_type_name(type_name);
+    if parameters.is_empty() {
+        return type_name;
+    }
+    let names = parameters
+        .iter()
+        .map(|parameter| csharp_type_parameter_name(&parameter.name))
+        .collect::<Vec<_>>();
+    format!("{type_name}<{}>", names.join(", "))
+}
+
+fn csharp_generic_resource_type(resource: &PlannedResource) -> String {
+    csharp_generic_type(&resource.type_name, &resource.type_parameters)
 }
 
 fn resource_method_request_field_exprs(
@@ -4050,7 +4409,10 @@ fn resource_return_expression(
         .output_resource_return
         .as_ref()
         .expect("the operation returns a resource");
-    let type_name = csharp_type_name(&resource.resource_type_name);
+    let type_name = csharp_generic_type(
+        &resource.resource_type_name,
+        &operation.data.runtime_type_parameters,
+    );
     let args = resource
         .bindings
         .iter()
@@ -4129,10 +4491,9 @@ fn resource_return_binding_expr(
             proto_field_name: _,
             origin,
         } => {
-            if matches!(
-                origin,
-                Some(FieldOrigin::Source { .. } | FieldOrigin::Omitted)
-            ) {
+            if origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || origin.as_ref().is_some_and(FieldPolicy::is_sourced)
+            {
                 let expr = format!("{request_expr}.{}", csharp_type_name(field_name));
                 optional_resource_binding_expr(resource, binding, expr, api_plan)
             } else {

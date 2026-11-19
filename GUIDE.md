@@ -22,6 +22,8 @@ of `@nexus` directives.
   - [Resource Declaration](#resource-declaration)
   - [Name-Binding: How Resource Methods Find Operations](#name-binding-how-resource-methods-find-operations)
   - [Resource Return Binding](#resource-return-binding)
+  - [Closing a Resource](#closing-a-resource)
+  - [Variadic Items](#variadic-items)
   - [Edge Cases and Error Conditions](#edge-cases-and-error-conditions)
 - [Proto-Backed Models](#proto-backed-models)
   - [Transfer-Type Conversion](#transfer-type-conversion)
@@ -173,37 +175,59 @@ package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 `@nexus.namespace go="go.temporal.io/sdk/internal"`.
 
 Workflow System Nexus generation emits an operation-specific outbound interface,
-forwarding methods, terminal methods, and a dispatcher. Standalone packages
-expose `SystemNexus_WorkflowOutboundInterceptor`, its `Base` and `Terminal`
-types, and `SystemNexus_WorkflowOutboundRuntime` in a `Test-only adapters`
-section. The terminal embeds the runtime interface, whose
-`ExecuteNexusOperation` method supplies scheduling directly without a forwarding
-adapter. The host implements the runtime contract for failed futures and
-scheduling. Call the terminal's `SystemNexus_ExecuteOperation` with the head of
-the typed interceptor chain and a `SystemNexus_ExecuteOperationInput` containing
-the service, resolved operation name, and unencoded request. The host resolves
-operation references before dispatch. Terminal scheduling must not re-enter that
-chain.
+forwarding implementations, and terminal implementations. Public functions apply
+authored defaults and resolve function references before calling the SDK's typed
+interceptor chain or, in standalone packages, the generated terminal directly.
+Interceptor methods receive the public options and positional arguments, with
+resolved function names in place of function references, and return a workflow
+`Future`. The terminal constructs the request from the intercepted arguments,
+evaluates sourced fields, schedules the Nexus operation, and adapts the result.
+It does not reapply defaults or re-enter the typed interceptor chain. No
+service-name dispatcher is needed.
 
-For generation into `go.temporal.io/sdk/internal`, nexgen attaches forwarding
-methods directly to `WorkflowOutboundInterceptorBase` and terminal methods to
-`workflowEnvironmentInterceptor`, using the SDK's shared runtime helpers. The
-SDK embeds the generated interface once; its existing `Next` field remains the
-only forwarding state. Both package layouts use the same operation renderer. The
-existing Go `workflow-service` sample exercises dispatch, forwarding, and
-terminal scheduling through the standalone runtime contract.
+Ordinary Go public functions construct requests and inline execution and result
+adaptation. Neither mode generates private operation helpers.
 
-Interceptor methods accept a pointer to the unencoded request, without Nexus
-operation options or transport headers. The terminal uses default Nexus
-settings. Requests and their nested models become public types; the facade
-exposes their aliases. Interceptors may modify requests synchronously before
-forwarding but must not retain them. Request header maps may be nil, and
-interceptors may allocate or replace them. Go SDK header bindings use
-`map[string]*commonpb.Payload`, with pass-through converters. Interceptors own
-context propagation through the request headers; generated code does not bind
-them to the workflow context or invoke configured context propagators. SDK
-interceptor generation requires concrete request types because Go methods cannot
-declare type parameters.
+Go resource methods construct requests from their bound resource fields and
+method arguments, then inline the same execution and result adaptation. They
+preserve resource-owned values even when the corresponding public function
+sources those fields from the workflow context. Resource methods use the
+low-level Nexus client path, including generic Nexus interceptors, rather than
+the free function's typed interceptor hook in System Nexus mode. The existing
+`start-workflow`, `user-service`, and `defaults` samples exercise resource
+execution, resource results, namespace precedence, defaults, optional values,
+and failures.
+
+For generation into `go.temporal.io/sdk/internal`, nexgen emits methods directly
+on `WorkflowOutboundInterceptorBase` and `workflowEnvironmentInterceptor`. The
+base method forwards to `Next`; the terminal method constructs the request,
+calls `wc.ExecuteNexusOperation` directly, and adapts the result. There are no
+extra adapter functions or handwritten methods. The SDK embeds the generated
+interface once; its existing `Next` field remains the only forwarding state.
+
+Standalone packages emit free functions named
+`SystemNexus_WorkflowOutboundInterceptorBase_<Operation>` and
+`SystemNexus_WorkflowEnvironmentInterceptor_<Operation>`, together with the
+private interceptor interface. The forwarding function takes the next typed
+interceptor explicitly; the terminal function takes an `ExecuteNexusOperation`
+function explicitly. They use the same request and result renderers as the SDK
+methods, without generated test-only base, terminal, or runtime types.
+
+Standalone public functions call the generated terminal with an inline callback
+that delegates execution to the input's Nexus client. No execution helper is
+required in the support package. Tests can instead supply the next interceptor
+or execution function directly. There is no context installer or scheduling
+fallback, and facades do not re-export interceptor helpers. The Go
+`workflow-service` and `multi-operation-service` samples exercise typed calls,
+forwarding, short-circuiting, and terminal scheduling. SDK tests cover
+public-function entry into the SDK's interceptor chain.
+
+The terminal uses default Nexus settings. With
+[`@nexus.context-propagation`](#nexuscontext-propagation), SDK generation
+initializes workflow headers before interception and injects configured context
+propagators afterward. Without that directive, it does neither. SDK interceptor
+generation requires concrete types because Go methods cannot declare type
+parameters.
 
 Go System Nexus operation requests use default-punning for optional scalar-like
 fields, matching the options surface: zero durations and numbers, false, empty
@@ -211,8 +235,8 @@ strings, and zero enum or flag values represent omission. Encoding omits those
 values, and decoding maps absent fields to their zero value. Requests cannot
 distinguish an explicitly supplied zero from an omitted field. Optional structs
 and nested record fields retain their existing presence-bearing representation.
-Authored defaults still apply only in operation wrappers, not in interceptors or
-encoding/decoding.
+Authored defaults apply when preparing public function calls or resource-method
+requests, not in interceptors or encoding/decoding.
 
 ### Python
 
@@ -311,6 +335,22 @@ and `ToPayloads` for the generic payload carriers, along with any converters and
 serialization-context helpers named in your WIT. For `@nexus.source`, write
 `TemporalWorkflowContext.WorkflowNamespace()`. Generated code adds the support
 namespace to the call. Verify that the project compiles with `dotnet build`.
+
+### System Nexus interception in Python, .NET, and TypeScript
+
+With `--system-nexus`, workflow operations use their operation-specific outbound
+interceptor chain and then schedule directly. SDK integrations must not enter a
+second, generic System Nexus or ordinary Nexus interceptor chain.
+
+Python terminal implementations provide `_schedule_system_nexus_operation`. .NET
+integrations provide `WorkflowInstance.ScheduleSystemNexusOperationAsync` for
+generated terminal methods to call directly. TypeScript integrations pass a
+direct scheduling callback to `dispatchSystemNexusSpecificInterceptors`.
+
+Dispatch rejects services and operations outside the generated bindings. .NET
+also rejects operations with generic request or response models because their
+operation-specific interception is not yet supported. See
+[nexgen issue #414](https://github.com/temporalio/nexgen/issues/414).
 
 ---
 
@@ -505,6 +545,10 @@ coordinates?: [number, number];
 
 `option<T>` fields become optional with a `None`/`undefined` default.
 
+In proto-backed records, API optionality is independent of protobuf presence.
+Non-optional booleans and numbers accept implicit protobuf defaults, including
+`false` and zero, even when the field is omitted from the wire.
+
 **Python:**
 
 ```python
@@ -559,10 +603,12 @@ information, so decoding their wire values produces collections even when empty;
 their API fields do not gain implicit constructor defaults.
 
 In a record with `@nexus.proto`, write a proto `bytes` field as `list<u8>`.
-nexgen generates Python `bytes`, TypeScript `Uint8Array`, Go `[]byte`, or .NET
-`byte[]`. The .NET converters translate between `byte[]` and protobuf
-`ByteString` at the wire boundary. In other records, `list<u8>` is a list of
-integers, like any other `list<T>`.
+Write a `bytes` member of a oneof the same way, as the case payload of a variant
+with `@nexus.proto`. A resource method parameter of `list<u8>` that fills such a
+field is `bytes` too. nexgen generates Python `bytes`, TypeScript `Uint8Array`,
+Go `[]byte`, or .NET `byte[]`. The .NET converters translate between `byte[]`
+and protobuf `ByteString` at the wire boundary. In other records, `list<u8>` is
+a list of integers, like any other `list<T>`.
 
 ---
 
@@ -571,6 +617,9 @@ integers, like any other `list<T>`.
 Resources are the most complex feature of the code generator. They produce
 classes whose constructor fields represent the resource's identity, and whose
 methods delegate to Nexus operations.
+
+A resource that uses a type parameter is generic. See
+[Generic resources](#generic-resources).
 
 ### Resource Declaration
 
@@ -741,7 +790,9 @@ request = CancelWorkflowRequest(
 
 After field matching, the generator also filters candidates by return type. If
 the method returns `own<user>`, only operations that also return `own<user>` (or
-the equivalent proto type) are considered.
+the equivalent proto type) are considered. A method that returns a record binds
+to an operation that returns that record. An output transform on the operation
+changes the method's result too.
 
 **Disambiguation by name:**
 
@@ -805,6 +856,45 @@ record create-job-result {
 ```python
 result = await handle  # CreateJobResponse
 return CreateJobResult(job=Job(job_id=result.job_id), created=result.created)
+```
+
+### Closing a Resource
+
+`@nexus.close` marks the method that ends a resource. In Python, the end of an
+`async with` block calls it with no arguments, so its parameters must be
+optional.
+
+```wit
+/// @nexus.operation "close-stream"
+/// @nexus.close
+close: func();
+```
+
+```python
+async with client.create_stream(id="turns", body_type=Turn) as stream:
+    await stream.publish(records=[AppendRecord(body=Turn(role="user"))])
+```
+
+A call that returns the resource returns a `ResourceCall`, such as
+`ResourceCall[Stream[Turn]]`. Await it for the resource, or enter it with
+`async with`. Only Python closes a resource this way.
+
+### Variadic Items
+
+`@nexus.varargs "<parameter>"` makes a resource method take the items of that
+list parameter as positional arguments. Only Python generates it, and Go refuses
+it.
+
+```wit
+resource %stream {
+  /// @nexus.operation "append-records"
+  /// @nexus.varargs "records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
+```
+
+```python
+async def publish(self, *records: BodyT) -> int: ...
 ```
 
 ### Edge Cases and Error Conditions
@@ -1090,7 +1180,17 @@ making it a public operation parameter.
 headers: option<header>,
 ```
 
-`@nexus.api-omit` cannot be combined with `@nexus.omit` or `@nexus.source`.
+`targets="workflow"` or `targets="client"` omits the field from those targets
+only. The other targets take it as an argument or from their `@nexus.source`.
+
+```wit
+/// @nexus.api-omit targets="workflow"
+last: option<s32>,
+```
+
+The field must be an `option<T>` or a `list<T>`, since a call leaves it unset.
+An omitted list is sent empty. `@nexus.api-omit` cannot be combined with
+`@nexus.omit`, `@nexus.default`, or a `@nexus.source` for the same target.
 
 ### Flattened Records
 
@@ -1130,6 +1230,40 @@ the optional nested record when none of its fields are supplied. Go uses nil
 pointers internally for wire presence, but its public options use
 default-punning: empty strings mean omitted.
 
+#### Flattening one field
+
+On a request field, `@nexus.flatten-in-api` makes that call take the fields of
+the field's record. The models keep the record.
+
+```wit
+record create-stream-request {
+  /// @nexus.flatten-in-api
+  stream-ref: stream-ref,
+}
+```
+
+```python
+stream = await client.create_stream(id="s1", store="redis")
+```
+
+A resource method can't bind an operation whose request flattens a field.
+
+A list of a flattened record with one field takes that field's values, and the
+call wraps each value in the record. The record must be proto-backed. Go refuses
+such a list.
+
+```wit
+/// @nexus.flatten-in-api
+record append-record {
+  body: body-t,
+}
+```
+
+```python
+# Sends records=[AppendRecord(body="a"), AppendRecord(body="b")].
+await append_records(ref=ref, records=["a", "b"])
+```
+
 ### Output Transforms
 
 An operation annotated with `@nexus.output-transform` transforms the raw
@@ -1158,6 +1292,10 @@ signal-with-start-workflow: func(
 The generated wrapper returns the transformed type. The transform expression has
 access to `request` (the input) and `result` (the raw response). Go transform
 expressions must evaluate to `(T, error)`, where `T` is the `go-type` value:
+
+Go transforms run inside the terminal workflow interceptor, so `request`
+contains any changes made by outbound interceptors. References to the `workflow`
+package in the transform use the same import alias as generated SDK references.
 
 For TypeScript, `typescript-type-import` adds a type-only import for the type
 named by `typescript-type`; `typescript-import` adds the value import used by
@@ -1551,6 +1689,16 @@ separate the targets with commas.
   selected independently or alongside `workflow`. nexgen refuses it for a
   service with no `@nexus.endpoint`.
 
+Go operation convenience wrappers take `ctx`, an options struct, and positional
+arguments for required input fields, in that order. Optional fields and fields
+with an applicable `@nexus.default` stay in the options struct. Fields supplied
+by `@nexus.source`, omitted fields, and API-omitted fields are not arguments.
+The options struct is required even when it is empty:
+
+```go
+future := userservice.UpdateEmail(ctx, userservice.UpdateEmailOptions{}, "user-123", "alice@example.com")
+```
+
 Python keeps shared models and service contracts in the root package. Client
 APIs live in `client/`. Workflow-only generation keeps its API in the root
 package; when both targets are selected, the workflow API lives in `workflow/`.
@@ -1640,6 +1788,15 @@ await job.restart()
 nexgen refuses a factory name that is also the name of a client method of a
 service in the package.
 
+In Python, the Workflow package has the same `get_<resource>` factory for each
+resource with a method. nexgen refuses one with the name of an operation
+function of the package. The factory returns the handle from its ref, with no
+call.
+
+```python
+stream = get_stream(ref=StreamRef(id="chat-1:turns", store="redis"), body_type=Turn)
+```
+
 Sources work in the client target as well. Restrict workflow-only helpers with
 `targets="workflow"`. If a required resource-method request field has neither an
 applicable source nor a resource field or method parameter supplying it,
@@ -1678,11 +1835,12 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.delay-load-temporalio-workflow` | interface                                                                                     |
 | `@nexus.proto`                          | record, enum, flags, variant, type alias, resource                                            |
 | `@nexus.type-parameter`                 | type alias                                                                                    |
+| `@nexus.generic`                        | record                                                                                        |
 | `@nexus.proto-field`                    | record field                                                                                  |
 | `@nexus.name`                           | record field                                                                                  |
 | `@nexus.type`                           | record field, type alias, resource                                                            |
 | `@nexus.omit`                           | record field                                                                                  |
-| `@nexus.api-omit`                       | record field                                                                                  |
+| `@nexus.api-omit`                       | record field, resource method, freestanding function                                          |
 | `@nexus.source`                         | record field                                                                                  |
 | `@nexus.default`                        | record field                                                                                  |
 | `@nexus.fallback`                       | enum case                                                                                     |
@@ -1691,12 +1849,15 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.operation`                      | resource method, freestanding function                                                        |
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
+| `@nexus.context-propagation`            | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
-| `@nexus.flatten-in-api`                 | record                                                                                        |
+| `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
 | `@nexus.function-args`                  | freestanding function                                                                         |
 | `@nexus.add-rpc-compatible-with`        | type alias                                                                                    |
+| `@nexus.close`                          | resource method                                                                               |
+| `@nexus.varargs`                        | resource method                                                                               |
 
 <!-- annotation-placements:end -->
 
@@ -1748,6 +1909,7 @@ The catalog currently declares these restrictions:
 | `@nexus.operations-class`               | dotnet               | required                |
 | `@nexus.delay-load-temporalio-workflow` | none                 | required                |
 | `@nexus.poll`                           | python               | required                |
+| `@nexus.context-propagation`            | go                   | required                |
 
 <!-- annotation-availability:end -->
 
@@ -1998,14 +2160,124 @@ const inputType = {
 };
 ```
 
-Type parameters are also unsupported in resources, map keys, function-signature
-metadata, or resource-bound generic operations.
+Type parameters are also unsupported in map keys and in function-signature
+metadata.
 
 Python represents generic variants as tagged tuples and protobuf oneof-backed
 generic variants as unions of generic case dataclasses. TypeScript uses tagged
 object unions, Go uses sealed interfaces and case structs, and .NET uses nested
 records. References to generic variants are closed automatically wherever they
 occur.
+
+#### Generic resources
+
+A resource that uses a type parameter in its fields, its methods or the
+operations that they bind is generic in it. Records, protos and a returned
+generic resource count too, so the resource needs no annotation. It takes its
+type parameters in the order of their aliases.
+
+```wit
+/// @nexus.type-parameter
+type body-t = placeholder;
+
+/// @nexus.proto "temporal.api.stream.v1.AppendRecord"
+record append-record {
+  body: body-t,
+}
+
+resource %stream {
+  /// @nexus.operation "append-records"
+  publish: func(records: list<append-record>) -> append-records-response;
+}
+```
+
+The handle keeps a runtime type for each type parameter and decodes responses
+with it. Python takes `Stream[Turn](...)` with a `StreamRef[Turn]`, or a
+keyword, as in `create_stream(stream_ref=ref, body_type=Turn)` or
+`client.get_stream(ref=ref, body_type=Turn)`. A create call with no `body_type`
+decodes as `typing.Any`, but its static return type is `Stream[object]`; a
+concrete `Stream[Turn]` requires a typed ref or `body_type=Turn`. Generic Python
+resource handles do not support subclasses; constructing one raises `TypeError`.
+TypeScript takes `bodyType` after the fields, and .NET takes the type argument,
+as in `CreateStreamAsync<Turn>(options)`.
+
+In Python, a ref explicitly declared generic with `@nexus.generic "body-t"` can
+carry the payload type without storing a body. Its phantom parameter defaults to
+`object`, and the ref keeps the same wire message, equality and repr. The type
+argument rides in memory, in `__orig_class__`. `StreamRef[Turn]`, the ref
+returned by a factory with `body_type=Turn`, and a decode with the type hint
+`StreamRef[Turn]`, such as a Workflow input's, each set it. `get_stream(ref)`
+infers the handle's type from the ref, so a reader that gets a ref keeps its
+payload type. An untyped ref produces `Stream[object]`, whose bodies decode as
+ordinary Python values. The `ref` attribute is a plain field: direct
+construction preserves the supplied ref rather than attaching the handle's type
+to it.
+
+For callable Python resources, a constructor record field that explicitly
+declares any resource type parameters must declare all of them, and only one
+such field is supported. Partial declarations and multiple sources are rejected
+during Python backend planning rather than silently disabling inference.
+Resources without a declared source retain the explicit runtime-type keyword
+API.
+
+```python
+stream = client.get_stream(ref)  # Stream[Turn] for a StreamRef[Turn]
+stream = client.get_stream(StreamRef(id="s1"), body_type=Turn)  # Choose a decoder
+```
+
+An explicit `body_type` must agree with an already-typed ref; it cannot
+reinterpret `StreamRef[Turn]` as `StreamRef[str]`. Requests and results
+containing a generic ref inherit its parameters too, so
+`CreateStreamRequest[Turn]` contains `StreamRef[Turn]`. Decoding a request or
+result with a concrete type hint preserves the nested ref's type argument.
+
+Public operation functions preserve this relationship too:
+`read_records(ref=ref)` infers and decodes `Turn` bodies from a
+`StreamRef[Turn]`, while an unknown ref yields `ReadRecordsResponse[object]`. An
+explicit `body_type=Turn` can select the decoder for an unknown ref, but cannot
+contradict a typed ref. Write operations such as `append_records` require the
+ref and the records to have the same payload type.
+
+Go and Java refuse a generic resource. A record field can't hold one yet, and an
+operation with no `@nexus.proto` message can't return one yet.
+
+---
+
+### @nexus.generic
+
+**Placement:** Record **Syntax:** `@nexus.generic "type-parameter-alias"`
+
+Explicitly declares a record's dependency on an alias marked
+`@nexus.type-parameter`, even when no field uses that parameter. Repeat the
+annotation to declare multiple parameters. The alias must be in scope in the
+record's interface, including aliases imported with WIT `use`. Declaring the
+same resolved parameter twice is an error.
+
+```wit
+/// @nexus.type-parameter
+type body-t = placeholder;
+
+/// @nexus.generic "body-t"
+record stream-ref {
+  id: string,
+}
+
+record read-request {
+  ref: stream-ref,
+}
+```
+
+Both `stream-ref` and `read-request` are generic in `body-t`. Explicit
+parameters come first in annotation order, followed by parameters inferred from
+fields in first-use order; a parameter used by both is included only once.
+Dependencies propagate through containing records, variants, operations, and
+resources using the same rules as field-inferred parameters.
+
+A parameter unused by the record's fields is a phantom parameter: it affects the
+generated type, but adds no field to the model or wire representation. Python
+defaults phantom parameters to `object` and retains explicit runtime arguments
+for decoding. No record becomes generic merely because a generic resource has a
+constructor field of that record type.
 
 ---
 
@@ -2109,14 +2381,38 @@ Cannot be combined with `@nexus.source`, `@nexus.type`, `@nexus.function`,
 
 ### @nexus.api-omit
 
-**Placement:** Record field **Syntax:** `@nexus.api-omit` (no arguments)
+**Placement:** Record field, resource method, or freestanding function
+**Syntax:** `@nexus.api-omit [targets="workflow,client"]`
 
-Keeps the field on generated models and in proto conversion, but excludes it
-from generated convenience operation APIs. Unlike `@nexus.omit`, this preserves
-the field in the generated model. See [API-omitted fields](#api-omitted-fields)
-for an example.
+On a record field, keeps the field on generated models and in proto conversion,
+but excludes it from generated convenience operation APIs. `targets` limits the
+omission to those targets. Unlike `@nexus.omit`, this preserves the field in the
+generated model. See [API-omitted fields](#api-omitted-fields) for an example.
 
-Cannot be combined with `@nexus.omit` or `@nexus.source`.
+On a freestanding function (an operation), the bare `@nexus.api-omit` suppresses
+the operation's public top-level function and its export. Only the workflow
+target has a top-level operation function, so on a function `@nexus.api-omit` is
+effectively workflow-only, and `targets` (if given) must include `workflow`. The
+operation stays registered, stays in the generated service, and stays bindable
+by resource methods. The private per-operation helper that resource methods call
+remains, so the operation is still reached through its resource.
+
+On a field, it cannot be combined with `@nexus.omit`, `@nexus.default`, or a
+`@nexus.source` for the same target.
+
+On a resource method, `targets="workflow"` or `targets="client"` leaves the
+method out of the resource class of that target, with the helpers that only it
+used. The operation stays in the service and in the other target. Without its
+`@nexus.close` method, the resource of that target is not a context manager.
+nexgen refuses a method omission without one target, since no target would keep
+the method. Remove such a method instead. Go refuses a method omitted for
+`workflow`.
+
+```wit
+/// @nexus.operation "read-records"
+/// @nexus.api-omit targets="workflow"
+read: func(from-offset: option<list<u8>>) -> read-records-response;
+```
 
 ---
 
@@ -2203,6 +2499,16 @@ Defaults apply only to exposed operation arguments, including flattened
 arguments. Supplied nested records must be complete and pass through unchanged;
 defaults are not applied to their fields or to records inside lists or maps.
 Constructors and encoding/decoding do not evaluate defaults.
+
+In a resource method, an optional parameter (`option<T>`) can share its name
+with a defaulted request field. The method then sends the caller's value when
+there is one, and the default otherwise. The default is evaluated only when the
+caller passes no value. Go and Java pass an optional parameter as it is, and so
+does a .NET resource method that builds the request itself.
+
+```python
+producer=((_support.default_producer()) if producer is None else producer)
+```
 
 A default cannot be combined with `@nexus.source` for the same language.
 
@@ -2362,6 +2668,75 @@ signal-with-start-workflow: func(...) -> ...;
 
 ---
 
+### @nexus.context-propagation
+
+**Placement:** Operation (function) **Syntax:**
+`@nexus.context-propagation go="request.headers"`
+
+Enables outbound workflow context propagation for a Go System Nexus operation
+generated into `go.temporal.io/sdk/internal`. It requires `--targets workflow`
+and a protobuf-backed request record. The Go backend ignores this directive when
+generating into any other package because header injection calls the SDK's
+private helpers. Operations bound to resource methods are not supported because
+those methods bypass the typed interceptor chain.
+
+The value is a checked WIT field path, not a Go expression. Its root must be the
+operation's input parameter name, and it must select a direct field of that
+record. Input record aliases are supported; nested paths are not. Nexgen
+resolves the WIT field identity before applying `@nexus.proto-field` and
+`@nexus.name` mappings, so the path uses authored WIT names.
+
+The selected field must use `@nexus.api-omit`. Its Go binding must accept
+`map[string]*commonpb.Payload`; the Go compiler checks that binding. For
+example, using the Temporal `header` binding:
+
+```wit
+/// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+record signal-with-start-workflow-request {
+  /// @nexus.api-omit
+  /// @nexus.proto-field "header"
+  headers: option<header>,
+}
+
+/// @nexus.context-propagation go="request.headers"
+signal-with-start-workflow: func(
+  request: signal-with-start-workflow-request,
+) -> signal-with-start-workflow-response;
+```
+
+The public function creates a fresh header map before the typed interceptor
+chain. Interceptors read and modify it with `interceptor.WorkflowHeader(ctx)`.
+The terminal calls the configured propagators' `InjectFromWorkflow` methods with
+the forwarded context, then assigns the map to the selected request field before
+encoding or scheduling. Injection errors resolve the returned workflow `Future`
+with an error and do not schedule an operation. Interceptor-supplied headers are
+preserved unless a propagator overwrites the same key.
+
+These are Temporal payload headers inside the operation request, not Nexus
+transport headers. The directive does not enable inbound extraction or response
+propagation. Use `go=` in multi-language inputs to keep it inactive for other
+backends.
+
+---
+
+### @nexus.close
+
+**Placement:** Resource method **Syntax:** `@nexus.close` (no arguments)
+
+Marks the method that ends the resource. Its parameters must be optional. See
+[Closing a Resource](#closing-a-resource).
+
+---
+
+### @nexus.varargs
+
+**Placement:** Resource method **Syntax:** `@nexus.varargs "<parameter>"`
+
+The method takes the items of that list parameter as positional arguments. See
+[Variadic Items](#variadic-items).
+
+---
+
 ### @nexus.serialization-context
 
 **Placement:** Operation (function) **Syntax:**
@@ -2451,18 +2826,36 @@ type or transform expression refers to an otherwise-unavailable module.
 ### @nexus.poll
 
 **Placement:** Operation (function) **Syntax:**
-`@nexus.poll python="<support-helper>" targets="client"`, with optional
+`@nexus.poll python="<support-helper>"`, with optional `targets`,
 `items="<field>"` and `python-resume="<support-helper>"`
 
-Generates an `iter_<name>` async iterator on the client extension, and on each
-client resource method that binds the operation. The iterator sends the request,
-yields the response, and calls `<support-helper>(request, response)` for the
-next request. The helper is a sync function in the `--support-package`. It
-returns `None` to stop.
+Generates an `iter_<name>` async iterator on the client extension. The iterator
+sends the request, yields the response, and calls
+`<support-helper>(request, response)` for the next request. The helper is a sync
+function in the `--support-package`. It returns `None` to stop.
+
+A resource method `<method>` that binds the operation gets these methods
+instead. The short name is the iterator that callers should use first:
+
+| Method           | With `items`                        | Without `items`     |
+| ---------------- | ----------------------------------- | ------------------- |
+| `<method>`       | yields each item                    | yields each page    |
+| `<method>_pages` | yields each page                    | not generated       |
+| `<method>_page`  | sends one request, returns one page | the same            |
+
+Without `items`, the page iterator gets the short name, since the pages are what
+a caller reads. `<method>_page` is always the one call.
+
+The Workflow target gets the same methods, with the same names, on each Workflow
+resource method that binds the operation. Each page is the call of the Workflow
+method, so the loop uses no clock, sleep or thread. Without `targets`, every
+target that has the method gets them, and `targets="client"` keeps them out of
+Workflow code. With `targets="client"`, the Workflow `<method>` stays the one
+call.
 
 ```wit
 /// @nexus.operation name="ReadRecords"
-/// @nexus.poll python="next_read_request" targets="client"
+/// @nexus.poll python="next_read_request"
 read-records: func(request: read-records-request) -> read-records-response;
 ```
 
@@ -2476,9 +2869,10 @@ def next_read_request(request, response):
     return dataclasses.replace(request, from_offset=response.next_offset)
 ```
 
-With `items="<field>"`, nexgen also generates `iter_<name>_items`. It takes the
-parameters of `iter_<name>`, reads its pages, and yields the items of the list
-field `<field>` of each response. It returns a `PollIterator`, whose
+With `items="<field>"`, nexgen also generates `iter_<name>_items` on the client
+extension, and `<method>` on a resource method. The item iterator takes the
+parameters of the page iterator, reads its pages, and yields the items of the
+list field `<field>` of each response. It returns a `PollIterator`, whose
 `next_request` is the request to resume with:
 
 - After an item, the `python-resume` helper gives it. The helper takes the
@@ -2491,7 +2885,7 @@ field `<field>` of each response. It returns a `PollIterator`, whose
 
 ```wit
 /// @nexus.poll python="next_read_request" items="records"
-///   python-resume="resume_read_request" targets="client"
+///   python-resume="resume_read_request"
 read-records: func(request: read-records-request) -> read-records-response;
 ```
 
@@ -2500,20 +2894,23 @@ def resume_read_request(request, item):
     return dataclasses.replace(request, from_offset=item.offset + 1)
 ```
 
-To resume, pass the fields of a saved `next_request` to `iter_<name>_items`. A
+To resume, pass the fields of a saved `next_request` to the item iterator. A
 resource method's iterator takes only the method's parameters, such as
-`from_offset` of the Stream's `iter_read_items`.
+`from_offset` of the Stream's `read`.
 
 The stream sample's full helpers are in
 [`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
 
-- `iter_<name>` yields pages, and `iter_<name>_items` yields the items in them.
-- All pages use one Nexus client. Each page is a new operation with a new random
-  operation ID.
-- Only the Python client target generates the iterator, so `targets` must be
-  `client`.
+- On the client extension, `iter_<name>` yields pages, and `iter_<name>_items`
+  yields the items in them. On a resource method, `<method>` yields the items,
+  `<method>_pages` yields the pages, and `<method>_page` reads one page.
+- In the client, all pages use one Nexus client. Each page is a new operation
+  with a new random operation ID.
+- Only Python generates the iterators. The Workflow target has no standalone
+  iterator, only the ones on resource methods.
 - nexgen refuses the directive on a resource method, on an operation that it
-  can't poll, and when an iterator clashes with another member.
+  can't poll, and when a method that it adds clashes with another member, such
+  as a resource method called `<method>_page`.
 - nexgen refuses an `items` field that the response doesn't have, a field with
   `@nexus.omit`, or a field that isn't a list in the model, such as a proto
   `bytes` field. It also refuses `python-resume` without `items`, and `items` in
@@ -2525,11 +2922,12 @@ The stream sample's full helpers are in
 
 ### @nexus.flatten-in-api
 
-**Placement:** Record type (with `@nexus.proto`) **Syntax:**
-`@nexus.flatten-in-api` (no arguments)
+**Placement:** Record type (with `@nexus.proto`), or a request field of such a
+type **Syntax:** `@nexus.flatten-in-api` (no arguments)
 
 Flattens the record's fields into the parent record's generated API surface
-instead of creating a nested model.
+instead of creating a nested model. On a field, it flattens only that call. See
+[Flattening one field](#flattening-one-field).
 
 ```wit
 /// @nexus.proto "temporal.api.sdk.v1.UserMetadata"
@@ -2539,8 +2937,6 @@ record user-metadata {
   static-details: option<payload>,
 }
 ```
-
-Only supported on record types.
 
 In Go, `@nexus.flatten-in-api` promotes the record's fields into the generated
 operation options struct. For a parent request with

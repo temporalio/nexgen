@@ -30,8 +30,8 @@ struct Selector {
 impl ApiSpecTransform<AuthoredFamily, SelectedFamily> for Selector {
     fn map_origin(
         &mut self,
-        origin: crate::spec::LanguageFieldOrigins,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: crate::spec::LanguageFieldPolicies,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin.for_language(self.language).cloned()
     }
     fn map_spec_data(&mut self, _data: ()) {}

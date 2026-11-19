@@ -1,1 +1,0 @@
-`@nexus.fallback` on a case of an enum with `@nexus.proto` decodes a protobuf number that the enum doesn't know as that case, in Python, TypeScript and .NET. Without it, Python still raises on such a number.

@@ -1,0 +1,6 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "unsupported-flatten"
+contains = ["can't flatten a request field of operation `GetHistory`: its request has a `@nexus.default` too"]

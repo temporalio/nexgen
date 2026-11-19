@@ -1,13 +1,13 @@
 [project]
 name = "advanced-samples-python"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "basedpyright==1.31.4",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "ruff>=0.15.12",
-    "temporalio>=1.34.0",
+    "temporalio>=1.36.1",
     "temporalio-stream-protos",
     "typing_extensions>=4.15.0",
 ]
@@ -15,6 +15,8 @@ dependencies = [
 [tool.uv]
 package = false
 exclude-newer = "2 weeks"
+# The launcher fixes require a newer SDK than the general dependency cooldown.
+exclude-newer-package = { temporalio = false }
 
 [tool.uv.sources]
 # Keep it non-editable. An editable install adds a path entry, and Python ignores that path for
@@ -27,7 +29,7 @@ pythonpath = ["."]
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py311"
 # The protoc output of the stream protos.
 extend-exclude = ["temporalio_stream_protos"]
 

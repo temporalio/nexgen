@@ -33,20 +33,22 @@ async def _start_system_nexus_operation(
         and input.operation_name == "CreateStream"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.CreateStreamRequest, models.CreateStreamResult]",
+            "StartNexusOperationInput[models.CreateStreamRequest[typing.Any], models.CreateStreamResult[typing.Any]]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
         return typing.cast(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
-            await interceptor.start_create_stream(typed_input.input),
+            await interceptor.start_create_stream(
+                typed_input.input, typed_input.output_type
+            ),
         )
     if (
         input.service == "temporal.api.streamservice.v1.StreamService"
         and input.operation_name == "AppendRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.AppendRecordsRequest, models.AppendRecordsResponse]",
+            "StartNexusOperationInput[models.AppendRecordsRequest[typing.Any], models.AppendRecordsResponse]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -59,7 +61,7 @@ async def _start_system_nexus_operation(
         and input.operation_name == "CloseStream"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.CloseStreamRequest, models.CloseStreamResponse]",
+            "StartNexusOperationInput[models.CloseStreamRequest[typing.Any], models.CloseStreamResponse]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -72,20 +74,22 @@ async def _start_system_nexus_operation(
         and input.operation_name == "ReadRecords"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.ReadRecordsRequest, models.ReadRecordsResponse]",
+            "StartNexusOperationInput[models.ReadRecordsRequest[typing.Any], models.ReadRecordsResponse[typing.Any]]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
         return typing.cast(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
-            await interceptor.start_read_records(typed_input.input),
+            await interceptor.start_read_records(
+                typed_input.input, typed_input.output_type
+            ),
         )
     if (
         input.service == "temporal.api.streamservice.v1.StreamService"
         and input.operation_name == "DescribeStream"
     ):
         typed_input = typing.cast(
-            "StartNexusOperationInput[models.DescribeStreamRequest, models.DescribeStreamResponse]",
+            "StartNexusOperationInput[models.DescribeStreamRequest[typing.Any], models.DescribeStreamResponse]",
             input,
         )
         # The dispatch check above establishes that this operation's response type is _OutputT.
@@ -93,7 +97,9 @@ async def _start_system_nexus_operation(
             "temporalio.workflow.NexusOperationHandle[_OutputT]",
             await interceptor.start_describe_stream(typed_input.input),
         )
-    return await interceptor.start_system_nexus_operation(input)
+    raise ValueError(
+        f"unsupported System Nexus operation: {input.service}/{input.operation_name}"
+    )
 
 
 class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
@@ -102,40 +108,44 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
         self,
     ) -> _SystemNexusWorkflowOutboundInterceptorBase: ...
 
-    @abc.abstractmethod
-    async def start_system_nexus_operation(
-        self,
-        input: StartNexusOperationInput[_InputT, _OutputT],
-    ) -> temporalio.workflow.NexusOperationHandle[_OutputT]:
-        """Intercept a System Nexus operation through the generic hook."""
-        ...
-
     async def start_create_stream(
-        self, request: models.CreateStreamRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.CreateStreamResult]:
+        self,
+        request: models.CreateStreamRequest[typing.Any],
+        output_type: type[models.CreateStreamResult[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.CreateStreamResult[typing.Any]
+    ]:
         """Intercept the CreateStream operation."""
-        return await self._next_system_nexus_interceptor().start_create_stream(request)
+        return await self._next_system_nexus_interceptor().start_create_stream(
+            request, output_type
+        )
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         """Intercept the AppendRecords operation."""
         return await self._next_system_nexus_interceptor().start_append_records(request)
 
     async def start_close_stream(
-        self, request: models.CloseStreamRequest
+        self, request: models.CloseStreamRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.CloseStreamResponse]:
         """Intercept the CloseStream operation."""
         return await self._next_system_nexus_interceptor().start_close_stream(request)
 
     async def start_read_records(
-        self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+        self,
+        request: models.ReadRecordsRequest[typing.Any],
+        output_type: type[models.ReadRecordsResponse[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         """Intercept the ReadRecords operation."""
-        return await self._next_system_nexus_interceptor().start_read_records(request)
+        return await self._next_system_nexus_interceptor().start_read_records(
+            request, output_type
+        )
 
     async def start_describe_stream(
-        self, request: models.DescribeStreamRequest
+        self, request: models.DescribeStreamRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.DescribeStreamResponse]:
         """Intercept the DescribeStream operation."""
         return await self._next_system_nexus_interceptor().start_describe_stream(
@@ -145,25 +155,34 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
 
 class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
     @abc.abstractmethod
-    async def _intercept_system_nexus_operation(
+    async def _schedule_system_nexus_operation(
         self,
         input: StartNexusOperationInput[_InputT, _OutputT],
     ) -> temporalio.workflow.NexusOperationHandle[_OutputT]: ...
 
     async def start_create_stream(
-        self, request: models.CreateStreamRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.CreateStreamResult]:
+        self,
+        request: models.CreateStreamRequest[typing.Any],
+        output_type: type[models.CreateStreamResult[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.CreateStreamResult[typing.Any]
+    ]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
                 operation="CreateStream",
                 input=request,
-                output_type=models.CreateStreamResult,
+                output_type=typing.cast(
+                    "type[models.CreateStreamResult[typing.Any]]",
+                    models.CreateStreamResult,
+                )
+                if output_type is None
+                else output_type,
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,
@@ -174,13 +193,13 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_append_records(
-        self, request: models.AppendRecordsRequest
+        self, request: models.AppendRecordsRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.AppendRecordsResponse]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -197,13 +216,13 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_close_stream(
-        self, request: models.CloseStreamRequest
+        self, request: models.CloseStreamRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.CloseStreamResponse]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
@@ -220,19 +239,28 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_read_records(
-        self, request: models.ReadRecordsRequest
-    ) -> temporalio.workflow.NexusOperationHandle[models.ReadRecordsResponse]:
+        self,
+        request: models.ReadRecordsRequest[typing.Any],
+        output_type: type[models.ReadRecordsResponse[typing.Any]] | None = None,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        models.ReadRecordsResponse[typing.Any]
+    ]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",
                 operation="ReadRecords",
                 input=request,
-                output_type=models.ReadRecordsResponse,
+                output_type=typing.cast(
+                    "type[models.ReadRecordsResponse[typing.Any]]",
+                    models.ReadRecordsResponse,
+                )
+                if output_type is None
+                else output_type,
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,
@@ -243,13 +271,13 @@ class _SystemNexusWorkflowOutboundInterceptorTerminal(abc.ABC):
         )
 
     async def start_describe_stream(
-        self, request: models.DescribeStreamRequest
+        self, request: models.DescribeStreamRequest[typing.Any]
     ) -> temporalio.workflow.NexusOperationHandle[models.DescribeStreamResponse]:
         from temporalio.worker._interceptor import StartNexusOperationInput
         from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
         from temporalio.workflow import NexusOperationCancellationType
 
-        return await self._intercept_system_nexus_operation(
+        return await self._schedule_system_nexus_operation(
             StartNexusOperationInput(
                 endpoint=TEMPORAL_SYSTEM_ENDPOINT,
                 service="temporal.api.streamservice.v1.StreamService",

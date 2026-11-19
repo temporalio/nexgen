@@ -7,7 +7,7 @@
 [project]
 name = "temporalio-stream-protos"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 # uv installs a path dependency from a wheel that it builds, so the package needs a backend.
 [build-system]

@@ -2,10 +2,9 @@
 
 import type * as common from "@temporalio/common";
 import type {
-  StreamReadStart,
   StreamRef,
   AppendRecordsResponse,
-  AppendRecord,
+  Producer,
   ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";
@@ -14,42 +13,57 @@ import { closeStream } from "./operations/close-stream";
 import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
-export class Stream {
-  public constructor(
-    public readonly ref: StreamRef,
-    public readonly created: boolean | undefined,
-  ) {}
+export class Stream<BodyT = unknown> {
+  // The handle converts as data without its private fields.
+  readonly #bodyType: common.TypeInfo<BodyT> | undefined;
 
-  public async publish(records: AppendRecord[]): Promise<AppendRecordsResponse> {
-    const request = { ref: this.ref, records: records };
+  public constructor(
+    public readonly ref: StreamRef<BodyT>,
+    public readonly created: boolean | undefined,
+    bodyType?: common.TypeInfo<BodyT>,
+  ) {
+    this.#bodyType = bodyType;
+  }
+
+  public get bodyType(): common.TypeInfo<BodyT> | undefined {
+    return this.#bodyType;
+  }
+
+  public async append(
+    records: BodyT[],
+    producer?: Producer,
+    sequence?: number,
+  ): Promise<AppendRecordsResponse> {
+    const request = {
+      ref: this.ref,
+      producer: producer,
+      sequence: sequence,
+      records: records,
+    };
     const handle = await appendRecords(request);
     return await handle.result();
   }
 
-  public async close(): Promise<void> {
-    const request = { ref: this.ref };
+  public async close(producer?: Producer): Promise<void> {
+    const request = { ref: this.ref, producer: producer };
     const handle = await closeStream(request);
     await handle.result();
   }
 
   public async read(
-    fromOffset?: number,
-    start?: StreamReadStart,
+    fromOffset?: Uint8Array,
     maxRecords?: number,
     wait?: common.Duration,
-    createWait?: common.Duration,
     maxBytes?: number,
-  ): Promise<ReadRecordsResponse> {
+  ): Promise<ReadRecordsResponse<BodyT>> {
     const request = {
       ref: this.ref,
       fromOffset: fromOffset,
-      start: start,
       maxRecords: maxRecords,
       wait: wait,
-      createWait: createWait,
       maxBytes: maxBytes,
     };
-    const handle = await readRecords(request);
+    const handle = await readRecords(request, this.bodyType);
     return await handle.result();
   }
 

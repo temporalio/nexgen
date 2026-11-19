@@ -1,0 +1,19 @@
+package test:list-without-proto@1.0.0;
+
+world system { export batch-service; }
+
+/// @nexus.endpoint "batches"
+interface batch-service {
+  // No proto converter wraps the values of a list of this record.
+  /// @nexus.flatten-in-api
+  record batch-item {
+    value: string,
+  }
+
+  record add-items-request {
+    batch-id: string,
+    items: list<batch-item>,
+  }
+
+  add-items: func(request: add-items-request);
+}

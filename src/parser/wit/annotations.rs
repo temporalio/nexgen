@@ -138,6 +138,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "generic",
+            sites: &[Record],
+            keys: &["value"],
+            language_keys: &[],
+            repeatable: true,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "proto-field",
             sites: &[Field],
             keys: &["value"],
@@ -175,8 +184,8 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "api-omit",
-            sites: &[Field],
-            keys: &[],
+            sites: &[Field, Method, Function],
+            keys: &["targets"],
             language_keys: &[],
             repeatable: false,
             languages: None,
@@ -263,6 +272,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "context-propagation",
+            sites: &[Function],
+            keys: &["value"],
+            language_keys: &[""],
+            repeatable: false,
+            languages: Some(&[Language::Go]),
+            system_nexus: true,
+        },
+        Annotation {
             name: "output-transform",
             sites: &[Function],
             keys: &["value", "import"],
@@ -273,7 +291,7 @@ const CATALOG: &[Annotation] = {
         },
         Annotation {
             name: "flatten-in-api",
-            sites: &[Record],
+            sites: &[Record, Field],
             keys: &[],
             language_keys: &[],
             repeatable: false,
@@ -334,6 +352,27 @@ const CATALOG: &[Annotation] = {
             keys: &["value"],
             language_keys: &[],
             repeatable: true,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
+            name: "close",
+            sites: &[Method],
+            keys: &[],
+            language_keys: &[],
+            repeatable: false,
+            // The `async with` close is Python-only today. This stays `None` because a language
+            // list makes the generator reject the directive for the other languages in the shared
+            // stream-service WIT, instead of ignoring it.
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
+            name: "varargs",
+            sites: &[Method],
+            keys: &["value"],
+            language_keys: &[],
+            repeatable: false,
             languages: None,
             system_nexus: false,
         },

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import typing_extensions
 
 
 ContextT = typing.TypeVar("ContextT")
 MetadataT = typing.TypeVar("MetadataT")
 OutputT = typing.TypeVar("OutputT")
+_ContextT = typing_extensions.TypeVar("_ContextT", default=object)
 
 
 @dataclasses.dataclass(slots=True)
@@ -18,6 +20,7 @@ class GenericRequest(typing.Generic[ContextT]):
     by_name: dict[str, ContextT]
     nested: Inner[ContextT]
     probe: GetterProbe[ContextT] | None = None
+    reference: ContextRef[ContextT] | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -38,6 +41,11 @@ class GetterProbe(typing.Generic[ContextT]):
     elapsed: int
     namespace: str
     type: str
+
+
+@dataclasses.dataclass
+class ContextRef(typing.Generic[_ContextT]):
+    id: str
 
 
 @dataclasses.dataclass(slots=True)

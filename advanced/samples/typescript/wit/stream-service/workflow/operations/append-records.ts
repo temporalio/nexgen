@@ -2,31 +2,32 @@
 
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
-import type { AppendRecordsResponse, AppendRecordsRequest } from "../models";
+import type { AppendRecordsResponse, AppendRecordsRequest, Producer } from "../models";
 import * as support from "../../../../support/temporal_model_converters";
 
-type AppendRecordsInput = AppendRecordsRequest extends infer Input
-  ? Input extends unknown
-    ? Omit<Input, "producer" | "withdraw_run"> & {
-        producer?: never;
-        withdraw_run?: never;
-      }
-    : never
-  : never;
+type AppendRecordsInput<BodyT> =
+  AppendRecordsRequest<BodyT> extends infer Input
+    ? Input extends unknown
+      ? Omit<Input, "producer"> & {
+          producer?: Producer;
+        }
+      : never
+    : never;
 
 /**
- * Append one batch. Workflow code makes the call from a Local Activity.
+ * Append one batch. For Workflow code, Core makes the call.
  *
  * @param requestInput - Request for the operation.
  */
-export async function appendRecords(
-  requestInput: AppendRecordsInput,
+export async function appendRecords<BodyT>(
+  requestInput: AppendRecordsInput<BodyT>,
 ): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const request = {
     ...requestInput,
-    producer: support.workflowProducer(),
-    withdrawRun: support.withdrawRun(),
-  } as AppendRecordsRequest;
+    producer: (requestInput.producer !== undefined
+      ? requestInput.producer
+      : support.workflowProducer()) satisfies Producer,
+  } as AppendRecordsRequest<BodyT>;
   const client = nexus.createNexusServiceClient({
     service: streamService,
     endpoint: "__temporal_system",

@@ -88,4 +88,8 @@ attaches binaries, and publishes the crate.
 GitHub Actions checks out a pinned SDK Rust revision to build only the shared
 changelog CLI for fragment validation and release-note extraction. Local release
 preparation needs no SDK Rust checkout; Nexgen has no Core submodule. Keep the
-tool pins in the changelog and Create Release workflows consistent.
+SDK Rust revision pins in the changelog and Create Release workflows consistent.
+
+CI validation and release jobs use the Rust compiler version pinned in
+`mise.toml`. Change the compiler version there so validation and publishing stay
+in sync.

@@ -1,0 +1,12 @@
+package test:jobs;
+world system { export jobs; }
+interface jobs {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  resource job {
+    constructor(value: value-t);
+  }
+  variant job-case { none, some(job), }
+  record holder { jobs: job-case, }
+}

@@ -1,0 +1,7 @@
+languages = ["go"]
+system_nexus = true
+targets = ["workflow"]
+
+[error]
+kind = "invalid-wit-directive"
+contains = ["header field must use @nexus.api-omit so context propagation owns its value"]

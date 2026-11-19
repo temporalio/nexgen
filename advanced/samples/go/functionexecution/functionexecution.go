@@ -17,8 +17,10 @@ import (
 
 type executeFunctionRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeFunctionRequest) GetFunction() string {
@@ -35,8 +37,10 @@ func (m executeFunctionRequest) GetEnabled() bool {
 
 type executeCallbackRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeCallbackRequest) GetFunction() string {
@@ -53,8 +57,10 @@ func (m executeCallbackRequest) GetEnabled() bool {
 
 type executeCountedFunctionRequest struct {
 	Function string
-	Name     string
-	Count    int32
+	// Name - The name argument for the function.
+	Name string
+	// Count - The count argument for the function.
+	Count int32
 }
 
 func (m executeCountedFunctionRequest) GetFunction() string {
@@ -71,8 +77,10 @@ func (m executeCountedFunctionRequest) GetCount() int32 {
 
 type executeNamedFunctionRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeNamedFunctionRequest) GetFunction() string {
@@ -89,7 +97,8 @@ func (m executeNamedFunctionRequest) GetEnabled() bool {
 
 type executeVarargsFunctionRequest struct {
 	Function string
-	Args     []string
+	// Args - Arguments for the function.
+	Args []string
 }
 
 func (m executeVarargsFunctionRequest) GetFunction() string {
@@ -102,7 +111,8 @@ func (m executeVarargsFunctionRequest) GetArgs() []string {
 
 type executeNamedVarargsFunctionRequest struct {
 	Function string
-	Args     []string
+	// Args - Arguments for the function.
+	Args []string
 }
 
 func (m executeNamedVarargsFunctionRequest) GetFunction() string {
@@ -114,13 +124,17 @@ func (m executeNamedVarargsFunctionRequest) GetArgs() []string {
 }
 
 type executeDescriptorsRequest struct {
-	Function       string
-	Args           []string
-	Durations      string
+	Function string
+	// Args - Arguments for the function.
+	Args      []string
+	Durations string
+	// DurationValues - Arguments for the durations.
 	DurationValues []any
 	Callback       string
+	// CallbackValues - Arguments for the callback.
 	CallbackValues []any
 	Callable       string
+	// CallableValues - Arguments for the callable.
 	CallableValues []any
 }
 
@@ -154,50 +168,6 @@ func (m executeDescriptorsRequest) GetCallable() string {
 
 func (m executeDescriptorsRequest) GetCallableValues() []any {
 	return m.CallableValues
-}
-
-// --- Operations (internal) ---
-
-func executeFunction(ctx workflow.Context, request executeFunctionRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteFunction", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeCallback(ctx workflow.Context, request executeCallbackRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteCallback", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeCountedFunction(ctx workflow.Context, request executeCountedFunctionRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteCountedFunction", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeNamedFunction(ctx workflow.Context, request executeNamedFunctionRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteNamedFunction", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeVarargsFunction(ctx workflow.Context, request executeVarargsFunctionRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteVarargsFunction", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeNamedVarargsFunction(ctx workflow.Context, request executeNamedVarargsFunctionRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteNamedVarargsFunction", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func executeDescriptors(ctx workflow.Context, request executeDescriptorsRequest) workflow.Future {
-	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
-	fut := c.ExecuteOperation(ctx, "ExecuteDescriptors", request, workflow.NexusOperationOptions{})
-	return fut
 }
 
 // --- Operations (public API) ---
@@ -247,9 +217,12 @@ func (m ExecuteNamedVarargsFunctionResult) GetValue() string {
 	return m.Value
 }
 
+// ExecuteFunctionOptions - Options for ExecuteFunction.
 type ExecuteFunctionOptions struct {
 }
 
+// ExecuteFunction.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteFunction(
@@ -267,16 +240,22 @@ func ExecuteFunction(
 		shortName := elements[len(elements)-1]
 		functionName = strings.TrimSuffix(shortName, "-fm")
 	}
-	return executeFunction(ctx, executeFunctionRequest{
+	request := executeFunctionRequest{
 		Function: functionName,
 		Name:     name,
 		Enabled:  enabled,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteFunction", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteCallbackOptions - Options for ExecuteCallback.
 type ExecuteCallbackOptions struct {
 }
 
+// ExecuteCallback.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteCallback(
@@ -294,16 +273,22 @@ func ExecuteCallback(
 		shortName := elements[len(elements)-1]
 		functionName = strings.TrimSuffix(shortName, "-fm")
 	}
-	return executeCallback(ctx, executeCallbackRequest{
+	request := executeCallbackRequest{
 		Function: functionName,
 		Name:     name,
 		Enabled:  enabled,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteCallback", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteCountedFunctionOptions - Options for ExecuteCountedFunction.
 type ExecuteCountedFunctionOptions struct {
 }
 
+// ExecuteCountedFunction.
+//
 // Input name: The name argument for the function.
 // Input count: The count argument for the function.
 func ExecuteCountedFunction(
@@ -321,16 +306,22 @@ func ExecuteCountedFunction(
 		shortName := elements[len(elements)-1]
 		functionName = strings.TrimSuffix(shortName, "-fm")
 	}
-	return executeCountedFunction(ctx, executeCountedFunctionRequest{
+	request := executeCountedFunctionRequest{
 		Function: functionName,
 		Name:     name,
 		Count:    count,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteCountedFunction", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteNamedFunctionOptions - Options for ExecuteNamedFunction.
 type ExecuteNamedFunctionOptions struct {
 }
 
+// ExecuteNamedFunction.
+//
 // Input name: The name argument for the function.
 // Input enabled: The enabled argument for the function.
 func ExecuteNamedFunction[FunctionF interface {
@@ -356,16 +347,22 @@ func ExecuteNamedFunction[FunctionF interface {
 			panic("nexgen function name requires string or function")
 		}
 	}
-	return executeNamedFunction(ctx, executeNamedFunctionRequest{
+	request := executeNamedFunctionRequest{
 		Function: functionName,
 		Name:     name,
 		Enabled:  enabled,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteNamedFunction", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteVarargsFunctionOptions - Options for ExecuteVarargsFunction.
 type ExecuteVarargsFunctionOptions struct {
 }
 
+// ExecuteVarargsFunction.
+//
 // Input args: Arguments for the function.
 func ExecuteVarargsFunction(
 	ctx workflow.Context,
@@ -381,15 +378,21 @@ func ExecuteVarargsFunction(
 		shortName := elements[len(elements)-1]
 		functionName = strings.TrimSuffix(shortName, "-fm")
 	}
-	return executeVarargsFunction(ctx, executeVarargsFunctionRequest{
+	request := executeVarargsFunctionRequest{
 		Function: functionName,
 		Args:     args,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteVarargsFunction", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteNamedVarargsFunctionOptions - Options for ExecuteNamedVarargsFunction.
 type ExecuteNamedVarargsFunctionOptions struct {
 }
 
+// ExecuteNamedVarargsFunction.
+//
 // Input args: Arguments for the function.
 func ExecuteNamedVarargsFunction[FunctionF interface {
 	~string | func(...string) string
@@ -413,15 +416,21 @@ func ExecuteNamedVarargsFunction[FunctionF interface {
 			panic("nexgen function name requires string or function")
 		}
 	}
-	return executeNamedVarargsFunction(ctx, executeNamedVarargsFunctionRequest{
+	request := executeNamedVarargsFunctionRequest{
 		Function: functionName,
 		Args:     args,
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteNamedVarargsFunction", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// ExecuteDescriptorsOptions - Options for ExecuteDescriptors.
 type ExecuteDescriptorsOptions struct {
 }
 
+// ExecuteDescriptors.
+//
 // Input durationValues: Arguments for the durations.
 // Input callbackValues: Arguments for the callback.
 // Input callableValues: Arguments for the callable.
@@ -457,7 +466,7 @@ func ExecuteDescriptors[FunctionF interface {
 	durationsName := support.DescriptorName(ctx, durations)
 	callbackName := support.DescriptorName(ctx, callback)
 	callableName := support.DescriptorName(ctx, callable)
-	return executeDescriptors(ctx, executeDescriptorsRequest{
+	request := executeDescriptorsRequest{
 		Function:       functionName,
 		Args:           args,
 		Durations:      durationsName,
@@ -466,5 +475,8 @@ func ExecuteDescriptors[FunctionF interface {
 		CallbackValues: []any{callbackValues},
 		Callable:       callableName,
 		CallableValues: []any{callableValues},
-	})
+	}
+	c := workflow.NewNexusClient("function-execution", "FunctionExecution")
+	fut := c.ExecuteOperation(ctx, "ExecuteDescriptors", request, workflow.NexusOperationOptions{})
+	return fut
 }

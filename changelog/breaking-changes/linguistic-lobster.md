@@ -1,1 +1,0 @@
-The WIT annotation catalog now checks declared language restrictions and System Nexus requirements before lowering. Unqualified `operations-class` and `poll` annotations fail for unsupported output languages instead of silently doing nothing; explicitly language-scoped values remain valid when generating other languages.

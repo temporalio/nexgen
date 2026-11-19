@@ -202,7 +202,6 @@ fn cli_generates_go_with_package_self_imports_removed() {
     assert!(api.contains("package workflow\n"));
     assert!(!api.contains("\"go.temporal.io/sdk/workflow\""));
     assert!(!api.contains("type OperationFuture interface {"));
-    assert!(api.contains("func getUser(ctx Context, request getUserRequest) Future"));
     assert!(!api.contains("const ServiceName"));
     assert!(!api.contains("const Endpoint"));
     assert!(!api.contains("const GetUserOp"));

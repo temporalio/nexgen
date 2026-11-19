@@ -78,134 +78,6 @@ func (namespaceInfo) TransferTypeConverter() (converter.TransferTypeConverter, e
 	)
 }
 
-// --- Operations (internal) ---
-
-func activityOptionsOperation(ctx workflow.Context, request ActivityOptions) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value ActivityOptions
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func failureOperation(ctx workflow.Context, request FailureContainer) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "FailureOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value FailureContainer
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func workflowExecutionInfoOperation(ctx workflow.Context, request WorkflowExecutionInfo) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "WorkflowExecutionInfoOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value WorkflowExecutionInfo
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func taskQueuePartitionsOperation(ctx workflow.Context, request TaskQueuePartitions) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "TaskQueuePartitionsOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value TaskQueuePartitions
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func badBinariesOperation(ctx workflow.Context, request BadBinaries) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "BadBinariesOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value BadBinaries
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func alertOperation(ctx workflow.Context, request Alert) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "AlertOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value Alert
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func callbackInternalOperation(ctx workflow.Context, request CallbackInternal) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "CallbackInternalOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value CallbackInternal
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func callbackNexusOperation(ctx workflow.Context, request CallbackNexus) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "CallbackNexusOperation", request, workflow.NexusOperationOptions{})
-	result, resultSettable := workflow.NewFuture(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		var value CallbackNexus
-		if err := fut.Get(ctx, &value); err != nil {
-			resultSettable.SetError(err)
-			return
-		}
-		resultSettable.Set(value, nil)
-	})
-	return result
-}
-
-func namespaceInfoOperation(ctx workflow.Context, request namespaceInfo) workflow.Future {
-	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
-	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
 // --- Operations (public API) ---
 
 type AlertLevel int32
@@ -731,18 +603,18 @@ func (CallbackNexus) TransferTypeConverter() (converter.TransferTypeConverter, e
 	)
 }
 
+// ActivityOptionsOperationOptions - Options for ActivityOptionsOperation.
 type ActivityOptionsOperationOptions struct {
 	// TaskQueue - Optional.
 	TaskQueue string
-	// RetryPolicy - Required.
-	RetryPolicy internal.RetryPolicy
 	// ScheduleToCloseTimeout - Optional.
 	ScheduleToCloseTimeout time.Duration
 	// Priority - Optional.
 	Priority *internal.Priority
 }
 
-func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions) workflow.Future {
+// ActivityOptionsOperation.
+func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperationOptions, retryPolicy internal.RetryPolicy) workflow.Future {
 	var taskQueue *string
 	if opts.TaskQueue != "" {
 		taskQueue = &opts.TaskQueue
@@ -751,107 +623,211 @@ func ActivityOptionsOperation(ctx workflow.Context, opts ActivityOptionsOperatio
 	if opts.ScheduleToCloseTimeout != 0 {
 		scheduleToCloseTimeout = &opts.ScheduleToCloseTimeout
 	}
-	return activityOptionsOperation(ctx, ActivityOptions{
+	request := ActivityOptions{
 		TaskQueue:              taskQueue,
-		RetryPolicy:            opts.RetryPolicy,
+		RetryPolicy:            retryPolicy,
 		ScheduleToCloseTimeout: scheduleToCloseTimeout,
 		Priority:               opts.Priority,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "ActivityOptionsOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value ActivityOptions
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// FailureOperationOptions - Options for FailureOperation.
 type FailureOperationOptions struct {
 	// Failure - Optional.
 	Failure error
 }
 
+// FailureOperation.
 func FailureOperation(ctx workflow.Context, opts FailureOperationOptions) workflow.Future {
-	return failureOperation(ctx, FailureContainer{
+	request := FailureContainer{
 		Failure: opts.Failure,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "FailureOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value FailureContainer
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// WorkflowExecutionInfoOperationOptions - Options for WorkflowExecutionInfoOperation.
 type WorkflowExecutionInfoOperationOptions struct {
-	// Execution - Required.
-	Execution WorkflowExecution
 	// ParentExecution - Optional.
 	ParentExecution *WorkflowExecution
 }
 
-func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions) workflow.Future {
-	return workflowExecutionInfoOperation(ctx, WorkflowExecutionInfo{
-		Execution:       opts.Execution,
+// WorkflowExecutionInfoOperation.
+func WorkflowExecutionInfoOperation(ctx workflow.Context, opts WorkflowExecutionInfoOperationOptions, execution WorkflowExecution) workflow.Future {
+	request := WorkflowExecutionInfo{
+		Execution:       execution,
 		ParentExecution: opts.ParentExecution,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "WorkflowExecutionInfoOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value WorkflowExecutionInfo
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// TaskQueuePartitionsOperationOptions - Options for TaskQueuePartitionsOperation.
 type TaskQueuePartitionsOperationOptions struct {
 	// WorkflowTaskQueuePartitions - Optional.
 	WorkflowTaskQueuePartitions []TaskQueuePartition
-	// ActivityTaskQueuePartitions - Required.
-	ActivityTaskQueuePartitions []TaskQueuePartition
 }
 
-func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions) workflow.Future {
-	return taskQueuePartitionsOperation(ctx, TaskQueuePartitions{
+// TaskQueuePartitionsOperation.
+func TaskQueuePartitionsOperation(ctx workflow.Context, opts TaskQueuePartitionsOperationOptions, activityTaskQueuePartitions []TaskQueuePartition) workflow.Future {
+	request := TaskQueuePartitions{
 		WorkflowTaskQueuePartitions: opts.WorkflowTaskQueuePartitions,
-		ActivityTaskQueuePartitions: opts.ActivityTaskQueuePartitions,
+		ActivityTaskQueuePartitions: activityTaskQueuePartitions,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "TaskQueuePartitionsOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value TaskQueuePartitions
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// BadBinariesOperationOptions - Options for BadBinariesOperation.
 type BadBinariesOperationOptions struct {
 	// Binaries - Optional.
 	Binaries map[string]BadBinary
 }
 
+// BadBinariesOperation.
 func BadBinariesOperation(ctx workflow.Context, opts BadBinariesOperationOptions) workflow.Future {
-	return badBinariesOperation(ctx, BadBinaries{
+	request := BadBinaries{
 		Binaries: opts.Binaries,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "BadBinariesOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value BadBinaries
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// AlertOperationOptions - Options for AlertOperation.
 type AlertOperationOptions struct {
-	// Message - Required.
-	Message string
 	// Severity - Optional.
 	Severity AlertLevel
 }
 
-func AlertOperation(ctx workflow.Context, opts AlertOperationOptions) workflow.Future {
+// AlertOperation.
+func AlertOperation(ctx workflow.Context, opts AlertOperationOptions, message string) workflow.Future {
 	var severity *AlertLevel
 	if opts.Severity != 0 {
 		severity = &opts.Severity
 	}
-	return alertOperation(ctx, Alert{
-		Message:  opts.Message,
+	request := Alert{
+		Message:  message,
 		Severity: severity,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "AlertOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value Alert
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// CallbackInternalOperationOptions - Options for CallbackInternalOperation.
 type CallbackInternalOperationOptions struct {
-	// Data - Required.
-	Data []byte
 }
 
-func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions) workflow.Future {
-	return callbackInternalOperation(ctx, CallbackInternal{
-		Data: opts.Data,
+// CallbackInternalOperation.
+func CallbackInternalOperation(ctx workflow.Context, opts CallbackInternalOperationOptions, data []byte) workflow.Future {
+	request := CallbackInternal{
+		Data: data,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "CallbackInternalOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value CallbackInternal
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// CallbackNexusOperationOptions - Options for CallbackNexusOperation.
 type CallbackNexusOperationOptions struct {
-	// Url - Required.
-	Url string
-	// Header - Required.
-	Header map[string]string
 }
 
-func CallbackNexusOperation(ctx workflow.Context, opts CallbackNexusOperationOptions) workflow.Future {
-	return callbackNexusOperation(ctx, CallbackNexus{
-		Url:    opts.Url,
-		Header: opts.Header,
+// CallbackNexusOperation.
+func CallbackNexusOperation(
+	ctx workflow.Context,
+	opts CallbackNexusOperationOptions,
+	url string,
+	header map[string]string,
+) workflow.Future {
+	request := CallbackNexus{
+		Url:    url,
+		Header: header,
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "CallbackNexusOperation", request, workflow.NexusOperationOptions{})
+	result, resultSettable := workflow.NewFuture(ctx)
+	workflow.Go(ctx, func(ctx workflow.Context) {
+		var value CallbackNexus
+		if err := fut.Get(ctx, &value); err != nil {
+			resultSettable.SetError(err)
+			return
+		}
+		resultSettable.Set(value, nil)
 	})
+	return result
 }
 
+// NamespaceInfoOperationOptions - Options for NamespaceInfoOperation.
 type NamespaceInfoOperationOptions struct {
 	// Name - Optional.
 	Name string
@@ -859,6 +835,7 @@ type NamespaceInfoOperationOptions struct {
 	State NamespaceState
 }
 
+// NamespaceInfoOperation.
 func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOptions) workflow.Future {
 	var name *string
 	if opts.Name != "" {
@@ -870,9 +847,12 @@ func NamespaceInfoOperation(ctx workflow.Context, opts NamespaceInfoOperationOpt
 	} else {
 		state = NamespaceStateNamespaceStateRegistered
 	}
-	return namespaceInfoOperation(ctx, namespaceInfo{
+	request := namespaceInfo{
 		Name:  name,
 		State: state,
 		Data:  support.NamespaceData(ctx),
-	})
+	}
+	c := workflow.NewNexusClient("temporal-system", "ProtoBackedShowcaseService")
+	fut := c.ExecuteOperation(ctx, "NamespaceInfoOperation", request, workflow.NexusOperationOptions{})
+	return fut
 }

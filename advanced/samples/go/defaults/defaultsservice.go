@@ -31,24 +31,7 @@ func NewSender(token string) *Sender {
 }
 
 func (u *Sender) Submit(ctx workflow.Context) workflow.Future {
-	return submitFromSender(ctx, Request{Attempts: 3, Enabled: true, Ratio: 1.5, Mode: MyEnumStandard, Permissions: MyFlagsRead | MyFlagsWrite, Namespace: support.WorkflowNamespace(ctx), AliasLabel: "alias"})
-}
-
-// --- Operations (internal) ---
-
-func submit(ctx workflow.Context, request Request) workflow.Future {
-	c := workflow.NewNexusClient("defaults", "DefaultsService")
-	fut := c.ExecuteOperation(ctx, "Submit", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func getSender(ctx workflow.Context, request getSenderRequest) workflow.Future {
-	c := workflow.NewNexusClient("defaults", "DefaultsService")
-	fut := c.ExecuteOperation(ctx, "GetSender", request, workflow.NexusOperationOptions{})
-	return fut
-}
-
-func submitFromSender(ctx workflow.Context, request Request) workflow.Future {
+	request := Request{Attempts: 3, Enabled: true, Ratio: 1.5, Mode: MyEnumStandard, Permissions: MyFlagsRead | MyFlagsWrite, Namespace: support.WorkflowNamespace(ctx), AliasLabel: "alias"}
 	c := workflow.NewNexusClient("defaults", "DefaultsService")
 	fut := c.ExecuteOperation(ctx, "SubmitFromSender", request, workflow.NexusOperationOptions{})
 	return fut
@@ -158,6 +141,7 @@ func (m FlattenedRecordWithDefaults) GetDetails() *string {
 	return m.Details
 }
 
+// SubmitOptions - Options for Submit.
 type SubmitOptions struct {
 	// Attempts - Optional.
 	Attempts int32
@@ -181,6 +165,7 @@ type SubmitOptions struct {
 	Details string
 }
 
+// Submit.
 func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 	var attempts int32
 	if opts.Attempts != 0 {
@@ -241,7 +226,7 @@ func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 			Details: details,
 		}
 	}
-	return submit(ctx, Request{
+	request := Request{
 		Attempts:    attempts,
 		Enabled:     enabled,
 		Ratio:       ratio,
@@ -251,20 +236,27 @@ func Submit(ctx workflow.Context, opts SubmitOptions) workflow.Future {
 		AliasLabel:  aliasLabel,
 		Retry:       opts.Retry,
 		Metadata:    metadataValue,
-	})
+	}
+	c := workflow.NewNexusClient("defaults", "DefaultsService")
+	fut := c.ExecuteOperation(ctx, "Submit", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// GetSenderOptions - Options for GetSender.
 type GetSenderOptions struct {
-	// Token - Required.
-	Token string
 }
 
-func GetSender(ctx workflow.Context, opts GetSenderOptions) workflow.Future {
-	return getSender(ctx, getSenderRequest{
-		Token: opts.Token,
-	})
+// GetSender.
+func GetSender(ctx workflow.Context, opts GetSenderOptions, token string) workflow.Future {
+	request := getSenderRequest{
+		Token: token,
+	}
+	c := workflow.NewNexusClient("defaults", "DefaultsService")
+	fut := c.ExecuteOperation(ctx, "GetSender", request, workflow.NexusOperationOptions{})
+	return fut
 }
 
+// SubmitFromSenderOptions - Options for SubmitFromSender.
 type SubmitFromSenderOptions struct {
 	// Attempts - Optional.
 	Attempts int32
@@ -288,6 +280,7 @@ type SubmitFromSenderOptions struct {
 	Details string
 }
 
+// SubmitFromSender.
 func SubmitFromSender(ctx workflow.Context, opts SubmitFromSenderOptions) workflow.Future {
 	var attempts int32
 	if opts.Attempts != 0 {
@@ -348,7 +341,7 @@ func SubmitFromSender(ctx workflow.Context, opts SubmitFromSenderOptions) workfl
 			Details: details,
 		}
 	}
-	return submitFromSender(ctx, Request{
+	request := Request{
 		Attempts:    attempts,
 		Enabled:     enabled,
 		Ratio:       ratio,
@@ -358,5 +351,8 @@ func SubmitFromSender(ctx workflow.Context, opts SubmitFromSenderOptions) workfl
 		AliasLabel:  aliasLabel,
 		Retry:       opts.Retry,
 		Metadata:    metadataValue,
-	})
+	}
+	c := workflow.NewNexusClient("defaults", "DefaultsService")
+	fut := c.ExecuteOperation(ctx, "SubmitFromSender", request, workflow.NexusOperationOptions{})
+	return fut
 }

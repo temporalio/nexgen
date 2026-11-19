@@ -1,31 +1,36 @@
 //! Resource resolution resolves resource methods and operation-return field sources.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use heck::{ToKebabCase, ToUpperCamelCase};
 use prost_types::FieldDescriptorProto;
 use prost_types::field_descriptor_proto::Type;
 
-use crate::descriptors::DescriptorIndex;
+use crate::descriptors::{DescriptorIndex, real_oneof_groups};
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
-    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldOrigin, JsonModelSpec, OperationSpec,
-    RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec, ResourceResultSpec,
-    ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec, ServiceSpec, Symbol,
-    TypeFamily, TypeSpec,
+    ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, IntSpec, JsonModelSpec,
+    OperationSpec, RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec,
+    ResourceResultSpec, ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec,
+    ServiceSpec, Symbol, TypeFamily, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
-/// Selected IR after resource-method and resource-return bindings are resolved.
+
+mod type_parameters;
+
+/// Selected IR with validated resource metadata and resolved operation-return bindings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ResourceBoundFamily;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResourceBoundData {
-    pub(crate) bindings: BTreeMap<String, ResolvedServiceResources>,
+    pub(crate) operation_returns: BTreeMap<String, BTreeMap<String, ResolvedResourceReturnSpec>>,
 }
 
 impl TypeFamily for ResourceBoundFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = ResourceBoundData;
     type Record = Symbol;
     type Enum = Symbol;
@@ -37,7 +42,7 @@ impl TypeFamily for ResourceBoundFamily {
     type Alias = Symbol;
     type ServiceData = ();
     type RecordData = ();
-    type ResourceData = ();
+    type ResourceData = ResolvedResourceSpec;
     type OperationData = ();
     type FieldData = ();
     type Text = SelectedTextSpec;
@@ -46,17 +51,20 @@ impl TypeFamily for ResourceBoundFamily {
 
 struct ResourceBindingMapper {
     data: ResourceBoundData,
+    resources: BTreeMap<String, ResolvedResourceSpec>,
 }
 
 impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMapper {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) -> ResourceBoundData {
-        self.data.clone()
+        ResourceBoundData {
+            operation_returns: std::mem::take(&mut self.data.operation_returns),
+        }
     }
     fn map_record(&mut self, value: Symbol) -> Symbol {
         value
@@ -84,7 +92,11 @@ impl ApiSpecTransform<SelectedFamily, ResourceBoundFamily> for ResourceBindingMa
     }
     fn map_service_data(&mut self, _: &str, _: ()) {}
     fn map_record_data(&mut self, _: &str, _: ()) {}
-    fn map_resource_data(&mut self, _: &str, _: ()) {}
+    fn map_resource_data(&mut self, name: &str, _: ()) -> ResolvedResourceSpec {
+        self.resources
+            .remove(name)
+            .expect("resource resolution includes every resource")
+    }
     fn map_operation_data(&mut self, _: &str, _: ()) {}
     fn map_field_data(&mut self, _: &str, _: &str, _: ()) {}
     fn map_text(&mut self, value: SelectedTextSpec) -> SelectedTextSpec {
@@ -109,8 +121,11 @@ pub(crate) struct ResolvedServiceResources {
 pub(crate) struct ResolvedResourceSpec {
     pub(crate) name: String,
     pub(crate) doc: crate::documentation::SelectedDocSpec,
+    /// Inferred during resource resolution, in stable type-identity order.
+    pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) methods: Vec<ResolvedResourceMethodSpec>,
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -119,6 +134,8 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) params: Vec<ResourceFieldSpec<SelectedFamily>>,
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
+    pub(crate) varargs: Option<String>,
+    pub(crate) api_omitted: BTreeSet<GenerationTarget>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -160,7 +177,7 @@ pub enum ResolvedResourceBindingSource {
     RequestField {
         field_name: String,
         proto_field_name: String,
-        origin: Option<FieldOrigin>,
+        origin: Option<FieldPolicy>,
     },
     ResultField {
         field_name: String,
@@ -194,33 +211,44 @@ struct MessageFieldInfo {
     proto_name: String,
     api_name: String,
     required: bool,
-    origin: Option<FieldOrigin>,
+    origin: Option<FieldPolicy>,
     message_name: Option<String>,
 }
 
-pub(crate) fn resolve_service_resources(
+#[cfg(test)]
+fn resolve_service_resources(
     spec: &ApiSpec<SelectedFamily>,
     service: &ServiceSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
     targets: &[crate::nexgen_config::GenerationTarget],
 ) -> Result<ResolvedServiceResources> {
-    let resources = service
+    let mut resources = resolve_service_resource_methods(spec, service, descriptors)?;
+    if targets.is_empty() {
+        for resource in &mut resources {
+            resource.methods.clear();
+        }
+    }
+    resolve_service_resource_returns(spec, service, descriptors, resources)
+}
+
+fn resolve_service_resource_methods(
+    spec: &ApiSpec<SelectedFamily>,
+    service: &ServiceSpec<SelectedFamily>,
+    descriptors: &DescriptorIndex,
+) -> Result<Vec<ResolvedResourceSpec>> {
+    service
         .resources
         .iter()
-        .map(|resource| {
-            if targets.is_empty() {
-                Ok(ResolvedResourceSpec {
-                    name: resource.name.clone(),
-                    doc: resource.doc.clone(),
-                    fields: resource.fields.clone(),
-                    methods: Vec::new(),
-                })
-            } else {
-                resolve_resource_methods(spec, service, resource, descriptors)
-            }
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .map(|resource| resolve_resource_methods(spec, service, resource, descriptors))
+        .collect()
+}
 
+fn resolve_service_resource_returns(
+    spec: &ApiSpec<SelectedFamily>,
+    service: &ServiceSpec<SelectedFamily>,
+    descriptors: &DescriptorIndex,
+    resources: Vec<ResolvedResourceSpec>,
+) -> Result<ResolvedServiceResources> {
     let mut operation_returns = BTreeMap::new();
     for operation in &service.operations {
         if let Some(TypeSpec::Resource(resource)) = operation.output_type() {
@@ -351,8 +379,10 @@ fn resolve_resource_methods(
     Ok(ResolvedResourceSpec {
         name: resource.name.clone(),
         doc: resource.doc.clone(),
+        type_parameters: Vec::new(),
         fields: resource.fields.clone(),
         methods,
+        close: resource.close.clone(),
     })
 }
 
@@ -412,8 +442,10 @@ fn resolve_resource_method(
         return Ok(ResolvedResourceMethodSpec {
             name: method.name.clone(),
             doc: method.doc.clone(),
-            params: method.params.clone(),
+            params: bytes_bound_params(spec, &method.params, &request_plan),
             result: method.result.clone(),
+            varargs: method.varargs.clone(),
+            api_omitted: method.api_omitted.clone(),
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
@@ -441,6 +473,15 @@ fn resolve_resource_method(
     }
 
     let binding = match matching_operations.len() {
+        // A stub close method would fail at the end of each scope.
+        0 if resource.close.as_deref() == Some(method.name.as_str()) => {
+            return Err(Error::InvalidResourceMethod {
+                service: service.name.clone(),
+                resource: resource.name.to_upper_camel_case(),
+                method: method.name.to_string(),
+                reason: "has `@nexus.close`, but binds to no operation".to_string(),
+            });
+        }
         0 => ResolvedResourceMethodBinding::Stub,
         1 => {
             let (operation_name, request_plan) = matching_operations.pop().expect("len checked");
@@ -464,13 +505,98 @@ fn resolve_resource_method(
         }
     };
 
+    let params = match &binding {
+        ResolvedResourceMethodBinding::Operation { request_plan, .. } => {
+            bytes_bound_params(spec, &method.params, request_plan)
+        }
+        ResolvedResourceMethodBinding::Stub => method.params.clone(),
+    };
     Ok(ResolvedResourceMethodSpec {
         name: method.name.clone(),
         doc: method.doc.clone(),
-        params: method.params.clone(),
+        params,
         result: method.result.clone(),
+        varargs: method.varargs.clone(),
+        api_omitted: method.api_omitted.clone(),
         binding,
     })
+}
+
+/// A proto-backed record reads a `list<u8>` field as the proto `bytes`. A method parameter that
+/// fills such a field takes `bytes` too, or the method could not pass its value to the request.
+fn bytes_bound_params(
+    spec: &ApiSpec<SelectedFamily>,
+    params: &[ResourceFieldSpec<SelectedFamily>],
+    request_plan: &RequestPlan,
+) -> Vec<ResourceFieldSpec<SelectedFamily>> {
+    let mut bytes_params = BTreeSet::new();
+    collect_bytes_params(spec, request_plan, &mut bytes_params);
+    params
+        .iter()
+        .cloned()
+        .map(|mut param| {
+            if bytes_params.contains(param.name.as_str())
+                && let Some(field_type) = list_as_bytes(&param.field_type)
+            {
+                param.field_type = field_type;
+            }
+            param
+        })
+        .collect()
+}
+
+fn collect_bytes_params<'a>(
+    spec: &ApiSpec<SelectedFamily>,
+    plan: &'a RequestPlan,
+    bytes_params: &mut BTreeSet<&'a str>,
+) {
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = plan
+    else {
+        return;
+    };
+    let record = spec
+        .record(message_name)
+        .or_else(|| spec.record_for_proto(message_name));
+    for field in fields {
+        match &field.value {
+            RequestPlan::Source(RequestPlanSource::MethodParam(param_name)) => {
+                let is_bytes = record
+                    .and_then(|record| {
+                        record
+                            .fields
+                            .values()
+                            .find(|record_field| record_field.name == field.field_name)
+                    })
+                    .is_some_and(|record_field| {
+                        matches!(record_field.field_type.without_option(), TypeSpec::Bytes)
+                    });
+                if is_bytes {
+                    bytes_params.insert(param_name.as_str());
+                }
+            }
+            RequestPlan::Source(RequestPlanSource::ResourceField(_)) => {}
+            child @ RequestPlan::Construct { .. } => {
+                collect_bytes_params(spec, child, bytes_params);
+            }
+        }
+    }
+}
+
+/// A WIT `u8` reads as a `u32` integer, so this matches the list of integers that a `list<u8>`
+/// parameter reads as.
+fn list_as_bytes(param_type: &TypeSpec<SelectedFamily>) -> Option<TypeSpec<SelectedFamily>> {
+    match param_type {
+        TypeSpec::List(item) if matches!(**item, TypeSpec::Int(IntSpec::U32)) => {
+            Some(TypeSpec::Bytes)
+        }
+        TypeSpec::Option(inner) => {
+            list_as_bytes(inner).map(|bytes| TypeSpec::Option(Box::new(bytes)))
+        }
+        _ => None,
+    }
 }
 
 fn resource_method_result_matches_operation(
@@ -488,6 +614,9 @@ fn resource_method_result_matches_operation(
         TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) => {
             operation_output_ref(operation) == Some(proto_name.as_str())
                 || operation_output_resource_message_name(operation) == Some(proto_name.as_str())
+        }
+        TypeSpec::Record(record) => {
+            matches!(operation.output_type(), Some(TypeSpec::Record(output)) if output == record)
         }
         _ => false,
     }
@@ -577,7 +706,7 @@ fn synthesize_request_plan(
             && !field
                 .origin
                 .as_ref()
-                .is_some_and(FieldOrigin::can_initialize)
+                .is_some_and(FieldPolicy::can_initialize)
         {
             return Ok(None);
         }
@@ -640,7 +769,7 @@ fn synthesize_record_request_plan(
             && !field
                 .origin
                 .as_ref()
-                .is_some_and(FieldOrigin::can_initialize)
+                .is_some_and(FieldPolicy::can_initialize)
         {
             return Ok(None);
         }
@@ -668,7 +797,7 @@ fn visible_message_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_message_fields(spec, descriptors, message_name)?
         .into_iter()
-        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .collect())
 }
 
@@ -678,7 +807,7 @@ fn visible_record_fields(
 ) -> Result<Vec<MessageFieldInfo>> {
     Ok(all_record_fields(spec, record_name)?
         .into_iter()
-        .filter(|field| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|field| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .collect())
 }
 
@@ -714,14 +843,39 @@ fn all_message_fields(
         .ok_or_else(|| Error::UnknownTypeOverride {
             type_name: message_name.to_string(),
         })?;
-    message
-        .descriptor
-        .field
-        .iter()
-        .map(|field| {
-            build_message_field_info(field, spec.record_for_proto(message_name), descriptors)
-        })
-        .collect()
+    let record = spec.record_for_proto(message_name);
+    // A record holds a proto oneof as one field named after the oneof, so a method parameter
+    // binds to that field and not to the oneof's members.
+    let mut grouped = BTreeMap::new();
+    if let Some(record) = record {
+        let groups =
+            real_oneof_groups(message).map_err(|reason| Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: "<oneof>".to_string(),
+                property: "oneof",
+                reason,
+            })?;
+        for group in groups {
+            if let Some(field) = record.fields.get(group.name) {
+                for (index, _) in group.fields {
+                    grouped.insert(index, (group.name, field));
+                }
+            }
+        }
+    }
+    let mut emitted = BTreeSet::new();
+    let mut fields = Vec::new();
+    for (index, field) in message.descriptor.field.iter().enumerate() {
+        match grouped.get(&index) {
+            Some((oneof_name, record_field)) => {
+                if emitted.insert(*oneof_name) {
+                    fields.push(build_record_field_info(oneof_name, record_field, spec)?);
+                }
+            }
+            None => fields.push(build_message_field_info(field, record, descriptors)?),
+        }
+    }
+    Ok(fields)
 }
 
 fn all_record_fields(
@@ -736,7 +890,7 @@ fn all_record_fields(
     record
         .fields
         .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
         .map(|(field_name, field)| build_record_field_info(field_name, field, spec))
         .collect()
 }
@@ -943,8 +1097,8 @@ fn operation_output_resource_wire_type(
     resource_name.wire_type.as_ref()
 }
 
-/// Resolves descriptor-backed resource facts before they are attached to their
-/// owning operation and resource nodes by `OperationBindingPass`.
+/// Resolves and validates resource facts into resource data. Operation-return relationships
+/// are retained for `OperationBindingPass` to attach to operations.
 pub(crate) struct ResourceResolutionPass<'a> {
     descriptors: &'a DescriptorIndex,
     targets: Vec<crate::nexgen_config::GenerationTarget>,
@@ -964,19 +1118,60 @@ impl<'a> ResourceResolutionPass<'a> {
     pub(super) fn bind_spec(
         &self,
         spec: ApiSpec<SelectedFamily>,
+        path: &Path,
     ) -> Result<ApiSpec<super::ResourceBoundFamily>> {
         ensure_unique_resource_names(&spec)?;
-        // Return bindings determine shared wire models even when no callable API is emitted.
-        let bindings = spec
+        let mut bindings = spec
             .services
             .iter()
             .map(|service| {
-                resolve_service_resources(&spec, service, self.descriptors, &self.targets)
-                    .map(|resources| (service.name.clone(), resources))
+                resolve_service_resource_methods(&spec, service, self.descriptors).map(
+                    |resources| {
+                        (
+                            service.name.clone(),
+                            ResolvedServiceResources {
+                                resources,
+                                operation_returns: BTreeMap::new(),
+                            },
+                        )
+                    },
+                )
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
+        type_parameters::infer_and_validate(&spec, &mut bindings, path)?;
+        // Return bindings determine shared wire models even when no callable API is emitted.
+        for service in &spec.services {
+            let resolved = bindings
+                .get_mut(&service.name)
+                .expect("resource resolution includes every service");
+            if self.targets.is_empty() {
+                for resource in &mut resolved.resources {
+                    resource.methods.clear();
+                }
+            }
+            *resolved = resolve_service_resource_returns(
+                &spec,
+                service,
+                self.descriptors,
+                std::mem::take(&mut resolved.resources),
+            )?;
+        }
+        let mut resources = BTreeMap::new();
+        let operation_returns = bindings
+            .into_iter()
+            .map(|(service, resolved)| {
+                resources.extend(
+                    resolved
+                        .resources
+                        .into_iter()
+                        .map(|resource| (resource.name.clone(), resource)),
+                );
+                (service, resolved.operation_returns)
+            })
+            .collect();
         Ok(spec.map_names(ResourceBindingMapper {
-            data: ResourceBoundData { bindings },
+            data: ResourceBoundData { operation_returns },
+            resources,
         }))
     }
 }
@@ -1005,11 +1200,12 @@ impl CompilerPass<SelectedFamily, super::ResourceBoundFamily> for ResourceResolu
         &mut self,
         leaf: ApiSpecLeaf<SelectedFamily>,
     ) -> Result<ApiSpecLeaf<super::ResourceBoundFamily>> {
+        let spec = self.bind_spec(leaf.spec, &leaf.source_path)?;
         Ok(ApiSpecLeaf {
             module_path: leaf.module_path,
             source_root: leaf.source_root,
             source_path: leaf.source_path,
-            spec: self.bind_spec(leaf.spec)?,
+            spec,
         })
     }
 }
@@ -1022,7 +1218,9 @@ mod tests {
 
     use crate::descriptors::DescriptorIndex;
     use crate::language::Language;
-    use crate::spec::{ApiSpec, SelectedFamily};
+    use crate::spec::{
+        ApiSpec, ApiSpecLeaf, ApiSpecNode, ApiSpecTree, CompilerPass, SelectedFamily, TypeSpec,
+    };
 
     use super::{
         RequestPlan, RequestPlanSource, ResolvedResourceMethodBinding, resolve_service_resources,
@@ -1051,6 +1249,173 @@ mod tests {
         )
         .unwrap();
         crate::planning::select_spec(authored, language)
+    }
+
+    #[test]
+    fn infers_resource_parameters_in_resource_data_for_every_target() {
+        let wit = r#"
+package test:pairs@1.0.0;
+world system { export pairs; }
+interface pairs {
+  type placeholder = string;
+  record entry { value: value-t, }
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  /// @nexus.type-parameter
+  type key-t = placeholder;
+  resource pair {
+    constructor(value: entry, key: key-t);
+  }
+}
+"#;
+        use crate::nexgen_config::GenerationTarget::{Client, Workflow};
+        for targets in [vec![], vec![Workflow], vec![Client], vec![Workflow, Client]] {
+            let descriptors = empty_descriptors();
+            let spec = super::ResourceResolutionPass::new(&descriptors, targets)
+                .bind_spec(
+                    parse(Language::Python, wit),
+                    std::path::Path::new("inline.wit"),
+                )
+                .unwrap();
+            let resource = spec.services[0].resource("pair").unwrap();
+            assert_eq!(
+                resource
+                    .data
+                    .type_parameters
+                    .iter()
+                    .map(|parameter| parameter.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["KeyT", "ValueT"],
+            );
+            let tree = ApiSpecTree {
+                root: ApiSpecNode::Leaf(ApiSpecLeaf {
+                    module_path: crate::spec::ModulePath::default(),
+                    source_root: PathBuf::new(),
+                    source_path: PathBuf::from("inline.wit"),
+                    spec,
+                }),
+            };
+            let bound = crate::planning::OperationBindingPass::new()
+                .apply(tree)
+                .unwrap();
+            let lowered = crate::planning::OperationLoweringPass::new()
+                .apply(bound)
+                .unwrap();
+            let crate::spec::ApiSpecNode::Leaf(leaf) = lowered.root else {
+                panic!("expected one module");
+            };
+            assert_eq!(
+                leaf.spec.services[0].resources[0]
+                    .data
+                    .type_parameters()
+                    .iter()
+                    .map(|parameter| parameter.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["KeyT", "ValueT"],
+            );
+        }
+    }
+
+    #[test]
+    fn propagates_parameters_through_returned_resources_to_a_fixed_point() {
+        let wit = r#"
+package test:holders@1.0.0;
+world system { export holders; }
+interface holders {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type value-t = placeholder;
+  resource opener {
+    constructor(id: string);
+    open: func() -> holder;
+  }
+  resource watcher {
+    constructor(id: string);
+    watch: func(holder: borrow<holder>);
+  }
+  resource holder {
+    constructor(value: value-t);
+  }
+}
+"#;
+        let descriptors = empty_descriptors();
+        for targets in [
+            vec![],
+            vec![crate::nexgen_config::GenerationTarget::Workflow],
+        ] {
+            let spec = super::ResourceResolutionPass::new(&descriptors, targets)
+                .bind_spec(
+                    parse(Language::Python, wit),
+                    std::path::Path::new("inline.wit"),
+                )
+                .unwrap();
+            let service = &spec.services[0];
+            assert_eq!(
+                service
+                    .resource("opener")
+                    .unwrap()
+                    .data
+                    .type_parameters
+                    .iter()
+                    .map(|parameter| parameter.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["ValueT"],
+            );
+            assert!(
+                service
+                    .resource("watcher")
+                    .unwrap()
+                    .data
+                    .type_parameters
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn infers_parameters_from_implicit_bindings_even_without_an_api_target() {
+        let wit = r#"
+package test:senders@1.0.0;
+world system { export senders; }
+interface senders {
+  type placeholder = string;
+  /// @nexus.type-parameter
+  type body-t = placeholder;
+  record send-request {
+    id: string,
+    /// @nexus.source python="body()"
+    body: body-t,
+  }
+  resource sender {
+    constructor(id: string);
+    send: func();
+  }
+  send: func(request: send-request);
+}
+"#;
+        let descriptors = empty_descriptors();
+        for targets in [
+            vec![],
+            vec![crate::nexgen_config::GenerationTarget::Workflow],
+        ] {
+            let emits_methods = !targets.is_empty();
+            let spec = super::ResourceResolutionPass::new(&descriptors, targets)
+                .bind_spec(
+                    parse(Language::Python, wit),
+                    std::path::Path::new("inline.wit"),
+                )
+                .unwrap();
+            let resource = &spec.services[0].resources[0].data;
+            assert_eq!(
+                resource
+                    .type_parameters
+                    .iter()
+                    .map(|parameter| parameter.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["BodyT"],
+            );
+            assert_eq!(!resource.methods.is_empty(), emits_methods);
+        }
     }
 
     #[test]
@@ -1157,6 +1522,124 @@ interface user-service {
             method.binding,
             ResolvedResourceMethodBinding::Stub
         ));
+    }
+
+    #[test]
+    fn binds_a_method_parameter_to_the_record_field_of_a_proto_oneof() {
+        let wit = r#"
+package test:oneof@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  /// @nexus.proto "temporal.api.workflowservice.v1.PauseActivityRequest.activity"
+  variant activity-selection {
+    id(string),
+    %type(string),
+  }
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowExecution"
+  record workflow-execution {
+    workflow-id: string,
+    run-id: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.PauseActivityRequest"
+  record pause-activity-request {
+    namespace: string,
+    execution: option<workflow-execution>,
+    identity: option<string>,
+    activity: option<activity-selection>,
+    reason: option<string>,
+    request-id: option<string>,
+  }
+
+  resource activities {
+    constructor(namespace: string);
+    pause: func(activity: option<activity-selection>);
+  }
+
+  pause: func(request: pause-activity-request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let resolved = resolve_service_resources(
+            &spec,
+            &spec.services[0],
+            &descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
+
+        let ResolvedResourceMethodBinding::Operation { request_plan, .. } =
+            &resolved.resources[0].methods[0].binding
+        else {
+            panic!("pause should bind to its operation");
+        };
+        let RequestPlan::Construct { fields, .. } = request_plan else {
+            panic!("the request plan should construct the request");
+        };
+        assert_eq!(
+            fields
+                .iter()
+                .map(|field| (field.field_name.as_str(), &field.value))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "namespace",
+                    &RequestPlan::Source(RequestPlanSource::ResourceField("namespace".to_string()))
+                ),
+                (
+                    "activity",
+                    &RequestPlan::Source(RequestPlanSource::MethodParam("activity".to_string()))
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_list_u8_parameter_that_fills_a_proto_bytes_field_is_bytes() {
+        let wit = r#"
+package test:bytes@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  /// @nexus.proto "temporal.api.common.v1.Callback.Internal"
+  record callback-internal {
+    data: option<list<u8>>,
+  }
+
+  resource callback {
+    constructor();
+    send: func(data: option<list<u8>>);
+  }
+
+  send: func(request: callback-internal);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let resolved = resolve_service_resources(
+            &spec,
+            &spec.services[0],
+            &descriptors(),
+            &[crate::nexgen_config::GenerationTarget::Workflow],
+        )
+        .unwrap();
+
+        let method = &resolved.resources[0].methods[0];
+        assert!(matches!(
+            method.binding,
+            ResolvedResourceMethodBinding::Operation { .. }
+        ));
+        assert_eq!(
+            method.params[0].field_type,
+            TypeSpec::Option(Box::new(TypeSpec::Bytes))
+        );
     }
 
     #[test]

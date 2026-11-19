@@ -57,10 +57,12 @@ pub enum Error {
     },
 
     #[error(
-        "the client target can't make an iterator for `@nexus.poll` on operation `{operation}` in \
-         `{path}`, since the operation {reason}"
+        "the {target} target can't make an iterator for `@nexus.poll` on operation `{operation}` \
+         in `{path}`, since the operation {reason}"
     )]
     UnsupportedPoll {
+        /// `Workflow` or `client`, as the docs write the target.
+        target: &'static str,
         path: PathBuf,
         operation: String,
         reason: String,
@@ -68,6 +70,27 @@ pub enum Error {
 
     #[error("the client target {reason}")]
     UnsupportedClientTarget { reason: String },
+
+    #[error("the generic resource `{resource}` isn't supported in {language}")]
+    UnsupportedGenericResource {
+        language: Language,
+        resource: String,
+    },
+
+    #[error("{language} runtime type inference for resource `{resource}` is unsupported: {reason}")]
+    UnsupportedResourceTypeInference {
+        language: Language,
+        resource: String,
+        reason: String,
+    },
+
+    #[error("the {language} runtime type `{name}` of `{parameter}` clashes with {conflicting}")]
+    RuntimeTypeArgumentNameConflict {
+        language: Language,
+        name: String,
+        parameter: String,
+        conflicting: String,
+    },
 
     #[error("`{name}` is a client method of both `{first_service}` and `{second_service}`")]
     ClientTargetNameConflict {
@@ -84,6 +107,9 @@ pub enum Error {
         generated_by: String,
         conflicting_declaration: String,
     },
+
+    #[error("can't flatten a request field of operation `{operation}`: {reason}")]
+    UnsupportedFlatten { operation: String, reason: String },
 
     #[error(
         ".NET type parameter `{parameter}` in `{declaration}` maps to `{name}`, which conflicts with {conflicting}"
@@ -331,13 +357,6 @@ pub enum Error {
         message: String,
         field: String,
         property: &'static str,
-        reason: String,
-    },
-
-    #[error("type override for `{message}.{field}` cannot be marked required: {reason}")]
-    UnsupportedRequiredTypeField {
-        message: String,
-        field: String,
         reason: String,
     },
 

@@ -132,9 +132,7 @@ func TestOptionalScalarResourceConstruction(t *testing.T) {
 		env.RegisterNexusService(service)
 		env.ExecuteWorkflow(func(ctx workflow.Context) (sw.SignalResult, error) {
 			var result sw.SignalResult
-			err := sw.SignalWithStart(ctx, sw.SignalWithStartOptions{
-				WorkflowExecution: sw.WorkflowExecution{WorkflowID: "workflow"},
-			}).Get(ctx, &result)
+			err := sw.SignalWithStart(ctx, sw.SignalWithStartOptions{}, sw.WorkflowExecution{WorkflowID: "workflow"}).Get(ctx, &result)
 			return result, err
 		})
 		require.NoError(t, env.GetWorkflowError())

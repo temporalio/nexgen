@@ -7,43 +7,31 @@ import (
 	"go.temporal.io/sdk/internal"
 )
 
-// Request fields for signaling a workflow, starting it first if needed.
-type SignalWithStartWorkflowRequest = workflowservice.SystemNexus_SignalWithStartWorkflowRequest
-
-// Static metadata for a workflow execution.
-type UserMetadata = workflowservice.SystemNexus_UserMetadata
-
-// Result of signaling a workflow and starting it if needed.
-type SignalWithStartWorkflowResponse = workflowservice.SystemNexus_SignalWithStartWorkflowResponse
-
-type WorkflowOutboundInterceptor = workflowservice.SystemNexus_WorkflowOutboundInterceptor
-
-type WorkflowOutboundInterceptorBase = workflowservice.SystemNexus_WorkflowOutboundInterceptorBase
-
-type WorkflowOutboundInterceptorTerminal = workflowservice.SystemNexus_WorkflowOutboundInterceptorTerminal
-
-type WorkflowOutboundRuntime = workflowservice.SystemNexus_WorkflowOutboundRuntime
-
-type ExecuteOperationInput = workflowservice.SystemNexus_ExecuteOperationInput
-
+// SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
+//
+// NOTE: Experimental
 type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
-// Signal a workflow, starting it first if needed. Encode payloads with the configured
-// data converter.
+// SignalWithStartWorkflow - Signal a workflow, starting it first if needed. Encode
+// payloads with the configured data converter.
 //
+// Input id: Unique identifier for the workflow execution. Must be nonempty.
 // Input signal: Signal name to send with the start request.
 // Input signalArg: Arguments for the signal.
-// Input workflowValue: Workflow function identifying the workflow to start.
+// Input workflow: Workflow function identifying the workflow to start.
 // Input args: Arguments for the workflow.
 //
-// Returns: A workflow handle to the started workflow.
+// Returns: A workflow.Execution with details about the signaled workflow.
+//
+// NOTE: Experimental
 func SignalWithStartWorkflow(
 	ctx internal.Context,
 	opts SignalWithStartWorkflowOptions,
+	id string,
 	signal string,
 	signalArg any,
-	workflowValue any,
+	workflow any,
 	args ...any,
 ) internal.Future {
-	return workflowservice.SystemNexus_SignalWithStartWorkflow(ctx, opts, signal, signalArg, workflowValue, args...)
+	return workflowservice.SystemNexus_SignalWithStartWorkflow(ctx, opts, id, signal, signalArg, workflow, args...)
 }

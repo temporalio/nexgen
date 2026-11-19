@@ -1,0 +1,1 @@
+A `list<u8>` case of a variant with `@nexus.proto` is the proto `bytes`, an enum case of a proto oneof is its bound WIT enum, and a resource method parameter named after a proto oneof binds to the record field of that oneof.

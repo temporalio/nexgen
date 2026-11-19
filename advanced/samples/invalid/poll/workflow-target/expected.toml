@@ -1,9 +1,10 @@
 languages = ["python"]
 system_nexus = true
+targets = ["workflow"]
 
 [error]
-kind = "invalid-wit-directive"
+kind = "unsupported-poll"
 contains = [
-  "invalid WIT directive `@nexus.poll` on interface `reader` operation `Read`",
-  "`targets` includes `workflow`, but only the client target gets an iterator",
+  "the Workflow target can't make an iterator for `@nexus.poll` on operation `Reader.Open`",
+  "since the operation returns a resource",
 ]

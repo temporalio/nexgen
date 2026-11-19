@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use indexmap::IndexMap;
@@ -212,7 +212,7 @@ pub trait TextSpec: std::fmt::Debug + Clone + PartialEq {
 pub struct AuthoredFamily;
 
 impl TypeFamily for AuthoredFamily {
-    type Origin = LanguageFieldOrigins;
+    type Origin = LanguageFieldPolicies;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -237,7 +237,7 @@ impl TypeFamily for AuthoredFamily {
 pub(crate) struct SelectedFamily;
 
 impl TypeFamily for SelectedFamily {
-    type Origin = Option<FieldOrigin>;
+    type Origin = Option<FieldPolicy>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -690,8 +690,14 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub output: Option<TypeSpec<F>>,
     pub output_transform: Option<OperationOutputTransformSpec<F>>,
     pub serialization_context: F::Text,
+    /// Input record field key that receives outbound context headers.
+    pub context_propagation_header: F::Text,
     /// The `@nexus.poll` settings. None when the operation has no poll.
     pub poll: Option<OperationPollSpec<F>>,
+    /// Targets whose public top-level operation function `@nexus.api-omit` suppresses. The
+    /// operation stays registered, in the service, and bindable by resource methods. Empty
+    /// keeps the function on every target.
+    pub api_omitted: BTreeSet<GenerationTarget>,
     pub data: F::OperationData,
 }
 
@@ -728,7 +734,9 @@ impl<F: TypeFamily> OperationSpec<F> {
                 .output_transform
                 .map(|transform| transform.map_names_with(map)),
             serialization_context: map.map_text(self.serialization_context),
+            context_propagation_header: map.map_text(self.context_propagation_header),
             poll: self.poll.map(|poll| poll.map_names_with(map)),
+            api_omitted: self.api_omitted,
             data,
         }
     }
@@ -740,6 +748,9 @@ pub struct ResourceSpec<F: TypeFamily = AuthoredFamily> {
     pub doc: F::Doc,
     pub fields: Vec<ResourceFieldSpec<F>>,
     pub methods: Vec<ResourceMethodSpec<F>>,
+    /// Set by `@nexus.close` to the method the end of an `async with` block calls. One per
+    /// resource, so it lives here and not as a flag on each method.
+    pub close: Option<String>,
     pub data: F::ResourceData,
 }
 
@@ -758,6 +769,11 @@ pub struct ResourceMethodSpec<F: TypeFamily = AuthoredFamily> {
     pub params: Vec<ResourceFieldSpec<F>>,
     pub result: Option<ResourceResultSpec<F>>,
     pub operation_name: Option<String>,
+    /// Set by `@nexus.varargs` to the name of its list parameter.
+    pub varargs: Option<String>,
+    /// Targets whose resource class leaves this method out, from `@nexus.api-omit`. The bound
+    /// operation stays in the service and in every other target.
+    pub api_omitted: BTreeSet<GenerationTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -785,6 +801,7 @@ impl<F: TypeFamily> ResourceSpec<F> {
                 .into_iter()
                 .map(|method| method.map_names_with(map))
                 .collect(),
+            close: self.close,
             data,
         }
     }
@@ -821,6 +838,8 @@ impl<F: TypeFamily> ResourceMethodSpec<F> {
                 .collect(),
             result: self.result.map(|result| result.map_names_with(map)),
             operation_name: self.operation_name,
+            varargs: self.varargs,
+            api_omitted: self.api_omitted,
         }
     }
 }
@@ -845,6 +864,8 @@ pub struct RecordSpec<F: TypeFamily = AuthoredFamily> {
     pub source: Option<ExternalTypeSourceSpec<F>>,
     pub experimental: bool,
     pub flatten_in_api: bool,
+    /// Explicit generic dependencies, including parameters not used by any field.
+    pub declared_type_parameters: Vec<TypeParameterSpec>,
     pub fields: IndexMap<String, RecordFieldSpec<F>>,
     pub data: F::RecordData,
 }
@@ -858,22 +879,30 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub field_type: TypeSpec<F>,
     pub required: bool,
     pub origin: F::Origin,
+    /// Set by `@nexus.flatten-in-api` on the field.
+    pub flatten_in_api: bool,
     pub function: Option<FunctionFieldSpec<F>>,
     pub data: F::FieldData,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldOrigin {
-    /// Present in generated models and wire conversion, but omitted from
-    /// generated operation convenience APIs.
-    ApiOmitted,
+    /// Supplied by the caller; also the fallback for missing target entries.
+    Parameter,
+    /// Retained in the shared model, but absent from this target's convenience API.
     Omitted,
-    Default {
-        expressions: BTreeMap<GenerationTarget, FieldExpression>,
-    },
-    Source {
-        expressions: BTreeMap<GenerationTarget, FieldExpression>,
-    },
+    /// Supplied by the caller, or initialized from the expression when absent.
+    Default(FieldExpression),
+    /// Initialized by the API rather than supplied by the caller.
+    Source(FieldExpression),
+}
+
+/// Model omission is independent of the target-specific convenience API policy.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldPolicy {
+    /// Removes the field from generated models and wire conversion for all targets.
+    pub omitted: bool,
+    pub origin: BTreeMap<GenerationTarget, FieldOrigin>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -882,52 +911,168 @@ pub struct FieldExpression {
     pub import: Option<String>,
 }
 
-/// Origin alternatives retained until language selection.
+/// Field-policy alternatives retained until language selection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct LanguageFieldOrigins {
-    pub default: Option<FieldOrigin>,
-    pub by_language: BTreeMap<Language, FieldOrigin>,
+pub struct LanguageFieldPolicies {
+    pub default: Option<FieldPolicy>,
+    pub by_language: BTreeMap<Language, FieldPolicy>,
 }
 
-impl LanguageFieldOrigins {
-    pub fn for_language(&self, language: Language) -> Option<&FieldOrigin> {
+impl LanguageFieldPolicies {
+    pub fn for_language(&self, language: Language) -> Option<&FieldPolicy> {
         self.by_language.get(&language).or(self.default.as_ref())
     }
 
     pub fn is_omitted(&self) -> bool {
-        matches!(self.default, Some(FieldOrigin::Omitted))
+        self.default.as_ref().is_some_and(FieldPolicy::is_omitted)
     }
 }
 
-impl FieldOrigin {
+impl FieldPolicy {
+    /// Missing target entries represent ordinary caller-supplied parameters.
+    pub fn origin_for(&self, target: GenerationTarget) -> &FieldOrigin {
+        self.origin.get(&target).unwrap_or(&FieldOrigin::Parameter)
+    }
+
     pub fn is_omitted(&self) -> bool {
-        matches!(self, Self::Omitted)
+        self.omitted
     }
 
     pub fn source_for(&self, target: GenerationTarget) -> Option<&str> {
-        match self {
-            Self::Source { expressions } => {
-                expressions.get(&target).map(|expr| expr.value.as_str())
-            }
+        match self.origin_for(target) {
+            FieldOrigin::Source(expression) => Some(expression.value.as_str()),
             _ => None,
         }
+    }
+
+    pub fn source_expressions(&self) -> BTreeMap<GenerationTarget, &FieldExpression> {
+        self.origin
+            .iter()
+            .filter_map(|(&target, origin)| match origin {
+                FieldOrigin::Source(expression) => Some((target, expression)),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn is_sourced(&self) -> bool {
-        matches!(self, Self::Source { .. })
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Source(_)))
+    }
+
+    pub fn api_omitted_for(&self, target: GenerationTarget) -> bool {
+        matches!(self.origin_for(target), FieldOrigin::Omitted)
+    }
+
+    pub fn has_api_omission(&self) -> bool {
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Omitted))
     }
 
     pub fn default_for(&self, target: GenerationTarget) -> Option<&str> {
-        match self {
-            Self::Default { expressions } => {
-                expressions.get(&target).map(|expr| expr.value.as_str())
-            }
+        match self.origin_for(target) {
+            FieldOrigin::Default(expression) => Some(expression.value.as_str()),
             _ => None,
         }
     }
 
+    pub fn has_default(&self) -> bool {
+        self.origin
+            .values()
+            .any(|origin| matches!(origin, FieldOrigin::Default(_)))
+    }
+
     pub fn can_initialize(&self) -> bool {
-        matches!(self, Self::Default { .. } | Self::Source { .. })
+        self.has_default() || self.is_sourced()
+    }
+}
+
+#[cfg(test)]
+mod field_policy_tests {
+    use super::*;
+
+    #[test]
+    fn missing_targets_are_parameters_without_materializing_entries() {
+        let policy = FieldPolicy::default();
+        for target in [GenerationTarget::Workflow, GenerationTarget::Client] {
+            assert_eq!(policy.origin_for(target), &FieldOrigin::Parameter);
+            assert_eq!(policy.source_for(target), None);
+            assert_eq!(policy.default_for(target), None);
+            assert!(!policy.api_omitted_for(target));
+        }
+        assert!(policy.origin.is_empty());
+        assert!(!policy.is_omitted());
+        assert!(!policy.can_initialize());
+    }
+
+    #[test]
+    fn model_omission_is_independent_of_api_omission() {
+        let policy = FieldPolicy {
+            omitted: true,
+            ..Default::default()
+        };
+        assert!(policy.is_omitted());
+        assert!(!policy.api_omitted_for(GenerationTarget::Workflow));
+
+        let policy = FieldPolicy {
+            origin: BTreeMap::from([(GenerationTarget::Workflow, FieldOrigin::Omitted)]),
+            ..Default::default()
+        };
+        assert!(!policy.is_omitted());
+        assert!(policy.api_omitted_for(GenerationTarget::Workflow));
+        assert_eq!(
+            policy.origin_for(GenerationTarget::Client),
+            &FieldOrigin::Parameter
+        );
+        assert!(!policy.can_initialize());
+    }
+
+    #[test]
+    fn expression_accessors_select_only_the_requested_origin() {
+        let source = FieldExpression {
+            value: "workflow_source()".to_string(),
+            import: None,
+        };
+        let default = FieldExpression {
+            value: "client_default".to_string(),
+            import: Some("client_defaults".to_string()),
+        };
+        let policy = FieldPolicy {
+            origin: BTreeMap::from([
+                (
+                    GenerationTarget::Workflow,
+                    FieldOrigin::Source(source.clone()),
+                ),
+                (
+                    GenerationTarget::Client,
+                    FieldOrigin::Default(default.clone()),
+                ),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            policy.source_for(GenerationTarget::Workflow),
+            Some(source.value.as_str())
+        );
+        assert_eq!(policy.source_for(GenerationTarget::Client), None);
+        assert_eq!(
+            policy.default_for(GenerationTarget::Client),
+            Some(default.value.as_str())
+        );
+        assert_eq!(policy.default_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            policy.origin_for(GenerationTarget::Client),
+            &FieldOrigin::Default(default)
+        );
+        assert_eq!(
+            policy.source_expressions(),
+            BTreeMap::from([(GenerationTarget::Workflow, &source)])
+        );
+        assert!(policy.is_sourced());
+        assert!(policy.has_default());
+        assert!(policy.can_initialize());
     }
 }
 
@@ -995,6 +1140,7 @@ impl<F: TypeFamily> RecordSpec<F> {
             source: self.source.map(|source| source.map_names_with(map)),
             experimental: self.experimental,
             flatten_in_api: self.flatten_in_api,
+            declared_type_parameters: self.declared_type_parameters,
             fields: self
                 .fields
                 .into_iter()
@@ -1013,11 +1159,15 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn public_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
-            .filter(|(_, field)| matches!(field.origin, None | Some(FieldOrigin::Default { .. })))
+            .filter(|(_, field)| {
+                !field.origin.as_ref().is_some_and(|policy| {
+                    policy.is_omitted() || policy.is_sourced() || policy.has_api_omission()
+                })
+            })
             .map(|(name, field)| (name.as_str(), field))
     }
 
@@ -1028,15 +1178,14 @@ impl<F: TypeFamily> RecordSpec<F> {
         target: GenerationTarget,
     ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
             .filter(move |(_, field)| {
-                !matches!(
-                    field.origin,
-                    Some(FieldOrigin::Omitted | FieldOrigin::ApiOmitted)
-                ) && field.source_for(target).is_none()
+                !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                    && !field.api_omitted_for(target)
+                    && field.source_for(target).is_none()
             })
             .map(|(name, field)| (name.as_str(), field))
     }
@@ -1046,29 +1195,28 @@ impl<F: TypeFamily> RecordSpec<F> {
         target: GenerationTarget,
     ) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>, &str)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        self.sourced_fields()
-            .filter_map(move |(name, field, expressions)| {
-                expressions
-                    .get(&target)
-                    .map(|source| (name, field, source.value.as_str()))
-            })
+        self.fields.iter().filter_map(move |(name, field)| {
+            field
+                .source_for(target)
+                .map(|source| (name.as_str(), field, source))
+        })
     }
 
     /// Fields represented by the generated model, including fields hidden from
     /// operation convenience APIs and excluding sourced fields.
     pub fn model_fields(&self) -> impl Iterator<Item = (&str, &RecordFieldSpec<F>)>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .iter()
             .filter(|(_, field)| {
-                matches!(
-                    field.origin,
-                    None | Some(FieldOrigin::Default { .. } | FieldOrigin::ApiOmitted)
-                )
+                !field
+                    .origin
+                    .as_ref()
+                    .is_some_and(|policy| policy.is_omitted() || policy.is_sourced())
             })
             .map(|(name, field)| (name.as_str(), field))
     }
@@ -1079,20 +1227,20 @@ impl<F: TypeFamily> RecordSpec<F> {
         Item = (
             &str,
             &RecordFieldSpec<F>,
-            &BTreeMap<GenerationTarget, FieldExpression>,
+            BTreeMap<GenerationTarget, &FieldExpression>,
         ),
     >
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        self.fields
-            .iter()
-            .filter_map(|(name, field)| match &field.origin {
-                Some(FieldOrigin::Source { expressions }) => {
-                    Some((name.as_str(), field, expressions))
-                }
-                _ => None,
-            })
+        self.fields.iter().filter_map(|(name, field)| {
+            field
+                .origin
+                .as_ref()
+                .filter(|policy| policy.is_sourced())
+                .map(FieldPolicy::source_expressions)
+                .map(|expressions| (name.as_str(), field, expressions))
+        })
     }
 
     pub fn functions(&self) -> impl Iterator<Item = (&str, &FunctionFieldSpec<F>)> {
@@ -1106,7 +1254,7 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn is_empty_model(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.doc.is_empty()
             && self
@@ -1149,11 +1297,11 @@ impl<F: TypeFamily> RecordSpec<F> {
 
     pub fn field_omitted(&self, field_name: &str) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.fields
             .get(field_name)
-            .is_some_and(|field| field.origin.as_ref().is_some_and(FieldOrigin::is_omitted))
+            .is_some_and(|field| field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     }
 
     pub fn function(&self, field_name: &str) -> Option<&FunctionFieldSpec<F>> {
@@ -1208,14 +1356,14 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
     /// Defaults make operation arguments omittable, not model or wire fields.
     pub fn api_required(&self, target: GenerationTarget) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.required && self.default_for(target).is_none() && self.source_for(target).is_none()
     }
 
     pub fn default_for(&self, target: GenerationTarget) -> Option<&str>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.origin
             .as_ref()
@@ -1224,18 +1372,34 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
 
     pub fn has_default(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
-        matches!(self.origin, Some(FieldOrigin::Default { .. }))
+        self.origin.as_ref().is_some_and(FieldPolicy::has_default)
     }
 
     pub fn source_for(&self, target: GenerationTarget) -> Option<&str>
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.origin
             .as_ref()
             .and_then(|origin| origin.source_for(target))
+    }
+
+    pub fn has_source(&self) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
+    {
+        self.origin.as_ref().is_some_and(FieldPolicy::is_sourced)
+    }
+
+    pub fn api_omitted_for(&self, target: GenerationTarget) -> bool
+    where
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
+    {
+        self.origin
+            .as_ref()
+            .is_some_and(|origin| origin.api_omitted_for(target))
     }
 
     fn map_names_with<G, M>(
@@ -1257,6 +1421,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             field_type: self.field_type.map_names_with(map),
             required: self.required,
             origin: map.map_origin(self.origin),
+            flatten_in_api: self.flatten_in_api,
             function: self.function.map(|function| function.map_names_with(map)),
             data,
         }
@@ -1264,7 +1429,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
 
     fn is_empty_model_field(&self) -> bool
     where
-        F: TypeFamily<Origin = Option<FieldOrigin>>,
+        F: TypeFamily<Origin = Option<FieldPolicy>>,
     {
         self.name.is_empty()
             && self.doc.is_none()
@@ -1272,6 +1437,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             && self.flattened_annotation.is_none()
             && !self.required
             && self.origin.is_none()
+            && !self.flatten_in_api
             && self.function.is_none()
     }
 }
@@ -1889,18 +2055,37 @@ where
 
 impl<F> ApiSpec<F>
 where
-    F: TypeFamily<Origin = Option<FieldOrigin>>,
+    F: TypeFamily<Origin = Option<FieldPolicy>>,
     F::Record: AsRef<str>,
     F::Variant: AsRef<str>,
 {
-    /// Returns the model parameters in first-use order. Selected field
-    /// annotations are authoritative, so an overridden field does not
+    /// Returns declared parameters first, then field dependencies in first-use order.
+    /// Selected field annotations are authoritative, so an overridden field does not
     /// contribute parameters.
     pub(crate) fn record_type_parameters(&self, record_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters);
+        self.collect_record_type_parameters(record_name, &mut visiting, &mut parameters, &|_| None);
         parameters.into_values().collect()
+    }
+
+    /// Explicit dependencies not carried by this record's fields.
+    pub(crate) fn record_phantom_type_parameters(
+        &self,
+        record_name: &str,
+    ) -> Vec<TypeParameterSpec> {
+        let Some(record) = self.record(record_name) else {
+            return Vec::new();
+        };
+        let mut fields = IndexMap::new();
+        let mut visiting = std::collections::BTreeSet::from([record_name.to_string()]);
+        self.collect_record_field_type_parameters(record, &mut visiting, &mut fields, &|_| None);
+        record
+            .declared_type_parameters
+            .iter()
+            .filter(|parameter| !fields.contains_key(&parameter.full_name))
+            .cloned()
+            .collect()
     }
 
     /// Returns a variant's parameters in first-use order, recursively walking
@@ -1908,14 +2093,16 @@ where
     pub(crate) fn variant_type_parameters(&self, variant_name: &str) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_variant_type_parameters(variant_name, &mut visiting, &mut parameters);
+        self.collect_variant_type_parameters(variant_name, &mut visiting, &mut parameters, &|_| {
+            None
+        });
         parameters.into_values().collect()
     }
 
     pub(crate) fn type_parameters(&self, value: &TypeSpec<F>) -> Vec<TypeParameterUsage> {
         let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
         let mut visiting = std::collections::BTreeSet::new();
-        self.collect_type_parameters(value, &mut visiting, &mut parameters);
+        self.collect_type_parameters(value, &mut visiting, &mut parameters, &|_| None);
         parameters.into_values().collect()
     }
 
@@ -1924,24 +2111,42 @@ where
         record_name: &str,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         if !visiting.insert(record_name.to_string()) {
             return;
         }
         if let Some(record) = self.record(record_name) {
-            for field in record.fields.values() {
-                if field.origin.as_ref().is_some_and(FieldOrigin::is_omitted)
-                    || field
-                        .annotation
-                        .as_ref()
-                        .is_some_and(|annotation| !annotation.is_empty())
-                {
-                    continue;
-                }
-                self.collect_type_parameters(&field.field_type, visiting, parameters);
+            for parameter in &record.declared_type_parameters {
+                parameters
+                    .entry(parameter.full_name.clone())
+                    .or_insert_with(|| TypeParameterUsage {
+                        parameter: parameter.clone(),
+                    });
             }
+            self.collect_record_field_type_parameters(record, visiting, parameters, proto_record);
         }
         visiting.remove(record_name);
+    }
+
+    fn collect_record_field_type_parameters(
+        &self,
+        record: &RecordSpec<F>,
+        visiting: &mut std::collections::BTreeSet<String>,
+        parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
+    ) {
+        for field in record.fields.values() {
+            if field.origin.as_ref().is_some_and(FieldPolicy::is_omitted)
+                || field
+                    .annotation
+                    .as_ref()
+                    .is_some_and(|annotation| !annotation.is_empty())
+            {
+                continue;
+            }
+            self.collect_type_parameters(&field.field_type, visiting, parameters, proto_record);
+        }
     }
 
     fn collect_variant_type_parameters(
@@ -1949,6 +2154,7 @@ where
         variant_name: &str,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         if !visiting.insert(variant_name.to_string()) {
             return;
@@ -1956,7 +2162,7 @@ where
         if let Some(variant) = self.variant(variant_name) {
             for case in &variant.cases {
                 if let Some(payload) = &case.payload {
-                    self.collect_type_parameters(payload, visiting, parameters);
+                    self.collect_type_parameters(payload, visiting, parameters, proto_record);
                 }
             }
         }
@@ -1968,6 +2174,7 @@ where
         value: &TypeSpec<F>,
         visiting: &mut std::collections::BTreeSet<String>,
         parameters: &mut IndexMap<String, TypeParameterUsage>,
+        proto_record: &dyn Fn(&F::Proto) -> Option<String>,
     ) {
         match value {
             TypeSpec::TypeParameter(parameter) => {
@@ -1981,33 +2188,49 @@ where
                 }
             }
             TypeSpec::Option(inner) | TypeSpec::List(inner) => {
-                self.collect_type_parameters(inner, visiting, parameters)
+                self.collect_type_parameters(inner, visiting, parameters, proto_record)
             }
             TypeSpec::Tuple(items) => {
                 for item in items {
-                    self.collect_type_parameters(item, visiting, parameters);
+                    self.collect_type_parameters(item, visiting, parameters, proto_record);
                 }
             }
             TypeSpec::Map(key, value) => {
-                self.collect_type_parameters(key, visiting, parameters);
-                self.collect_type_parameters(value, visiting, parameters);
+                self.collect_type_parameters(key, visiting, parameters, proto_record);
+                self.collect_type_parameters(value, visiting, parameters, proto_record);
             }
             TypeSpec::Result { ok, err } => {
                 if let Some(ok) = ok {
-                    self.collect_type_parameters(ok, visiting, parameters);
+                    self.collect_type_parameters(ok, visiting, parameters, proto_record);
                 }
                 if let Some(err) = err {
-                    self.collect_type_parameters(err, visiting, parameters);
+                    self.collect_type_parameters(err, visiting, parameters, proto_record);
                 }
             }
-            TypeSpec::Record(record) => {
-                self.collect_record_type_parameters(record.as_ref(), visiting, parameters)
-            }
-            TypeSpec::Variant(variant) => {
-                self.collect_variant_type_parameters(variant.as_ref(), visiting, parameters)
-            }
+            TypeSpec::Record(record) => self.collect_record_type_parameters(
+                record.as_ref(),
+                visiting,
+                parameters,
+                proto_record,
+            ),
+            TypeSpec::Variant(variant) => self.collect_variant_type_parameters(
+                variant.as_ref(),
+                visiting,
+                parameters,
+                proto_record,
+            ),
             TypeSpec::External(ExternalTypeSpec::Alias(alias)) => {
-                self.collect_type_parameters(&alias.target, visiting, parameters)
+                self.collect_type_parameters(&alias.target, visiting, parameters, proto_record)
+            }
+            TypeSpec::External(ExternalTypeSpec::Proto(proto)) => {
+                if let Some(record_name) = proto_record(proto) {
+                    self.collect_record_type_parameters(
+                        &record_name,
+                        visiting,
+                        parameters,
+                        proto_record,
+                    );
+                }
             }
             TypeSpec::Bool
             | TypeSpec::Int(_)
@@ -2017,9 +2240,31 @@ where
             | TypeSpec::Enum(_)
             | TypeSpec::Flags(_)
             | TypeSpec::Resource(_)
-            | TypeSpec::External(ExternalTypeSpec::Proto(_))
             | TypeSpec::External(ExternalTypeSpec::Json(_)) => {}
         }
+    }
+}
+
+impl<F> ApiSpec<F>
+where
+    F: TypeFamily<Origin = Option<FieldPolicy>>,
+    F::Proto: AsRef<str>,
+    F::Record: AsRef<str>,
+    F::Variant: AsRef<str>,
+{
+    /// Before planning, a proto-backed record appears as its proto type, so this walks the record.
+    pub(crate) fn type_parameters_through_protos(
+        &self,
+        value: &TypeSpec<F>,
+    ) -> Vec<TypeParameterUsage> {
+        let mut parameters = IndexMap::<String, TypeParameterUsage>::new();
+        let mut visiting = std::collections::BTreeSet::new();
+        let proto_record = |proto: &F::Proto| {
+            self.record_for_proto(proto.as_ref())
+                .map(|record| record.full_name.clone())
+        };
+        self.collect_type_parameters(value, &mut visiting, &mut parameters, &proto_record);
+        parameters.into_values().collect()
     }
 }
 

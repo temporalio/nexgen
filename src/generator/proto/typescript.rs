@@ -17,7 +17,7 @@ use crate::generator::typescript::{
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
-    PlannedWireFieldBinding, relative_descriptor_name,
+    PlannedWireFieldBinding, flattened_list_field, relative_descriptor_name,
 };
 use crate::spec::{EnumSpec, ExternalTypeSpec, RecordFieldSpec, RecordSpec, TypeReplacementSpec};
 
@@ -240,14 +240,40 @@ fn nested_generic_expressions(
         .as_ref()?
         .wire_function_names
         .as_ref()?;
+    // A required collection stays required after the conversion, as in a non-generic record.
+    let collection = |value: String| {
+        if field.required {
+            required_field_expr(&value, &record.name, name)
+        } else {
+            value
+        }
+    };
     Some(match &field.field_type {
+        // The model holds the values of a flattened record, and the converter wraps each one.
+        PlannedType::List(item) if let Some((_, value)) = flattened_list_field(api_plan, item) => {
+            let conversion = resolved.wire_conversion.as_ref()?;
+            let value = typescript_generated_field_name(&value.name);
+            (
+                collection(format!(
+                    "{wire}?.map((value: any) => {}.{value})",
+                    conversion.from_wire_expr("value")
+                )),
+                collection(format!(
+                    "model.{name}?.map((value) => {})",
+                    conversion.to_wire_expr(&format!("{{ {value}: value }}"))
+                )),
+            )
+        }
         PlannedType::List(_) => (
-            repeated_from_wire_expr(&resolved, wire),
-            repeated_to_wire_expr(&resolved, name),
+            collection(repeated_from_wire_expr(&resolved, wire)),
+            collection(repeated_to_wire_expr(&resolved, name)),
         ),
         PlannedType::Map(_, _) => (
-            map_value_from_wire_expr(&resolved, wire),
-            map_value_to_wire_expr_from_expr(&resolved, &format!("model.{name}")),
+            collection(map_value_from_wire_expr(&resolved, wire)),
+            collection(map_value_to_wire_expr_from_expr(
+                &resolved,
+                &format!("model.{name}"),
+            )),
         ),
         _ if field.required => (
             required_from_wire_expr(&resolved, &record.name, wire, name, field),
@@ -960,7 +986,7 @@ fn render_model_to_proto_function(
         for field in &model.sourced_fields {
             output.push_str(&format!(
                 "  proto.{} = {};\n",
-                field.name, field.to_wire_expr
+                field.wire_name, field.to_wire_expr
             ));
         }
         output.push_str("  return proto;\n");
@@ -978,7 +1004,7 @@ fn render_model_to_proto_function(
         }
         for field in &model.sourced_fields {
             output.push_str("    ");
-            output.push_str(&field.name);
+            output.push_str(&field.wire_name);
             output.push_str(": ");
             output.push_str(&field.to_wire_expr);
             output.push_str(",\n");

@@ -359,8 +359,8 @@ struct TypePlanningMapper<'a, 'descriptors> {
 impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMapper<'_, '_> {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) -> PlannedSpecData {
@@ -459,8 +459,10 @@ impl ApiSpecTransform<OperationLoweredFamily, PlannedFamily> for TypePlanningMap
                 name: name.to_string(),
                 doc: Default::default(),
                 type_name: name.to_upper_camel_case(),
+                type_parameters: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
+                close: None,
             })
     }
 
@@ -525,7 +527,7 @@ impl<'a> TypePlanningContext<'a> {
         planned_spec
     }
 
-    // `map_names` keeps a oneof case payload as its proto message. Re-plan it as the bound record.
+    // `map_names` keeps a oneof case payload as its proto type. Re-plan a bound record or enum.
     fn resolve_planned_variant_case_types(
         &mut self,
         source_spec: &ApiSpec<OperationLoweredFamily>,
@@ -552,7 +554,9 @@ impl<'a> TypePlanningContext<'a> {
                 else {
                     continue;
                 };
-                if self.spec.record_for_proto(proto_name.as_str()).is_none() {
+                if self.spec.record_for_proto(proto_name.as_str()).is_none()
+                    && self.spec.enum_for_proto(proto_name.as_str()).is_none()
+                {
                     continue;
                 }
                 let record = self.planned_type_from_authored(payload);
@@ -663,16 +667,21 @@ impl<'a> TypePlanningContext<'a> {
                 }
             }),
             serialization_context: operation.serialization_context.clone(),
+            context_propagation_header: operation.context_propagation_header.clone(),
             poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
                 next: poll.next.clone(),
                 targets: poll.targets.clone(),
                 items: poll.items.clone(),
                 resume: poll.resume.clone(),
             }),
+            api_omitted: operation.api_omitted.clone(),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
                     &self.spec,
                     operation.data.output_resource_return.as_ref(),
+                ),
+                runtime_type_parameters: operation_runtime_type_parameters(
+                    &self.spec, service, operation,
                 ),
             },
         })
@@ -859,7 +868,9 @@ impl<'a> TypePlanningContext<'a> {
                     result: method
                         .result
                         .as_ref()
-                        .map(|result| self.planned_resource_method_result(result)),
+                        .map(|result| self.planned_resource_method_result(service, result)),
+                    varargs: method.varargs.clone(),
+                    api_omitted: method.api_omitted.clone(),
                     binding,
                 })
             })
@@ -869,23 +880,30 @@ impl<'a> TypePlanningContext<'a> {
             name: resource.name.clone(),
             doc: resource.doc.clone(),
             type_name: resource.name.to_upper_camel_case(),
+            type_parameters: resource.type_parameters.clone(),
             fields: resource
                 .fields
                 .iter()
                 .map(|field| self.planned_resource_field(field))
                 .collect(),
             methods,
+            close: resource.close.clone(),
         })
     }
 
     fn planned_resource_method_result(
         &mut self,
+        service: &ServiceSpec<OperationLoweredFamily>,
         result: &ResourceResultSpec<SelectedFamily>,
     ) -> PlannedResourceMethodResult {
         let optional = matches!(result.result_type, TypeSpec::Option(_));
         let kind = match result.result_type.without_option() {
             TypeSpec::Resource(resource) => PlannedResourceMethodResultKind::Resource {
                 type_name: resource.as_str().to_upper_camel_case(),
+                type_parameters: service
+                    .resource(resource.as_str())
+                    .map(|resource| resource.data.type_parameters().to_vec())
+                    .unwrap_or_default(),
             },
             _ => PlannedResourceMethodResultKind::Value(
                 self.planned_selected_type_from_authored(&result.result_type),
@@ -1321,6 +1339,42 @@ fn plan_operation_resource_return(
     })
 }
 
+/// A request encodes from its value, so a bound operation takes only its output's type parameters.
+fn operation_runtime_type_parameters(
+    spec: &ApiSpec<OperationLoweredFamily>,
+    service: &ServiceSpec<OperationLoweredFamily>,
+    operation: &OperationSpec<OperationLoweredFamily>,
+) -> Vec<crate::spec::TypeParameterSpec> {
+    if let Some(resource_return) = &operation.data.output_resource_return {
+        return service
+            .resource(&resource_return.resource_name)
+            .map(|resource| resource.data.type_parameters().to_vec())
+            .unwrap_or_default();
+    }
+    let bound = service.resources.iter().any(|resource| {
+        !resource.data.type_parameters().is_empty()
+            && resource.data.resolved.as_ref().is_some_and(|resolved| {
+                resolved.methods.iter().any(|method| {
+                    matches!(
+                        &method.binding,
+                        ResolvedResourceMethodBinding::Operation { operation_name, .. }
+                            if *operation_name == operation.name
+                    )
+                })
+            })
+    });
+    if !bound {
+        return Vec::new();
+    }
+    operation
+        .output_type()
+        .map(|output| spec.type_parameters_through_protos(output))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|usage| usage.parameter)
+        .collect()
+}
+
 pub(crate) struct TypePlanningPass<'a> {
     imports: BTreeMap<ModulePath, BTreeMap<ModulePath, BTreeSet<String>>>,
     descriptors: &'a DescriptorIndex,
@@ -1379,8 +1433,8 @@ struct SelectedToOperationLoweredMapper;
 impl ApiSpecTransform<SelectedFamily, OperationLoweredFamily> for SelectedToOperationLoweredMapper {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) {}
@@ -1446,7 +1500,7 @@ impl TypePlanningContext<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
     use super::*;
@@ -1866,7 +1920,9 @@ interface alerts {
                     )))),
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
+                    context_propagation_header: LanguageStringSpec::default(),
                     poll: None,
+                    api_omitted: BTreeSet::new(),
                     data: (),
                 }],
                 resources: Vec::new(),

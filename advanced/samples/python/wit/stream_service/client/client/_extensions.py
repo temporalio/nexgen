@@ -4,23 +4,28 @@ from __future__ import annotations
 
 import collections.abc
 import typing
-import temporalio.client
 import temporalio.nexus.system
 import uuid as _uuid
 import abc
 import datetime
 
+if typing.TYPE_CHECKING:
+    import temporalio.client
+
 from ..services import StreamService
 from ..models import (
     CreateStreamRequest,
+    CreateStreamResult,
     StreamIdConflictPolicy,
     StreamRef,
 )
 from ._resources.stream import Stream
 import temporal_support as _support
+from .._resource_context_manager import resource_context_manager
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
+BodyT = typing.TypeVar("BodyT")
 
 
 class StreamServiceClientExtension(abc.ABC):
@@ -42,14 +47,39 @@ class StreamServiceClientExtension(abc.ABC):
         """Return the Nexus client that starts the operations of ``service``."""
         ...
 
+    @typing.overload
     def get_stream(
         self,
+        ref: StreamRef[BodyT],
         *,
-        ref: StreamRef,
-        created: bool | None,
-    ) -> Stream:
-        """Return the ``Stream`` handle that has these identity fields."""
-        return Stream(
+        created: bool | None = None,
+        body_type: None = None,
+    ) -> Stream[BodyT]: ...
+    @typing.overload
+    def get_stream(
+        self,
+        ref: StreamRef[BodyT] | StreamRef[object],
+        *,
+        created: bool | None = None,
+        body_type: type[BodyT],
+    ) -> Stream[BodyT]: ...
+    def get_stream(
+        self,
+        ref: StreamRef[typing.Any],
+        *,
+        created: bool | None = None,
+        body_type: typing.Any = None,
+    ) -> Stream[typing.Any]:
+        """Return the ``Stream`` handle for this ref."""
+        arguments = typing.get_args(getattr(ref, "__orig_class__", None))
+        # None means no explicit type, so use the ref's type argument, else object.
+        if body_type is None:
+            body_type = arguments[0] if arguments else object
+        elif arguments and arguments[0] is not object and arguments[0] != body_type:
+            raise TypeError("The decoding type must match the typed ref")
+        if arguments != (body_type,):
+            ref = StreamRef[body_type](id=ref.id, store=ref.store)
+        return Stream[body_type](
             self.create_nexus_client(
                 service=StreamService,
                 endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -60,56 +90,90 @@ class StreamServiceClientExtension(abc.ABC):
 
     async def _stream_service_create_stream(
         self,
-        request: CreateStreamRequest,
+        request: CreateStreamRequest[BodyT],
+        body_type: type[BodyT],
         *,
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+    ) -> Stream[BodyT]:
         nexus_client = self.create_nexus_client(
             service=StreamService,
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
-            operation=StreamService.create_stream,
+            operation="CreateStream",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=CreateStreamResult[body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
         if result.ref is None:
             raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream(
+        resource = Stream[body_type](
             nexus_client,
             ref=result.ref,
             created=result.created or None,
         )
         return resource
 
+    @typing.overload
+    @resource_context_manager
     async def create_stream(
         self,
         *,
-        stream_ref: StreamRef,
-        retention: datetime.timedelta | None = None,
+        id: str,
+        store: str | None = None,
         id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: type[BodyT],
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
-    ) -> Stream:
+    ) -> Stream[BodyT]: ...
+
+    @typing.overload
+    @resource_context_manager
+    async def create_stream(
+        self,
+        *,
+        id: str,
+        store: str | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: None = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[object]: ...
+
+    @resource_context_manager
+    async def create_stream(
+        self,
+        *,
+        id: str,
+        store: str | None = None,
+        id_conflict_policy: StreamIdConflictPolicy | None = None,
+        body_type: typing.Any = None,
+        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
+        rpc_timeout: datetime.timedelta | None = None,
+    ) -> Stream[typing.Any]:
         """
         Args:
-            stream_ref: The ref of the Stream to create. Its id is the Stream id.
-            retention: The age after which a Record is dropped. Empty is the Store
-                default.
+            id: The Stream id, 1 to 4096 bytes.
+            store: Registered Store name. With none, the SDK picks one. Only an SDK
+                reads it.
             id_conflict_policy: What the create does when the Stream exists. Unspecified
                 is fail.
         """
+        if body_type is None:
+            body_type = typing.Any
+        stream_ref = StreamRef(
+            id=id,
+            store=store,
+        )
         request = CreateStreamRequest(
             stream_ref=stream_ref,
-            retention=retention,
-            withdraw_run=_support.withdraw_run(),
             id_conflict_policy=id_conflict_policy,
             request_id=_support.request_id(),
         )
         return await self._stream_service_create_stream(
-            request, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
         )

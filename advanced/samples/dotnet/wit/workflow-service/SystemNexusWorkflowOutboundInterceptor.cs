@@ -48,20 +48,13 @@ namespace Temporalio.Worker
                 var handle = outbound.Value.SignalWithStartWorkflowAsync(request);
                 return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
             }
-            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                Service: service,
-                Operation: new(
-                    operationName,
-                    arg?.GetType() ?? typeof(object),
-                    typeof(TResult)),
-                Arg: arg,
-                Headers: null));
+            throw new System.ArgumentException($"Unsupported System Nexus operation: {service}/{operationName}");
         }
 
         internal partial class OutboundImpl
         {
             [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<SignalWithStartWorkflowResponse>> SignalWithStartWorkflowAsync(SignalWithStartWorkflowRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<SignalWithStartWorkflowResponse>(new(
+            public override Task<NexusWorkflowOperationHandle<SignalWithStartWorkflowResponse>> SignalWithStartWorkflowAsync(SignalWithStartWorkflowRequest request) => instance.ScheduleSystemNexusOperationAsync<SignalWithStartWorkflowResponse>(new(
                 Service: "temporal.api.workflowservice.v1.WorkflowService",
                 Operation: new(
                     "SignalWithStartWorkflowExecution",

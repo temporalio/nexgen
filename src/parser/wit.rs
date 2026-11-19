@@ -842,6 +842,7 @@ fn build_wit_variant_spec(
         .map(directive_language_string)
         .unwrap_or_default();
     let doc = documentation::for_type(resolve, type_id, doc, path, &context, language)?;
+    let proto_backed = directive(&directives, "proto", path, &context)?.is_some();
     let cases = variant
         .cases
         .iter()
@@ -857,7 +858,7 @@ fn build_wit_variant_spec(
                 .ty
                 .as_ref()
                 .map(|ty| {
-                    resolve_authored_field_type_spec(resolve, ty, path, &case_context)
+                    resolve_field_type_spec(resolve, ty, proto_backed, path, &case_context)
                         .map(|field_type| authored_field_type_for_language(field_type, language))
                 })
                 .transpose()?;
@@ -921,9 +922,60 @@ fn build_wit_record_spec(
         source,
         experimental,
         flatten_in_api,
+        declared_type_parameters: record_generic_parameters(
+            resolve,
+            type_def.owner,
+            &directives,
+            path,
+            &context,
+        )?,
         fields,
         data: (),
     }))
+}
+
+fn record_generic_parameters(
+    resolve: &Resolve,
+    owner: TypeOwner,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Vec<TypeParameterSpec>> {
+    let mut parameters = Vec::new();
+    for directive in directives
+        .iter()
+        .filter(|directive| directive.name() == "generic")
+    {
+        let invalid = |reason: String| Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.generic".to_string(),
+            reason,
+        };
+        let name = directive
+            .value("value")
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| invalid("requires a type-parameter alias name".to_string()))?;
+        let TypeOwner::Interface(interface_id) = owner else {
+            return Err(invalid("requires an interface-owned record".to_string()));
+        };
+        let id = resolve.interfaces[interface_id]
+            .types
+            .get(name)
+            .ok_or_else(|| invalid(format!("unknown type-parameter alias `{name}`")))?;
+        let TypeSpec::TypeParameter(parameter) =
+            resolve_authored_field_type_spec(resolve, &Type::Id(*id), path, context)?
+        else {
+            return Err(invalid(format!(
+                "`{name}` must name an alias declared with `@nexus.type-parameter`"
+            )));
+        };
+        if parameters.contains(&parameter) {
+            return Err(invalid(format!("duplicate generic parameter `{name}`")));
+        }
+        parameters.push(parameter);
+    }
+    Ok(parameters)
 }
 
 fn build_type_source(
@@ -1144,8 +1196,14 @@ fn build_fields_from_record(
         }
 
         if omit_directive.is_some() {
-            for conflicting_directive in ["source", "type", "flattened-type", "function", "default"]
-            {
+            for conflicting_directive in [
+                "source",
+                "type",
+                "flattened-type",
+                "function",
+                "default",
+                "flatten-in-api",
+            ] {
                 if directives
                     .iter()
                     .any(|directive| directive.name() == conflicting_directive)
@@ -1169,13 +1227,7 @@ fn build_fields_from_record(
             }
 
             let field_type = authored_field_type_for_language(
-                resolve_record_field_type_spec(
-                    resolve,
-                    &field.ty,
-                    proto_backed,
-                    path,
-                    &field_context,
-                )?,
+                resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
                 language,
             );
             fields.insert(
@@ -1187,10 +1239,14 @@ fn build_fields_from_record(
                     flattened_annotation: None,
                     field_type,
                     required: false,
-                    origin: LanguageFieldOrigins {
-                        default: Some(FieldOrigin::Omitted),
+                    origin: LanguageFieldPolicies {
+                        default: Some(FieldPolicy {
+                            omitted: true,
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     },
+                    flatten_in_api: false,
                     function: None,
                     data: (),
                 },
@@ -1206,12 +1262,15 @@ fn build_fields_from_record(
             .transpose()?
             .filter(|doc| !doc.is_empty());
         let field_type = authored_field_type_for_language(
-            resolve_record_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
+            resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
             language,
         );
-        let origin = build_field_origins(
+        let api_omit_targets = api_omit_directive
+            .map(|directive| build_origin_targets(directive, path, &field_context, "api-omit"))
+            .transpose()?;
+        let origin = build_field_policies(
             &directives,
-            api_omit_directive.is_some(),
+            api_omit_targets.as_deref(),
             path,
             &field_context,
         )?;
@@ -1230,7 +1289,19 @@ fn build_fields_from_record(
         }
         let sourced = origin
             .for_language(language)
-            .is_some_and(FieldOrigin::is_sourced);
+            .is_some_and(FieldPolicy::is_sourced);
+        if api_omit_targets.is_some() && required && !is_list_type(resolve, &field.ty) {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: field_context,
+                directive: "@nexus.api-omit".to_string(),
+                reason: "needs an `option<T>` or `list<T>` field, since the call leaves the field \
+                         unset"
+                    .to_string(),
+            });
+        }
+        let flatten_in_api =
+            build_field_flatten(resolve, &field.ty, &directives, path, &field_context)?;
         let annotation =
             directive(&directives, "type", path, &field_context)?.map(directive_language_string);
         let flattened_annotation = directive(&directives, "flattened-type", path, &field_context)?
@@ -1257,6 +1328,7 @@ fn build_fields_from_record(
                 field_type,
                 required,
                 origin,
+                flatten_in_api,
                 function,
                 data: (),
             },
@@ -1288,6 +1360,7 @@ fn build_fields_from_record(
                         ),
                         required: arg_field.required,
                         origin: Default::default(),
+                        flatten_in_api: false,
                         function: None,
                         data: (),
                     },
@@ -1366,9 +1439,10 @@ fn build_type_replacement(
     }))
 }
 
-/// Resolves the type of a record field. A proto-backed record spells a proto `bytes` field as
-/// `list<u8>`, so the field is bytes there. A record without a proto keeps a list of integers.
-fn resolve_record_field_type_spec(
+/// Resolves the type of a record field or a variant case. A proto-backed record or oneof variant
+/// spells a proto `bytes` member as `list<u8>`, so the type is bytes there. Without a proto it
+/// stays a list of integers.
+fn resolve_field_type_spec(
     resolve: &Resolve,
     ty: &Type,
     proto_backed: bool,
@@ -1707,13 +1781,14 @@ pub(crate) fn find_proto_name_for_type_def(
     directive_value(&directives, "proto", path, context, "value")
 }
 
-fn build_field_origins(
+fn build_field_policies(
     directives: &[Directive],
-    api_omitted: bool,
+    api_omit_targets: Option<&[GenerationTarget]>,
     path: &Path,
     context: &str,
-) -> Result<LanguageFieldOrigins> {
-    let mut origins = LanguageFieldOrigins::default();
+) -> Result<LanguageFieldPolicies> {
+    let mut policies = LanguageFieldPolicies::default();
+    let api_omitted = api_omit_targets.is_some();
     let sources = origin_directives(directives, "source", path, context)?;
     let defaults = origin_directives(directives, "default", path, context)?
         .into_iter()
@@ -1722,7 +1797,14 @@ fn build_field_origins(
         })
         .collect::<Result<Vec<_>>>()?;
     if api_omitted {
-        origins.default = Some(FieldOrigin::ApiOmitted);
+        policies.default = Some(FieldPolicy {
+            omitted: false,
+            origin: api_omit_targets
+                .unwrap_or_default()
+                .iter()
+                .map(|&target| (target, FieldOrigin::Omitted))
+                .collect(),
+        });
         if !defaults.is_empty() {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(), context: context.to_string(),
@@ -1768,30 +1850,39 @@ fn build_field_origins(
                 reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
             });
         }
-        let origin = if !source_expressions.is_empty() {
-            if api_omitted {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: context.to_string(),
-                    directive: "@nexus.api-omit".to_string(),
-                    reason: "cannot be combined with `@nexus.source`".to_string(),
-                });
-            }
-            Some(FieldOrigin::Source {
-                expressions: source_expressions,
-            })
-        } else if !default_expressions.is_empty() {
-            Some(FieldOrigin::Default {
-                expressions: default_expressions,
-            })
-        } else {
-            None
-        };
-        if let Some(origin) = origin {
-            origins.by_language.insert(language, origin);
+        if source_expressions.is_empty() && default_expressions.is_empty() {
+            continue;
         }
+        let mut policy = policies.default.clone().unwrap_or_default();
+        if source_expressions
+            .keys()
+            .any(|&target| policy.api_omitted_for(target))
+        {
+            return Err(Error::InvalidWitDirective {
+                path: path.to_path_buf(),
+                context: context.to_string(),
+                directive: "@nexus.api-omit".to_string(),
+                reason: if api_omit_targets.is_some_and(|targets| targets.len() == 2) {
+                    "cannot be combined with `@nexus.source`"
+                } else {
+                    "cannot be combined with `@nexus.source` for the same target"
+                }
+                .to_string(),
+            });
+        }
+        policy.origin.extend(
+            source_expressions
+                .into_iter()
+                .map(|(target, expression)| (target, FieldOrigin::Source(expression))),
+        );
+        policy.origin.extend(
+            default_expressions
+                .into_iter()
+                .map(|(target, expression)| (target, FieldOrigin::Default(expression))),
+        );
+        policies.by_language.insert(language, policy);
     }
-    Ok(origins)
+    Ok(policies)
 }
 
 /// Repeated origin directives have no ordering or override precedence.
@@ -1827,6 +1918,36 @@ fn origin_directives<'a>(
         selected.push((directive, targets));
     }
     Ok(selected)
+}
+
+fn build_field_flatten(
+    resolve: &Resolve,
+    ty: &Type,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<bool> {
+    if directive(directives, "flatten-in-api", path, context)?.is_none() {
+        return Ok(false);
+    }
+    let mut ty = *ty;
+    loop {
+        let kind = match ty {
+            Type::Id(id) => &resolve.types[id].kind,
+            _ => break,
+        };
+        match kind {
+            TypeDefKind::Option(inner) | TypeDefKind::Type(inner) => ty = *inner,
+            TypeDefKind::Record(_) => return Ok(true),
+            _ => break,
+        }
+    }
+    Err(Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.flatten-in-api".to_string(),
+        reason: "on a field, needs a record type".to_string(),
+    })
 }
 
 fn build_origin_targets(
@@ -2853,19 +2974,29 @@ fn build_resource(
         None => Vec::new(),
     };
 
-    let methods = interface
-        .functions
-        .values()
-        .filter(|function| {
-            matches!(
-                function.kind,
-                FunctionKind::Method(id) | FunctionKind::AsyncMethod(id) if id == resource_id
-            )
-        })
-        .map(|function| {
-            build_resource_method(resolve, interface, function, path, &context, language)
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let mut close = None;
+    let mut methods = Vec::new();
+    for function in interface.functions.values().filter(|function| {
+        matches!(
+            function.kind,
+            FunctionKind::Method(id) | FunctionKind::AsyncMethod(id) if id == resource_id
+        )
+    }) {
+        let (method, closes) =
+            build_resource_method(resolve, interface, function, path, &context, language)?;
+        if closes {
+            if close.is_some() {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context,
+                    directive: "@nexus.close".to_string(),
+                    reason: "marks more than one method of the resource".to_string(),
+                });
+            }
+            close = Some(method.name.clone());
+        }
+        methods.push(method);
+    }
 
     for function in interface.functions.values() {
         match function.kind {
@@ -2887,10 +3018,12 @@ fn build_resource(
         doc,
         fields,
         methods,
+        close,
         data: (),
     })
 }
 
+/// The flag says whether this method carries `@nexus.close`. The resource records which one.
 fn build_resource_method(
     resolve: &Resolve,
     interface: &Interface,
@@ -2898,7 +3031,7 @@ fn build_resource_method(
     path: &Path,
     resource_context: &str,
     language: Language,
-) -> Result<ResourceMethodSpec> {
+) -> Result<(ResourceMethodSpec, bool)> {
     let method_name = function
         .name
         .rsplit('.')
@@ -2931,8 +3064,11 @@ fn build_resource_method(
         .as_ref()
         .map(|ty| build_resource_result(resolve, ty, path, &context, language))
         .transpose()?;
+    let close = build_resource_method_close(&params, &directives, path, &context)?;
+    let varargs = build_resource_method_varargs(&params, &directives, path, &context)?;
+    let api_omitted = build_resource_method_api_omit(&directives, path, &context)?;
 
-    Ok(ResourceMethodSpec {
+    let method = ResourceMethodSpec {
         name: method_name,
         doc: directive(&directives, "doc", path, &context)?
             .map(directive_language_string)
@@ -2946,7 +3082,102 @@ fn build_resource_method(
         params,
         result,
         operation_name: build_resource_method_operation_name(&directives, path, &context)?,
-    })
+        varargs,
+        api_omitted,
+    };
+    Ok((method, close))
+}
+
+/// A method that no target keeps has no use, so the directive must leave one target its method.
+fn build_resource_method_api_omit(
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<BTreeSet<GenerationTarget>> {
+    let Some(api_omit) = directive(directives, "api-omit", path, context)? else {
+        return Ok(BTreeSet::new());
+    };
+    let targets = build_origin_targets(api_omit, path, context, "api-omit")?
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    if targets.contains(&GenerationTarget::Workflow) && targets.contains(&GenerationTarget::Client)
+    {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.api-omit".to_string(),
+            reason: "a resource method needs `targets=\"workflow\"` or `targets=\"client\"`. To \
+                     leave the method out of every target, remove the method instead"
+                .to_string(),
+        });
+    }
+    Ok(targets)
+}
+
+/// A scope's end calls the close method with no arguments, so its parameters must be optional.
+fn build_resource_method_close(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<bool> {
+    if directive(directives, "close", path, context)?.is_none() {
+        return Ok(false);
+    }
+    if let Some(param) = params.iter().find(|param| !param.optional) {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.to_string(),
+            directive: "@nexus.close".to_string(),
+            reason: format!(
+                "needs optional parameters, but `{}` is required",
+                param.name
+            ),
+        });
+    }
+    Ok(true)
+}
+
+fn build_resource_method_varargs(
+    params: &[ResourceFieldSpec],
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Option<String>> {
+    let Some(varargs) = directive(directives, "varargs", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.varargs".to_string(),
+        reason,
+    };
+    let Some(name) = varargs.value("value") else {
+        return Err(invalid(
+            "needs the name of a parameter, such as `\"values\"`".to_string(),
+        ));
+    };
+    let Some(param) = params.iter().find(|param| param.name == name) else {
+        return Err(invalid(format!("`{name}` isn't a parameter of the method")));
+    };
+    if param.optional || !matches!(param.field_type, TypeSpec::List(_)) {
+        return Err(invalid(format!(
+            "needs a list parameter, but `{name}` isn't a list or is an `option`"
+        )));
+    }
+    // A varargs function parameter also takes the trailing positional arguments.
+    if let Some(function) = params.iter().find(|param| {
+        param.function.as_ref().is_some_and(|function| {
+            function.primary && matches!(function.args, FunctionArgsSpec::Varargs { .. })
+        })
+    }) {
+        return Err(invalid(format!(
+            "can't go with parameter `{}`, a function that takes its arguments as varargs",
+            function.name
+        )));
+    }
+    Ok(Some(param.name.clone()))
 }
 
 fn build_resource_method_operation_name(
@@ -3054,7 +3285,30 @@ fn build_operation(
         &operation_name,
     )?;
     let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
+    let context_propagation_header =
+        build_operation_context_propagation(resolve, function, &directives, path, &context)?;
     let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
+    // On a free func, `@nexus.api-omit` hides the operation's public top-level function for its
+    // targets while keeping the operation registered and bindable by resource methods. Only the
+    // workflow target has a top-level function, so a workflow-excluding `targets` does nothing and
+    // is rejected rather than silently ignored.
+    let api_omitted = match directive(&directives, "api-omit", path, &context)? {
+        Some(api_omit) => {
+            let targets = build_origin_targets(api_omit, path, &context, "api-omit")?;
+            if !targets.contains(&GenerationTarget::Workflow) {
+                return Err(Error::InvalidWitDirective {
+                    path: path.to_path_buf(),
+                    context: context.clone(),
+                    directive: "@nexus.api-omit".to_string(),
+                    reason: "on a function, `@nexus.api-omit` omits the workflow top-level \
+                             function, so `targets` must include `workflow`"
+                        .to_string(),
+                });
+            }
+            targets.into_iter().collect()
+        }
+        None => BTreeSet::new(),
+    };
     let output = if let Some(output_type) = function.result.as_ref() {
         Some(
             find_operation_type_spec(resolve, output_type, path, &context)?.ok_or_else(|| {
@@ -3106,7 +3360,9 @@ fn build_operation(
         output,
         output_transform,
         serialization_context,
+        context_propagation_header,
         poll,
+        api_omitted,
         data: (),
     })
 }
@@ -3263,18 +3519,7 @@ fn build_operation_poll(
             )));
         }
     }
-    if directive.value("targets").is_none() {
-        return Err(invalid(
-            "needs `targets=\"client\"`, since only the client target gets an iterator".to_string(),
-        ));
-    }
     let targets = build_origin_targets(directive, path, context, "poll")?;
-    if targets.contains(&GenerationTarget::Workflow) {
-        return Err(invalid(
-            "`targets` includes `workflow`, but only the client target gets an iterator"
-                .to_string(),
-        ));
-    }
     let resume = directive_language_string_for_key(directive, "resume");
     for helper in resume.default.iter().chain(resume.by_language.values()) {
         if !is_valid_support_helper_path(helper) {
@@ -3361,6 +3606,63 @@ fn build_operation_serialization_context(
     Ok(spec)
 }
 
+fn build_operation_context_propagation(
+    resolve: &Resolve,
+    function: &Function,
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<LanguageStringSpec> {
+    let Some(directive) = directive(directives, "context-propagation", path, context)? else {
+        return Ok(LanguageStringSpec::default());
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.context-propagation".to_string(),
+        reason,
+    };
+    let mut spec = directive_language_string(directive);
+    if spec.is_empty() {
+        return Err(invalid("requires a request field path".to_string()));
+    }
+    let parameter = &function.params[0];
+    let mut input = parameter.ty;
+    let record = loop {
+        let Type::Id(id) = input else { break None };
+        match &resolve.types[id].kind {
+            TypeDefKind::Record(record) => break Some(record),
+            TypeDefKind::Type(next) => input = *next,
+            _ => break None,
+        }
+    }
+    .ok_or_else(|| invalid("requires an operation whose input is a record".to_string()))?;
+    for value in spec.default.iter_mut().chain(spec.by_language.values_mut()) {
+        let (root, field_name) = value.split_once('.').ok_or_else(|| {
+            invalid(format!(
+                "`{value}` must select a direct input field as `{}.<field>`",
+                parameter.name
+            ))
+        })?;
+        if root != parameter.name || field_name.is_empty() || field_name.contains('.') {
+            return Err(invalid(format!(
+                "`{value}` must select a direct input field as `{}.<field>`",
+                parameter.name
+            )));
+        }
+        let field = record
+            .fields
+            .iter()
+            .find(|field| field.name == field_name)
+            .ok_or_else(|| invalid(format!("`{field_name}` isn't a field of the request")))?;
+        let field_context = format!("{context} field `{field_name}`");
+        let field_directives =
+            parse_directives(field.docs.contents.as_deref(), path, &field_context)?;
+        *value = record_field_key(field, &field_directives, path, &field_context)?;
+    }
+    Ok(spec)
+}
+
 pub(crate) fn select_world(
     resolve: &Resolve,
     package_id: PackageId,
@@ -3391,6 +3693,20 @@ fn interface_export_name(key: &WorldKey, interface: &Interface) -> String {
             .name
             .clone()
             .unwrap_or_else(|| "unnamed-interface".to_string()),
+    }
+}
+
+fn is_list_type(resolve: &Resolve, ty: &Type) -> bool {
+    let mut current = ty;
+    loop {
+        match current {
+            Type::Id(id) => match &resolve.types[*id].kind {
+                TypeDefKind::List(_) => return true,
+                TypeDefKind::Type(next) => current = next,
+                _ => return false,
+            },
+            _ => return false,
+        }
     }
 }
 
@@ -3769,8 +4085,8 @@ mod tests {
     use crate::error::Error;
     use crate::language::Language;
     use crate::spec::{
-        CompilerPass, ExternalTypeSourceSpec, ExternalVariantSourceSpec, LanguageStringSpec,
-        ProtoOneofSpec, ProtoTypeSpec,
+        CompilerPass, ExternalTypeSourceSpec, ExternalVariantSourceSpec, FieldOrigin,
+        LanguageStringSpec, ProtoOneofSpec, ProtoTypeSpec,
     };
 
     use super::{
@@ -3824,6 +4140,64 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("nexgen-{label}-{unique}"))
+    }
+
+    #[test]
+    fn context_propagation_lowers_authored_paths_to_field_keys() {
+        let _scope = crate::nexgen_config::scope(crate::nexgen_config::NexgenConfig {
+            system_nexus: true,
+            targets: vec![GenerationTarget::Workflow],
+        });
+        let input = r#"
+package test:context-identity;
+world system { export api; }
+interface api {
+  record request {
+    /// @nexus.proto-field "header"
+    /// @nexus.name go="TransportHeaders"
+    /// @nexus.api-omit
+    context-headers: option<string>,
+  }
+  type request-alias = request;
+  /// @nexus.context-propagation go="input.context-headers"
+  send: func(input: request-alias);
+  plain: func(input: request);
+}
+"#;
+        for language in [
+            Language::Go,
+            Language::Python,
+            Language::TypeScript,
+            Language::Dotnet,
+        ] {
+            let spec = parse(language, input);
+            let operations = &spec.services[0].operations;
+            assert_eq!(
+                operations[0]
+                    .context_propagation_header
+                    .for_language(Language::Go),
+                Some("header"),
+            );
+            assert_eq!(
+                operations[0]
+                    .context_propagation_header
+                    .for_language(Language::Python),
+                None,
+            );
+            assert!(operations[1].context_propagation_header.is_empty());
+            let selected = crate::planning::LanguageSelectionPass::new(language)
+                .apply(crate::spec::ApiSpecTree::single(spec))
+                .unwrap();
+            let crate::spec::ApiSpecNode::Leaf(leaf) = selected.root else {
+                panic!("expected a single module");
+            };
+            assert_eq!(
+                leaf.spec.services[0].operations[0]
+                    .context_propagation_header
+                    .value(),
+                (language == Language::Go).then_some("header"),
+            );
+        }
     }
 
     #[test]
@@ -3944,6 +4318,39 @@ interface generic-service {
                 .map(|usage| usage.parameter.name.as_str())
                 .collect::<Vec<_>>(),
             ["ContextT", "OutputT"]
+        );
+    }
+
+    #[test]
+    fn explicit_record_parameters_propagate_without_resources() {
+        let input = GENERIC_WIT.replace(
+            "record inner { value: context-t, }",
+            "/// @nexus.generic \"output-t\"\n  /// @nexus.generic \"context-t\"\n  record inner { value: context-t, }",
+        );
+        let spec = crate::planning::select_spec(parse(Language::Python, &input), Language::Python);
+        let inner = spec.record("generic-service.inner").unwrap();
+        assert_eq!(
+            inner
+                .declared_type_parameters
+                .iter()
+                .map(|parameter| parameter.full_name.as_str())
+                .collect::<Vec<_>>(),
+            ["generic-service.output-t", "generic-service.context-t"]
+        );
+        let parameters = spec.record_type_parameters("generic-service.request");
+        assert_eq!(
+            parameters
+                .iter()
+                .map(|usage| usage.parameter.name.as_str())
+                .collect::<Vec<_>>(),
+            ["OutputT", "ContextT"]
+        );
+        assert_eq!(
+            spec.record_phantom_type_parameters("generic-service.inner")
+                .iter()
+                .map(|parameter| parameter.name.as_str())
+                .collect::<Vec<_>>(),
+            ["OutputT"]
         );
     }
 
@@ -4211,6 +4618,98 @@ interface example {
             assert_eq!(source.default_for(GenerationTarget::Workflow), None);
             assert_eq!(default.source_for(GenerationTarget::Client), None);
         }
+    }
+
+    #[test]
+    fn lowers_api_omission_and_sources_to_independent_target_policies() {
+        let wit = r#"
+package test:policies@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.api-omit targets="workflow"
+    last: option<s32>,
+    /// @nexus.api-omit targets="workflow"
+    /// @nexus.source targets="client" python="client_source()"
+    owner: option<string>,
+    /// @nexus.api-omit
+    hidden: option<string>,
+  }
+  submit: func(request: request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let record = spec
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        for language in [Language::Python, Language::Go] {
+            let last = record.fields["last"].origin.for_language(language).unwrap();
+            assert!(!last.is_omitted());
+            assert_eq!(
+                last.origin_for(GenerationTarget::Workflow),
+                &FieldOrigin::Omitted
+            );
+            assert_eq!(
+                last.origin_for(GenerationTarget::Client),
+                &FieldOrigin::Parameter
+            );
+            assert_eq!(last.origin.len(), 1);
+            let owner = record.fields["owner"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            assert!(owner.api_omitted_for(GenerationTarget::Workflow));
+            if language == Language::Python {
+                assert_eq!(
+                    owner.source_for(GenerationTarget::Client),
+                    Some("client_source()")
+                );
+                assert_eq!(owner.origin.len(), 2);
+            } else {
+                assert_eq!(
+                    owner.origin_for(GenerationTarget::Client),
+                    &FieldOrigin::Parameter
+                );
+                assert_eq!(owner.origin.len(), 1);
+            }
+            let hidden = record.fields["hidden"]
+                .origin
+                .for_language(language)
+                .unwrap();
+            assert!(!hidden.is_omitted());
+            assert!(hidden.api_omitted_for(GenerationTarget::Workflow));
+            assert!(hidden.api_omitted_for(GenerationTarget::Client));
+        }
+        let selected = crate::planning::select_spec(spec, Language::Python);
+        let record = selected
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        assert_eq!(record.api_fields(GenerationTarget::Workflow).count(), 0);
+        assert_eq!(
+            record
+                .api_fields(GenerationTarget::Client)
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>(),
+            ["last"]
+        );
+        assert_eq!(
+            record
+                .model_fields()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>(),
+            ["last", "hidden"]
+        );
+        assert_eq!(
+            record
+                .sources_for(GenerationTarget::Client)
+                .map(|(name, _, source)| (name, source))
+                .collect::<Vec<_>>(),
+            [("owner", "client_source()")]
+        );
     }
 
     #[test]

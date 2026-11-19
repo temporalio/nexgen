@@ -39,21 +39,29 @@ function requestArgsToPayloads(
  */
 export interface SignalWithStartWorkflowResponse {
   /**
-   * Run ID of the started workflow.
+   * Run ID of the signaled workflow.
    */
-  runId?: string;
+  runId: string;
   /**
    * Whether the workflow was started.
    */
-  started?: boolean;
+  started: boolean;
 }
 
 function signalWithStartWorkflowResponseFromProto(
   proto: temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse,
 ): SignalWithStartWorkflowResponse {
   return {
-    runId: proto.runId ?? undefined,
-    started: proto.started ?? undefined,
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "SignalWithStartWorkflowResponse",
+      "runId",
+    ),
+    started: requiredField(
+      proto.started ?? false,
+      "SignalWithStartWorkflowResponse",
+      "started",
+    ),
   };
 }
 
@@ -61,8 +69,8 @@ function signalWithStartWorkflowResponseToProto(
   model: SignalWithStartWorkflowResponse,
 ): temporal.api.workflowservice.v1.ISignalWithStartWorkflowExecutionResponse {
   return {
-    runId: model.runId,
-    started: model.started,
+    runId: requiredField(model.runId, "SignalWithStartWorkflowResponse", "runId"),
+    started: requiredField(model.started, "SignalWithStartWorkflowResponse", "started"),
   };
 }
 

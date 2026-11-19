@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing_extensions import assert_type
 
 from wit.generic_models.models import (
+    ContextRef,
     GenericRequest,
     GenericResponse,
     Inner,
@@ -18,6 +19,7 @@ def test_generic_model_runtime_shapes() -> None:
         contexts=["first"],
         by_name={"primary": "value"},
         nested=inner,
+        reference=ContextRef[str](id="context-1"),
     )
     completion = OperationCompletionSuccess(output=42)
     result: OperationCompletionResult[int] = ("success", completion)
@@ -28,6 +30,7 @@ def test_generic_model_runtime_shapes() -> None:
     _ = assert_type(response, GenericResponse[str, int, bool])
     _ = assert_type(response.completion, OperationCompletionResult[int])
     assert request.nested.value == "nested"
+    assert request.reference == ContextRef(id="context-1")
     assert response.completion[0] == "success"
     assert isinstance(response.completion[1], OperationCompletionSuccess)
     assert response.completion[1].output == 42

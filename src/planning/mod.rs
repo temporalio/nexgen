@@ -6,6 +6,7 @@ use prost_types::FileOptions;
 
 use crate::descriptors::DescriptorIndex;
 use crate::error::{Error, Result};
+use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     AliasTypeSpec, ApiSpec, ApiSpecTransform, ExternalTypeSourceSpec, ExternalTypeSpec,
     ExternalVariantSourceSpec, FunctionArgSpec, FunctionArgsSpec, FunctionFieldSpec,
@@ -53,7 +54,7 @@ pub(crate) use type_planning::TypePlanningPass;
 pub(crate) struct PlannedFamily;
 
 impl TypeFamily for PlannedFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = PlannedSpecData;
     type Record = PlannedRecordType;
     type Enum = PlannedEnumType;
@@ -93,6 +94,24 @@ pub(crate) fn operation_input_model(
         Some(_) => panic!("planned operation inputs are model-shaped when present"),
         None => None,
     }
+}
+
+pub(crate) fn flattened_list_field<'a>(
+    api_plan: &'a PlannedSpec,
+    item: &PlannedType,
+) -> Option<(&'a str, &'a crate::spec::RecordFieldSpec<PlannedFamily>)> {
+    let TypeSpec::Record(record) = item else {
+        return None;
+    };
+    let record = api_plan.record(&record.full_name)?;
+    let mut fields = record.fields.iter().filter(|(_, field)| {
+        !field
+            .origin
+            .as_ref()
+            .is_some_and(crate::spec::FieldPolicy::is_omitted)
+    });
+    let (key, field) = fields.next().filter(|_| record.flatten_in_api)?;
+    fields.next().is_none().then_some((key.as_str(), field))
 }
 
 pub(crate) fn planned_type_is_model_shaped(planned_type: &PlannedType) -> bool {
@@ -151,8 +170,11 @@ pub(crate) struct PlannedResource {
     pub(crate) name: String,
     pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) type_name: String,
+    pub(crate) type_parameters: Vec<crate::spec::TypeParameterSpec>,
     pub(crate) fields: Vec<PlannedResourceField>,
     pub(crate) methods: Vec<PlannedResourceMethod>,
+    /// The method the end of an `async with` block calls, from `@nexus.close`.
+    pub(crate) close: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -169,7 +191,37 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) doc: crate::documentation::SelectedDocSpec,
     pub(crate) params: Vec<PlannedResourceField>,
     pub(crate) result: Option<PlannedResourceMethodResult>,
+    pub(crate) varargs: Option<String>,
+    /// Targets whose resource class leaves this method out, from `@nexus.api-omit`.
+    pub(crate) api_omitted: BTreeSet<GenerationTarget>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
+}
+
+impl PlannedResource {
+    /// The methods of the resource class of `target`.
+    pub(crate) fn methods_for(
+        &self,
+        target: GenerationTarget,
+    ) -> impl Iterator<Item = &PlannedResourceMethod> {
+        self.methods
+            .iter()
+            .filter(move |method| !method.omitted_for(target))
+    }
+
+    /// A target without the close method has nothing to call at the end of a scope, so its
+    /// resource is not a context manager.
+    pub(crate) fn close_for(&self, target: GenerationTarget) -> Option<&str> {
+        let close = self.close.as_deref()?;
+        self.methods_for(target)
+            .any(|method| method.name == close)
+            .then_some(close)
+    }
+}
+
+impl PlannedResourceMethod {
+    pub(crate) fn omitted_for(&self, target: GenerationTarget) -> bool {
+        self.api_omitted.contains(&target)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -180,7 +232,10 @@ pub(crate) struct PlannedResourceMethodResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PlannedResourceMethodResultKind {
-    Resource { type_name: String },
+    Resource {
+        type_name: String,
+        type_parameters: Vec<crate::spec::TypeParameterSpec>,
+    },
     Value(PlannedType),
 }
 
@@ -236,6 +291,8 @@ pub(crate) struct PlannedWireVariantMember {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct PlannedOperationData {
     pub(crate) output_resource_return: Option<PlannedOperationResourceReturn>,
+    /// A request value can't give its type at runtime, so the call passes these types.
+    pub(crate) runtime_type_parameters: Vec<crate::spec::TypeParameterSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -343,5 +400,57 @@ impl PlannedProtoType {
             PlannedProtoType::Message(message) => &message.proto.full_name,
             PlannedProtoType::Enum(enumeration) => &enumeration.proto.full_name,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn method(name: &str, api_omitted: &[GenerationTarget]) -> PlannedResourceMethod {
+        PlannedResourceMethod {
+            name: name.to_string(),
+            doc: Default::default(),
+            params: Vec::new(),
+            result: None,
+            varargs: None,
+            api_omitted: api_omitted.iter().copied().collect(),
+            binding: PlannedResourceMethodBindingSpec::Stub,
+        }
+    }
+
+    fn method_names(resource: &PlannedResource, target: GenerationTarget) -> Vec<&str> {
+        resource
+            .methods_for(target)
+            .map(|method| method.name.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn a_target_drops_the_methods_and_the_close_that_it_omits() {
+        let resource = PlannedResource {
+            name: "stream".to_string(),
+            doc: Default::default(),
+            type_name: "Stream".to_string(),
+            type_parameters: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![
+                method("append", &[GenerationTarget::Workflow]),
+                method("close", &[GenerationTarget::Workflow]),
+                method("read", &[]),
+            ],
+            close: Some("close".to_string()),
+        };
+
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Workflow),
+            ["read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            method_names(&resource, GenerationTarget::Client),
+            ["append", "close", "read"]
+        );
+        assert_eq!(resource.close_for(GenerationTarget::Client), Some("close"));
     }
 }

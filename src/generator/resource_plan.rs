@@ -5,7 +5,7 @@ use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResourceMethodBindingSpec, PlannedSpec, RequestPlan,
     RequestPlanField, RequestPlanSource,
 };
-use crate::spec::{ExternalTypeSourceSpec, FieldOrigin, RecordSpec};
+use crate::spec::{ExternalTypeSourceSpec, RecordSpec};
 
 pub(crate) fn render_request_plan<FName, FAssign, FConstruct, FResource, FParam>(
     plan: &RequestPlan,
@@ -96,8 +96,8 @@ pub(crate) fn request_plan_fills_source(
     })
 }
 
-/// Whether a resource method of the service binds the operation with a plan that fills one of
-/// the operation's sourced fields.
+/// Whether a resource method of the service's `target` binds the operation with a plan that
+/// fills one of the operation's sourced fields.
 pub(crate) fn resource_method_fills_source(
     api_plan: &PlannedSpec,
     service_name: &str,
@@ -109,7 +109,7 @@ pub(crate) fn resource_method_fills_source(
         .iter()
         .filter(|service| service.name == service_name)
         .flat_map(|service| service.resources.iter().map(|resource| &resource.data))
-        .flat_map(|resource| &resource.methods)
+        .flat_map(|resource| resource.methods_for(target))
         .any(|method| {
             matches!(
                 &method.binding,
@@ -130,7 +130,7 @@ pub(crate) fn validate_resource_origins(
 ) -> Result<()> {
     for service in &api_plan.services {
         for resource in service.resources.iter().map(|resource| &resource.data) {
-            for method in &resource.methods {
+            for method in resource.methods_for(target) {
                 let PlannedResourceMethodBindingSpec::Operation { request_plan, .. } =
                     &method.binding
                 else {
@@ -173,13 +173,14 @@ fn missing_origin_field(
     if let Some(record) = record_for_request_name(api_plan, message_name) {
         for field in record.fields.values() {
             let kind = match field.origin.as_ref() {
-                Some(FieldOrigin::Source { .. }) => "sourced",
-                Some(FieldOrigin::Default { .. }) => "defaulted",
+                _ if field.has_default() => "defaulted",
+                _ if field.has_source() => "sourced",
                 _ => continue,
             };
             if field.required
                 && field.source_for(target).is_none()
                 && field.default_for(target).is_none()
+                && !field.api_omitted_for(target)
                 && fields
                     .iter()
                     .all(|planned| planned.field_name != field.name)

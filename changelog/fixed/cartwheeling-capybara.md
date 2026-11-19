@@ -1,1 +1,0 @@
-WIT list and map fields in Python and TypeScript now honor authored optionality instead of gaining implicit empty-collection defaults or optional annotations; required Python collection parameters no longer accept omission or normalize `None` to empty collections.

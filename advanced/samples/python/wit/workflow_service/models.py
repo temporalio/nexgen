@@ -283,8 +283,8 @@ class SignalWithStartWorkflowResponse:
         This API is experimental and subject to change.
     """
 
-    run_id: str | None = None
-    started: bool | None = None
+    run_id: str
+    started: bool
 
 
 class _SignalWithStartWorkflowResponseTransferTypeConverter(
@@ -306,9 +306,15 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
         value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
         type_hint: type[SignalWithStartWorkflowResponse],
     ) -> SignalWithStartWorkflowResponse:
+        if not value.run_id:
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowResponse.run_id"
+            )
+        run_id = value.run_id
+        started = value.started
         return SignalWithStartWorkflowResponse(
-            run_id=value.run_id if bool(value.run_id) else None,
-            started=value.started if bool(value.started) else None,
+            run_id=run_id,
+            started=started,
         )
 
     @typing_extensions.override
@@ -317,10 +323,8 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
         value: SignalWithStartWorkflowResponse,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
         message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse()
-        if value.run_id is not None:
-            message.run_id = value.run_id
-        if value.started is not None:
-            message.started = value.started
+        message.run_id = value.run_id
+        message.started = value.started
         return message
 
 

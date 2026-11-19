@@ -1,6 +1,6 @@
 # Python JSON-Schema Samples
 
-`uv`-managed Python 3.10+ sample suite for the JSON-Schema **definitions**
+`uv`-managed Python 3.11+ sample suite for the JSON-Schema **definitions**
 generator outputs.
 
 - Authored JSON-Schema inputs live in `samples/schemas/`

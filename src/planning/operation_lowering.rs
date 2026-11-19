@@ -25,7 +25,7 @@ use super::{
 pub(crate) struct OperationLoweredFamily;
 
 impl crate::spec::TypeFamily for OperationLoweredFamily {
-    type Origin = Option<crate::spec::FieldOrigin>;
+    type Origin = Option<crate::spec::FieldPolicy>;
     type SpecData = ();
     type Record = Symbol;
     type Enum = Symbol;
@@ -109,6 +109,7 @@ impl CompilerPass<OperationBoundFamily, OperationLoweredFamily> for OperationLow
                         })),
                         experimental: operation.experimental,
                         flatten_in_api: false,
+                        declared_type_parameters: Vec::new(),
                         fields: resource_result_fields(resource_return),
                         data: (),
                     },
@@ -215,6 +216,7 @@ fn lower_resource_holder(
             })),
             experimental: record.experimental,
             flatten_in_api: false,
+            declared_type_parameters: record.declared_type_parameters.clone(),
             fields,
             data: (),
         },
@@ -245,6 +247,7 @@ fn resource_result_fields(
                     field_type: TypeSpec::String,
                     required: false,
                     origin: None,
+                    flatten_in_api: false,
                     function: None,
                     data: (),
                 },
@@ -258,8 +261,8 @@ struct OperationLoweringMapper;
 impl ApiSpecTransform<OperationBoundFamily, OperationLoweredFamily> for OperationLoweringMapper {
     fn map_origin(
         &mut self,
-        origin: Option<crate::spec::FieldOrigin>,
-    ) -> Option<crate::spec::FieldOrigin> {
+        origin: Option<crate::spec::FieldPolicy>,
+    ) -> Option<crate::spec::FieldPolicy> {
         origin
     }
     fn map_spec_data(&mut self, _data: ()) {}

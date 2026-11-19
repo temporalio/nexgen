@@ -1,0 +1,22 @@
+package temporal:poll-resource-method-name-clash@1.0.0;
+
+world service { export reader; }
+
+// The polled `read` gives its one call the name `read_page`, which another method has.
+/// @nexus.endpoint "reader"
+interface reader {
+  record read-request { cursor-id: string, offset: option<s64> }
+  record read-response { values: list<s64>, done: option<bool> }
+
+  resource cursor {
+    constructor(cursor-id: string);
+
+    /// @nexus.operation "read-values"
+    read: func(offset: option<s64>) -> read-response;
+
+    read-page: func();
+  }
+
+  /// @nexus.poll python="next_read" items="values"
+  read-values: func(request: read-request) -> read-response;
+}

@@ -110,11 +110,10 @@ func (s *ProtoBackedShowcaseIntegrationSuite) TestProtoRoundTrips() {
 		// Public Temporal SDK types are converted to protobuf at the Nexus
 		// boundary, then converted back when the future resolves.
 		if err := tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{
-			RetryPolicy:            policy,
 			TaskQueue:              "demo-task-queue",
 			ScheduleToCloseTimeout: 7 * time.Second,
 			Priority:               &priority,
-		}).Get(ctx, &results.ActivityOption); err != nil {
+		}, policy).Get(ctx, &results.ActivityOption); err != nil {
 			return nil, err
 		}
 		failure := temporal.NewApplicationErrorWithOptions(
@@ -210,7 +209,7 @@ func (s *ProtoBackedShowcaseIntegrationSuite) TestActivityOptionsOperationRequir
 
 	s.env.ExecuteWorkflow(func(ctx workflow.Context) (*tr.ActivityOptions, error) {
 		var result tr.ActivityOptions
-		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{RetryPolicy: policy}).Get(ctx, &result)
+		return &result, tr.ActivityOptionsOperation(ctx, tr.ActivityOptionsOperationOptions{}, policy).Get(ctx, &result)
 	})
 
 	s.True(s.env.IsWorkflowCompleted())
@@ -285,8 +284,8 @@ func (s *ProtoBackedShowcaseIntegrationSuite) TestNestedModelRoundTrips() {
 				ParentExecution: &tr.WorkflowExecution{WorkflowID: "stale"},
 			}
 			if err := tr.WorkflowExecutionInfoOperation(ctx, tr.WorkflowExecutionInfoOperationOptions{
-				Execution: tt.execution.Execution, ParentExecution: tt.execution.ParentExecution,
-			}).Get(ctx, &execution); err != nil {
+				ParentExecution: tt.execution.ParentExecution,
+			}, tt.execution.Execution).Get(ctx, &execution); err != nil {
 				return err
 			}
 			if !reflect.DeepEqual(tt.execution, execution) {
@@ -295,7 +294,7 @@ func (s *ProtoBackedShowcaseIntegrationSuite) TestNestedModelRoundTrips() {
 			partitions := tr.TaskQueuePartitions{WorkflowTaskQueuePartitions: []tr.TaskQueuePartition{{Key: "stale"}}}
 			if err := tr.TaskQueuePartitionsOperation(ctx, tr.TaskQueuePartitionsOperationOptions{
 				WorkflowTaskQueuePartitions: tt.partitions.WorkflowTaskQueuePartitions,
-			}).Get(ctx, &partitions); err != nil {
+			}, tt.partitions.ActivityTaskQueuePartitions).Get(ctx, &partitions); err != nil {
 				return err
 			}
 			if !reflect.DeepEqual(tt.partitions, partitions) {

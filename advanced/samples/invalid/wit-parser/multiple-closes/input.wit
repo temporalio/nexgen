@@ -1,0 +1,17 @@
+package test:multiple-closes@1.0.0;
+
+world system { export job-service; }
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(id: string);
+
+    // Two closes on one resource. The async with exit has no single method to run.
+    /// @nexus.close
+    cancel: func(reason: option<string>);
+
+    /// @nexus.close
+    abandon: func();
+  }
+}

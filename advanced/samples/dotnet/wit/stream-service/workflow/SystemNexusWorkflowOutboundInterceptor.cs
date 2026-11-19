@@ -11,46 +11,6 @@ namespace Temporalio.Worker.Interceptors
 
     public partial class WorkflowOutboundInterceptor
     {
-        /// <summary>
-        /// Intercept the CreateStream operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<CreateStreamResult>> CreateStreamAsync(CreateStreamRequest request) => Next.CreateStreamAsync(request);
-
-        /// <summary>
-        /// Intercept the AppendRecords operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<AppendRecordsResponse>> AppendRecordsAsync(AppendRecordsRequest request) => Next.AppendRecordsAsync(request);
-
-        /// <summary>
-        /// Intercept the CloseStream operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<CloseStreamResponse>> CloseStreamAsync(CloseStreamRequest request) => Next.CloseStreamAsync(request);
-
-        /// <summary>
-        /// Intercept the ReadRecords operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<ReadRecordsResponse>> ReadRecordsAsync(ReadRecordsRequest request) => Next.ReadRecordsAsync(request);
-
-        /// <summary>
-        /// Intercept the DescribeStream operation.
-        /// </summary>
-        /// <param name="request">Request for the operation.</param>
-        /// <returns>Operation handle.</returns>
-        [GeneratedCode("nexgen", null)]
-        public virtual Task<NexusWorkflowOperationHandle<DescribeStreamResponse>> DescribeStreamAsync(DescribeStreamRequest request) => Next.DescribeStreamAsync(request);
-
     }
 
 }
@@ -69,135 +29,80 @@ namespace Temporalio.Worker
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "CreateStream")
             {
-                if (arg is not CreateStreamRequest request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(CreateStreamRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamRequest request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamRequest<> request.", nameof(arg));
                 }
-                if (typeof(TResult) != typeof(CreateStreamResult))
+                if (!typeof(TResult).IsGenericType ||
+                    typeof(TResult).GetGenericTypeDefinition() != typeof(CreateStreamResult<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamResult result.");
+                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamResult<> result.");
                 }
-                var handle = outbound.Value.CreateStreamAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "AppendRecords")
             {
-                if (arg is not AppendRecordsRequest request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(AppendRecordsRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a AppendRecordsRequest request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a AppendRecordsRequest<> request.", nameof(arg));
                 }
                 if (typeof(TResult) != typeof(AppendRecordsResponse))
                 {
                     throw new System.ArgumentException("System Nexus operation expects a AppendRecordsResponse result.");
                 }
-                var handle = outbound.Value.AppendRecordsAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "CloseStream")
             {
-                if (arg is not CloseStreamRequest request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(CloseStreamRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a CloseStreamRequest request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a CloseStreamRequest<> request.", nameof(arg));
                 }
                 if (typeof(TResult) != typeof(CloseStreamResponse))
                 {
                     throw new System.ArgumentException("System Nexus operation expects a CloseStreamResponse result.");
                 }
-                var handle = outbound.Value.CloseStreamAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "ReadRecords")
             {
-                if (arg is not ReadRecordsRequest request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(ReadRecordsRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsRequest request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsRequest<> request.", nameof(arg));
                 }
-                if (typeof(TResult) != typeof(ReadRecordsResponse))
+                if (!typeof(TResult).IsGenericType ||
+                    typeof(TResult).GetGenericTypeDefinition() != typeof(ReadRecordsResponse<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsResponse result.");
+                    throw new System.ArgumentException("System Nexus operation expects a ReadRecordsResponse<> result.");
                 }
-                var handle = outbound.Value.ReadRecordsAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "DescribeStream")
             {
-                if (arg is not DescribeStreamRequest request)
+                if (arg is null || !arg.GetType().IsGenericType ||
+                    arg.GetType().GetGenericTypeDefinition() != typeof(DescribeStreamRequest<>))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a DescribeStreamRequest request.", nameof(arg));
+                    throw new System.ArgumentException("System Nexus operation expects a DescribeStreamRequest<> request.", nameof(arg));
                 }
                 if (typeof(TResult) != typeof(DescribeStreamResponse))
                 {
                     throw new System.ArgumentException("System Nexus operation expects a DescribeStreamResponse result.");
                 }
-                var handle = outbound.Value.DescribeStreamAsync(request);
-                return (Task<NexusWorkflowOperationHandle<TResult>>)(object)handle;
+                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
-            return outbound.Value.ScheduleSystemNexusOperationAsync<TResult>(new(
-                Service: service,
-                Operation: new(
-                    operationName,
-                    arg?.GetType() ?? typeof(object),
-                    typeof(TResult)),
-                Arg: arg,
-                Headers: null));
+            throw new System.ArgumentException($"Unsupported System Nexus operation: {service}/{operationName}");
         }
 
         internal partial class OutboundImpl
         {
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<CreateStreamResult>> CreateStreamAsync(CreateStreamRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<CreateStreamResult>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "CreateStream",
-                    typeof(CreateStreamRequest),
-                    typeof(CreateStreamResult)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<AppendRecordsResponse>> AppendRecordsAsync(AppendRecordsRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<AppendRecordsResponse>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "AppendRecords",
-                    typeof(AppendRecordsRequest),
-                    typeof(AppendRecordsResponse)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<CloseStreamResponse>> CloseStreamAsync(CloseStreamRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<CloseStreamResponse>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "CloseStream",
-                    typeof(CloseStreamRequest),
-                    typeof(CloseStreamResponse)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<ReadRecordsResponse>> ReadRecordsAsync(ReadRecordsRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<ReadRecordsResponse>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "ReadRecords",
-                    typeof(ReadRecordsRequest),
-                    typeof(ReadRecordsResponse)),
-                Arg: request,
-                Headers: null));
-
-            [GeneratedCode("nexgen", null)]
-            public override Task<NexusWorkflowOperationHandle<DescribeStreamResponse>> DescribeStreamAsync(DescribeStreamRequest request) => instance.outbound.Value.ScheduleSystemNexusOperationAsync<DescribeStreamResponse>(new(
-                Service: "temporal.api.streamservice.v1.StreamService",
-                Operation: new(
-                    "DescribeStream",
-                    typeof(DescribeStreamRequest),
-                    typeof(DescribeStreamResponse)),
-                Arg: request,
-                Headers: null));
-
         }
     }
 }
