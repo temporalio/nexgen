@@ -13,8 +13,10 @@ import (
 
 // OnCompleteRequestResult - The successful output or failure of the source operation.
 //
-// WARNING: This API is experimental and may change in the future.
+// NOTE: Experimental
 type OnCompleteRequestResult[OutputT any] interface {
+	// isOnCompleteRequestResult is a marker method implemented by each case of
+	// OnCompleteRequestResult[OutputT].
 	isOnCompleteRequestResult(OutputT)
 }
 
@@ -34,7 +36,14 @@ type OnCompleteRequestResultFailure[OutputT any] struct {
 
 func (OnCompleteRequestResultFailure[OutputT]) isOnCompleteRequestResult(OutputT) {}
 
+func _[OutputT any]() {
+	var _ OnCompleteRequestResult[OutputT] = OnCompleteRequestResultSuccess[OutputT]{}
+	var _ OnCompleteRequestResult[OutputT] = OnCompleteRequestResultFailure[OutputT]{}
+}
+
 // OnCompleteRequest - A notification that reports that a source operation completed.
+//
+// NOTE: Experimental
 type OnCompleteRequest[OutputT any, SourceContextT any] struct {
 	// Result - The successful output or failure of the source operation.
 	//
@@ -172,6 +181,8 @@ func (OnCompleteRequest[OutputT, SourceContextT]) TransferTypeConverter() (conve
 }
 
 // OnCompleteResponse - An empty response that acknowledges a completion notification.
+//
+// NOTE: Experimental
 type OnCompleteResponse struct {
 }
 

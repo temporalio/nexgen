@@ -496,6 +496,11 @@ export type NotificationTarget =
 TypeScript cases with a payload carry a `value` field. Cases without a payload
 do not.
 
+Go represents WIT variants as interfaces with an unexported marker method and a
+struct for each case. The marker method is not meant to be called. Generated
+compile-time assertions verify that every case struct implements the interface,
+including for all type arguments of a generic variant.
+
 ### Results
 
 WIT `result<T, E>` types use the same tagged-union pattern as variants, with

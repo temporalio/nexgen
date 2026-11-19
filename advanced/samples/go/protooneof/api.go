@@ -14,6 +14,7 @@ import (
 // --- Operations (public API) ---
 
 type OutcomeValue[OutputT any] interface {
+	// isOutcomeValue is a marker method implemented by each case of OutcomeValue[OutputT].
 	isOutcomeValue(OutputT)
 }
 
@@ -29,7 +30,14 @@ type OutcomeValueFailure[OutputT any] struct {
 
 func (OutcomeValueFailure[OutputT]) isOutcomeValue(OutputT) {}
 
+func _[OutputT any]() {
+	var _ OutcomeValue[OutputT] = OutcomeValueSuccess[OutputT]{}
+	var _ OutcomeValue[OutputT] = OutcomeValueFailure[OutputT]{}
+}
+
 type ActivitySelection interface {
+	// isActivitySelection is a marker method implemented by each case of
+	// ActivitySelection.
 	isActivitySelection()
 }
 
@@ -44,6 +52,11 @@ type ActivitySelectionType struct {
 }
 
 func (ActivitySelectionType) isActivitySelection() {}
+
+var (
+	_ ActivitySelection = ActivitySelectionID{}
+	_ ActivitySelection = ActivitySelectionType{}
+)
 
 type Outcome[OutputT any] struct {
 	// Value - Required.

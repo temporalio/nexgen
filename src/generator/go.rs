@@ -4848,6 +4848,7 @@ fn render_flags(output: &mut String, flags: &RenderedFlags, package: &GoPackageC
 ///
 /// ```go
 /// type NotificationTarget interface {
+///     // isNotificationTarget is a marker method implemented by each case of NotificationTarget.
 ///     isNotificationTarget()
 /// }
 ///
@@ -4875,6 +4876,15 @@ fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPa
         &variant.type_parameters,
     ));
     output.push_str(" interface {\n");
+    let interface_type = go_generic_reference(&variant.name, &variant.type_parameters, false);
+    render_go_doc_comment(
+        output,
+        "\t",
+        &format!(
+            "{} is a marker method implemented by each case of {interface_type}.",
+            variant.marker_method
+        ),
+    );
     output.push('\t');
     output.push_str(&variant.marker_method);
     output.push('(');
@@ -4926,6 +4936,25 @@ fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPa
         );
         output.push_str(") {}\n");
     }
+
+    let generic = !variant.type_parameters.is_empty();
+    output.push('\n');
+    if generic {
+        // A blank-named function checks all type arguments without adding a callable symbol.
+        output.push_str("func ");
+        output.push_str(&go_generic_declaration_name("_", &variant.type_parameters));
+        output.push_str("() {\n");
+    } else {
+        output.push_str("var (\n");
+    }
+    for case in &variant.cases {
+        let case_type = go_generic_reference(&case.struct_name, &variant.type_parameters, false);
+        let declaration = if generic { "var " } else { "" };
+        output.push_str(&format!(
+            "\t{declaration}_ {interface_type} = {case_type}{{}}\n"
+        ));
+    }
+    output.push_str(if generic { "}\n" } else { ")\n" });
 }
 
 /// Renders a WIT record (or proto message) as a Go struct. Required fields
