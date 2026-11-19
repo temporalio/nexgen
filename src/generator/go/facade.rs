@@ -268,6 +268,7 @@ struct AliasPlan {
     target: TypeReference,
     parameters: Vec<String>,
     documentation: Option<String>,
+    experimental: bool,
 }
 
 struct ConstantPlan {
@@ -346,6 +347,7 @@ impl FacadePlan {
         name: &str,
         parameters: Vec<String>,
         documentation: Option<&str>,
+        experimental: bool,
     ) {
         let name = split_go_type_decl_name(name).0;
         let public = public_name(name);
@@ -359,6 +361,7 @@ impl FacadePlan {
             target,
             parameters,
             documentation: documentation.map(str::to_string),
+            experimental,
         });
     }
 
@@ -409,7 +412,7 @@ pub(super) fn plan(
         .values()
         .filter(|value| is_go_exported_decl(&value.name))
     {
-        plan.add_alias(&mut scope, &enumeration.name, Vec::new(), None);
+        plan.add_alias(&mut scope, &enumeration.name, Vec::new(), None, false);
         for value in &enumeration.values {
             plan.add_constant(format!("{}{}", enumeration.name, value.name), options);
         }
@@ -418,7 +421,7 @@ pub(super) fn plan(
         .values()
         .filter(|value| is_go_exported_decl(&value.name))
     {
-        plan.add_alias(&mut scope, &flags.name, Vec::new(), None);
+        plan.add_alias(&mut scope, &flags.name, Vec::new(), None, false);
         for flag in &flags.flags {
             plan.add_constant(format!("{}{}", flags.name, flag.name), options);
         }
@@ -437,20 +440,29 @@ pub(super) fn plan(
             &variant.name,
             parameters.clone(),
             variant.doc.value(),
+            variant.experimental,
         );
         for case in &variant.cases {
-            plan.add_alias(&mut scope, &case.struct_name, parameters.clone(), None);
+            plan.add_alias(
+                &mut scope,
+                &case.struct_name,
+                parameters.clone(),
+                case.doc.value(),
+                false,
+            );
         }
     }
     for (key, model) in models
         .iter()
         .filter(|(_, model)| is_go_exported_type_decl(&model.name))
     {
+        let record = record_for_model_key(api_plan, key);
         plan.add_alias(
             &mut scope,
             &model.name,
             model.type_parameters.clone(),
-            record_for_model_key(api_plan, key).and_then(|record| record.doc.value()),
+            record.and_then(|record| record.doc.value()),
+            record.is_some_and(|record| record.experimental),
         );
     }
     for service in services {
@@ -459,7 +471,8 @@ pub(super) fn plan(
                 &mut scope,
                 &go_declaration_name(&resource.type_name),
                 Vec::new(),
-                None,
+                resource.doc.as_deref(),
+                false,
             );
         }
         if service.endpoint.is_some() {
@@ -478,6 +491,7 @@ pub(super) fn plan(
                         .map(|usage| usage.parameter.name.clone())
                         .collect(),
                     Some(&format!("Options for {name}.")),
+                    operation.experimental,
                 );
             }
         }
@@ -668,6 +682,7 @@ fn render_plan(plan: &FacadePlan) -> String {
     output.push('\n');
     for alias in &plan.aliases {
         render_go_declaration_doc(&mut output, "", &alias.name, alias.documentation.as_deref());
+        render_go_experimental_note(&mut output, "", alias.experimental);
         output.push_str(&format!("type {}", alias.name));
         if !alias.parameters.is_empty() {
             output.push('[');
@@ -839,6 +854,7 @@ mod tests {
             "SystemNexus_Result[T]",
             vec!["T".to_string()],
             None,
+            false,
         );
         plan.add_constant("SystemNexus_StatusActive".to_string(), &options);
         plan.add_function(FunctionPlan {

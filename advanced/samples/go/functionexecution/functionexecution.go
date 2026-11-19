@@ -17,8 +17,10 @@ import (
 
 type executeFunctionRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeFunctionRequest) GetFunction() string {
@@ -35,8 +37,10 @@ func (m executeFunctionRequest) GetEnabled() bool {
 
 type executeCallbackRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeCallbackRequest) GetFunction() string {
@@ -53,8 +57,10 @@ func (m executeCallbackRequest) GetEnabled() bool {
 
 type executeCountedFunctionRequest struct {
 	Function string
-	Name     string
-	Count    int32
+	// Name - The name argument for the function.
+	Name string
+	// Count - The count argument for the function.
+	Count int32
 }
 
 func (m executeCountedFunctionRequest) GetFunction() string {
@@ -71,8 +77,10 @@ func (m executeCountedFunctionRequest) GetCount() int32 {
 
 type executeNamedFunctionRequest struct {
 	Function string
-	Name     string
-	Enabled  bool
+	// Name - The name argument for the function.
+	Name string
+	// Enabled - The enabled argument for the function.
+	Enabled bool
 }
 
 func (m executeNamedFunctionRequest) GetFunction() string {
@@ -89,7 +97,8 @@ func (m executeNamedFunctionRequest) GetEnabled() bool {
 
 type executeVarargsFunctionRequest struct {
 	Function string
-	Args     []string
+	// Args - Arguments for the function.
+	Args []string
 }
 
 func (m executeVarargsFunctionRequest) GetFunction() string {
@@ -102,7 +111,8 @@ func (m executeVarargsFunctionRequest) GetArgs() []string {
 
 type executeNamedVarargsFunctionRequest struct {
 	Function string
-	Args     []string
+	// Args - Arguments for the function.
+	Args []string
 }
 
 func (m executeNamedVarargsFunctionRequest) GetFunction() string {
@@ -114,13 +124,17 @@ func (m executeNamedVarargsFunctionRequest) GetArgs() []string {
 }
 
 type executeDescriptorsRequest struct {
-	Function       string
-	Args           []string
-	Durations      string
+	Function string
+	// Args - Arguments for the function.
+	Args      []string
+	Durations string
+	// DurationValues - Arguments for the durations.
 	DurationValues []any
 	Callback       string
+	// CallbackValues - Arguments for the callback.
 	CallbackValues []any
 	Callable       string
+	// CallableValues - Arguments for the callable.
 	CallableValues []any
 }
 

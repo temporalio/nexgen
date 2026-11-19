@@ -8,6 +8,8 @@ import (
 )
 
 // SignalWithStartWorkflowOptions - Options for SignalWithStartWorkflow.
+//
+// NOTE: Experimental
 type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStartWorkflowOptions
 
 // SignalWithStartWorkflow - Signal a workflow, starting it first if needed. Encode
@@ -20,6 +22,8 @@ type SignalWithStartWorkflowOptions = workflowservice.SystemNexus_SignalWithStar
 // Input args: Arguments for the workflow.
 //
 // Returns: A workflow.Execution with details about the signaled workflow.
+//
+// NOTE: Experimental
 func SignalWithStartWorkflow(
 	ctx internal.Context,
 	opts SignalWithStartWorkflowOptions,

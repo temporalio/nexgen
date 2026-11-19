@@ -8,6 +8,9 @@ import (
 
 // --- Datatypes ---
 
+// getUserRequest.
+//
+// NOTE: Experimental
 type getUserRequest struct {
 	UserID           string
 	ConsistencyToken *string
@@ -142,6 +145,7 @@ func (m getSyncSettingsRequest) GetSettings() *SyncSettings {
 
 // --- Resources ---
 
+// User - Go user.
 type User struct {
 	// UserID - Required.
 	UserID string
@@ -172,6 +176,7 @@ func (u *User) UpdateEmail(ctx workflow.Context, email string) workflow.Future {
 	return fut
 }
 
+// Rename - Go rename.
 func (u *User) Rename(ctx workflow.Context, displayName string) workflow.Future {
 	request := renameRequest{UserID: u.UserID, DisplayName: displayName}
 	c := workflow.NewNexusClient("type-showcase", "TypeShowcase")
@@ -217,7 +222,7 @@ const (
 
 // NotificationTarget - Go notification target.
 //
-// WARNING: This API is experimental and may change in the future.
+// NOTE: Experimental
 type NotificationTarget interface {
 	isNotificationTarget()
 }
@@ -256,7 +261,9 @@ type SingleTargetOnly struct{}
 
 func (SingleTargetOnly) isSingleTarget() {}
 
-// WARNING: This API is experimental and may change in the future.
+// ExperimentalTarget.
+//
+// NOTE: Experimental
 type ExperimentalTarget interface {
 	isExperimentalTarget()
 }
@@ -380,6 +387,9 @@ func (m Tuple2[T1, T2]) GetSecond() T2 {
 	return m.Second
 }
 
+// SyncReport.
+//
+// NOTE: Experimental
 type SyncReport struct {
 	// Route - Required.
 	Route []Tuple2[float64, float64]
@@ -450,6 +460,8 @@ func (m SyncSettings) GetCheckpoint() *string {
 }
 
 // GetUserOptions - Options for GetUser.
+//
+// NOTE: Experimental
 type GetUserOptions struct {
 	// ConsistencyToken - Optional.
 	ConsistencyToken string
@@ -458,6 +470,8 @@ type GetUserOptions struct {
 // GetUser - Get a user.
 //
 // Returns: The matching user.
+//
+// NOTE: Experimental
 func GetUser(ctx workflow.Context, opts GetUserOptions, userID string) workflow.Future {
 	var consistencyToken *string
 	if opts.ConsistencyToken != "" {
