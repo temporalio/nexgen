@@ -1,0 +1,10 @@
+package test:storage-target-call;
+
+world system { export api; }
+
+interface api {
+  record request { value: string }
+
+  /// @nexus.storage-target python="requestTarget()"
+  send: func(request: request);
+}

@@ -475,6 +475,13 @@ def test_generated_metadata() -> None:
     )
     assert serialization_context.namespace == "target-namespace"
     assert serialization_context.workflow_id == "target-workflow-id"
+    assert signal_operation_info.storage_target is not None
+    target = signal_operation_info.storage_target(request)
+    assert target == temporalio.converter.StorageDriverWorkflowInfo(
+        namespace="target-namespace",
+        id="target-workflow-id",
+        type="ExampleWorkflow",
+    )
     assert not hasattr(workflow_service, "WorkflowService")
     assert not hasattr(workflow_service, "SignalWithStartWorkflowRequest")
     assert not hasattr(workflow_service, "UserMetadata")

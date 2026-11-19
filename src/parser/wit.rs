@@ -3254,7 +3254,10 @@ fn build_operation(
         service_name,
         &operation_name,
     )?;
-    let serialization_context = build_operation_serialization_context(&directives, path, &context)?;
+    let serialization_context =
+        build_operation_context_helper(&directives, "serialization-context", path, &context)?;
+    let storage_target =
+        build_operation_context_helper(&directives, "storage-target", path, &context)?;
     let context_propagation_header =
         build_operation_context_propagation(resolve, function, &directives, path, &context)?;
     let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
@@ -3318,6 +3321,7 @@ fn build_operation(
         output,
         output_transform,
         serialization_context,
+        storage_target,
         context_propagation_header,
         poll,
         api_omitted,
@@ -3532,12 +3536,13 @@ fn build_operation_poll(
     }))
 }
 
-fn build_operation_serialization_context(
+fn build_operation_context_helper(
     directives: &[Directive],
+    name: &str,
     path: &Path,
     context: &str,
 ) -> Result<LanguageStringSpec> {
-    let Some(directive) = directive(directives, "serialization-context", path, context)? else {
+    let Some(directive) = directive(directives, name, path, context)? else {
         return Ok(LanguageStringSpec::default());
     };
 
@@ -3556,7 +3561,7 @@ fn build_operation_serialization_context(
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
                 context: context.to_string(),
-                directive: "@nexus.serialization-context".to_string(),
+                directive: format!("@nexus.{name}"),
                 reason: format!("invalid `{language}` support helper `{helper}`"),
             });
         }

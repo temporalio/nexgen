@@ -660,6 +660,7 @@ impl<'a> TypePlanningContext<'a> {
                 }
             }),
             serialization_context: operation.serialization_context.clone(),
+            storage_target: operation.storage_target.clone(),
             context_propagation_header: operation.context_propagation_header.clone(),
             poll: operation.poll.as_ref().map(|poll| OperationPollSpec {
                 next: poll.next.clone(),
@@ -1645,6 +1646,7 @@ interface alerts {
         operation.doc = text.clone();
         operation.return_doc = text.clone();
         operation.serialization_context = text.clone();
+        operation.storage_target = text.clone();
         operation.output_transform = Some(OperationOutputTransformSpec {
             type_name: text.clone(),
             type_import: text.clone(),
@@ -1703,6 +1705,7 @@ interface alerts {
             &operation.doc,
             &operation.return_doc,
             &operation.serialization_context,
+            &operation.storage_target,
         ] {
             assert_eq!(text, &expected);
         }
@@ -1909,6 +1912,7 @@ interface alerts {
                     )))),
                     output_transform: None,
                     serialization_context: LanguageStringSpec::default(),
+                    storage_target: LanguageStringSpec::default(),
                     context_propagation_header: LanguageStringSpec::default(),
                     poll: None,
                     api_omitted: BTreeSet::new(),

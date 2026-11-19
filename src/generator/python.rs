@@ -2975,6 +2975,10 @@ impl<'a> ApiPlanner<'a> {
                 .serialization_context
                 .value()
                 .map(|helper| format!("_support.{helper}")),
+            storage_target_expr: operation
+                .storage_target
+                .value()
+                .map(|helper| format!("_support.{helper}")),
             poll: operation.poll.as_ref(),
             api_omitted: &operation.api_omitted,
             poll_items,
@@ -4347,6 +4351,7 @@ struct RenderedOperation<'a> {
     output_type_expr: String,
     output_transform_expr: Option<String>,
     serialization_context_expr: Option<String>,
+    storage_target_expr: Option<String>,
     poll: Option<&'a OperationPollSpec<PlannedFamily>>,
     /// Targets whose public top-level function `@nexus.api-omit` suppresses.
     api_omitted: &'a BTreeSet<GenerationTarget>,
@@ -7096,10 +7101,11 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
     );
     output.push_str("\n\nclass _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):\n");
     output.push_str(
-        "    def __init__(\n        self,\n        *,\n        operation: nexusrpc.Operation[_InputT, _OutputT],\n        serialization_context: _SerializationContextFactory[_InputT] | None = None,\n    ) -> None:\n",
+        "    def __init__(\n        self,\n        *,\n        operation: nexusrpc.Operation[_InputT, _OutputT],\n        serialization_context: _SerializationContextFactory[_InputT] | None = None,\n        storage_target: collections.abc.Callable[[_InputT], temporalio.converter.StorageDriverWorkflowInfo] | None = None,\n    ) -> None:\n",
     );
     output.push_str("        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation\n");
     output.push_str("        self.serialization_context: _SerializationContextFactory[_InputT] | None = serialization_context\n");
+    output.push_str("        self.storage_target: collections.abc.Callable[[_InputT], temporalio.converter.StorageDriverWorkflowInfo] | None = storage_target\n");
     output.push_str("\n\n__nexus_operation_registry__: dict[tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]] = {\n");
     for service in services {
         for operation in &service.operations {
@@ -7119,6 +7125,11 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
             if let Some(serialization_context) = &operation.serialization_context_expr {
                 output.push_str("        serialization_context=");
                 output.push_str(serialization_context);
+                output.push_str(",\n");
+            }
+            if let Some(storage_target) = &operation.storage_target_expr {
+                output.push_str("        storage_target=");
+                output.push_str(storage_target);
                 output.push_str(",\n");
             }
             output.push_str("    ),\n");
