@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 
 use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
-use crate::language::Language;
 use crate::planning::ResolvedResourceBindingSource;
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResource, PlannedResourceField, PlannedSpec,
@@ -20,9 +19,8 @@ use crate::generator::go::{
     PlannedTypeInfo, PlannedValueType, RenderedField, RenderedModel, RenderedService,
     go_authored_type_annotation, go_declaration_name, go_field_name, go_replacement_type_name,
     go_unexported_name, operation_output, planned_field, planned_field_kind, planned_message_type,
-    public_default_punning_zero_for_field, record_for_message, record_for_model_key,
-    render_operation_execution, render_operation_future_adapter, resolve_resource_field_kind,
-    split_go_type_decl_name,
+    public_default_punning_zero_for_field, record_for_model_key, render_operation_execution,
+    render_operation_future_adapter, resolve_resource_field_kind, split_go_type_decl_name,
 };
 
 #[derive(Debug, Default)]
@@ -110,6 +108,7 @@ pub(in crate::generator) struct ModelBackend {
     proto_models: BTreeMap<String, PlannedTypeInfo>,
     /// Final local type identifiers, populated after Go visibility is applied.
     model_names: BTreeMap<String, String>,
+    model_parameters: BTreeMap<String, Vec<String>>,
     wire_models: RefCell<BTreeMap<String, RenderedModelWire>>,
     /// Models that appear as a top-level Nexus operation input or output, and
     /// therefore need a [`converter.TransferTypeConverter`] so the SDK performs
@@ -153,6 +152,7 @@ impl ModelBackend {
             imports: RefCell::new(imports),
             proto_models: BTreeMap::new(),
             model_names: BTreeMap::new(),
+            model_parameters: BTreeMap::new(),
             wire_models: RefCell::new(BTreeMap::new()),
             transfer_models: RefCell::new(BTreeSet::new()),
         }
@@ -166,7 +166,14 @@ impl ModelBackend {
         match self.model_names.get(&message.info.full_name) {
             Some(name) => {
                 let (_, arguments) = split_go_type_decl_name(&message.model_name);
-                format!("{name}{arguments}")
+                if arguments.is_empty()
+                    && let Some(parameters) = self.model_parameters.get(&message.info.full_name)
+                    && !parameters.is_empty()
+                {
+                    format!("{name}[{}]", parameters.join(", "))
+                } else {
+                    format!("{name}{arguments}")
+                }
             }
             None => message.model_name.clone(),
         }
@@ -260,37 +267,13 @@ impl ModelBackend {
         self.wire_models.borrow_mut().insert(key, wire);
     }
 
-    /// Marks a top-level operation message as needing a transfer-type
-    /// converter, rejecting generic models: the converter is a package-level
-    /// singleton instantiated with concrete type arguments, which a generic
-    /// model cannot provide.
-    fn mark_transfer_model_checked(
-        &self,
-        api_plan: &PlannedSpec,
-        message: &PlannedMessageType,
-        operation_name: &str,
-        direction: &str,
-    ) -> Result<()> {
+    /// Marks a top-level operation message as needing a transfer-type converter.
+    fn mark_transfer_model(&self, message: &PlannedMessageType) {
         let key = &message.info.full_name;
         if self.model_proto_info(key).is_none() {
-            return Ok(());
-        }
-        if let Some(record) = record_for_message(api_plan, message)
-            && !api_plan
-                .record_type_parameters(&record.full_name)
-                .is_empty()
-        {
-            return Err(Error::UnsupportedGoProtoConversion {
-                context: format!("operation `{operation_name}` {direction}"),
-                reason: format!(
-                    "model `{}` is generic; Go transfer-type converters are package-level \
-                     singletons and cannot be instantiated per type argument",
-                    record.name
-                ),
-            });
+            return;
         }
         self.transfer_models.borrow_mut().insert(key.to_string());
-        Ok(())
     }
 
     /// Whether any transfer-type converter will be emitted. Drives SDK imports.
@@ -570,9 +553,11 @@ fn go_message_conversion(
     }
 
     if message.source == PlannedMessageSource::Proto {
-        let base = go_unexported_name(&backend.model_name(message));
-        let from_proto = format!("{base}FromProto");
-        let to_proto = format!("{base}ToProto");
+        let model_name = backend.model_name(message);
+        let (ident, arguments) = split_go_type_decl_name(&model_name);
+        let base = go_unexported_name(ident);
+        let from_proto = format!("{base}FromProto{arguments}");
+        let to_proto = format!("{base}ToProto{arguments}");
         let config_arg = if crate::nexgen_config::current().system_nexus {
             let config = config.map(str::to_string).unwrap_or_else(|| {
                 format!(
@@ -692,6 +677,9 @@ fn go_value_conversion(
     package: &GoPackageContext,
     config: Option<&str>,
 ) -> GoConversionResult<GoValueConversion> {
+    if let PlannedValueType::External { fallback, .. } = value {
+        return go_value_conversion(fallback, api_plan, backend, package, config);
+    }
     if let PlannedValueType::Message(message) = value {
         return go_message_conversion(message, backend, config);
     }
@@ -858,6 +846,10 @@ impl ModelBackend {
                 (key.clone(), name.to_string())
             })
             .collect();
+        self.model_parameters = models
+            .iter()
+            .map(|(key, model)| (key.clone(), model.type_parameters.clone()))
+            .collect();
         let full_names: Vec<String> = models.keys().cloned().collect();
         for full_name in full_names {
             let Some(proto_info) = self.model_proto_info(&full_name) else {
@@ -865,8 +857,14 @@ impl ModelBackend {
             };
 
             let planned_record = record_for_model_key(api_plan, &full_name);
-            if let Some(planned_record) = planned_record {
-                validate_record_conversion(planned_record)?;
+            // Exported models need converters even without an operation.
+            if planned_record.is_some_and(|record| {
+                api_plan
+                    .types
+                    .get(&record.full_name)
+                    .is_some_and(|entry| entry.is_module_export())
+            }) {
+                self.transfer_models.borrow_mut().insert(full_name.clone());
             }
 
             let proto_type = self
@@ -935,7 +933,7 @@ impl ModelBackend {
                 // not own) uses an eager converter unless policy selection needs
                 // the native request in the SDK.
                 let input_to_proto = if input_conv.kind == GoConversionKind::ModelConverter {
-                    self.mark_transfer_model_checked(api_plan, &input, &planned_op.name, "input")?;
+                    self.mark_transfer_model(&input);
                     None
                 } else {
                     if system_nexus && rendered_op.serialization_context_expr.is_some() {
@@ -1016,12 +1014,7 @@ impl ModelBackend {
                                 Some((proto_type, conv))
                                     if conv.kind == GoConversionKind::ModelConverter =>
                                 {
-                                    self.mark_transfer_model_checked(
-                                        api_plan,
-                                        output,
-                                        &planned_op.name,
-                                        "output",
-                                    )?;
+                                    self.mark_transfer_model(output);
                                     // The model decodes directly; the SDK
                                     // runs the transfer converter for us.
                                     let model_type = rendered_op
@@ -1057,41 +1050,6 @@ impl ModelBackend {
         }
         Ok(())
     }
-}
-
-fn validate_record_conversion(record: &RecordSpec<PlannedFamily>) -> Result<()> {
-    let Some(proto) = &record.data.proto else {
-        return Ok(());
-    };
-    for (field_name, field) in record
-        .fields
-        .iter()
-        .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
-    {
-        match &field.data.wire_binding {
-            Some(PlannedWireFieldBinding::VariantMembers { wire_name, .. }) => {
-                return Err(Error::UnsupportedProtoOneofConversion {
-                    language: Language::Go,
-                    message: proto.full_name.clone(),
-                    oneof: wire_name.clone(),
-                });
-            }
-            Some(PlannedWireFieldBinding::Value { wire_type, .. })
-                if matches!(
-                    field.field_type.validation_type(),
-                    PlannedType::TypeParameter(_)
-                ) && is_proto_generic_carrier(wire_type) =>
-            {
-                return Err(Error::UnsupportedProtoGenericCarrierConversion {
-                    language: Language::Go,
-                    message: proto.full_name.clone(),
-                    field: field_name.clone(),
-                });
-            }
-            _ => {}
-        }
-    }
-    Ok(())
 }
 
 fn is_proto_generic_carrier(kind: &PlannedType) -> bool {
@@ -1786,6 +1744,48 @@ fn build_field_conversions(
         )
         .enumerate()
         .map(|(index, (field_name, field))| {
+            if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
+                &field.data.wire_binding
+            {
+                return build_oneof_conversion(
+                    planned_model, field_name, field, wire_name, members, api_plan, backend,
+                );
+            }
+            if let Some(PlannedWireFieldBinding::Value { wire_name, wire_type }) =
+                &field.data.wire_binding
+                && matches!(field.field_type.validation_type(), PlannedType::TypeParameter(_))
+                && is_proto_generic_carrier(wire_type)
+            {
+                let go_field = go_field_name(field_name);
+                let proto_field = go_proto_field_name(wire_name);
+                let mut conversion = generic_carrier_conversion(
+                    wire_type,
+                    &format!("m.{go_field}"),
+                    &format!("message.{proto_field} = converted"),
+                    &format!("proto.Get{proto_field}()"),
+                    &format!("out.{go_field}"),
+                    &format!("{}.{}", planned_model.name, go_field),
+                    backend,
+                );
+                if field.required {
+                    conversion.from_proto_lines.insert(0, format!(
+                        "if proto.Get{proto_field}() == nil {{ return fmt.Errorf(\"missing required field {}.{go_field}\") }}",
+                        planned_model.name,
+                    ));
+                }
+                // Record fields share a function scope; isolate their temporary
+                // variables. Oneof cases already have their own switch scope.
+                let scope = if field.required {
+                    "{".to_string()
+                } else {
+                    format!("if m.{go_field} != nil {{")
+                };
+                conversion.to_proto_lines = std::iter::once(scope)
+                    .chain(conversion.to_proto_lines.into_iter().map(|line| format!("\t{line}")))
+                    .chain(std::iter::once("}".to_string()))
+                    .collect();
+                return Ok(conversion);
+            }
             let planned_field = planned_field(planned_model, field_name, field, api_plan);
             build_field_conversion(&planned_field, &native_fields[index], api_plan, backend)
                 .map_err(|reason| Error::UnsupportedGoProtoConversion {
@@ -1797,6 +1797,254 @@ fn build_field_conversions(
                 })
         })
         .collect()
+}
+
+/// Generic values decode directly into their concrete Go destination. In ordinary
+/// modules the callbacks are context-free; System Nexus callbacks use the SDK's
+/// selected data converter instead.
+fn generic_carrier_conversion(
+    wire_type: &PlannedType,
+    source: &str,
+    wire_assignment: &str,
+    wire_source: &str,
+    destination: &str,
+    context: &str,
+    backend: &ModelBackend,
+) -> RenderedFieldConversion {
+    let dc = if crate::nexgen_config::current().system_nexus {
+        "cfg.DataConverter".to_string()
+    } else {
+        backend.imports.borrow_mut().by_path.insert(
+            "go.temporal.io/sdk/converter".to_string(),
+            "converter".to_string(),
+        );
+        "converter.GetDefaultDataConverter()".to_string()
+    };
+    backend
+        .imports
+        .borrow_mut()
+        .by_path
+        .insert("fmt".to_string(), "fmt".to_string());
+    let PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(message))) =
+        wire_type.validation_type()
+    else {
+        unreachable!("validated generic carrier")
+    };
+    let plural = message.proto.full_name.ends_with(".Payloads");
+    let method = if plural { "Payloads" } else { "Payload" };
+    let to_proto_lines = vec![
+        format!("converted, err := {dc}.To{method}({source})"),
+        "if err != nil { return nil, err }".to_string(),
+        format!(
+            "if converted == nil {{ return nil, fmt.Errorf(\"missing required field {context}\") }}"
+        ),
+        wire_assignment.to_string(),
+    ];
+    let mut from_proto_lines = vec![format!("if {wire_source} != nil {{")];
+    if plural {
+        from_proto_lines.push(format!(
+            "\tif len({wire_source}.GetPayloads()) > 1 {{ return fmt.Errorf(\"field {context} expected one payload, got %d\", len({wire_source}.GetPayloads())) }}"
+        ));
+    }
+    from_proto_lines.extend([
+        format!("\tif err := {dc}.From{method}({wire_source}, &{destination}); err != nil {{ return err }}"),
+        "}".to_string(),
+    ]);
+    RenderedFieldConversion {
+        to_proto_lines,
+        from_proto_lines,
+    }
+}
+
+fn build_oneof_conversion(
+    record: &RecordSpec<PlannedFamily>,
+    field_name: &str,
+    field: &crate::spec::RecordFieldSpec<PlannedFamily>,
+    wire_name: &str,
+    members: &[crate::planning::PlannedWireVariantMember],
+    api_plan: &PlannedSpec,
+    backend: &ModelBackend,
+) -> Result<RenderedFieldConversion> {
+    let PlannedType::Variant(reference) = field.field_type.without_option().validation_type()
+    else {
+        unreachable!("validated oneof variant")
+    };
+    let variant = api_plan
+        .variant(&reference.full_name)
+        .expect("planned variant");
+    let parameters = api_plan.variant_type_parameters(&variant.full_name);
+    let arguments = if parameters.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "[{}]",
+            parameters
+                .iter()
+                .map(|usage| usage.parameter.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    let proto = backend
+        .proto_type(record.data.proto.as_ref().expect("proto-backed record"))
+        .expect("Go proto package");
+    let go_field = go_field_name(field_name);
+    let wire_field = go_proto_field_name(wire_name);
+    let context = format!("{}.{go_field}", record.name);
+    backend
+        .imports
+        .borrow_mut()
+        .by_path
+        .insert("fmt".to_string(), "fmt".to_string());
+    let mut to = vec![format!("switch value := m.{go_field}.(type) {{")];
+    let mut from = vec![format!("switch value := proto.Get{wire_field}().(type) {{")];
+    for member in members {
+        let case = variant
+            .cases
+            .iter()
+            .find(|case| case.wire_name == member.wire_name)
+            .expect("validated oneof case");
+        let case_type = format!("{}{}{arguments}", variant.name, go_field_name(&case.name));
+        let member_field = go_proto_field_name(&member.wire_name);
+        let wrapper = format!("{proto}_{member_field}");
+        from.push(format!("case *{wrapper}:"));
+        from.push(format!(
+            "\tif value == nil {{ return fmt.Errorf(\"missing required field {context}\") }}"
+        ));
+        from.push(format!("\tvar model {case_type}"));
+        let payload = case.payload.as_ref().expect("oneof payload");
+        let conversion = if matches!(payload.validation_type(), PlannedType::TypeParameter(_))
+            && is_proto_generic_carrier(&member.wire_type)
+        {
+            generic_carrier_conversion(
+                &member.wire_type,
+                "value.Value",
+                &format!("message.{wire_field} = &{wrapper}{{{member_field}: converted}}"),
+                &format!("value.{member_field}"),
+                "model.Value",
+                &context,
+                backend,
+            )
+        } else {
+            let kind = planned_field_kind(payload, api_plan);
+            let PlannedFieldKind::Singular(value_type) = kind else {
+                unreachable!("singular oneof member")
+            };
+            let value = go_value_conversion(
+                &value_type,
+                api_plan,
+                backend,
+                &backend.package,
+                Some("cfg"),
+            )
+            .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                context: context.clone(),
+                reason,
+            })?;
+            let arg = if value.to_proto_takes_pointer {
+                "&value.Value"
+            } else {
+                "value.Value"
+            };
+            let call = (value.to_proto)(arg);
+            let to_lines = if value.fallible {
+                vec![
+                    format!("converted, err := {call}"),
+                    "if err != nil { return nil, err }".to_string(),
+                ]
+            } else {
+                vec![format!("converted := {call}")]
+            };
+            let wire_source = format!("value.{member_field}");
+            let from_lines = if value.kind == GoConversionKind::ModelConverter {
+                vec![format!(
+                    "if err := {}; err != nil {{ return err }}",
+                    (value.from_proto)(&wire_source, "&model.Value")
+                )]
+            } else {
+                let call = (value.from_proto)(&wire_source, "");
+                let mut lines = if value.fallible {
+                    vec![
+                        format!("converted, err := {call}"),
+                        "if err != nil { return err }".to_string(),
+                    ]
+                } else {
+                    vec![format!("converted := {call}")]
+                };
+                lines.push(if value.from_proto_returns_pointer {
+                    "if converted != nil { model.Value = *converted }".to_string()
+                } else {
+                    "model.Value = converted".to_string()
+                });
+                lines
+            };
+            RenderedFieldConversion {
+                to_proto_lines: to_lines,
+                from_proto_lines: from_lines,
+            }
+        };
+        let generic = is_proto_generic_carrier(&member.wire_type)
+            && matches!(payload.validation_type(), PlannedType::TypeParameter(_));
+        let mut to_case_lines = conversion.to_proto_lines;
+        if !generic {
+            if matches!(
+                member.wire_type.validation_type(),
+                PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(_)))
+            ) {
+                to_case_lines.push(format!("if converted == nil {{ return nil, fmt.Errorf(\"missing required field {context}\") }}"));
+            }
+            to_case_lines.push(format!(
+                "message.{wire_field} = &{wrapper}{{{member_field}: converted}}"
+            ));
+        }
+        // Separate cases keep the switch variable concrete in both arms. Go
+        // permits the same field access for values and non-nil pointers.
+        for pointer in [false, true] {
+            let prefix = if pointer { "*" } else { "" };
+            to.push(format!("case {prefix}{case_type}:"));
+            if pointer {
+                to.push(format!("\tif value == nil {{ return nil, fmt.Errorf(\"missing required field {context}\") }}"));
+            }
+            to.extend(to_case_lines.iter().map(|line| format!("\t{line}")));
+        }
+        if matches!(
+            member.wire_type.validation_type(),
+            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(_)))
+        ) {
+            from.push(format!("\tif value.{member_field} == nil {{ return fmt.Errorf(\"missing required field {context}\") }}"));
+        }
+        from.extend(
+            conversion
+                .from_proto_lines
+                .into_iter()
+                .map(|line| format!("\t{line}")),
+        );
+        from.push(format!("\tout.{go_field} = model"));
+    }
+    to.push("case nil:".to_string());
+    from.push("case nil:".to_string());
+    if field.required {
+        to.push(format!(
+            "\treturn nil, fmt.Errorf(\"missing required field {context}\")"
+        ));
+        from.push(format!(
+            "\treturn fmt.Errorf(\"missing required field {context}\")"
+        ));
+    }
+    to.extend([
+        "default:".to_string(),
+        format!("\treturn nil, fmt.Errorf(\"invalid oneof field {context}: %T\", value)"),
+        "}".to_string(),
+    ]);
+    from.extend([
+        "default:".to_string(),
+        format!("\treturn fmt.Errorf(\"invalid oneof field {context}: %T\", value)"),
+        "}".to_string(),
+    ]);
+    Ok(RenderedFieldConversion {
+        to_proto_lines: to,
+        from_proto_lines: from,
+    })
 }
 
 fn build_field_conversion(
@@ -1953,8 +2201,9 @@ fn render_model_transfer_type_converter(
 ) {
     let (model_ident, _) = split_go_type_decl_name(&model.name);
     let base = go_unexported_name(model_ident);
-    let from_proto_fn = format!("{base}FromProto");
-    let to_proto_fn = format!("{base}ToProto");
+    let arguments = model_type_arguments(model);
+    let from_proto_fn = format!("{base}FromProto{arguments}");
+    let to_proto_fn = format!("{base}ToProto{arguments}");
 
     let new_converter = package.new_transfer_type_converter();
     let converter_type = package.transfer_type_converter_type();
@@ -1963,7 +2212,7 @@ fn render_model_transfer_type_converter(
     // converter by model type, so no generated package-level cache is needed.
     output.push('\n');
     output.push_str(&format!(
-        "func ({model_ident}) TransferTypeConverter() ({converter_type}, error) {{\n"
+        "func ({model_ident}{arguments}) TransferTypeConverter() ({converter_type}, error) {{\n"
     ));
     output.push_str(&format!("\treturn {new_converter}(\n"));
     output.push_str(&format!("\t\t{to_proto_fn},\n\t\t{from_proto_fn},\n"));
@@ -2342,6 +2591,14 @@ fn map_from_proto_lines(
     lines
 }
 
+fn model_type_arguments(model: &RenderedModel) -> String {
+    if model.type_parameters.is_empty() {
+        String::new()
+    } else {
+        format!("[{}]", model.type_parameters.join(", "))
+    }
+}
+
 /// Renders the unexported conversion functions for a proto-backed model.
 fn render_model_converters(
     output: &mut String,
@@ -2350,20 +2607,23 @@ fn render_model_converters(
     package: &GoPackageContext,
 ) {
     let proto_value_type = wire.proto_type.trim_start_matches('*');
-    let (model_ident, _) = split_go_type_decl_name(&model.name);
+    let (model_ident, declaration) = split_go_type_decl_name(&model.name);
     let base = go_unexported_name(model_ident);
+    let model_type = format!("{model_ident}{}", model_type_arguments(model));
 
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("ToProto(");
+    output.push_str("ToProto");
+    output.push_str(declaration);
+    output.push('(');
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
         output.push_str(&package.system_nexus_context_type());
         output.push_str(", ");
     }
     output.push_str("m *");
-    output.push_str(&model.name);
+    output.push_str(&model_type);
     output.push_str(") (");
     output.push_str(&wire.proto_type);
     output.push_str(", error) {\n");
@@ -2383,7 +2643,9 @@ fn render_model_converters(
     output.push('\n');
     output.push_str("func ");
     output.push_str(&base);
-    output.push_str("FromProto(");
+    output.push_str("FromProto");
+    output.push_str(declaration);
+    output.push('(');
     if crate::nexgen_config::current().system_nexus {
         output.push_str("cfg *");
         output.push_str(&package.system_nexus_context_type());
@@ -2392,10 +2654,10 @@ fn render_model_converters(
     output.push_str("proto ");
     output.push_str(&wire.proto_type);
     output.push_str(", out *");
-    output.push_str(&model.name);
+    output.push_str(&model_type);
     output.push_str(") error {\n");
     output.push_str("\t*out = ");
-    output.push_str(&model.name);
+    output.push_str(&model_type);
     output.push_str("{}\n");
     for conversion in &wire.field_conversions {
         for line in &conversion.from_proto_lines {

@@ -224,6 +224,8 @@ const (
 //
 // NOTE: Experimental
 type NotificationTarget interface {
+	// isNotificationTarget is a marker method implemented by each case of
+	// NotificationTarget.
 	isNotificationTarget()
 }
 
@@ -251,8 +253,16 @@ type NotificationTargetUndocumented struct{}
 
 func (NotificationTargetUndocumented) isNotificationTarget() {}
 
+var (
+	_ NotificationTarget = NotificationTargetEmail{}
+	_ NotificationTarget = NotificationTargetSms{}
+	_ NotificationTarget = NotificationTargetNone{}
+	_ NotificationTarget = NotificationTargetUndocumented{}
+)
+
 // SingleTarget - Default-only documentation on a single-case variant.
 type SingleTarget interface {
+	// isSingleTarget is a marker method implemented by each case of SingleTarget.
 	isSingleTarget()
 }
 
@@ -261,16 +271,26 @@ type SingleTargetOnly struct{}
 
 func (SingleTargetOnly) isSingleTarget() {}
 
+var (
+	_ SingleTarget = SingleTargetOnly{}
+)
+
 // ExperimentalTarget.
 //
 // NOTE: Experimental
 type ExperimentalTarget interface {
+	// isExperimentalTarget is a marker method implemented by each case of
+	// ExperimentalTarget.
 	isExperimentalTarget()
 }
 
 type ExperimentalTargetSecond struct{}
 
 func (ExperimentalTargetSecond) isExperimentalTarget() {}
+
+var (
+	_ ExperimentalTarget = ExperimentalTargetSecond{}
+)
 
 type UserProfile struct {
 	// Tags - A very long field doc that has to be wrapped because it exceeds the generated

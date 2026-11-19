@@ -59,6 +59,8 @@ func (m result[T, E]) GetError() E {
 // --- Operations (public API) ---
 
 type OperationCompletionResult[OutputT any] interface {
+	// isOperationCompletionResult is a marker method implemented by each case of
+	// OperationCompletionResult[OutputT].
 	isOperationCompletionResult(OutputT)
 }
 
@@ -73,6 +75,11 @@ type OperationCompletionResultFailure[OutputT any] struct {
 }
 
 func (OperationCompletionResultFailure[OutputT]) isOperationCompletionResult(OutputT) {}
+
+func _[OutputT any]() {
+	var _ OperationCompletionResult[OutputT] = OperationCompletionResultSuccess[OutputT]{}
+	var _ OperationCompletionResult[OutputT] = OperationCompletionResultFailure[OutputT]{}
+}
 
 type Inner[ContextT any] struct {
 	// Value - Required.
