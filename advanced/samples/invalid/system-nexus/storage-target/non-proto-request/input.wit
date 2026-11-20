@@ -1,0 +1,11 @@
+package test:storage-target-non-proto;
+
+world system { export api; }
+
+/// @nexus.endpoint "__temporal_system"
+interface api {
+  record request { namespace: string }
+
+  /// @nexus.storage-target go="requestTarget"
+  send: func(request: request);
+}
