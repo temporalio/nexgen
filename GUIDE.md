@@ -2792,10 +2792,12 @@ The referenced helper must be available from the package specified by
 `@nexus.storage-target python="<support-helper>"`
 
 Supplies a support helper that identifies the destination workflow for external
-storage routing. Currently supported by the Python backend. The generated
-operation registry exposes the helper as `storage_target`; it receives the
-actual generated request model and returns a
-`temporalio.converter.StorageDriverWorkflowInfo`.
+storage routing. Supported by Python, TypeScript, Go, and .NET. The generated
+operation registry exposes the helper as `storage_target` in Python and
+`StorageTarget` / `storageTarget` in the other languages. It receives the actual
+generated request model and returns the SDK's storage target identity:
+`StorageDriverWorkflowInfo` in Python and Go, `StorageDriverTargetInfo` in
+TypeScript, or `IStorageDriverTargetInfo` in .NET.
 
 Use this alongside `@nexus.serialization-context` when embedded user payloads
 are sent to another workflow. The SDK preserves the storing client or worker

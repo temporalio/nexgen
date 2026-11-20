@@ -660,6 +660,7 @@ impl<'a> ApiPlanner<'a> {
                 .serialization_context
                 .value()
                 .map(support_reference),
+            storage_target_expr: operation.storage_target.value().map(support_reference),
             runtime_type_parameters,
             output_record_type_parameters,
             api_omitted: &operation.api_omitted,
@@ -3175,6 +3176,7 @@ struct RenderedOperation<'a> {
     output_model_name: Option<String>,
     output_transfer_type_converter: Option<String>,
     serialization_context_expr: Option<String>,
+    storage_target_expr: Option<String>,
     runtime_type_parameters: Vec<String>,
     output_record_type_parameters: Vec<String>,
     /// Targets whose public top-level function `@nexus.api-omit` suppresses.
@@ -4420,14 +4422,26 @@ fn render_operation_registry_module(
         .iter()
         .flat_map(|service| &service.operations)
         .any(|operation| operation.serialization_context_expr.is_some());
-    if has_serialization_context {
+    let has_storage_target = services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.storage_target_expr.is_some());
+    let has_context_helpers = has_serialization_context || has_storage_target;
+    if has_context_helpers {
         body.push_str("interface OperationRegistryEntry<Input = unknown> {\n");
         body.push_str("  readonly service: string;\n");
         body.push_str("  readonly operation: string;\n");
-        body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
-        body.push_str(
-            "  readonly serializationContext?: (input: Input) => SerializationContext;\n",
-        );
+        if has_serialization_context {
+            body.push_str("  /** Context for nested payloads, determined by the operation. */\n");
+            body.push_str(
+                "  readonly serializationContext?: (input: Input) => SerializationContext;\n",
+            );
+        }
+        if has_storage_target {
+            body.push_str(
+                "  readonly storageTarget?: (input: Input) => StorageDriverTargetInfo;\n",
+            );
+        }
         body.push_str("}\n\n");
     }
     body.push_str("export const operationRegistry = [\n");
@@ -4445,10 +4459,15 @@ fn render_operation_registry_module(
                 body.push_str(serialization_context);
                 body.push_str(",\n");
             }
+            if let Some(storage_target) = &operation.storage_target_expr {
+                body.push_str("    storageTarget: ");
+                body.push_str(storage_target);
+                body.push_str(",\n");
+            }
             body.push_str("  },\n");
         }
     }
-    if has_serialization_context {
+    if has_context_helpers {
         body.push_str("] as const satisfies readonly OperationRegistryEntry<any>[];\n");
     } else {
         body.push_str("] as const;\n");
@@ -4460,6 +4479,13 @@ fn render_operation_registry_module(
             &mut imports,
             "@temporalio/common",
             &["SerializationContext".to_string()],
+        );
+    }
+    if has_storage_target {
+        render_type_imports(
+            &mut imports,
+            "@temporalio/common",
+            &["StorageDriverTargetInfo".to_string()],
         );
     }
     render_support_import(
