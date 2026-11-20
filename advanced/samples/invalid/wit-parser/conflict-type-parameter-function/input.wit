@@ -1,0 +1,11 @@
+package test:conflict-type-parameter-function;
+
+world system { export models; }
+
+interface models {
+  /// @nexus.type-parameter
+  /// @nexus.function signature="signature"
+  type unused = string;
+
+  signature: func();
+}

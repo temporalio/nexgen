@@ -702,16 +702,6 @@ fn validate_type_parameter_directive(
             reason: "is only supported on WIT type aliases".to_string(),
         });
     }
-    for conflict in ["proto", "type", "function"] {
-        if directive(&directives, conflict, path, &context)?.is_some() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context,
-                directive: "@nexus.type-parameter".to_string(),
-                reason: format!("cannot be combined with `@nexus.{conflict}`"),
-            });
-        }
-    }
     Ok(())
 }
 
@@ -1181,46 +1171,7 @@ fn build_fields_from_record(
             });
         }
 
-        if omit_directive.is_some() && api_omit_directive.is_some() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: field_context,
-                directive: "@nexus.api-omit".to_string(),
-                reason: "cannot be combined with `@nexus.omit`".to_string(),
-            });
-        }
-
         if omit_directive.is_some() {
-            for conflicting_directive in [
-                "source",
-                "type",
-                "flattened-type",
-                "function",
-                "default",
-                "flatten-in-api",
-            ] {
-                if directives
-                    .iter()
-                    .any(|directive| directive.name() == conflicting_directive)
-                {
-                    return Err(Error::InvalidWitDirective {
-                        path: path.to_path_buf(),
-                        context: field_context,
-                        directive: "@nexus.omit".to_string(),
-                        reason: format!("cannot be combined with `@nexus.{conflicting_directive}`"),
-                    });
-                }
-            }
-
-            if flattened_function_type.is_some() {
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: field_context,
-                    directive: "@nexus.omit".to_string(),
-                    reason: "cannot be combined with a flattened function field type".to_string(),
-                });
-            }
-
             let field_type = authored_field_type_for_language(
                 resolve_field_type_spec(resolve, &field.ty, proto_backed, path, &field_context)?,
                 language,
@@ -1278,9 +1229,6 @@ fn build_fields_from_record(
                 reason: "cannot be used on option<T> fields; use T and omit the operation argument instead".to_string(),
             });
         }
-        let sourced = origin
-            .for_language(language)
-            .is_some_and(FieldPolicy::is_sourced);
         if api_omit_targets.is_some() && required && !is_list_type(resolve, &field.ty) {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
@@ -1299,15 +1247,6 @@ fn build_fields_from_record(
             .map(directive_language_string);
         let function =
             build_function_field(resolve, owner, &directives, path, &field_context, language)?;
-
-        if sourced && function.is_some() {
-            return Err(Error::ConflictingTypeOverrideFieldProperties {
-                message: context.to_string(),
-                field: proto_field_name,
-                property: "source",
-                conflicting_property: "function",
-            });
-        }
 
         fields.insert(
             proto_field_name.clone(),
@@ -1796,13 +1735,6 @@ fn build_field_policies(
                 .map(|&target| (target, FieldOrigin::Omitted))
                 .collect(),
         });
-        if !defaults.is_empty() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(), context: context.to_string(),
-                directive: "@nexus.api-omit".to_string(),
-                reason: "cannot be combined with `@nexus.default`; use `@nexus.source` to supply a value without a caller argument".to_string(),
-            });
-        }
     }
     for language in all_languages() {
         let mut source_expressions = BTreeMap::new();
@@ -1833,34 +1765,10 @@ fn build_field_policies(
                 }
             }
         }
-        if !source_expressions.is_empty() && !default_expressions.is_empty() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.default".to_string(),
-                reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
-            });
-        }
         if source_expressions.is_empty() && default_expressions.is_empty() {
             continue;
         }
         let mut policy = policies.default.clone().unwrap_or_default();
-        if source_expressions
-            .keys()
-            .any(|&target| policy.api_omitted_for(target))
-        {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.api-omit".to_string(),
-                reason: if api_omit_targets.is_some_and(|targets| targets.len() == 2) {
-                    "cannot be combined with `@nexus.source`"
-                } else {
-                    "cannot be combined with `@nexus.source` for the same target"
-                }
-                .to_string(),
-            });
-        }
         policy.origin.extend(
             source_expressions
                 .into_iter()
@@ -1876,7 +1784,7 @@ fn build_field_policies(
     Ok(policies)
 }
 
-/// Repeated origin directives have no ordering or override precedence.
+/// Target overlap is rejected by the annotation catalog before lowering.
 fn origin_directives<'a>(
     directives: &'a [Directive],
     kind: &str,
@@ -1884,28 +1792,11 @@ fn origin_directives<'a>(
     context: &str,
 ) -> Result<Vec<(&'a Directive, Vec<GenerationTarget>)>> {
     let mut selected = Vec::new();
-    let mut seen = BTreeSet::new();
     for directive in directives
         .iter()
         .filter(|directive| directive.name() == kind)
     {
         let targets = build_origin_targets(directive, path, context, kind)?;
-        for &target in &targets {
-            if !seen.insert(target) {
-                let target = match target {
-                    crate::nexgen_config::GenerationTarget::Workflow => "workflow",
-                    crate::nexgen_config::GenerationTarget::Client => "client",
-                };
-                return Err(Error::InvalidWitDirective {
-                    path: path.to_path_buf(),
-                    context: context.to_string(),
-                    directive: format!("@nexus.{kind}"),
-                    reason: format!(
-                        "overlapping target `{target}`; repeated `@nexus.{kind}` directives must have disjoint target sets"
-                    ),
-                });
-            }
-        }
         selected.push((directive, targets));
     }
     Ok(selected)
@@ -2173,18 +2064,6 @@ fn build_function_field_for_type_alias(
     let converter = directive_converter(function_directive, language);
 
     if let Some(signature_name) = function_directive.value("signature") {
-        if function_directive.value("args-name").is_some()
-            || !directive_result_language_string(function_directive).is_empty()
-        {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.to_string(),
-                directive: "@nexus.function".to_string(),
-                reason: "signature cannot be combined with args-name or result overrides"
-                    .to_string(),
-            });
-        }
-
         let mut signature =
             resolve_function_signature(resolve, type_def, signature_name, path, context)?;
         signature.args.field_type =

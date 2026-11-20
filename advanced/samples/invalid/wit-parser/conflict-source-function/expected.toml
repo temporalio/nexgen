@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.source` on type `models.unused` field `value`",
+  "cannot be combined with `@nexus.function`",
+]

@@ -1,0 +1,11 @@
+package test:dependency;
+
+interface types {
+  type value = string;
+
+  record unused {
+    /// @nexus.omit
+    /// @nexus.flatten-in-api
+    value: value,
+  }
+}

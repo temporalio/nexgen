@@ -100,14 +100,17 @@ flowchart LR
 The WIT and JSON Schema frontends construct authored IR. The WIT frontend
 validates annotations after resolving the input packages. The catalog in
 `src/parser/wit/annotations.rs` defines placements, argument names, cardinality,
-language eligibility, and System Nexus requirements. Parsing uses that catalog
+language eligibility, System Nexus requirements, and symmetric conflict rules.
+Conflict rules specify their placements and whether exclusion is unconditional
+or depends on overlapping languages or API targets. Parsing uses that catalog
 for common checks; a complete resolved tree walk checks placements, including
 unused declarations and linked packages. WIT generation checks availability
 against the selected language and mode before lowering. Unqualified annotations
 apply to the selected output; language-qualified annotations can remain inactive
-for other outputs. Scaffolding only checks vocabulary and placements, without
-imposing a generation language or mode. Builders retain semantic checks and
-interpretation.
+for other outputs. Scaffolding checks vocabulary, placements, and conflicts
+without imposing a generation language or mode. Conflict checks include
+disjoint-target requirements for repeated field origins. Builders retain
+type-dependent semantic checks and interpretation, not annotation-pair checks.
 
 ### AuthoredValidationPass
 
