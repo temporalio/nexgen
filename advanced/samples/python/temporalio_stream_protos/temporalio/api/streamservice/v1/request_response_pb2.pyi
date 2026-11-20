@@ -36,34 +36,32 @@ class CreateStreamRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    STREAM_REF_FIELD_NUMBER: _builtins.int
+    STREAM_ID_FIELD_NUMBER: _builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: _builtins.int
     REQUEST_ID_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     read it.
     """
+    stream_id: _builtins.str
+    """Required. The id of the Stream."""
     id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType
     """What the create does when the Stream exists. Unspecified is FAIL."""
     request_id: _builtins.str
     """Unique for each create call, and the same on its retries. The Store keeps the request_id of
     the create that made the Stream, so a retry after a lost answer doesn't get ALREADY_EXISTS.
     """
-    @_builtins.property
-    def stream_ref(self) -> _message_pb2.StreamRef:
-        """Required. The ref of the Stream to create. Its id is the Stream id, and is never empty."""
-
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
-        stream_ref: _message_pb2.StreamRef | None = ...,
+        stream_id: _builtins.str = ...,
         id_conflict_policy: _stream_pb2.StreamIdConflictPolicy.ValueType = ...,
         request_id: _builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["stream_ref", b"stream_ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "request_id", b"request_id", "stream_ref", b"stream_ref"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["id_conflict_policy", b"id_conflict_policy", "namespace", b"namespace", "request_id", b"request_id", "stream_id", b"stream_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -77,26 +75,17 @@ class CreateStreamResponse(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    REF_FIELD_NUMBER: _builtins.int
     CREATED_FIELD_NUMBER: _builtins.int
     created: _builtins.bool
     """False when USE_EXISTING got a Stream that existed."""
-    @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
-        Store that it picked, also when the request left the name empty. The server gives the ref
-        back as the request had it, since it doesn't know that name.
-        """
-
     def __init__(
         self,
         *,
-        ref: _message_pb2.StreamRef | None = ...,
         created: _builtins.bool = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created", "ref", b"ref"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created", b"created"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -112,7 +101,7 @@ class AppendRecordsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    REF_FIELD_NUMBER: _builtins.int
+    STREAM_ID_FIELD_NUMBER: _builtins.int
     PRODUCER_FIELD_NUMBER: _builtins.int
     SEQUENCE_FIELD_NUMBER: _builtins.int
     RECORDS_FIELD_NUMBER: _builtins.int
@@ -120,14 +109,12 @@ class AppendRecordsRequest(_message.Message):
     """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     read it.
     """
+    stream_id: _builtins.str
+    """Required. The id of the Stream."""
     sequence: _builtins.int
     """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
     the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
     """
-    @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """Required."""
-
     @_builtins.property
     def producer(self) -> _message_pb2.Producer:
         """Required. The Producer of the batch. An append and a close of one Producer carry the same
@@ -140,14 +127,14 @@ class AppendRecordsRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        ref: _message_pb2.StreamRef | None = ...,
+        stream_id: _builtins.str = ...,
         producer: _message_pb2.Producer | None = ...,
         sequence: _builtins.int = ...,
         records: _abc.Iterable[_message_pb2.AppendRecord] | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer", "ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "records", b"records", "ref", b"ref", "sequence", b"sequence"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "records", b"records", "sequence", b"sequence", "stream_id", b"stream_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -189,16 +176,14 @@ class CloseStreamRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    REF_FIELD_NUMBER: _builtins.int
+    STREAM_ID_FIELD_NUMBER: _builtins.int
     PRODUCER_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     read it.
     """
-    @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """Required."""
-
+    stream_id: _builtins.str
+    """Required. The id of the Stream."""
     @_builtins.property
     def producer(self) -> _message_pb2.Producer:
         """Required. The Producer that closes the Stream."""
@@ -207,12 +192,12 @@ class CloseStreamRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        ref: _message_pb2.StreamRef | None = ...,
+        stream_id: _builtins.str = ...,
         producer: _message_pb2.Producer | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer", "ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["producer", b"producer"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "ref", b"ref"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "producer", b"producer", "stream_id", b"stream_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -247,7 +232,7 @@ class ReadRecordsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    REF_FIELD_NUMBER: _builtins.int
+    STREAM_ID_FIELD_NUMBER: _builtins.int
     FROM_OFFSET_FIELD_NUMBER: _builtins.int
     MAX_RECORDS_FIELD_NUMBER: _builtins.int
     WAIT_FIELD_NUMBER: _builtins.int
@@ -256,6 +241,8 @@ class ReadRecordsRequest(_message.Message):
     """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     read it.
     """
+    stream_id: _builtins.str
+    """Required. The id of the Stream."""
     from_offset: _builtins.bytes
     """Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
     Leave empty to read from the beginning. To read only new Records, a caller gets last_offset
@@ -270,10 +257,6 @@ class ReadRecordsRequest(_message.Message):
     marker. A larger Record still comes alone, so the read always moves on. Zero is no cap.
     """
     @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """Required."""
-
-    @_builtins.property
     def wait(self) -> _duration_pb2.Duration:
         """How long the read waits for a new Record before it answers with an empty page. Empty answers
         at once, and a wait longer than 60 s waits 60 s.
@@ -283,15 +266,15 @@ class ReadRecordsRequest(_message.Message):
         self,
         *,
         namespace: _builtins.str = ...,
-        ref: _message_pb2.StreamRef | None = ...,
+        stream_id: _builtins.str = ...,
         from_offset: _builtins.bytes = ...,
         max_records: _builtins.int = ...,
         wait: _duration_pb2.Duration | None = ...,
         max_bytes: _builtins.int = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref", "wait", b"wait"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["wait", b"wait"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["from_offset", b"from_offset", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "ref", b"ref", "wait", b"wait"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["from_offset", b"from_offset", "max_bytes", b"max_bytes", "max_records", b"max_records", "namespace", b"namespace", "stream_id", b"stream_id", "wait", b"wait"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -345,24 +328,22 @@ class DescribeStreamRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
-    REF_FIELD_NUMBER: _builtins.int
+    STREAM_ID_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
     """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     read it.
     """
-    @_builtins.property
-    def ref(self) -> _message_pb2.StreamRef:
-        """Required."""
-
+    stream_id: _builtins.str
+    """Required. The id of the Stream."""
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
-        ref: _message_pb2.StreamRef | None = ...,
+        stream_id: _builtins.str = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["ref", b"ref"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "ref", b"ref"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace", "stream_id", b"stream_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

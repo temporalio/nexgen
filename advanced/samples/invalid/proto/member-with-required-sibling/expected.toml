@@ -1,0 +1,11 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = [
+  "../../../descriptors/temporal_api.bin",
+  "../../../descriptors/streams.bin",
+]
+
+[error]
+kind = "invalid-type-override-field"
+contains = [
+  "type override for `temporal.api.streamservice.v1.DescribeStreamRequest.stream_id` has invalid field `member`: field `store` of record `StreamRef` must be `option<T>`, since the conversion from the proto sets only member `id`",
+]

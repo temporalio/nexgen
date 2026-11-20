@@ -1923,7 +1923,7 @@ language restriction, not that every backend emits the feature. In particular,
 delayed workflow loading remains a Python-specific effect of an unqualified
 marker shared by multi-language WIT files. More detailed backend restrictions
 remain in semantic validation, including .NET's System Nexus requirement for
-namespace overrides.
+namespace overrides. Go refuses a field with `@nexus.proto-field` `member`.
 
 ### @nexus.endpoint
 
@@ -2312,7 +2312,7 @@ outside that mode, whether or not the interface declares an endpoint.
 ### @nexus.proto-field
 
 **Placement:** Record field (within a `@nexus.proto` record) **Syntax:**
-`@nexus.proto-field "<proto_field_name>"`
+`@nexus.proto-field "<proto_field_name>" [member="<field>"]`
 
 Maps a WIT field name to a differently-named proto field. Without this, the WIT
 name converted to `snake_case` is assumed to match.
@@ -2325,6 +2325,45 @@ record start-workflow-request {
 ```
 
 Here the WIT field `workflow` maps to proto field `workflow_type`.
+
+With `member`, the model field keeps a record type, and the proto field holds
+one field of that record. `member` is the WIT name of that field. The conversion
+to the proto writes the member. The conversion from the proto builds the record
+from the member alone, so every other field of the record stays unset.
+
+```wit
+/// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
+record append-records-request {
+  /// @nexus.proto-field "stream_id" member="id"
+  ref: stream-ref,
+  records: list<append-record>,
+}
+```
+
+```python
+# To the proto.
+message.stream_id = value.ref.id
+
+# From the proto.
+if not value.stream_id:
+    raise ValueError("missing required field AppendRecordsRequest.ref")
+ref = typing.cast(StreamRef[BodyT], StreamRef[body_type](id=value.stream_id))
+```
+
+The compiler refuses `member` in these cases:
+
+- The field also has `@nexus.omit`, `@nexus.function`, `@nexus.type` or
+  `@nexus.flattened-type`.
+- The field type is not a record, or an alias of one. `option<T>` and `list<T>`
+  of a record are refused too.
+- The record has `@nexus.flatten-in-api`. The same annotation on the field is
+  allowed.
+- The record has no field with the name of `member`, or that field is
+  `option<T>`.
+- The member is not a string, bool, integer, float or bytes, or its type is not
+  the type of the proto field.
+- Another field of the record is required. Each of them must be `option<T>`,
+  since the conversion from the proto can't fill it.
 
 ---
 

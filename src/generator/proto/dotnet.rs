@@ -384,13 +384,36 @@ fn validate_record_conversion(
         .iter()
         .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
-        if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
-            &field.data.wire_binding
-        {
-            oneof_cases(api_plan, &proto.full_name, field, wire_name, members)?;
+        match &field.data.wire_binding {
+            Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) => {
+                oneof_cases(api_plan, &proto.full_name, field, wire_name, members)?;
+            }
+            Some(
+                PlannedWireFieldBinding::Member { .. } | PlannedWireFieldBinding::Value { .. },
+            )
+            | None => {}
         }
     }
     Ok(())
+}
+
+/// Returns the record that a `member` field holds one member of, with that member.
+fn member_target<'a>(
+    api_plan: &'a PlannedSpec,
+    field: &RecordFieldSpec<PlannedFamily>,
+    member: &str,
+) -> Option<(
+    &'a RecordSpec<PlannedFamily>,
+    &'a RecordFieldSpec<PlannedFamily>,
+)> {
+    let PlannedType::Record(record) = field.field_type.validation_type() else {
+        return None;
+    };
+    let record = api_plan.record(&record.full_name)?;
+    let (_, member_field) = record
+        .model_fields()
+        .find(|(_, candidate)| candidate.name == member)?;
+    Some((record, member_field))
 }
 
 /// Protobuf messages that carry a type parameter's value through the payload converter.
@@ -874,6 +897,19 @@ fn field_from_wire_expr(
                 };
             }
         }
+        Some(PlannedWireFieldBinding::Member { member, .. }) => {
+            let (record, member_field) = member_target(api_plan, field, member)
+                .expect("planning checks the member of a member field");
+            let member_expr = value_from_wire_expr(
+                &member_field.field_type,
+                source_expr,
+                false,
+                None,
+                api_plan,
+                support_namespace,
+            );
+            return format!("new {}({member_expr})", model_type_name(record, api_plan));
+        }
         None => {}
     }
     value_from_wire_expr(
@@ -949,6 +985,20 @@ fn render_field_from_wire_setup(
                 );
                 output.push('\n');
             }
+        }
+        Some(PlannedWireFieldBinding::Member { wire_type, .. }) => {
+            let source_expr = format!("wire.{}", csharp_type_name(field_name));
+            // A proto field that the sender did not set reads as empty. Then the record is missing.
+            let missing = match wire_type {
+                PlannedType::String => format!("string.IsNullOrEmpty({source_expr})"),
+                PlannedType::Bytes => format!("{source_expr}.IsEmpty"),
+                _ => return,
+            };
+            output.push_str(&format!("        if ({missing})\n        {{\n"));
+            output.push_str(&format!(
+                "            throw new System.InvalidOperationException({});\n        }}\n\n",
+                missing_required_field_message(model, &field.name)
+            ));
         }
         None => {}
     }
@@ -1407,6 +1457,17 @@ fn field_to_proto_expr(
         && let Some((_, carrier)) = generic_carrier(&field.field_type, wire_type)
     {
         return generic_carrier_to_wire_expr(carrier, wire_type, source_expr, support_namespace);
+    }
+    if let Some(PlannedWireFieldBinding::Member { member, .. }) = &field.data.wire_binding {
+        let (_, member_field) = member_target(api_plan, field, member)
+            .expect("planning checks the member of a member field");
+        return backend.field_kind_to_wire_expr(
+            &member_field.field_type,
+            &format!("{source_expr}.{}", field_property_name(member_field)),
+            false,
+            api_plan,
+            support_namespace,
+        );
     }
     backend.field_kind_to_wire_expr(
         &field.field_type,

@@ -1751,6 +1751,12 @@ fn build_field_conversions(
                     planned_model, field_name, field, wire_name, members, api_plan, backend,
                 );
             }
+            if let Some(PlannedWireFieldBinding::Member { .. }) = &field.data.wire_binding {
+                return Err(Error::UnsupportedGoProtoConversion {
+                    context: format!("field `{}.{field_name}`", planned_model.name),
+                    reason: "a field with `member` has no Go conversion".to_string(),
+                });
+            }
             if let Some(PlannedWireFieldBinding::Value { wire_name, wire_type }) =
                 &field.data.wire_binding
                 && matches!(field.field_type.validation_type(), PlannedType::TypeParameter(_))

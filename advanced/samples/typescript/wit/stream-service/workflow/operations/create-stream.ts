@@ -7,24 +7,13 @@ import type { CreateStreamRequest } from "../models";
 import * as support from "../../../../support/temporal_model_converters";
 import { Stream } from "../resources";
 
-function requiredField<T>(
-  value: T | null | undefined,
-  owner: string,
-  field: string,
-): T {
-  if (value == null) {
-    throw new Error(`missing required field ${owner}.${field}`);
-  }
-  return value;
-}
-
 type CreateStreamInput<BodyT> =
   CreateStreamRequest<BodyT> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "request_id" | "streamRef"> & {
-          request_id?: never;
-          streamRef?: never;
-        } & { id: string; store?: string }
+      ? Omit<Input, "ref" | "request_id"> & { ref?: never; request_id?: never } & {
+          id: string;
+          store?: string;
+        }
       : never
     : never;
 
@@ -39,7 +28,7 @@ export async function createStream<BodyT>(
   const request = {
     ...requestFields,
     requestId: support.requestId(),
-    streamRef: { id, store },
+    ref: { id, store },
   } as CreateStreamRequest<BodyT>;
   const client = nexus.createNexusServiceClient({
     service: streamService,
@@ -50,9 +39,5 @@ export async function createStream<BodyT>(
     request,
   );
   const result = await handle.result();
-  return new Stream(
-    requiredField(result.ref, "resource", "ref"),
-    result.created ?? undefined,
-    bodyType,
-  );
+  return new Stream(request.ref, result.created ?? undefined, bodyType);
 }

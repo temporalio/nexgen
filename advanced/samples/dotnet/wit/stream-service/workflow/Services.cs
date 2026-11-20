@@ -20,7 +20,7 @@ namespace Temporalio.Workflows
     {
         [GeneratedCode("nexgen", null)]
         [NexusOperation("CreateStream")]
-        CreateStreamResult<object> CreateStream(CreateStreamRequest<object> request);
+        CreateStreamResult CreateStream(CreateStreamRequest<object> request);
 
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
@@ -78,7 +78,7 @@ namespace Temporalio.Workflows
 
         internal static IReadOnlyDictionary<(string Service, string Operation), INexgenOperationInfo> Operations { get; } = new Dictionary<(string Service, string Operation), INexgenOperationInfo>
         {
-            [("temporal.api.streamservice.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest<object>, CreateStreamResult<object>>(
+            [("temporal.api.streamservice.v1.StreamService", "CreateStream")] = new NexgenOperationInfo<CreateStreamRequest<object>, CreateStreamResult>(
                 StreamServiceServiceDefinition.Operations["CreateStream"]),
             [("temporal.api.streamservice.v1.StreamService", "AppendRecords")] = new NexgenOperationInfo<AppendRecordsRequest<object>, AppendRecordsResponse>(
                 StreamServiceServiceDefinition.Operations["AppendRecords"]),

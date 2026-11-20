@@ -1,0 +1,24 @@
+package temporal:nexus@1.0.0;
+
+world system { export stream-service; }
+
+/// @nexus.endpoint "__temporal_system"
+interface stream-service {
+  use nexus:temporal-types/model@1.0.0.{placeholder};
+
+  /// @nexus.proto "temporal.api.stream.v1.StreamRef"
+  record stream-ref {
+    id: string,
+    store: option<string>,
+  }
+
+  /// @nexus.proto "temporal.api.streamservice.v1.DescribeStreamRequest"
+  record describe-stream-request {
+    /// @nexus.proto-field "stream_id" member="id"
+    ref: option<stream-ref>,
+    /// @nexus.omit
+    namespace: placeholder,
+  }
+
+  describe-stream: func(request: describe-stream-request) -> describe-stream-request;
+}

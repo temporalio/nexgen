@@ -1,0 +1,11 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = [
+  "../../../descriptors/temporal_api.bin",
+  "../../../descriptors/streams.bin",
+]
+
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "`member` needs a field of a record type, not `option<T>` or `list<T>`",
+]

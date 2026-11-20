@@ -247,6 +247,7 @@ fn resource_result_fields(
                     required: false,
                     origin: None,
                     flatten_in_api: false,
+                    proto_member: None,
                     function: None,
                     data: (),
                 },

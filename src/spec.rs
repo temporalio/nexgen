@@ -876,6 +876,9 @@ pub struct RecordFieldSpec<F: TypeFamily = AuthoredFamily> {
     pub origin: F::Origin,
     /// Set by `@nexus.flatten-in-api` on the field.
     pub flatten_in_api: bool,
+    /// Set by `member` on `@nexus.proto-field`. The field of this field's record that the proto
+    /// field holds, in the form of `RecordFieldSpec::name`.
+    pub proto_member: Option<String>,
     pub function: Option<FunctionFieldSpec<F>>,
     pub data: F::FieldData,
 }
@@ -1417,6 +1420,7 @@ impl<F: TypeFamily> RecordFieldSpec<F> {
             required: self.required,
             origin: map.map_origin(self.origin),
             flatten_in_api: self.flatten_in_api,
+            proto_member: self.proto_member,
             function: self.function.map(|function| function.map_names_with(map)),
             data,
         }

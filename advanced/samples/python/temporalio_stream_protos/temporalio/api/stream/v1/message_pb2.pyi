@@ -35,8 +35,7 @@ class StreamRef(_message.Message):
     """The name of the Store that holds the Stream, as the Worker and client config register it,
     so every process routes a ref it receives. With no name, the SDK picks the Store from its
     config. Only an SDK sets and reads it, since only the SDK knows the name that its config
-    gives a Store. A request carries the whole ref, and the server and a Store ignore this
-    field.
+    gives a Store. A request has only the id, so the server and a Store never see this field.
     """
     def __init__(
         self,

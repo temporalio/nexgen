@@ -33,7 +33,7 @@ import type { Stream } from "./resources";
 export const streamService = nexus.service(
   "temporal.api.streamservice.v1.StreamService",
   {
-    createStream: nexus.operation<CreateStreamRequest<any>, CreateStreamResult<any>>({
+    createStream: nexus.operation<CreateStreamRequest<any>, CreateStreamResult>({
       name: "CreateStream",
       inputType: { transferTypeConverter: createStreamRequestTransferTypeConverter },
       outputType: { transferTypeConverter: createStreamResultTransferTypeConverter },

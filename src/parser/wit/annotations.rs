@@ -149,7 +149,7 @@ const CATALOG: &[Annotation] = {
         Annotation {
             name: "proto-field",
             sites: &[Field],
-            keys: &["value"],
+            keys: &["value", "member"],
             language_keys: &[],
             repeatable: false,
             languages: None,

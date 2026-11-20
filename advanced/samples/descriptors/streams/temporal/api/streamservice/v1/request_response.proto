@@ -32,8 +32,8 @@ message CreateStreamRequest {
     // The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     // read it.
     string namespace = 1;
-    // Required. The ref of the Stream to create. Its id is the Stream id, and is never empty.
-    temporal.api.stream.v1.StreamRef stream_ref = 2;
+    // Required. The id of the Stream.
+    string stream_id = 2;
     // What the create does when the Stream exists. Unspecified is FAIL.
     temporal.api.enums.v1.StreamIdConflictPolicy id_conflict_policy = 3;
     // Unique for each create call, and the same on its retries. The Store keeps the request_id of
@@ -44,10 +44,6 @@ message CreateStreamRequest {
 // Experimental. Might change in the future.
 // The Stream that a create made or got.
 message CreateStreamResponse {
-    // The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
-    // Store that it picked, also when the request left the name empty. The server gives the ref
-    // back as the request had it, since it doesn't know that name.
-    temporal.api.stream.v1.StreamRef ref = 1;
     // False when USE_EXISTING got a Stream that existed.
     bool created = 2;
 }
@@ -59,8 +55,8 @@ message AppendRecordsRequest {
     // The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     // read it.
     string namespace = 1;
-    // Required.
-    temporal.api.stream.v1.StreamRef ref = 2;
+    // Required. The id of the Stream.
+    string stream_id = 2;
     // Required. The Producer of the batch. An append and a close of one Producer carry the same
     // Producer, so the Store orders each write the same way.
     temporal.api.stream.v1.Producer producer = 3;
@@ -84,8 +80,8 @@ message CloseStreamRequest {
     // The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     // read it.
     string namespace = 1;
-    // Required.
-    temporal.api.stream.v1.StreamRef ref = 2;
+    // Required. The id of the Stream.
+    string stream_id = 2;
     // Required. The Producer that closes the Stream.
     temporal.api.stream.v1.Producer producer = 3;
 }
@@ -102,8 +98,8 @@ message ReadRecordsRequest {
     // The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     // read it.
     string namespace = 1;
-    // Required.
-    temporal.api.stream.v1.StreamRef ref = 2;
+    // Required. The id of the Stream.
+    string stream_id = 2;
     // Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
     // Leave empty to read from the beginning. To read only new Records, a caller gets last_offset
     // from a describe and reads after it.
@@ -141,8 +137,8 @@ message DescribeStreamRequest {
     // The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
     // read it.
     string namespace = 1;
-    // Required.
-    temporal.api.stream.v1.StreamRef ref = 2;
+    // Required. The id of the Stream.
+    string stream_id = 2;
 }
 
 // Experimental. Might change in the future.

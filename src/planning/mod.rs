@@ -279,6 +279,12 @@ pub(crate) enum PlannedWireFieldBinding {
         wire_name: String,
         members: Vec<PlannedWireVariantMember>,
     },
+    /// The proto field holds one member of the model field's record.
+    Member {
+        wire_name: String,
+        member: String,
+        wire_type: PlannedType,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
