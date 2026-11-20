@@ -8,8 +8,7 @@ use crate::generator::python::{
     PythonFieldDefaultKind, PythonGeneratedName, PythonImports, RenderedField, RenderedModel,
     RenderedModelFragments, RenderedRecordWireBlock, RenderedVariant, ResolvedFieldKind,
     ResolvedFieldType, RootPackageImports, WireValueConversion, phantom_type_variable,
-    python_authored_type_annotation, python_field_name, python_string_literal,
-    render_python_docstring,
+    python_authored_type_annotation, python_string_literal, render_python_docstring,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -59,10 +58,11 @@ struct ProtoOneof {
     cases: Vec<ProtoOneofCase>,
 }
 
-/// The member of the field's record that the proto field holds.
+/// The support helpers that convert the model value and the proto field.
 #[derive(Debug, Clone)]
-struct ProtoMember {
-    attr_name: String,
+struct ProtoConversion {
+    from_proto: String,
+    to_proto: String,
     wire_type: PlannedType,
 }
 
@@ -70,7 +70,7 @@ struct ProtoMember {
 struct ProtoField {
     oneof: Option<ProtoOneof>,
     generic_carrier: Option<ProtoGenericCarrier>,
-    member: Option<ProtoMember>,
+    conversion: Option<ProtoConversion>,
 }
 
 #[derive(Debug, Default)]
@@ -334,11 +334,14 @@ impl ModelBackend {
             }
             _ => None,
         };
-        let member = match &field.data.wire_binding {
-            Some(PlannedWireFieldBinding::Member {
-                member, wire_type, ..
-            }) => Some(ProtoMember {
-                attr_name: python_field_name(member),
+        let conversion = match &field.data.wire_binding {
+            Some(PlannedWireFieldBinding::Converted {
+                wire_name,
+                wire_type,
+                conversion,
+            }) => Some(ProtoConversion {
+                from_proto: python_from_proto_converter(wire_name, conversion),
+                to_proto: python_to_proto_converter(wire_name, conversion),
                 wire_type: wire_type.clone(),
             }),
             _ => None,
@@ -346,7 +349,7 @@ impl ModelBackend {
         Ok(ProtoField {
             oneof,
             generic_carrier,
-            member,
+            conversion,
         })
     }
 
@@ -689,18 +692,30 @@ fn field_read(
     field: &RecordFieldSpec<PlannedFamily>,
     resolved_value_type: &ResolvedFieldType,
     generic_carrier: Option<ProtoGenericCarrier>,
+    conversion: Option<&ProtoConversion>,
     type_arguments: &[(String, String)],
     policy: WireReadPolicy,
 ) -> RenderedWireRead {
     let proto_expr = format!("value.{proto_name}");
-    let value_expr = match generic_carrier {
-        Some(carrier) => generic_carrier_from_proto_expr(
+    let value_expr = match (conversion, generic_carrier) {
+        // The helper gets the model type, so it builds the class and the type argument of this
+        // package, which the support package can't know.
+        (Some(conversion), _) => cast_to_annotation(
+            resolved_value_type,
+            type_arguments,
+            format!(
+                "{}({proto_expr}, {})",
+                conversion.from_proto,
+                concrete_type_hint(&resolved_value_type.annotation, type_arguments)
+            ),
+        ),
+        (None, Some(carrier)) => generic_carrier_from_proto_expr(
             carrier,
             resolved_value_type,
             &proto_expr,
             type_arguments,
         ),
-        None => match &field.field_type {
+        (None, None) => match &field.field_type {
             PlannedType::Map(_, _) => {
                 map_value_from_proto_expr(resolved_value_type, proto_name, type_arguments)
             }
@@ -710,6 +725,8 @@ fn field_read(
             _ => from_proto_value_expr(resolved_value_type, &proto_expr, type_arguments),
         },
     };
+    // The empty check is on the proto field, since the model type is not the type of its value.
+    let checked_type = conversion.map_or(&field.field_type, |conversion| &conversion.wire_type);
 
     let mut read = match policy {
         WireReadPolicy::Required {
@@ -721,7 +738,7 @@ fn field_read(
                 setup_lines.push(format!("if not value.HasField(\"{proto_name}\"):"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
             } else if check_empty
-                && matches!(&field.field_type, PlannedType::String | PlannedType::Bytes)
+                && matches!(checked_type, PlannedType::String | PlannedType::Bytes)
             {
                 setup_lines.push(format!("if not value.{proto_name}:"));
                 setup_lines.push(format!("    raise ValueError({missing_error})"));
@@ -744,43 +761,6 @@ fn field_read(
         read.setup_lines = checks;
     }
     read
-}
-
-/// Builds the record from the member alone. Every other field of the record stays unset.
-fn member_field_read(
-    proto_name: &str,
-    field: &RecordFieldSpec<PlannedFamily>,
-    resolved_value_type: &ResolvedFieldType,
-    member: &ProtoMember,
-    type_arguments: &[(String, String)],
-    policy: WireReadPolicy,
-) -> RenderedWireRead {
-    let proto_expr = format!("value.{proto_name}");
-    let mut setup_lines = Vec::new();
-    if let WireReadPolicy::Required {
-        missing_error,
-        check_empty,
-    } = &policy
-    {
-        if field_has_proto_presence(field) {
-            setup_lines.push(format!("if not value.HasField(\"{proto_name}\"):"));
-            setup_lines.push(format!("    raise ValueError({missing_error})"));
-        } else if *check_empty
-            && matches!(member.wire_type, PlannedType::String | PlannedType::Bytes)
-        {
-            setup_lines.push(format!("if not {proto_expr}:"));
-            setup_lines.push(format!("    raise ValueError({missing_error})"));
-        }
-    }
-    let constructed = format!(
-        "{}({}={proto_expr})",
-        concrete_type_hint(&resolved_value_type.annotation, type_arguments),
-        member.attr_name
-    );
-    RenderedWireRead {
-        setup_lines,
-        expr: cast_to_annotation(resolved_value_type, type_arguments, constructed),
-    }
 }
 
 fn field_write(
@@ -1500,17 +1480,6 @@ fn field_read_for_rendered_field(
             ),
         );
     }
-    let policy = field_read_policy(model_name, planned_field, rendered_field);
-    if let Some(member) = &proto_field.member {
-        return member_field_read(
-            field_name,
-            planned_field,
-            &rendered_field.wire_value_type,
-            member,
-            type_arguments,
-            policy,
-        );
-    }
     field_read(
         model_name,
         field_name,
@@ -1518,8 +1487,9 @@ fn field_read_for_rendered_field(
         planned_field,
         &rendered_field.wire_value_type,
         proto_field.generic_carrier,
+        proto_field.conversion.as_ref(),
         type_arguments,
-        policy,
+        field_read_policy(model_name, planned_field, rendered_field),
     )
 }
 
@@ -1540,13 +1510,17 @@ fn field_write_for_rendered_field(
             ),
         );
     }
-    if let Some(member) = &proto_field.member {
-        return RenderedWireWrite {
-            lines: vec![format!(
-                "message.{field_name} = {value_expr}.{}",
-                member.attr_name
-            )],
+    if let Some(conversion) = &proto_field.conversion {
+        let converted = format!("{}({value_expr})", conversion.to_proto);
+        let line = if matches!(
+            conversion.wire_type,
+            PlannedType::External(ExternalTypeSpec::Proto(PlannedProtoType::Message(_)))
+        ) {
+            format!("message.{field_name}.CopyFrom({converted})")
+        } else {
+            format!("message.{field_name} = {converted}")
         };
+        return RenderedWireWrite { lines: vec![line] };
     }
     let optional_guard = matches!(rendered_field.default_kind, PythonFieldDefaultKind::None);
     let converter = planned_field

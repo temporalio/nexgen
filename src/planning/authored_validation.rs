@@ -529,14 +529,7 @@ fn validate_message_model_config(
         usage,
         language,
     )?;
-    validate_authored_field_types(
-        spec,
-        message_name,
-        model_config,
-        message,
-        &oneofs,
-        descriptors,
-    )?;
+    validate_authored_field_types(message_name, model_config, message, &oneofs, descriptors)?;
     validate_invocation_fields(message_name, model_config, message, descriptors, usage)?;
     for (field_name, _) in model_config
         .record
@@ -704,7 +697,6 @@ fn validate_record_fields(
 }
 
 fn validate_authored_field_types(
-    spec: &ApiSpec,
     message_name: &str,
     model_config: ModelConfig<'_>,
     message: &MessageMetadata,
@@ -726,18 +718,8 @@ fn validate_authored_field_types(
         if model_config.is_field_omitted(field_name) {
             continue;
         }
-
-        if let Some(member) = &field_spec.proto_member {
-            validate_proto_member(
-                spec,
-                model_config.language,
-                message_name,
-                field_name,
-                &field_spec.field_type,
-                member,
-                field,
-                descriptors,
-            )?;
+        // The helper converts, and the compiler of the target language checks the helper.
+        if field_spec.conversion.is_some() {
             continue;
         }
 
@@ -969,82 +951,6 @@ fn validate_invocation_args_field(
         property,
         reason: "argsField must point to temporal.api.common.v1.Payloads".to_string(),
     })
-}
-
-/// The proto field holds one member of the record. The conversion from the proto sets only
-/// that member, so every other field must be optional.
-#[allow(clippy::too_many_arguments)]
-fn validate_proto_member(
-    spec: &ApiSpec,
-    language: Language,
-    message_name: &str,
-    field_name: &str,
-    authored_type: &TypeSpec,
-    member: &str,
-    field: &FieldDescriptorProto,
-    descriptors: &DescriptorIndex,
-) -> Result<()> {
-    let invalid = |reason: String| Error::InvalidTypeOverrideField {
-        message: message_name.to_string(),
-        field: field_name.to_string(),
-        property: "member",
-        reason,
-    };
-    let record = match authored_type.validation_type() {
-        TypeSpec::Record(record_name) => spec.record(record_name.as_str()),
-        TypeSpec::External(ExternalTypeSpec::Proto(proto_name)) => {
-            spec.record_for_proto(proto_name.as_str())
-        }
-        _ => None,
-    }
-    .ok_or_else(|| invalid("the field type is not a record".to_string()))?;
-    // A field that the model doesn't have can't be the member.
-    let model = ModelConfig::from_record(record, language);
-    let Some((_, member_field)) = record
-        .fields
-        .iter()
-        .find(|(key, candidate)| candidate.name == member && !model.is_field_hidden(key))
-    else {
-        return Err(invalid(format!(
-            "record `{}` has no field `{member}`",
-            record.name
-        )));
-    };
-    if !member_field.required {
-        return Err(invalid(format!(
-            "member `{member}` must be required, not `{}`",
-            member_field.field_type.to_type_string()
-        )));
-    }
-    if !matches!(
-        member_field.field_type.validation_type(),
-        TypeSpec::Bool | TypeSpec::Int(_) | TypeSpec::Float | TypeSpec::String | TypeSpec::Bytes
-    ) {
-        return Err(invalid(format!(
-            "member `{member}` must be a string, bool, integer, float or bytes, not `{}`",
-            member_field.field_type.to_type_string()
-        )));
-    }
-    if !authored_field_matches_proto(&member_field.field_type, field, descriptors)? {
-        return Err(invalid(format!(
-            "member `{member}` has type `{}`, but proto field `{}` has type `{}`",
-            member_field.field_type.to_type_string(),
-            field.name.as_deref().unwrap_or(field_name),
-            proto_field_type_string(field, descriptors)?,
-        )));
-    }
-    if let Some(required) = record
-        .fields
-        .values()
-        .find(|candidate| candidate.name != member && candidate.required)
-    {
-        return Err(invalid(format!(
-            "field `{}` of record `{}` must be `option<T>`, since the conversion from the proto \
-             sets only member `{member}`",
-            required.name, record.name
-        )));
-    }
-    Ok(())
 }
 
 fn validate_authored_field_type(

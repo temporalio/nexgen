@@ -151,7 +151,10 @@ interface stream-service {
     // The field is called ref, so the created Stream takes its ref from the request. The
     // response has none.
     /// @nexus.doc "The ref of the Stream to create. Its id is the Stream id."
-    /// @nexus.proto-field "stream_id" member="id"
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+    ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     /// @nexus.flatten-in-api
     ref: stream-ref,
     /// @nexus.doc "What the create does when the Stream exists. Unspecified is fail."
@@ -188,7 +191,10 @@ interface stream-service {
   ///   "Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence."
   /// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
   record append-records-request {
-    /// @nexus.proto-field "stream_id" member="id"
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+    ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
     records: list<append-record>,
     // A call can pass its own Producer. A call that passes none gets the default, which the
@@ -219,7 +225,10 @@ interface stream-service {
   /// @nexus.doc "Close a Stream. Readers drain what is left, then end. Later appends are refused."
   /// @nexus.proto "temporal.api.streamservice.v1.CloseStreamRequest"
   record close-stream-request {
-    /// @nexus.proto-field "stream_id" member="id"
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+    ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
     /// @nexus.doc
     ///   "The Producer that closes the Stream. Defaults to the Producer of the calling context."
@@ -240,7 +249,10 @@ interface stream-service {
   /// @nexus.doc "Read Records after an offset."
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
   record read-records-request {
-    /// @nexus.proto-field "stream_id" member="id"
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+    ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
     // To read only new Records, a caller gets last-offset from a describe and reads after it.
     /// @nexus.doc "Read after this offset. Empty is the beginning. A too high offset fails."
@@ -267,7 +279,10 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.streamservice.v1.DescribeStreamRequest"
   record describe-stream-request {
-    /// @nexus.proto-field "stream_id" member="id"
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+    ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
     // Native only. The SDK sets it, and the SDK Stores don't read it.
     /// @nexus.omit

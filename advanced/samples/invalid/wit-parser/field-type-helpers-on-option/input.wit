@@ -1,0 +1,19 @@
+package test:field-type-helpers-on-option@1.0.0;
+
+world system { export stream-service; }
+
+/// @nexus.endpoint "streams"
+interface stream-service {
+  /// @nexus.proto "acme.streams.v1.StreamRef"
+  record stream-ref {
+    id: string,
+  }
+
+  /// @nexus.proto "acme.streams.v1.Request"
+  record request {
+    // A helper converts a whole value, so an optional field has none.
+    /// @nexus.proto-field "stream_id"
+    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    ref: option<stream-ref>,
+  }
+}

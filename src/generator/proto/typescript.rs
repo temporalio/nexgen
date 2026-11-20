@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use heck::ToLowerCamelCase;
 use prost_types::FieldDescriptorProto;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
     RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
@@ -31,6 +31,20 @@ impl ExternalModelBackend for ModelBackend {
     type WireConversion = WireValueConversion;
 
     fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
+        for (_, record) in api_plan.records() {
+            for (field_name, field) in &record.fields {
+                if let Some(PlannedWireFieldBinding::Converted { .. }) = &field.data.wire_binding {
+                    return Err(Error::InvalidTypeOverrideField {
+                        message: record.name.clone(),
+                        field: field_name.clone(),
+                        property: "type",
+                        reason:
+                            "a field with conversion helpers is not generated for TypeScript yet"
+                                .to_string(),
+                    });
+                }
+            }
+        }
         self.enum_conversions = api_plan
             .enums()
             .filter_map(|(name, model)| {
@@ -185,44 +199,6 @@ fn generic_carrier_expressions(
     Some((from_wire_expr, to_wire_expr))
 }
 
-/// Builds the record from the member alone. Every other member stays unset.
-fn member_expressions(
-    record: &RecordSpec<PlannedFamily>,
-    field: &RecordFieldSpec<PlannedFamily>,
-    generated_field_name: &str,
-    wire_field_expr: &str,
-    resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
-) -> Option<(String, String)> {
-    let PlannedWireFieldBinding::Member {
-        member, wire_type, ..
-    } = field.data.wire_binding.as_ref()?
-    else {
-        return None;
-    };
-    let member = typescript_generated_field_name(member);
-    let scalar = RecordFieldSpec {
-        field_type: wire_type.clone(),
-        ..field.clone()
-    };
-    let member_value = required_from_wire_expr(
-        &resolve_type(wire_type),
-        &record.name,
-        wire_field_expr,
-        generated_field_name,
-        &scalar,
-    );
-    let from_wire_expr = format!("{{ {member}: {member_value} }}");
-    let to_wire_expr = format!(
-        "{}.{member}",
-        required_field_expr(
-            &format!("model.{generated_field_name}"),
-            &record.name,
-            generated_field_name,
-        )
-    );
-    Some((from_wire_expr, to_wire_expr))
-}
-
 /// Bind only the parameters used by the nested record. Parameter identity is
 /// shared across records, but the nested converter may use a subset or order.
 fn bind_nested_type_info(
@@ -354,14 +330,6 @@ fn model_wire_fields<'a>(
             let wire_expr = format!("{{wire}}.{}", rendered.wire_name);
             if let Some((from_wire, to_wire)) =
                 generic_carrier_expressions(record, field, &rendered.name, &wire_expr)
-            {
-                let mut wire_field = rendered.clone();
-                wire_field.from_wire_expr = from_wire;
-                wire_field.to_wire_expr = to_wire;
-                return ModelWireField::Value(Cow::Owned(wire_field));
-            }
-            if let Some((from_wire, to_wire)) =
-                member_expressions(record, field, &rendered.name, &wire_expr, resolve_type)
             {
                 let mut wire_field = rendered.clone();
                 wire_field.from_wire_expr = from_wire;

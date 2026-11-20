@@ -1190,9 +1190,6 @@ fn build_fields_from_record(
             });
         }
 
-        let proto_member =
-            build_proto_member(resolve, field, &directives, path, &field_context, language)?;
-
         if omit_directive.is_some() {
             for conflicting_directive in [
                 "source",
@@ -1245,7 +1242,7 @@ fn build_fields_from_record(
                         ..Default::default()
                     },
                     flatten_in_api: false,
-                    proto_member: None,
+                    conversion: None,
                     function: None,
                     data: (),
                 },
@@ -1303,6 +1300,8 @@ fn build_fields_from_record(
             .map(directive_language_string);
         let function =
             build_function_field(resolve, owner, &directives, path, &field_context, language)?;
+        let conversion =
+            build_field_conversion(resolve, field, &directives, path, &field_context, language)?;
 
         if sourced && function.is_some() {
             return Err(Error::ConflictingTypeOverrideFieldProperties {
@@ -1324,7 +1323,7 @@ fn build_fields_from_record(
                 required,
                 origin,
                 flatten_in_api,
-                proto_member,
+                conversion,
                 function,
                 data: (),
             },
@@ -1357,7 +1356,7 @@ fn build_fields_from_record(
                         required: arg_field.required,
                         origin: Default::default(),
                         flatten_in_api: false,
-                        proto_member: None,
+                        conversion: None,
                         function: None,
                         data: (),
                     },
@@ -1750,78 +1749,85 @@ fn record_field_key(
     )
 }
 
-/// Returns the member of the field's record that the proto field holds, in the form of
-/// `RecordFieldSpec::name`, so planning finds it in the record.
-fn build_proto_member(
+/// The helpers of `<lang>-to` and `<lang>-from` on the `@nexus.type` of a record field, when the
+/// current language has them. A field with helpers keeps its WIT type, and they convert it.
+fn build_field_conversion(
     resolve: &Resolve,
     field: &Field,
     directives: &[Directive],
     path: &Path,
     field_context: &str,
     language: Language,
-) -> Result<Option<String>> {
-    let Some(member) = directive_value(directives, "proto-field", path, field_context, "member")?
-    else {
+) -> Result<Option<TypeReplacementSpec>> {
+    let Some(type_directive) = directive(directives, "type", path, field_context)? else {
         return Ok(None);
     };
+    let from_proto = directive_prefixed_language_string(type_directive, "from");
+    let to_proto = directive_prefixed_language_string(type_directive, "to");
+    if from_proto.is_empty() && to_proto.is_empty() {
+        return Ok(None);
+    }
     let invalid = |reason: String| Error::InvalidWitDirective {
         path: path.to_path_buf(),
         context: field_context.to_string(),
-        directive: "@nexus.proto-field".to_string(),
+        directive: "@nexus.type".to_string(),
         reason,
     };
-    for conflicting_directive in ["omit", "function", "type", "flattened-type"] {
-        if directives
-            .iter()
-            .any(|directive| directive.name() == conflicting_directive)
-        {
-            return Err(invalid(format!(
-                "`member` cannot be combined with `@nexus.{conflicting_directive}`"
-            )));
+    // Each language is checked, so a WIT file is valid for every target or for none.
+    for helper_language in [Language::Python, Language::TypeScript, Language::Dotnet] {
+        let key = language_key(helper_language);
+        match (
+            from_proto.by_language.contains_key(&helper_language),
+            to_proto.by_language.contains_key(&helper_language),
+        ) {
+            (true, false) => return Err(invalid(format!("`{key}-from` needs `{key}-to`"))),
+            (false, true) => return Err(invalid(format!("`{key}-to` needs `{key}-from`"))),
+            _ => {}
         }
     }
-
-    let not_a_record =
-        || invalid("`member` needs a field of a record type, not `option<T>` or `list<T>`".into());
-    let mut ty = field.ty;
-    let (record_name, record) = loop {
-        let Type::Id(id) = ty else {
-            return Err(not_a_record());
-        };
-        match &resolve.types[id].kind {
-            TypeDefKind::Type(next) => ty = *next,
-            TypeDefKind::Record(record) => break (&resolve.types[id], record),
-            _ => return Err(not_a_record()),
-        }
-    };
-    let record_context = format!(
-        "{field_context} type `{}`",
-        record_name.name.as_deref().unwrap_or("unnamed-type")
-    );
-    let record_directives =
-        parse_directives(record_name.docs.contents.as_deref(), path, &record_context)?;
-    if directive(&record_directives, "flatten-in-api", path, &record_context)?.is_some() {
+    if directive(directives, "function", path, field_context)?.is_some() {
         return Err(invalid(
-            "`member` cannot be used when the record has `@nexus.flatten-in-api`".to_string(),
+            "conversion helpers cannot be combined with `@nexus.function`".to_string(),
         ));
     }
-
-    let Some(member_field) = record
-        .fields
-        .iter()
-        .find(|candidate| candidate.name == member)
-    else {
-        return Ok(Some(member));
-    };
-    let member_context = format!("{record_context} field `{}`", member_field.name);
-    let member_directives =
-        parse_directives(member_field.docs.contents.as_deref(), path, &member_context)?;
-    Ok(Some(
-        directive(&member_directives, "name", path, &member_context)?
-            .and_then(|directive| directive_language_value(directive, language))
-            .unwrap_or(&member_field.name)
-            .to_string(),
-    ))
+    if is_optional_type(resolve, &field.ty) || is_list_type(resolve, &field.ty) {
+        return Err(invalid(
+            "conversion helpers cannot be used on an `option<T>` or `list<T>` field".to_string(),
+        ));
+    }
+    let mut ty = field.ty;
+    while let Type::Id(id) = ty {
+        let type_def = &resolve.types[id];
+        match &type_def.kind {
+            TypeDefKind::Type(next) => ty = *next,
+            TypeDefKind::Record(_) => {
+                let record_context = format!(
+                    "{field_context} type `{}`",
+                    type_def.name.as_deref().unwrap_or("unnamed-type")
+                );
+                let record_directives =
+                    parse_directives(type_def.docs.contents.as_deref(), path, &record_context)?;
+                if directive(&record_directives, "flatten-in-api", path, &record_context)?.is_some()
+                {
+                    return Err(invalid(
+                        "conversion helpers cannot be used when the record has \
+                         `@nexus.flatten-in-api`"
+                            .to_string(),
+                    ));
+                }
+                break;
+            }
+            _ => break,
+        }
+    }
+    if from_proto.for_language(language).is_none() {
+        return Ok(None);
+    }
+    Ok(Some(TypeReplacementSpec {
+        type_name: directive_language_string(type_directive),
+        from_proto,
+        to_proto,
+    }))
 }
 
 fn find_wit_record_name_for_type(resolve: &Resolve, ty: &Type) -> Option<String> {
@@ -4015,6 +4021,13 @@ impl Directive {
 
     pub(crate) fn value(&self, key: &str) -> Option<&str> {
         self.args.get(key).map(String::as_str)
+    }
+
+    /// Whether the directive has a conversion helper of a language, such as `python-to`.
+    pub(crate) fn has_conversion_helper(&self) -> bool {
+        self.args
+            .keys()
+            .any(|key| key.ends_with("-to") || key.ends_with("-from"))
     }
 }
 

@@ -810,7 +810,7 @@ fn add_message_reconciles_missing_proto_field_without_replacing_type_parameters(
 }
 
 #[test]
-fn add_message_keeps_a_field_with_a_proto_field_member() {
+fn add_message_keeps_a_field_with_conversion_helpers() {
     let root = project_root();
     let descriptors = [
         descriptor_path(&root),
@@ -818,17 +818,18 @@ fn add_message_keeps_a_field_with_a_proto_field_member() {
     ];
     let source =
         fs::read_to_string(root.join("advanced/samples/inputs/stream-service.wit")).unwrap();
-    let input_path = write_temp_wit("add-message-member", &source);
+    let input_path = write_temp_wit("add-message-conversion", &source);
     let rendered = add_message_to_string(
         &descriptors,
         "temporal.api.streamservice.v1.AppendRecordsRequest",
         &[input_path, linked_inputs_path(&root)],
     )
     .unwrap();
-    // The type of `ref` is its record, so the descriptor's `string` doesn't apply.
-    assert!(record_block(&rendered, "append-records-request").contains(
-        "    /// @nexus.proto-field \"stream_id\" member=\"id\"\n    ref: stream-ref,\n"
-    ));
+    // The helpers convert `ref`, so the descriptor's `string` doesn't apply to its type.
+    assert!(
+        record_block(&rendered, "append-records-request")
+            .contains("    /// @nexus.type python-to=\"stream_ref_to_id\"")
+    );
     assert_eq!(rendered, source);
 }
 

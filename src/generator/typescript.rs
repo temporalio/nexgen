@@ -2368,7 +2368,7 @@ fn collect_typescript_language_imports(api_plan: &PlannedSpec) -> Vec<LanguageIm
             match &field.data.wire_binding {
                 Some(
                     PlannedWireFieldBinding::Value { wire_type, .. }
-                    | PlannedWireFieldBinding::Member { wire_type, .. },
+                    | PlannedWireFieldBinding::Converted { wire_type, .. },
                 ) => {
                     collect_value_type_imports(wire_type, &mut imports);
                 }

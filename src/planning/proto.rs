@@ -263,12 +263,12 @@ pub(super) fn planned_record_field_data(
     let wire_binding = match record
         .fields
         .get(field_name)
-        .and_then(|authored_field| authored_field.proto_member.clone())
+        .and_then(|authored_field| authored_field.conversion.as_ref())
     {
-        Some(member) => PlannedWireFieldBinding::Member {
+        Some(conversion) => PlannedWireFieldBinding::Converted {
             wire_name,
-            member,
             wire_type,
+            conversion: materialize_selected_replacement(conversion),
         },
         None => PlannedWireFieldBinding::Value {
             wire_name,
@@ -294,7 +294,7 @@ pub(super) fn planned_record_field_type(
         return Some(planner.planned_type_from_authored(authored_type));
     };
     if record.fields.get(field_name).is_some_and(|authored_field| {
-        authored_field.proto_member.is_some()
+        authored_field.conversion.is_some()
             || matches!(
                 authored_field.field_type.without_option().validation_type(),
                 TypeSpec::TypeParameter(_)

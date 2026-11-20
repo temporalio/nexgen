@@ -54,3 +54,13 @@ def request_id() -> str:
     if temporalio.workflow.in_workflow():
         return str(temporalio.workflow.uuid4())
     return str(uuid.uuid4())
+
+
+def stream_ref_to_id(ref: typing.Any) -> str:
+    """The Stream id of a ref, which is all that a request message holds."""
+    return typing.cast(str, ref.id)
+
+
+def stream_ref_from_id(id: str, model_type: typing.Any) -> typing.Any:
+    """A ref with the Stream id, of the model type of the caller. A message has no Store name."""
+    return model_type(id=id)

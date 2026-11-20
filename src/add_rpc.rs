@@ -77,7 +77,7 @@ struct LinkedRecordFieldMetadata {
     type_expr: String,
     explicit_proto_field: bool,
     omitted: bool,
-    has_member: bool,
+    has_conversion: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -413,14 +413,9 @@ fn load_linked_wit_metadata_from_inputs(input_paths: &[PathBuf]) -> Result<Linke
                             &field_context,
                             "value",
                         )?;
-                        let has_member = directive_value(
-                            &field_directives,
-                            "proto-field",
-                            &origin_path,
-                            &field_context,
-                            "member",
-                        )?
-                        .is_some();
+                        let has_conversion =
+                            directive(&field_directives, "type", &origin_path, &field_context)?
+                                .is_some_and(|directive| directive.has_conversion_helper());
                         let field_proto_name = explicit_proto_name
                             .clone()
                             .unwrap_or_else(|| field.name.replace('-', "_"));
@@ -437,7 +432,7 @@ fn load_linked_wit_metadata_from_inputs(input_paths: &[PathBuf]) -> Result<Linke
                                     &field_context,
                                 )?
                                 .is_some(),
-                                has_member,
+                                has_conversion,
                             },
                         );
                     }
@@ -683,7 +678,7 @@ impl ExistingInterface {
             if let TypeDefKind::Record(record) = &type_def.kind {
                 records_by_proto.insert(
                     proto_name,
-                    ExistingRecord::from_resolve(resolve, type_name, record),
+                    ExistingRecord::from_resolve(resolve, type_name, record, path, &context)?,
                 );
             }
         }
@@ -775,11 +770,21 @@ struct ExistingRecord {
 }
 
 impl ExistingRecord {
-    fn from_resolve(resolve: &Resolve, wit_name: &str, record: &Record) -> Self {
+    fn from_resolve(
+        resolve: &Resolve,
+        wit_name: &str,
+        record: &Record,
+        path: &Path,
+        context: &str,
+    ) -> Result<Self> {
         let mut fields = BTreeMap::new();
         for field in &record.fields {
             let docs = field.docs.contents.as_deref();
-            let (explicit_proto_name, has_member) = proto_field_from_docs(docs);
+            let field_context = format!("{context} field `{}`", field.name);
+            let field_directives = parse_directives(docs, path, &field_context)?;
+            let has_conversion = directive(&field_directives, "type", path, &field_context)?
+                .is_some_and(|directive| directive.has_conversion_helper());
+            let explicit_proto_name = proto_field_name_from_docs(docs);
             let proto_name = explicit_proto_name
                 .clone()
                 .unwrap_or_else(|| field.name.replace('-', "_"));
@@ -790,15 +795,15 @@ impl ExistingRecord {
                     type_expr: render_wit_type(resolve, &field.ty),
                     explicit_proto_field: explicit_proto_name.is_some(),
                     omitted: field_has_omit_directive(docs),
-                    has_member,
+                    has_conversion,
                 },
             );
         }
 
-        Self {
+        Ok(Self {
             wit_name: wit_name.to_string(),
             fields,
-        }
+        })
     }
 }
 
@@ -808,8 +813,8 @@ struct ExistingField {
     type_expr: String,
     explicit_proto_field: bool,
     omitted: bool,
-    /// A field with `member` has the type of its record. The generator checks the member's type.
-    has_member: bool,
+    /// Conversion helpers on `@nexus.type` make the field keep its WIT type, not the proto type.
+    has_conversion: bool,
 }
 
 struct ProtoWitBuilder<'a> {
@@ -1094,7 +1099,7 @@ impl<'a> ProtoWitBuilder<'a> {
             missing.push(expected.line.clone());
             return Ok(());
         };
-        if existing.omitted || existing.has_member {
+        if existing.omitted || existing.has_conversion {
             return Ok(());
         }
         if self.field_uses_type_parameter(&existing.type_expr, field) {
@@ -1231,7 +1236,7 @@ impl<'a> ProtoWitBuilder<'a> {
                                     type_expr: field.type_expr.clone(),
                                     explicit_proto_field: field.explicit_proto_field,
                                     omitted: field.omitted,
-                                    has_member: field.has_member,
+                                    has_conversion: field.has_conversion,
                                 },
                             )
                         })
@@ -1549,7 +1554,7 @@ impl<'a> ProtoWitBuilder<'a> {
                         type_expr: format!("option<{name}>"),
                         explicit_proto_field: false,
                         omitted: false,
-                        has_member: false,
+                        has_conversion: false,
                     },
                 )]),
             };
@@ -2248,23 +2253,17 @@ fn collect_used_type_names(interface_source: &str) -> BTreeSet<String> {
     used_names
 }
 
-/// The proto field name that `@nexus.proto-field` gives, and whether the directive has `member`.
-fn proto_field_from_docs(docs: Option<&str>) -> (Option<String>, bool) {
-    for line in docs.into_iter().flat_map(str::lines) {
+/// The first quoted value of `@nexus.proto-field`, which is the proto field name.
+fn proto_field_name_from_docs(docs: Option<&str>) -> Option<String> {
+    for line in docs?.lines() {
         let Some(rest) = line.trim().strip_prefix("@nexus.proto-field") else {
             continue;
         };
-        let rest = rest.trim();
-        let (name, arguments) = match rest
-            .strip_prefix('"')
-            .and_then(|quoted| quoted.split_once('"'))
-        {
-            Some((name, arguments)) => (Some(name.to_string()), arguments),
-            None => (None, rest),
-        };
-        return (name, arguments.trim_start().starts_with("member="));
+        if let Some((name, _)) = rest.trim().strip_prefix('"')?.split_once('"') {
+            return Some(name.to_string());
+        }
     }
-    (None, false)
+    None
 }
 
 fn field_has_omit_directive(docs: Option<&str>) -> bool {
