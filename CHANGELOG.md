@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `@nexus.close` marks the method that ends a resource. Python calls it at the end of `async with`.
 - WIT records can explicitly declare generic dependencies with `@nexus.generic "body-t"`, including phantom parameters that add no wire fields. Dependencies propagate through containing models, operations, and resources; resource constructor fields no longer implicitly make records generic.
+- Generate Go notification-service models with generic success and source-context payloads, protobuf oneof conversion, and SDK transfer-type converters for models-only exports.
 - `@nexus.api-omit` on an operation hides that operation's public top-level function and its export for the named `targets` (default is every target). The operation stays registered, stays in the generated service, and stays bindable by resource methods, so it is reached through its resource.
 - In Python, a generic resource's ref takes the resource's type parameters, so `get_stream(ref)` infers the handle's type from a `StreamRef[Turn]` and reads `Turn` bodies. The ref carries its type argument in memory only, so its wire message, equality and repr do not change.
 - `@nexus.api-omit targets="workflow"` or `targets="client"` on a resource method leaves the method out of the resource class of that target, in Python, TypeScript and .NET. The operation stays in the service and in the other target. Without its `@nexus.close` method, the Python resource of that target is not a context manager. nexgen refuses the directive on a method without one target, and Go refuses a method omitted for the Workflow target.
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Python sample projects and generation validation now require Python 3.11 or newer, matching the current Temporal Python SDK.
+- Generated Go variants now document their marker methods and assert at compile time that each case implements the variant interface.
 
 ### :boom: Breaking Changes
 
