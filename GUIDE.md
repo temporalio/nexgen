@@ -1855,6 +1855,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.context-propagation`            | freestanding function                                                                         |
+| `@nexus.storage-target`                 | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
 | `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
