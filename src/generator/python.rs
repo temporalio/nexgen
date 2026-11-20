@@ -7099,13 +7099,18 @@ fn render_operation_registry_body(services: &[RenderedService<'_>]) -> String {
     output.push_str(
         "\n\n_SerializationContextFactory = collections.abc.Callable[\n    [_InputT], temporalio.converter.SerializationContext\n]\n",
     );
+    output.push_str(
+        "\n\n_StorageTargetFactory = collections.abc.Callable[\n    [_InputT], temporalio.converter.StorageDriverWorkflowInfo\n]\n",
+    );
     output.push_str("\n\nclass _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):\n");
     output.push_str(
-        "    def __init__(\n        self,\n        *,\n        operation: nexusrpc.Operation[_InputT, _OutputT],\n        serialization_context: _SerializationContextFactory[_InputT] | None = None,\n        storage_target: collections.abc.Callable[[_InputT], temporalio.converter.StorageDriverWorkflowInfo] | None = None,\n    ) -> None:\n",
+        "    def __init__(\n        self,\n        *,\n        operation: nexusrpc.Operation[_InputT, _OutputT],\n        serialization_context: _SerializationContextFactory[_InputT] | None = None,\n        storage_target: _StorageTargetFactory[_InputT] | None = None,\n    ) -> None:\n",
     );
     output.push_str("        self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation\n");
     output.push_str("        self.serialization_context: _SerializationContextFactory[_InputT] | None = serialization_context\n");
-    output.push_str("        self.storage_target: collections.abc.Callable[[_InputT], temporalio.converter.StorageDriverWorkflowInfo] | None = storage_target\n");
+    output.push_str(
+        "        self.storage_target: _StorageTargetFactory[_InputT] | None = storage_target\n",
+    );
     output.push_str("\n\n__nexus_operation_registry__: dict[tuple[str, str], _NexusOperationInfo[typing.Any, typing.Any]] = {\n");
     for service in services {
         for operation in &service.operations {
