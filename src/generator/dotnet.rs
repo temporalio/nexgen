@@ -353,22 +353,37 @@ impl<'a> ApiPlanner<'a> {
         if operations.is_empty() {
             return;
         }
+        let has_storage_target = operations
+            .iter()
+            .any(|(_, operation)| operation.storage_target.value().is_some());
 
         output.push_str("internal interface INexgenOperationInfo\n{\n");
         output.push_str("    OperationDefinition Operation { get; }\n\n");
         output.push_str("    Func<object, ISerializationContext>? SerializationContext { get; }\n");
+        if has_storage_target {
+            output
+                .push_str("\n    Func<object, IStorageDriverTargetInfo>? StorageTarget { get; }\n");
+        }
         output.push_str("}\n\n");
         output.push_str(
             "internal sealed class NexgenOperationInfo<TRequest, TResponse> : INexgenOperationInfo\n{\n",
         );
         output.push_str("    internal NexgenOperationInfo(\n");
         output.push_str("        OperationDefinition operation,\n");
-        output.push_str(
-            "        Func<TRequest, ISerializationContext>? serializationContext = null)\n",
-        );
+        output
+            .push_str("        Func<TRequest, ISerializationContext>? serializationContext = null");
+        if has_storage_target {
+            output.push_str(
+                ",\n        Func<TRequest, IStorageDriverTargetInfo>? storageTarget = null",
+            );
+        }
+        output.push_str(")\n");
         output.push_str("    {\n");
         output.push_str("        Operation = operation;\n");
         output.push_str("        SerializationContext = serializationContext;\n");
+        if has_storage_target {
+            output.push_str("        StorageTarget = storageTarget;\n");
+        }
         output.push_str("    }\n\n");
         output.push_str("    internal OperationDefinition Operation { get; }\n\n");
         output.push_str("    OperationDefinition INexgenOperationInfo.Operation => Operation;\n\n");
@@ -378,6 +393,12 @@ impl<'a> ApiPlanner<'a> {
         output.push_str(
             "\n    Func<object, ISerializationContext>? INexgenOperationInfo.SerializationContext => SerializationContext == null ? null : request => SerializationContext((TRequest)request);\n",
         );
+        if has_storage_target {
+            output.push_str(
+                "\n    internal Func<TRequest, IStorageDriverTargetInfo>? StorageTarget { get; }\n",
+            );
+            output.push_str("\n    Func<object, IStorageDriverTargetInfo>? INexgenOperationInfo.StorageTarget => StorageTarget == null ? null : request => StorageTarget((TRequest)request);\n");
+        }
         output.push_str("}\n\n");
 
         output.push_str("internal static class NexgenOperationRegistry\n{\n");
@@ -414,6 +435,13 @@ impl<'a> ApiPlanner<'a> {
                 output.push_str(",\n            serializationContext: ");
                 output.push_str(&qualify_dotnet_support_reference(
                     serialization_context,
+                    self.support_namespace,
+                ));
+            }
+            if let Some(storage_target) = operation.storage_target.value() {
+                output.push_str(",\n            storageTarget: ");
+                output.push_str(&qualify_dotnet_support_reference(
+                    storage_target,
                     self.support_namespace,
                 ));
             }
@@ -2903,7 +2931,13 @@ fn validate_dotnet_support_references(
 ) -> Result<()> {
     for service in &api_plan.services {
         for operation in &service.operations {
-            if let Some(reference) = operation.serialization_context.value() {
+            for reference in [
+                operation.serialization_context.value(),
+                operation.storage_target.value(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 validate_dotnet_support_reference(reference, support_namespace)?;
             }
         }
