@@ -122,7 +122,14 @@ architecture.
 
 - Update the architecture documentation when a pipeline boundary, ownership
   rule, or processing flow changes. JSON Schema architecture lives under
-  `specs/json-schema/`, especially `pipeline.md` and `PRINCIPLES.md`.
+  `specs/json-schema/`, especially `pipeline.md` and `PRINCIPLES.md`. Do not
+  update architecture documentation merely because a change adds a metadata
+  field, hook, helper, or generated API within the existing architecture.
+  Mapping implementation work onto existing components does not itself
+  constitute an architecture change. Before editing architecture docs, identify
+  the specific boundary, ownership rule, or processing flow that changes; if
+  none changes, leave those docs alone. Do not add paragraphs that only restate
+  existing responsibilities for the new feature.
 - Update `GUIDE.md` when WIT authoring or generated WIT-facing behavior changes.
 - For public-facing changes (CLI flags, generated APIs, or externally visible
   behavior), add a new fragment in `changelog/<category>/` instead of editing

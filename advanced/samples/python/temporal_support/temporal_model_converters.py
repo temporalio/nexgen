@@ -17,6 +17,7 @@ import temporalio.exceptions as temporalio_exceptions
 class SignalWithStartWorkflowModelRequest(typing.Protocol):
     namespace: str
     id: str
+    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]
 
 
 def retry_policy_from_proto(
@@ -93,6 +94,16 @@ def signal_with_start_workflow_serialization_context(
     return temporalio_converter.WorkflowSerializationContext(
         namespace=request.namespace,
         workflow_id=request.id,
+    )
+
+
+def signal_with_start_workflow_storage_target(
+    request: SignalWithStartWorkflowModelRequest,
+) -> temporalio_converter.StorageDriverWorkflowInfo:
+    return temporalio_converter.StorageDriverWorkflowInfo(
+        namespace=request.namespace,
+        id=request.id,
+        type=workflow_function_name(request.workflow),
     )
 
 
