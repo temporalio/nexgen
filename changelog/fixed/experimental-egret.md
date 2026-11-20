@@ -1,2 +1,0 @@
-Go now emits the SDK-style `NOTE: Experimental` on annotated records, variants, workflow functions and their options types, and corresponding facade declarations, even when there is no authored documentation.
-Go now emits `@nexus.doc` comments on unexported records, their fields, and sourced fields, as well as on resources and resource methods. Go facades also retain authored docs on resource and variant case aliases.
