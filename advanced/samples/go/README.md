@@ -6,12 +6,13 @@ ordinary Nexus samples and [`systemsupport/`](systemsupport/) for System Nexus
 samples. The workflow-service sample also generates a facade in
 `workflowservice_facade/`.
 
-The models-only `notificationservice/` package exposes generic completion
-requests and an empty acknowledgement response. Its SDK transfer converters
-encode success values and source context as Temporal payloads and convert
-failure cases to Temporal failures. `protooneof/` and `protogeneric/` exercise
-the same conversion paths with optional oneofs, nested generic records, and
-single-value `Payloads` carriers.
+The models-only notification sample generates System Nexus implementations in
+`notificationservice/` and unprefixed aliases in `notificationservice_facade/`
+without selecting a caller target. Its SDK transfer converters encode success
+values and source context as Temporal payloads and convert failure cases to
+Temporal failures. `protooneof/` and `protogeneric/` exercise related conversion
+paths with optional oneofs, nested generic records, and single-value `Payloads`
+carriers.
 
 ## Using the support package
 

@@ -497,9 +497,10 @@ TypeScript cases with a payload carry a `value` field. Cases without a payload
 do not.
 
 Go represents WIT variants as interfaces with an unexported marker method and a
-struct for each case. The marker method is not meant to be called. Generated
-compile-time assertions verify that every case struct implements the interface,
-including for all type arguments of a generic variant.
+struct for each case. Cases with a payload expose it in a documented `Value`
+field; cases without a payload are empty structs. The marker method is not meant
+to be called. Generated compile-time assertions verify that every case struct
+implements the interface, including for all type arguments of a generic variant.
 
 ### Results
 
@@ -1966,9 +1967,10 @@ Operation-bearing .NET WIT services use the module-derived namespace.
 `@nexus.facade go="<import-path>"`
 
 Generates a Go facade of type aliases, constants, and forwarding functions.
-Requires `--system-nexus`, `@nexus.namespace` for Go, and `--targets workflow`.
-Use `go=` in multi-language WIT files so the annotation is inactive for other
-languages:
+Requires `--system-nexus` and `@nexus.namespace` for Go. Interfaces with
+operations or resources also require `--targets workflow`. Models-only
+interfaces can generate a facade without any targets. Use `go=` in
+multi-language WIT files so the annotation is inactive for other languages:
 
 ```wit
 /// @nexus.namespace go="go.temporal.io/sdk/internal"
