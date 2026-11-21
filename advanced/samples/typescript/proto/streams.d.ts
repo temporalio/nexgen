@@ -9,7 +9,6 @@ declare module "@temporalio/proto" {
       STREAM_STATUS_UNSPECIFIED = 0,
       STREAM_STATUS_OPEN = 1,
       STREAM_STATUS_CLOSED = 2,
-      STREAM_STATUS_EXPIRED = 3,
     }
     enum StreamIdConflictPolicy {
       STREAM_ID_CONFLICT_POLICY_UNSPECIFIED = 0,
@@ -22,17 +21,14 @@ declare module "@temporalio/proto" {
       STREAM_ERROR_REASON_EXPIRED = 2,
       STREAM_ERROR_REASON_CLOSED = 3,
       STREAM_ERROR_REASON_FENCED = 4,
-      STREAM_ERROR_REASON_SEQUENCE_TOO_LOW = 5,
-      STREAM_ERROR_REASON_SEQ_DIVERGENT = 6,
-      STREAM_ERROR_REASON_NOT_OWNER = 7,
-      STREAM_ERROR_REASON_FORMAT_TOO_NEW = 8,
-      STREAM_ERROR_REASON_OFFSET_TOO_HIGH = 9,
-      STREAM_ERROR_REASON_TOO_LARGE = 10,
-      STREAM_ERROR_REASON_INVALID = 11,
-      STREAM_ERROR_REASON_STORAGE_UNAVAILABLE = 12,
-      STREAM_ERROR_REASON_UNSUPPORTED = 13,
-      STREAM_ERROR_REASON_ALREADY_EXISTS = 14,
-      STREAM_ERROR_REASON_STORAGE_CORRUPT = 15,
+      STREAM_ERROR_REASON_FORMAT_TOO_NEW = 5,
+      STREAM_ERROR_REASON_OFFSET_TOO_HIGH = 6,
+      STREAM_ERROR_REASON_TOO_LARGE = 7,
+      STREAM_ERROR_REASON_INVALID_ARGUMENT = 8,
+      STREAM_ERROR_REASON_STORE_UNAVAILABLE = 9,
+      STREAM_ERROR_REASON_UNSUPPORTED = 10,
+      STREAM_ERROR_REASON_ALREADY_EXISTS = 11,
+      STREAM_ERROR_REASON_STORE_CORRUPT = 12,
     }
   }
 
@@ -42,38 +38,54 @@ declare module "@temporalio/proto" {
       id?: string | null;
       store?: string | null;
     }
-    interface IWorkflowTaskEpoch {
+    interface IWorkflowTaskAttempt {
       startedEventId?: Long | null;
       attempt?: number | null;
       startedTime?: google.protobuf.ITimestamp | null;
     }
-    interface ILocalActivityEpoch {
-      task?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
+    interface ILocalActivityAttempt {
+      task?: temporal.api.stream.v1.IWorkflowTaskAttempt | null;
       attempt?: number | null;
     }
-    interface IActivityEpoch {
+    interface IActivityAttempt {
       attemptScheduledTime?: google.protobuf.ITimestamp | null;
       attempt?: number | null;
     }
     interface IWorkflowProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
       runId?: string | null;
-      epoch?: temporal.api.stream.v1.IWorkflowTaskEpoch | null;
+      attempt?: temporal.api.stream.v1.IWorkflowTaskAttempt | null;
     }
     interface ILocalActivityProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
       runId?: string | null;
-      epoch?: temporal.api.stream.v1.ILocalActivityEpoch | null;
+      activityId?: string | null;
+      attempt?: temporal.api.stream.v1.ILocalActivityAttempt | null;
     }
-    interface IActivityProducer {
+    interface IWorkflowActivityProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
       runId?: string | null;
-      epoch?: temporal.api.stream.v1.IActivityEpoch | null;
+      activityId?: string | null;
+      attempt?: temporal.api.stream.v1.IActivityAttempt | null;
     }
-    interface IClientProducer {}
-    interface IProducer {
+    interface IStandaloneActivityProducer {
+      namespace?: string | null;
+      activityId?: string | null;
+      runId?: string | null;
+      attempt?: temporal.api.stream.v1.IActivityAttempt | null;
+    }
+    interface IClientProducer {
+      namespace?: string | null;
       id?: string | null;
+    }
+    interface IProducer {
       workflow?: temporal.api.stream.v1.IWorkflowProducer | null;
       localActivity?: temporal.api.stream.v1.ILocalActivityProducer | null;
-      workflowActivity?: temporal.api.stream.v1.IActivityProducer | null;
-      standaloneActivity?: temporal.api.stream.v1.IActivityProducer | null;
+      workflowActivity?: temporal.api.stream.v1.IWorkflowActivityProducer | null;
+      standaloneActivity?: temporal.api.stream.v1.IStandaloneActivityProducer | null;
       client?: temporal.api.stream.v1.IClientProducer | null;
       kind?:
         | "workflow"
@@ -98,7 +110,6 @@ declare module "@temporalio/proto" {
   // temporal/api/streamservice/v1/request_response.proto
   namespace temporal.api.streamservice.v1 {
     interface ICreateStreamRequest {
-      namespace?: string | null;
       streamId?: string | null;
       idConflictPolicy?: temporal.api.enums.v1.StreamIdConflictPolicy | null;
       requestId?: string | null;
@@ -107,10 +118,9 @@ declare module "@temporalio/proto" {
       created?: boolean | null;
     }
     interface IAppendRecordsRequest {
-      namespace?: string | null;
       streamId?: string | null;
       producer?: temporal.api.stream.v1.IProducer | null;
-      sequence?: Long | null;
+      requestId?: string | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
     }
     interface IAppendRecordsResponse {
@@ -118,18 +128,16 @@ declare module "@temporalio/proto" {
       lastOffset?: Uint8Array | null;
     }
     interface ICloseStreamRequest {
-      namespace?: string | null;
       streamId?: string | null;
       producer?: temporal.api.stream.v1.IProducer | null;
     }
     interface ICloseStreamResponse {}
     interface IReadRecordsRequest {
-      namespace?: string | null;
       streamId?: string | null;
       fromOffset?: Uint8Array | null;
       maxRecords?: number | null;
-      wait?: google.protobuf.IDuration | null;
       maxBytes?: Long | null;
+      wait?: google.protobuf.IDuration | null;
     }
     interface IReadRecordsResponse {
       records?: temporal.api.stream.v1.IStreamRecord[] | null;
@@ -137,7 +145,6 @@ declare module "@temporalio/proto" {
       done?: boolean | null;
     }
     interface IDescribeStreamRequest {
-      namespace?: string | null;
       streamId?: string | null;
     }
     interface IDescribeStreamResponse {

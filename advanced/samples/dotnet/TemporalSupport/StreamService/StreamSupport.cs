@@ -7,14 +7,19 @@ namespace Nexgen.Support
     {
         // The run's Workflow Producer.
         internal static Temporalio.Workflows.Producer Producer() =>
-            new($"wf:{Workflow.Info.RunId}")
+            new()
             {
-                Kind = new ProducerKind.Workflow(new WorkflowProducer(Workflow.Info.RunId)),
+                Kind = new ProducerKind.Workflow(new WorkflowProducer(
+                    Workflow.Info.Namespace, Workflow.Info.WorkflowId, Workflow.Info.RunId)),
             };
 
         // A new id for each create call. A Workflow's replay gives the same id.
         internal static string RequestId() =>
             (Workflow.InWorkflow ? Workflow.NewGuid() : System.Guid.NewGuid()).ToString();
+
+        // A new id for each append call, or none in a Workflow, where the SDK sets it.
+        internal static string? AppendRequestId() =>
+            Workflow.InWorkflow ? null : System.Guid.NewGuid().ToString();
     }
 
     // A request message holds the Stream id of its ref, and no Store name.
