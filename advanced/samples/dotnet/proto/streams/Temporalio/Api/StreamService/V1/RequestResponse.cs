@@ -137,8 +137,9 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int StreamIdFieldNumber = 1;
     private string streamId_ = "";
     /// <summary>
-    /// Required. The id of the Stream to create. Callers treat it as opaque. An id is never used
-    /// for a second Stream, so a create for a closed or expired Stream fails.
+    /// Required. The id of the Stream to create. Callers treat it as opaque. A create for a closed
+    /// or expired Stream fails. A Store can forget an expired Stream after a time of its choice,
+    /// and a create for its id succeeds after that.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -684,6 +685,9 @@ namespace Temporalio.Api.StreamService.V1 {
     private static readonly pb::FieldCodec<global::Temporalio.Api.Stream.V1.AppendRecord> _repeated_records_codec
         = pb::FieldCodec.ForMessage(34, global::Temporalio.Api.Stream.V1.AppendRecord.Parser);
     private readonly pbc::RepeatedField<global::Temporalio.Api.Stream.V1.AppendRecord> records_ = new pbc::RepeatedField<global::Temporalio.Api.Stream.V1.AppendRecord>();
+    /// <summary>
+    /// Required. A batch has at least one Record.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public pbc::RepeatedField<global::Temporalio.Api.Stream.V1.AppendRecord> Records {
@@ -1565,7 +1569,7 @@ namespace Temporalio.Api.StreamService.V1 {
   /// <summary>
   /// Experimental. Might change in the future.
   /// Reads one page of Records after an offset. When no Record is left, the read waits for a new
-  /// one, so a reader long-polls.
+  /// one or for the close of the Stream, so a reader long-polls.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class ReadRecordsRequest : pb::IMessage<ReadRecordsRequest>
@@ -1687,8 +1691,9 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int WaitFieldNumber = 5;
     private global::Google.Protobuf.WellKnownTypes.Duration wait_;
     /// <summary>
-    /// How long the read waits for a new Record before it returns an empty page. When it's unset,
-    /// the read returns immediately. The deadline of the request must be longer than this wait.
+    /// How long the read waits for a new Record, or for the close of the Stream, before it returns
+    /// an empty page. When it's unset, the read returns immediately. The deadline of the request
+    /// must be longer than this wait.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2011,9 +2016,10 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int LastOffsetFieldNumber = 2;
     private pb::ByteString lastOffset_ = pb::ByteString.Empty;
     /// <summary>
-    /// The offset of the last Record in this page. The next read passes it as `from_offset`. For
-    /// an empty page it's the `from_offset` of the request, so it's empty only when the request
-    /// had none, and the next read then starts where this one did.
+    /// Where the next read goes on. The next read passes it as `from_offset`. It's never before
+    /// the last Record in this page, and it never skips a Record, but it can be after entries of
+    /// the Store that aren't Records. For an empty page it can be the `from_offset` of the
+    /// request, which is empty when the request had none.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2492,7 +2498,8 @@ namespace Temporalio.Api.StreamService.V1 {
     public const int LastOffsetFieldNumber = 2;
     private pb::ByteString lastOffset_ = pb::ByteString.Empty;
     /// <summary>
-    /// The offset of the newest Record. It's empty when the Stream has no Record.
+    /// The offset of the newest Record, or an offset after it that skips no Record. A read from it
+    /// returns only the Records that come later. It's empty when the Stream has no Record.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]

@@ -109,7 +109,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? MaxBytes { get; set; }
         /// <summary>
-        /// How long to wait for a new Record before the read returns an empty page.
+        /// How long the read waits for a new Record or a close before an empty page.
         /// </summary>
         public System.TimeSpan? Wait { get; set; }
     }
