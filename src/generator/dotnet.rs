@@ -17,7 +17,7 @@ use crate::nexgen_config::GenerationTarget;
 use crate::planning::{
     PlannedFamily, PlannedOperationResourceFieldBinding, PlannedProtoType, PlannedResource,
     PlannedResourceMethod, PlannedResourceMethodBindingSpec, PlannedResourceMethodResultKind,
-    PlannedSpec, PlannedType, flattened_list_field, operation_input_model,
+    PlannedSpec, PlannedType, PlannedWireFieldBinding, flattened_list_field, operation_input_model,
 };
 use crate::planning::{
     PlannedResourceHolderField, RequestPlan, RequestPlanField, RequestPlanSource,
@@ -2909,6 +2909,17 @@ fn validate_dotnet_support_references(
         }
     }
     for model in api_plan.records().map(|(_, record)| record) {
+        for field in model.fields.values() {
+            if let Some(PlannedWireFieldBinding::Converted { conversion, .. }) =
+                &field.data.wire_binding
+            {
+                for helper in [&conversion.from_proto, &conversion.to_proto] {
+                    if let Some(reference) = helper.value() {
+                        validate_dotnet_support_reference(reference, support_namespace)?;
+                    }
+                }
+            }
+        }
         for (_, sourced_field, _) in model.sourced_fields() {
             validate_dotnet_field_kind_support_references(
                 &sourced_field.field_type,

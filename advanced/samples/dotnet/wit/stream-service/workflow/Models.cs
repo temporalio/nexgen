@@ -252,7 +252,7 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field AppendRecordsRequest.Ref");
             }
 
-            return new AppendRecordsRequest<TBody>(new StreamRef<TBody>(wire.StreamId), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), Producer.FromTransferType(wire.Producer))
+            return new AppendRecordsRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), Producer.FromTransferType(wire.Producer))
             {
                 Sequence = wire.Sequence == 0 ? null : wire.Sequence,
             };
@@ -261,7 +261,7 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
-            proto.StreamId = Ref.Id;
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
             proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             if (Sequence is { } sequence)
@@ -399,13 +399,13 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field CloseStreamRequest.Ref");
             }
 
-            return new CloseStreamRequest<TBody>(new StreamRef<TBody>(wire.StreamId), Producer.FromTransferType(wire.Producer));
+            return new CloseStreamRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId), Producer.FromTransferType(wire.Producer));
         }
 
         internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.CloseStreamRequest();
-            proto.StreamId = Ref.Id;
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             return proto;
         }
@@ -495,7 +495,7 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field CreateStreamRequest.Ref");
             }
 
-            return new CreateStreamRequest<TBody>(new StreamRef<TBody>(wire.StreamId), string.IsNullOrEmpty(wire.RequestId) ? null : wire.RequestId)
+            return new CreateStreamRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId), string.IsNullOrEmpty(wire.RequestId) ? null : wire.RequestId)
             {
                 IdConflictPolicy = (int)wire.IdConflictPolicy == 0 ? null : (StreamIdConflictPolicy)wire.IdConflictPolicy,
             };
@@ -508,7 +508,7 @@ namespace Temporalio.Workflows
             {
                 proto.RequestId = requestId;
             }
-            proto.StreamId = Ref.Id;
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             if (IdConflictPolicy is { } idConflictPolicy)
             {
                 proto.IdConflictPolicy = (Temporalio.Api.Enums.V1.StreamIdConflictPolicy)idConflictPolicy;
@@ -595,13 +595,13 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field DescribeStreamRequest.Ref");
             }
 
-            return new DescribeStreamRequest<TBody>(new StreamRef<TBody>(wire.StreamId));
+            return new DescribeStreamRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId));
         }
 
         internal Temporalio.Api.StreamService.V1.DescribeStreamRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.DescribeStreamRequest();
-            proto.StreamId = Ref.Id;
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             return proto;
         }
 
@@ -913,7 +913,7 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field ReadRecordsRequest.Ref");
             }
 
-            return new ReadRecordsRequest<TBody>(new StreamRef<TBody>(wire.StreamId))
+            return new ReadRecordsRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId))
             {
                 FromOffset = wire.FromOffset.ToByteArray(),
                 MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
@@ -925,7 +925,7 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.ReadRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.ReadRecordsRequest();
-            proto.StreamId = Ref.Id;
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             if (FromOffset is { } fromOffset)
             {
                 proto.FromOffset = Google.Protobuf.ByteString.CopyFrom(fromOffset);
