@@ -1,0 +1,7 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = [
+  "operation `DescribeBatch` binds field `ref` from `result.ref`, but the result has no field `ref`",
+]

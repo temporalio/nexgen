@@ -1,0 +1,7 @@
+descriptors = "temporal"
+
+[error]
+kind = "invalid-resource"
+contains = [
+  "operation `DescribeBatch` states no binding for field `namespace`",
+]

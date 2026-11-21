@@ -1,0 +1,25 @@
+package test:resource-binding@1.0.0;
+
+world system {
+  export api;
+}
+
+/// @nexus.endpoint "batches"
+interface api {
+  resource batch {
+    constructor(ref: string);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.DescribeBatchOperationRequest"
+  record describe-batch-request {
+    namespace: string,
+    /// @nexus.proto-field "job_id"
+    ref: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.DescribeBatchOperationResponse"
+  type describe-batch-result = own<batch>;
+
+  /// @nexus.resource-binding ref="result.ref"
+  describe-batch: func(request: describe-batch-request) -> describe-batch-result;
+}
