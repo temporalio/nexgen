@@ -12,9 +12,9 @@ use crate::error::{Error, Result};
 use crate::nexgen_config::GenerationTarget;
 use crate::spec::{
     ApiSpec, ApiSpecTransform, ExternalTypeSpec, FieldPolicy, IntSpec, JsonModelSpec,
-    OperationSpec, RecordFieldSpec, RecordSpec, ResourceFieldSpec, ResourceMethodSpec,
-    ResourceResultSpec, ResourceSpec, SelectedFamily, SelectedResourceType, SelectedTextSpec,
-    ServiceSpec, Symbol, TypeFamily, TypeSpec,
+    OperationSpec, RecordFieldSpec, RecordSpec, ResourceFieldSourceSpec, ResourceFieldSpec,
+    ResourceMethodSpec, ResourceResultSpec, ResourceSpec, SelectedFamily, SelectedResourceType,
+    SelectedTextSpec, ServiceSpec, Symbol, TypeFamily, TypeSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -252,9 +252,26 @@ fn resolve_service_resource_returns(
             Some((_, _, resource_name, _)) => *resource_name,
             None => {
                 let Some(resource_name) = operation_output_resource_name(service, operation) else {
+                    if operation.resource_binding.is_some() {
+                        return Err(Error::ResourceBindingWithoutResource {
+                            service: service.name.clone(),
+                            operation: operation.name.clone(),
+                        });
+                    }
                     continue;
                 };
                 if operation_output_resource_wire_type(operation).is_none() {
+                    if operation.resource_binding.is_some() {
+                        return Err(Error::InvalidResource {
+                            service: service.name.clone(),
+                            resource: resource_name.to_upper_camel_case(),
+                            reason: format!(
+                                "operation `{}` states resource field bindings, but returns the \
+                                 resource as plain JSON",
+                                operation.name
+                            ),
+                        });
+                    }
                     continue;
                 }
                 resource_name
@@ -294,6 +311,22 @@ fn resolve_service_resource_returns(
                 ),
             });
         };
+        if let Some(binding) = &operation.resource_binding
+            && let Some(name) = binding
+                .sources
+                .keys()
+                .find(|name| !resource.fields.iter().any(|field| &field.name == *name))
+        {
+            return Err(Error::InvalidResource {
+                service: service.name.clone(),
+                resource: resource.name.to_upper_camel_case(),
+                reason: format!(
+                    "operation `{}` states a binding for `{name}`, but the resource has no field \
+                     `{name}`",
+                    operation.name
+                ),
+            });
+        }
         let bindings = resource
             .fields
             .iter()
@@ -302,6 +335,7 @@ fn resolve_service_resource_returns(
                     spec,
                     &service.name,
                     &resource.name,
+                    operation,
                     descriptors,
                     input_message_name,
                     output_message_name,
@@ -696,37 +730,69 @@ fn synthesize_operation_request_plan(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn bind_resource_return_field(
     spec: &ApiSpec<SelectedFamily>,
     service_name: &str,
     resource_name: &str,
+    operation: &OperationSpec<SelectedFamily>,
     descriptors: &DescriptorIndex,
     input_message_name: &str,
     output_message_name: &str,
     field_name: &str,
 ) -> Result<ResolvedResourceBindingSource> {
-    if let Some(field) = find_message_field(spec, descriptors, input_message_name, field_name)? {
-        return Ok(ResolvedResourceBindingSource::RequestField {
-            field_name: field.api_name,
-            proto_field_name: field.proto_name,
-            origin: field.origin,
-        });
-    }
-    if let Some(field) =
-        find_visible_message_field(spec, descriptors, output_message_name, field_name)?
-    {
-        return Ok(ResolvedResourceBindingSource::ResultField {
-            field_name: field.api_name,
-            proto_field_name: field.proto_name,
-        });
-    }
-    Err(Error::InvalidResource {
+    let invalid = |reason: String| Error::InvalidResource {
         service: service_name.to_string(),
         resource: resource_name.to_upper_camel_case(),
-        reason: format!(
+        reason,
+    };
+    let request_field = |name| find_message_field(spec, descriptors, input_message_name, name);
+    let result_field =
+        |name| find_visible_message_field(spec, descriptors, output_message_name, name);
+    let request_source = |field: MessageFieldInfo| ResolvedResourceBindingSource::RequestField {
+        field_name: field.api_name,
+        proto_field_name: field.proto_name,
+        origin: field.origin,
+    };
+    let result_source = |field: MessageFieldInfo| ResolvedResourceBindingSource::ResultField {
+        field_name: field.api_name,
+        proto_field_name: field.proto_name,
+    };
+    let Some(binding) = &operation.resource_binding else {
+        if let Some(field) = request_field(field_name)? {
+            return Ok(request_source(field));
+        }
+        if let Some(field) = result_field(field_name)? {
+            return Ok(result_source(field));
+        }
+        return Err(invalid(format!(
             "could not bind resource field `{field_name}` from operation input or output"
-        ),
-    })
+        )));
+    };
+    match binding.sources.get(field_name) {
+        Some(ResourceFieldSourceSpec::RequestField(name)) => {
+            request_field(name)?.map(request_source).ok_or_else(|| {
+                invalid(format!(
+                    "operation `{}` binds field `{field_name}` from `request.{name}`, but the \
+                     request has no field `{name}`",
+                    operation.name
+                ))
+            })
+        }
+        Some(ResourceFieldSourceSpec::ResultField(name)) => {
+            result_field(name)?.map(result_source).ok_or_else(|| {
+                invalid(format!(
+                    "operation `{}` binds field `{field_name}` from `result.{name}`, but the \
+                     result has no field `{name}`",
+                    operation.name
+                ))
+            })
+        }
+        None => Err(invalid(format!(
+            "operation `{}` states no binding for field `{field_name}`",
+            operation.name
+        ))),
+    }
 }
 
 fn synthesize_request_plan(
@@ -1283,7 +1349,7 @@ mod tests {
 
     use super::{
         BTreeMap, BTreeSet, GenerationTarget, RequestPlan, RequestPlanSource,
-        ResolvedResourceMethodBinding, resolve_service_resources,
+        ResolvedResourceBindingSource, ResolvedResourceMethodBinding, resolve_service_resources,
     };
 
     fn descriptors() -> DescriptorIndex {
@@ -1866,6 +1932,71 @@ interface user-service {
         assert!(matches!(
             method.binding,
             ResolvedResourceMethodBinding::Stub
+        ));
+    }
+
+    #[test]
+    fn resource_binding_takes_each_field_from_the_stated_source() {
+        let template = r#"
+package test:batches@1.0.0;
+
+world system {
+  export api;
+}
+
+interface api {
+  resource batch {
+    constructor(FIELDS);
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.DescribeBatchOperationRequest"
+  record describe-batch-request {
+    namespace: string,
+    job-id: string,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.DescribeBatchOperationResponse"
+  type describe-batch-result = own<batch>;
+
+  DIRECTIVE
+  describe-batch: func(request: describe-batch-request) -> describe-batch-result;
+}
+"#;
+        let sources = |fields: &str, directive: &str| {
+            let wit = template
+                .replace("FIELDS", fields)
+                .replace("DIRECTIVE", directive);
+            let spec = parse(Language::Python, &wit);
+            let resolved =
+                resolve_service_resources(&spec, &spec.services[0], &descriptors(), &[]).unwrap();
+            resolved.operation_returns["DescribeBatch"]
+                .bindings
+                .iter()
+                .map(|binding| binding.source.clone())
+                .collect::<Vec<_>>()
+        };
+
+        let stated = sources(
+            "job-id: string, id: string",
+            r#"/// @nexus.resource-binding job-id="result.job-id" id="request.job-id""#,
+        );
+        assert_eq!(
+            stated[0],
+            ResolvedResourceBindingSource::ResultField {
+                field_name: "job-id".to_string(),
+                proto_field_name: "job_id".to_string(),
+            }
+        );
+        // The backends read these names, so `id` gets the value of the request's `job-id`.
+        assert!(matches!(
+            &stated[1],
+            ResolvedResourceBindingSource::RequestField { field_name, proto_field_name, .. }
+                if field_name == "job-id" && proto_field_name == "job_id"
+        ));
+        assert!(matches!(
+            &sources("job-id: string", "")[0],
+            ResolvedResourceBindingSource::RequestField { proto_field_name, .. }
+                if proto_field_name == "job_id"
         ));
     }
 }

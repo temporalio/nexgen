@@ -689,6 +689,8 @@ pub struct OperationSpec<F: TypeFamily = AuthoredFamily> {
     pub context_propagation_header: F::Text,
     /// The `@nexus.poll` settings. None when the operation has no poll.
     pub poll: Option<OperationPollSpec<F>>,
+    /// None binds each field of a returned resource by name, from the request first.
+    pub resource_binding: Option<OperationResourceBindingSpec>,
     /// Targets whose public top-level operation function `@nexus.api-omit` suppresses. The
     /// operation stays registered, in the service, and bindable by resource methods. Empty
     /// keeps the function on every target.
@@ -731,6 +733,7 @@ impl<F: TypeFamily> OperationSpec<F> {
             serialization_context: map.map_text(self.serialization_context),
             context_propagation_header: map.map_text(self.context_propagation_header),
             poll: self.poll.map(|poll| poll.map_names_with(map)),
+            resource_binding: self.resource_binding,
             api_omitted: self.api_omitted,
             data,
         }
@@ -1527,6 +1530,19 @@ impl<F: TypeFamily> OperationPollSpec<F> {
             resume: map.map_text(self.resume),
         }
     }
+}
+
+/// Each key and field name has the form of `ResourceFieldSpec::name`, so planning compares them
+/// with no conversion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationResourceBindingSpec {
+    pub sources: BTreeMap<String, ResourceFieldSourceSpec>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceFieldSourceSpec {
+    RequestField(String),
+    ResultField(String),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

@@ -290,6 +290,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: false,
         },
         Annotation {
+            name: "resource-binding",
+            sites: &[Function],
+            keys: &[],
+            language_keys: &[],
+            repeatable: false,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "flatten-in-api",
             sites: &[Record, Field],
             keys: &[],
@@ -449,6 +458,10 @@ impl Annotation {
         {
             return false;
         }
+        // The keys are the constructor fields of a resource, so the catalog can't list them.
+        if self.name == "resource-binding" {
+            return is_wit_field_name(key);
+        }
         self.keys.contains(&key) || self.argument_language(key).is_some()
     }
 }
@@ -558,7 +571,9 @@ pub(super) fn validate_parsed(directives: &[Directive], path: &Path, context: &s
         }
         for key in directive.args.keys() {
             if !rule.sites.iter().any(|site| rule.accepts_key(key, *site)) {
-                let reason = if rule.keys.is_empty() && rule.language_keys.is_empty() {
+                let reason = if rule.name == "resource-binding" {
+                    format!("`{key}` isn't the WIT name of a field")
+                } else if rule.keys.is_empty() && rule.language_keys.is_empty() {
                     "does not take arguments".to_string()
                 } else if rule.name == "source" && key.ends_with("-support-import") {
                     format!(

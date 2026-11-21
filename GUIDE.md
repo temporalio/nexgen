@@ -842,6 +842,18 @@ return StartedWorkflow(
 If a resource constructor field name cannot be found in either, the generator
 raises `InvalidResource`.
 
+**A stated source for each field.**
+[`@nexus.resource-binding`](#nexusresource-binding) on the operation states the
+source of each constructor field, and the name rule is not used. Use it when the
+request and the response have a field with the same name, when the source field
+has another name, or when the WIT should say where each field comes from.
+
+```wit
+/// @nexus.operation name="CreateStream"
+/// @nexus.resource-binding ref="request.ref" created="result.created"
+create-stream: func(request: create-stream-request) -> create-stream-result;
+```
+
 **A result record that holds the resource.** An operation can also return a
 proto-backed record with one `own<T>` field and other fields. The resource binds
 from the record's message as above, and the other fields come from the fields of
@@ -1883,6 +1895,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.context-propagation`            | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
+| `@nexus.resource-binding`               | freestanding function                                                                         |
 | `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
 | `@nexus.function`                       | type alias, record field                                                                      |
@@ -2867,6 +2880,34 @@ expressions must return `(T, error)`.
 Both the type and expression must be provided together for each language. The
 TypeScript import fields are optional, but required when the generated return
 type or transform expression refers to an otherwise-unavailable module.
+
+---
+
+### @nexus.resource-binding
+
+**Placement:** Operation (function) that returns a resource **Syntax:**
+`@nexus.resource-binding <field>="request.<source>" <field>="result.<source>"`
+
+States the source of each constructor field of the returned resource, in place
+of the [name rule](#resource-return-binding). Each key is the WIT name of a
+constructor field. Its value is the WIT name of the request field
+(`request.<source>`) or of the response field (`result.<source>`) that gives the
+value. The source field can have another name. `request` and `result` are the
+names that `@nexus.output-transform` gives the same two values.
+
+```wit
+/// @nexus.resource-binding ref="request.ref" created="result.created"
+create-stream: func(request: create-stream-request) -> create-stream-result;
+```
+
+nexgen refuses the directive in these cases.
+
+- A constructor field has no key, or a key is not a constructor field.
+- A value is not `request.<source>` or `result.<source>`, where `<source>` is a
+  WIT field name.
+- The stated side has no field `<source>`. The other side is not searched.
+- The operation returns no resource.
+- The directive has no argument.
 
 ---
 

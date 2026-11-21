@@ -667,6 +667,7 @@ impl<'a> TypePlanningContext<'a> {
                 items: poll.items.clone(),
                 resume: poll.resume.clone(),
             }),
+            resource_binding: operation.resource_binding.clone(),
             api_omitted: operation.api_omitted.clone(),
             data: PlannedOperationData {
                 output_resource_return: plan_operation_resource_return(
@@ -1912,6 +1913,7 @@ interface alerts {
                     serialization_context: LanguageStringSpec::default(),
                     context_propagation_header: LanguageStringSpec::default(),
                     poll: None,
+                    resource_binding: None,
                     api_omitted: BTreeSet::new(),
                     data: (),
                 }],
