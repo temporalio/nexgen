@@ -32,14 +32,8 @@ export class Stream<BodyT = unknown> {
   public async append(
     records: BodyT[],
     producer?: Producer,
-    sequence?: number,
   ): Promise<AppendRecordsResponse> {
-    const request = {
-      ref: this.ref,
-      producer: producer,
-      sequence: sequence,
-      records: records,
-    };
+    const request = { ref: this.ref, producer: producer, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
   }
@@ -60,8 +54,8 @@ export class Stream<BodyT = unknown> {
       ref: this.ref,
       fromOffset: fromOffset,
       maxRecords: maxRecords,
-      wait: wait,
       maxBytes: maxBytes,
+      wait: wait,
     };
     const handle = await readRecords(request, this.bodyType);
     return await handle.result();

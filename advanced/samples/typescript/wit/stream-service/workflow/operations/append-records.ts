@@ -8,8 +8,9 @@ import * as support from "../../../../support/temporal_model_converters";
 type AppendRecordsInput<BodyT> =
   AppendRecordsRequest<BodyT> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "producer"> & {
+      ? Omit<Input, "producer" | "request_id"> & {
           producer?: Producer;
+          request_id?: never;
         }
       : never
     : never;
@@ -24,6 +25,7 @@ export async function appendRecords<BodyT>(
 ): Promise<nexus.NexusOperationHandle<AppendRecordsResponse>> {
   const request = {
     ...requestInput,
+    requestId: support.appendRequestId(),
     producer: (requestInput.producer !== undefined
       ? requestInput.producer
       : support.workflowProducer()) satisfies Producer,

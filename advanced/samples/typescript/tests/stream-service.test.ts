@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 interface WorkflowStream {
-  append(records: string[], producer?: Producer, sequence?: number): Promise<unknown>;
+  append(records: string[], producer?: Producer): Promise<unknown>;
   close(producer?: Producer): Promise<void>;
 }
 
@@ -228,7 +228,7 @@ describe("stream-service generated output", () => {
     const stream = new Stream({ id: "stream-1" }, undefined);
     const producer: Producer = { id: "la:r2:1" };
 
-    await stream.append(["a", "b"], undefined, 3);
+    await stream.append(["a", "b"]);
     await stream.close(producer);
 
     // A missing Producer stays missing here. The operation fills it from its default.
@@ -239,11 +239,46 @@ describe("stream-service generated output", () => {
           ref: { id: "stream-1" },
           records: ["a", "b"],
           producer: undefined,
-          sequence: 3,
         },
       },
       { operation: "closeStream", input: { ref: { id: "stream-1" }, producer } },
     ]);
+  });
+
+  test("sends the request id of its helper with an append", async () => {
+    // The operation fills the request id, so this test runs it in place of its mock.
+    const operation = "../wit/stream-service/workflow/operations/append-records.ts";
+    const { appendRecords } = await vi.importActual<{
+      appendRecords(input: {
+        ref: StreamRef<string>;
+        records: string[];
+        producer: Producer;
+      }): Promise<unknown>;
+    }>(operation);
+    const input = {
+      ref: { id: "stream-1" },
+      records: ["a"],
+      producer: { id: "wf:r1" },
+    };
+
+    await appendRecords(input);
+    vi.unstubAllGlobals();
+    await appendRecords(input);
+    await appendRecords(input);
+
+    const ids = captured.calls.map(
+      (call) => (call.input as { requestId?: string }).requestId,
+    );
+    // Workflow code sends no id, since the SDK sets it when it sends the batch.
+    expect(ids[0]).toBeUndefined();
+    // Elsewhere each call has a new id, so the Store writes two equal batches twice.
+    const uuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    expect(ids.slice(1)).toEqual([
+      expect.stringMatching(uuid),
+      expect.stringMatching(uuid),
+    ]);
+    expect(ids[1]).not.toBe(ids[2]);
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {

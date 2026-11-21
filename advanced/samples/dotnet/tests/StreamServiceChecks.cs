@@ -9,6 +9,7 @@ using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using StreamServiceExample = Streams::Temporalio.Workflows;
+using WireAppendRecordsRequest = Streams::Temporalio.Api.StreamService.V1.AppendRecordsRequest;
 using WireCreateStreamRequest = Streams::Temporalio.Api.StreamService.V1.CreateStreamRequest;
 using WireDescribeStreamRequest = Streams::Temporalio.Api.StreamService.V1.DescribeStreamRequest;
 using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
@@ -80,6 +81,28 @@ namespace Nexgen.DotNetExamples.Tests
             var decoded = FromPayload<StreamServiceExample.ReadRecordsRequest<Turn>>(
                 ToPayload(model));
             Assert.Equal(offset, decoded.FromOffset);
+        }
+
+        // Workflow code sends no request id, since the SDK sets it when it sends the batch.
+        [Theory]
+        [InlineData("append-1")]
+        [InlineData(null)]
+        public void AnAppendSendsItsRequestId(string? requestId)
+        {
+            var model = new StreamServiceExample.AppendRecordsRequest<Turn>(
+                new StreamServiceExample.StreamRef<Turn>("stream-1"),
+                new StreamServiceExample.AppendRecord<Turn>[0],
+                new StreamServiceExample.Producer("wf:r1"),
+                requestId);
+
+            var wire = Assert.IsType<WireAppendRecordsRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.AppendRecordsRequest<Turn>))
+                    .ToTransferType(model));
+            Assert.Equal(requestId ?? string.Empty, wire.RequestId);
+
+            var decoded = FromPayload<StreamServiceExample.AppendRecordsRequest<Turn>>(
+                ToPayload(model));
+            Assert.Equal(requestId, decoded.RequestId);
         }
 
         // A newer server can send a Stream status that this code doesn't know.

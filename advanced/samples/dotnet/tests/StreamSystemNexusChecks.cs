@@ -25,7 +25,7 @@ namespace Nexgen.DotNetExamples.Tests
                     StreamService,
                     "AppendRecords",
                     new StreamModels.AppendRecordsRequest<Turn>(
-                        streamRef, new StreamModels.AppendRecord<Turn>[0], null));
+                        streamRef, new StreamModels.AppendRecord<Turn>[0], null, null));
             });
             var readError = Assert.Throws<NotSupportedException>(() =>
             {

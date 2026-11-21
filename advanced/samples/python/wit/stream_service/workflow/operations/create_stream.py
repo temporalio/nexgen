@@ -73,10 +73,9 @@ async def create_stream(
     """
     Args:
         id: The Stream id, 1 to 4096 bytes.
-        store: Registered Store name. With none, the SDK picks one. Only an SDK reads
-            it.
-        id_conflict_policy: What the create does when the Stream exists. Unspecified is
-            fail.
+        store: The registered name of the Store. If empty, the SDK picks a Store.
+        id_conflict_policy: What the create does if the Stream already exists.
+            Unspecified means fail.
     """
     if body_type is None:
         body_type = typing.Any

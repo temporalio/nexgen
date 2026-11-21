@@ -86,8 +86,8 @@ def test_a_read_response_round_trips_with_its_records(models: types.ModuleType) 
                     kind=models.ProducerKindLocalActivity(
                         models.LocalActivityProducer(
                             run_id="r1",
-                            epoch=models.LocalActivityEpoch(
-                                task=models.WorkflowTaskEpoch(
+                            attempt=models.LocalActivityAttempt(
+                                task=models.WorkflowTaskAttempt(
                                     started_event_id=4, attempt=1
                                 ),
                                 attempt=2,
@@ -237,12 +237,13 @@ async def test_workflow_apis_call_the_stream_service(
     assert stream.ref == ref
     assert stream.body_type is str
     assert stream.created is True
-    assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
+    assert await stream.append("a", "b") == replies["AppendRecords"]
     read = stream.read(from_offset=_offset(1))
     assert [record.body async for record in read] == ["a", "b"]
     assert read.next_request is None
     await stream.close()
-    # The Workflow API fills the request id, and the Producer from its default.
+    # The Workflow API fills the request id of the create, and the Producer from its default.
+    # An append sends no request id, since the SDK sets it.
     producer = model_types.Producer(
         id="wf:r2",
         kind=model_types.ProducerKindWorkflow(
@@ -258,7 +259,7 @@ async def test_workflow_apis_call_the_stream_service(
         (
             "AppendRecords",
             model_types.AppendRecordsRequest(
-                ref=ref, records=records, producer=producer, sequence=3
+                ref=ref, records=records, producer=producer
             ),
         ),
         # Each page is a new Nexus operation from the Workflow.
@@ -282,7 +283,6 @@ async def test_workflow_apis_call_the_stream_service(
     assert [
         PayloadConverter.default.from_payload(record.body) for record in wire.records
     ] == ["a", "b"]
-    assert wire.sequence == 3
 
 
 @pytest.mark.parametrize("construction", ["create", "direct"])

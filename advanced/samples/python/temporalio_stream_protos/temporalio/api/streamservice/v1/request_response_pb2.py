@@ -27,7 +27,7 @@ from temporalio.api.enums.v1 import stream_pb2 as temporal_dot_api_dot_enums_dot
 from temporalio.api.stream.v1 import message_pb2 as temporal_dot_api_dot_stream_dot_v1_dot_message__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n4temporal/api/streamservice/v1/request_response.proto\x12\x1dtemporal.api.streamservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\"temporal/api/enums/v1/stream.proto\x1a$temporal/api/stream/v1/message.proto\"\x9a\x01\n\x13\x43reateStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12I\n\x12id_conflict_policy\x18\x03 \x01(\x0e\x32-.temporal.api.enums.v1.StreamIdConflictPolicy\x12\x12\n\nrequest_id\x18\x04 \x01(\t\"\'\n\x14\x43reateStreamResponse\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\"\xb9\x01\n\x14\x41ppendRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x10\n\x08sequence\x18\x04 \x01(\x03\x12\x35\n\x07records\x18\x05 \x03(\x0b\x32$.temporal.api.stream.v1.AppendRecord\"B\n\x15\x41ppendRecordsResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\"n\n\x12\x43loseStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x32\n\x08producer\x18\x03 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\"\x15\n\x13\x43loseStreamResponse\"\xa0\x01\n\x12ReadRecordsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x0c\x12\x13\n\x0bmax_records\x18\x04 \x01(\x05\x12\'\n\x04wait\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x11\n\tmax_bytes\x18\x06 \x01(\x03\"o\n\x13ReadRecordsResponse\x12\x35\n\x07records\x18\x01 \x03(\x0b\x32$.temporal.api.stream.v1.StreamRecord\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\"=\n\x15\x44\x65scribeStreamRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\"b\n\x16\x44\x65scribeStreamResponse\x12\x33\n\x06status\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.StreamStatus\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x42\xb4\x01\n io.temporal.api.streamservice.v1B\x14RequestResponseProtoP\x01Z1go.temporal.io/api/streamservice/v1;streamservice\xaa\x02\x1fTemporalio.Api.StreamService.V1\xea\x02\"Temporalio::Api::StreamService::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n4temporal/api/streamservice/v1/request_response.proto\x12\x1dtemporal.api.streamservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\"temporal/api/enums/v1/stream.proto\x1a$temporal/api/stream/v1/message.proto\"\x87\x01\n\x13\x43reateStreamRequest\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12I\n\x12id_conflict_policy\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.StreamIdConflictPolicy\x12\x12\n\nrequest_id\x18\x03 \x01(\t\"\'\n\x14\x43reateStreamResponse\x12\x0f\n\x07\x63reated\x18\x01 \x01(\x08\"\xa8\x01\n\x14\x41ppendRecordsRequest\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x32\n\x08producer\x18\x02 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x35\n\x07records\x18\x04 \x03(\x0b\x32$.temporal.api.stream.v1.AppendRecord\"B\n\x15\x41ppendRecordsResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\"[\n\x12\x43loseStreamRequest\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x32\n\x08producer\x18\x02 \x01(\x0b\x32 .temporal.api.stream.v1.Producer\"\x15\n\x13\x43loseStreamResponse\"\x8d\x01\n\x12ReadRecordsRequest\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x13\n\x0b\x66rom_offset\x18\x02 \x01(\x0c\x12\x13\n\x0bmax_records\x18\x03 \x01(\x05\x12\x11\n\tmax_bytes\x18\x04 \x01(\x03\x12\'\n\x04wait\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\"o\n\x13ReadRecordsResponse\x12\x35\n\x07records\x18\x01 \x03(\x0b\x32$.temporal.api.stream.v1.StreamRecord\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\"*\n\x15\x44\x65scribeStreamRequest\x12\x11\n\tstream_id\x18\x01 \x01(\t\"b\n\x16\x44\x65scribeStreamResponse\x12\x33\n\x06status\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.StreamStatus\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x42\xb4\x01\n io.temporal.api.streamservice.v1B\x14RequestResponseProtoP\x01Z1go.temporal.io/api/streamservice/v1;streamservice\xaa\x02\x1fTemporalio.Api.StreamService.V1\xea\x02\"Temporalio::Api::StreamService::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,23 +36,23 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n io.temporal.api.streamservice.v1B\024RequestResponseProtoP\001Z1go.temporal.io/api/streamservice/v1;streamservice\252\002\037Temporalio.Api.StreamService.V1\352\002\"Temporalio::Api::StreamService::V1'
   _globals['_CREATESTREAMREQUEST']._serialized_start=194
-  _globals['_CREATESTREAMREQUEST']._serialized_end=348
-  _globals['_CREATESTREAMRESPONSE']._serialized_start=350
-  _globals['_CREATESTREAMRESPONSE']._serialized_end=389
-  _globals['_APPENDRECORDSREQUEST']._serialized_start=392
-  _globals['_APPENDRECORDSREQUEST']._serialized_end=577
-  _globals['_APPENDRECORDSRESPONSE']._serialized_start=579
-  _globals['_APPENDRECORDSRESPONSE']._serialized_end=645
-  _globals['_CLOSESTREAMREQUEST']._serialized_start=647
-  _globals['_CLOSESTREAMREQUEST']._serialized_end=757
-  _globals['_CLOSESTREAMRESPONSE']._serialized_start=759
-  _globals['_CLOSESTREAMRESPONSE']._serialized_end=780
-  _globals['_READRECORDSREQUEST']._serialized_start=783
-  _globals['_READRECORDSREQUEST']._serialized_end=943
-  _globals['_READRECORDSRESPONSE']._serialized_start=945
-  _globals['_READRECORDSRESPONSE']._serialized_end=1056
-  _globals['_DESCRIBESTREAMREQUEST']._serialized_start=1058
-  _globals['_DESCRIBESTREAMREQUEST']._serialized_end=1119
-  _globals['_DESCRIBESTREAMRESPONSE']._serialized_start=1121
-  _globals['_DESCRIBESTREAMRESPONSE']._serialized_end=1219
+  _globals['_CREATESTREAMREQUEST']._serialized_end=329
+  _globals['_CREATESTREAMRESPONSE']._serialized_start=331
+  _globals['_CREATESTREAMRESPONSE']._serialized_end=370
+  _globals['_APPENDRECORDSREQUEST']._serialized_start=373
+  _globals['_APPENDRECORDSREQUEST']._serialized_end=541
+  _globals['_APPENDRECORDSRESPONSE']._serialized_start=543
+  _globals['_APPENDRECORDSRESPONSE']._serialized_end=609
+  _globals['_CLOSESTREAMREQUEST']._serialized_start=611
+  _globals['_CLOSESTREAMREQUEST']._serialized_end=702
+  _globals['_CLOSESTREAMRESPONSE']._serialized_start=704
+  _globals['_CLOSESTREAMRESPONSE']._serialized_end=725
+  _globals['_READRECORDSREQUEST']._serialized_start=728
+  _globals['_READRECORDSREQUEST']._serialized_end=869
+  _globals['_READRECORDSRESPONSE']._serialized_start=871
+  _globals['_READRECORDSRESPONSE']._serialized_end=982
+  _globals['_DESCRIBESTREAMREQUEST']._serialized_start=984
+  _globals['_DESCRIBESTREAMREQUEST']._serialized_end=1026
+  _globals['_DESCRIBESTREAMRESPONSE']._serialized_start=1028
+  _globals['_DESCRIBESTREAMRESPONSE']._serialized_end=1126
 # @@protoc_insertion_point(module_scope)
