@@ -5,6 +5,8 @@ world system {
 }
 
 /// Notification models for Nexus Handler Callbacks.
+/// @nexus.namespace go="go.temporal.io/sdk/advanced/samples/go/notificationservice"
+/// @nexus.facade go="go.temporal.io/sdk/advanced/samples/go/notificationservice_facade"
 /// @nexus.experimental
 interface notification-service {
   use nexus:temporal-types/model@1.0.0.{

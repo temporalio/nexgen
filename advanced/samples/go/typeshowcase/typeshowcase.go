@@ -231,6 +231,7 @@ type NotificationTarget interface {
 
 // NotificationTargetEmail - Go payload.
 type NotificationTargetEmail struct {
+	// Value carries the payload for this case.
 	Value string
 }
 
@@ -239,6 +240,7 @@ func (NotificationTargetEmail) isNotificationTarget() {}
 // NotificationTargetSms - XML characters remain valid in docs: <tag attr="value"> &
 // 'quoted'.
 type NotificationTargetSms struct {
+	// Value carries the payload for this case.
 	Value string
 }
 

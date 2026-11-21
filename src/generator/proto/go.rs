@@ -14,11 +14,12 @@ use crate::planning::{
 use crate::spec::{ExternalTypeSpec, FieldPolicy, RecordSpec};
 
 use crate::generator::go::{
-    GoPackageContext, OperationExecution, PlannedEnumType, PlannedFieldKind, PlannedMessageSource,
-    PlannedMessageType, PlannedOperationOutput, PlannedOperationResourceReturn, PlannedScalarType,
-    PlannedTypeInfo, PlannedValueType, RenderedField, RenderedModel, RenderedService,
-    go_authored_type_annotation, go_declaration_name, go_field_name, go_replacement_type_name,
-    go_unexported_name, operation_output, planned_field, planned_field_kind, planned_message_type,
+    GoPackageContext, GoVisibility, OperationExecution, PlannedEnumType, PlannedFieldKind,
+    PlannedMessageSource, PlannedMessageType, PlannedOperationOutput,
+    PlannedOperationResourceReturn, PlannedScalarType, PlannedTypeInfo, PlannedValueType,
+    RenderedField, RenderedModel, RenderedService, go_authored_type_annotation,
+    go_declaration_name, go_field_name, go_replacement_type_name, go_unexported_name,
+    operation_output, planned_field, planned_field_kind, planned_message_type,
     public_default_punning_zero_for_field, record_for_model_key, render_operation_execution,
     render_operation_future_adapter, resolve_resource_field_kind, split_go_type_decl_name,
 };
@@ -838,6 +839,7 @@ impl ModelBackend {
         &mut self,
         api_plan: &PlannedSpec,
         models: &IndexMap<String, RenderedModel>,
+        visibility: &GoVisibility,
     ) -> Result<()> {
         self.model_names = models
             .iter()
@@ -882,9 +884,13 @@ impl ModelBackend {
 
             let native_fields = &models[&full_name].fields;
             let field_conversions = match planned_record {
-                Some(planned_model) => {
-                    build_field_conversions(planned_model, native_fields, api_plan, self)?
-                }
+                Some(planned_model) => build_field_conversions(
+                    planned_model,
+                    native_fields,
+                    api_plan,
+                    self,
+                    visibility,
+                )?,
                 None => Vec::new(),
             };
 
@@ -1734,6 +1740,7 @@ fn build_field_conversions(
     native_fields: &[RenderedField],
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
+    visibility: &GoVisibility,
 ) -> Result<Vec<RenderedFieldConversion>> {
     planned_model
         .model_fields()
@@ -1748,7 +1755,7 @@ fn build_field_conversions(
                 &field.data.wire_binding
             {
                 return build_oneof_conversion(
-                    planned_model, field_name, field, wire_name, members, api_plan, backend,
+                    planned_model, field_name, field, (wire_name, members), api_plan, backend, visibility,
                 );
             }
             if let Some(PlannedWireFieldBinding::Value { wire_name, wire_type }) =
@@ -1860,10 +1867,10 @@ fn build_oneof_conversion(
     record: &RecordSpec<PlannedFamily>,
     field_name: &str,
     field: &crate::spec::RecordFieldSpec<PlannedFamily>,
-    wire_name: &str,
-    members: &[crate::planning::PlannedWireVariantMember],
+    (wire_name, members): (&str, &[crate::planning::PlannedWireVariantMember]),
     api_plan: &PlannedSpec,
     backend: &ModelBackend,
+    visibility: &GoVisibility,
 ) -> Result<RenderedFieldConversion> {
     let PlannedType::Variant(reference) = field.field_type.without_option().validation_type()
     else {
@@ -1904,7 +1911,9 @@ fn build_oneof_conversion(
             .iter()
             .find(|case| case.wire_name == member.wire_name)
             .expect("validated oneof case");
-        let case_type = format!("{}{}{arguments}", variant.name, go_field_name(&case.name));
+        let case_name =
+            visibility.rewrite_go_expr(&format!("{}{}", variant.name, go_field_name(&case.name)));
+        let case_type = format!("{case_name}{arguments}");
         let member_field = go_proto_field_name(&member.wire_name);
         let wrapper = format!("{proto}_{member_field}");
         from.push(format!("case *{wrapper}:"));

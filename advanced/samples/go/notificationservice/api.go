@@ -5,8 +5,9 @@ package notificationservice
 import (
 	"fmt"
 	notificationservice "go.temporal.io/api/notificationservice/v1"
-	support "go.temporal.io/sdk/advanced/samples/go/support"
+	support "go.temporal.io/sdk/advanced/samples/go/systemsupport"
 	"go.temporal.io/sdk/converter"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 )
 
 // --- Operations (public API) ---
@@ -14,60 +15,70 @@ import (
 // OnCompleteRequestResult - The successful output or failure of the source operation.
 //
 // NOTE: Experimental
-type OnCompleteRequestResult[OutputT any] interface {
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/notificationservice_facade.OnCompleteRequestResult]
+type SystemNexus_OnCompleteRequestResult[OutputT any] interface {
 	// isOnCompleteRequestResult is a marker method implemented by each case of
-	// OnCompleteRequestResult[OutputT].
+	// SystemNexus_OnCompleteRequestResult[OutputT].
 	isOnCompleteRequestResult(OutputT)
 }
 
 // OnCompleteRequestResultSuccess - The source operation completed successfully with
 // this output.
-type OnCompleteRequestResultSuccess[OutputT any] struct {
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/notificationservice_facade.OnCompleteRequestResultSuccess]
+type SystemNexus_OnCompleteRequestResultSuccess[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value OutputT
 }
 
-func (OnCompleteRequestResultSuccess[OutputT]) isOnCompleteRequestResult(OutputT) {}
+func (SystemNexus_OnCompleteRequestResultSuccess[OutputT]) isOnCompleteRequestResult(OutputT) {}
 
 // OnCompleteRequestResultFailure - The source operation failed, including timeout,
 // cancellation, and application errors.
-type OnCompleteRequestResultFailure[OutputT any] struct {
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/notificationservice_facade.OnCompleteRequestResultFailure]
+type SystemNexus_OnCompleteRequestResultFailure[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value error
 }
 
-func (OnCompleteRequestResultFailure[OutputT]) isOnCompleteRequestResult(OutputT) {}
+func (SystemNexus_OnCompleteRequestResultFailure[OutputT]) isOnCompleteRequestResult(OutputT) {}
 
 func _[OutputT any]() {
-	var _ OnCompleteRequestResult[OutputT] = OnCompleteRequestResultSuccess[OutputT]{}
-	var _ OnCompleteRequestResult[OutputT] = OnCompleteRequestResultFailure[OutputT]{}
+	var _ SystemNexus_OnCompleteRequestResult[OutputT] = SystemNexus_OnCompleteRequestResultSuccess[OutputT]{}
+	var _ SystemNexus_OnCompleteRequestResult[OutputT] = SystemNexus_OnCompleteRequestResultFailure[OutputT]{}
 }
 
 // OnCompleteRequest - A notification that reports that a source operation completed.
 //
 // NOTE: Experimental
-type OnCompleteRequest[OutputT any, SourceContextT any] struct {
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/notificationservice_facade.OnCompleteRequest]
+type SystemNexus_OnCompleteRequest[OutputT any, SourceContextT any] struct {
 	// Result - The successful output or failure of the source operation.
 	//
 	// Required.
-	Result OnCompleteRequestResult[OutputT]
+	Result SystemNexus_OnCompleteRequestResult[OutputT]
 	// SourceContext - User-supplied data associated with the source invocation.
 	//
 	// Required.
 	SourceContext SourceContextT
 }
 
-func (m OnCompleteRequest[OutputT, SourceContextT]) GetResult() OnCompleteRequestResult[OutputT] {
+func (m SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) GetResult() SystemNexus_OnCompleteRequestResult[OutputT] {
 	return m.Result
 }
 
-func (m OnCompleteRequest[OutputT, SourceContextT]) GetSourceContext() SourceContextT {
+func (m SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) GetSourceContext() SourceContextT {
 	return m.SourceContext
 }
 
-func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequest[OutputT, SourceContextT]) (*notificationservice.OnCompleteRequest, error) {
+func systemnexus_onCompleteRequestToProto[OutputT any, SourceContextT any](cfg *commonconverter.SystemNexusContext, m *SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) (*notificationservice.OnCompleteRequest, error) {
 	message := &notificationservice.OnCompleteRequest{}
 	switch value := m.Result.(type) {
-	case OnCompleteRequestResultSuccess[OutputT]:
-		converted, err := converter.GetDefaultDataConverter().ToPayload(value.Value)
+	case SystemNexus_OnCompleteRequestResultSuccess[OutputT]:
+		converted, err := cfg.DataConverter.ToPayload(value.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -75,11 +86,11 @@ func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequ
 			return nil, fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
 		message.Result = &notificationservice.OnCompleteRequest_Success{Success: converted}
-	case *OnCompleteRequestResultSuccess[OutputT]:
+	case *SystemNexus_OnCompleteRequestResultSuccess[OutputT]:
 		if value == nil {
 			return nil, fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
-		converted, err := converter.GetDefaultDataConverter().ToPayload(value.Value)
+		converted, err := cfg.DataConverter.ToPayload(value.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -87,8 +98,8 @@ func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequ
 			return nil, fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
 		message.Result = &notificationservice.OnCompleteRequest_Success{Success: converted}
-	case OnCompleteRequestResultFailure[OutputT]:
-		converted, err := support.FailureToProto(value.Value)
+	case SystemNexus_OnCompleteRequestResultFailure[OutputT]:
+		converted, err := support.FailureToProto(cfg.DataConverter, value.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -96,11 +107,11 @@ func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequ
 			return nil, fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
 		message.Result = &notificationservice.OnCompleteRequest_Failure{Failure: converted}
-	case *OnCompleteRequestResultFailure[OutputT]:
+	case *SystemNexus_OnCompleteRequestResultFailure[OutputT]:
 		if value == nil {
 			return nil, fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
-		converted, err := support.FailureToProto(value.Value)
+		converted, err := support.FailureToProto(cfg.DataConverter, value.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +125,7 @@ func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequ
 		return nil, fmt.Errorf("invalid oneof field OnCompleteRequest.Result: %T", value)
 	}
 	{
-		converted, err := converter.GetDefaultDataConverter().ToPayload(m.SourceContext)
+		converted, err := cfg.DataConverter.ToPayload(m.SourceContext)
 		if err != nil {
 			return nil, err
 		}
@@ -126,19 +137,19 @@ func onCompleteRequestToProto[OutputT any, SourceContextT any](m *OnCompleteRequ
 	return message, nil
 }
 
-func onCompleteRequestFromProto[OutputT any, SourceContextT any](proto *notificationservice.OnCompleteRequest, out *OnCompleteRequest[OutputT, SourceContextT]) error {
-	*out = OnCompleteRequest[OutputT, SourceContextT]{}
+func systemnexus_onCompleteRequestFromProto[OutputT any, SourceContextT any](cfg *commonconverter.SystemNexusContext, proto *notificationservice.OnCompleteRequest, out *SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) error {
+	*out = SystemNexus_OnCompleteRequest[OutputT, SourceContextT]{}
 	switch value := proto.GetResult().(type) {
 	case *notificationservice.OnCompleteRequest_Success:
 		if value == nil {
 			return fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
-		var model OnCompleteRequestResultSuccess[OutputT]
+		var model SystemNexus_OnCompleteRequestResultSuccess[OutputT]
 		if value.Success == nil {
 			return fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
 		if value.Success != nil {
-			if err := converter.GetDefaultDataConverter().FromPayload(value.Success, &model.Value); err != nil {
+			if err := cfg.DataConverter.FromPayload(value.Success, &model.Value); err != nil {
 				return err
 			}
 		}
@@ -147,11 +158,11 @@ func onCompleteRequestFromProto[OutputT any, SourceContextT any](proto *notifica
 		if value == nil {
 			return fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
-		var model OnCompleteRequestResultFailure[OutputT]
+		var model SystemNexus_OnCompleteRequestResultFailure[OutputT]
 		if value.Failure == nil {
 			return fmt.Errorf("missing required field OnCompleteRequest.Result")
 		}
-		converted, err := support.FailureFromProto(value.Failure)
+		converted, err := support.FailureFromProto(cfg.DataConverter, value.Failure)
 		if err != nil {
 			return err
 		}
@@ -166,39 +177,41 @@ func onCompleteRequestFromProto[OutputT any, SourceContextT any](proto *notifica
 		return fmt.Errorf("missing required field OnCompleteRequest.SourceContext")
 	}
 	if proto.GetSourceContext() != nil {
-		if err := converter.GetDefaultDataConverter().FromPayload(proto.GetSourceContext(), &out.SourceContext); err != nil {
+		if err := cfg.DataConverter.FromPayload(proto.GetSourceContext(), &out.SourceContext); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (OnCompleteRequest[OutputT, SourceContextT]) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return converter.NewTransferTypeConverter(
-		onCompleteRequestToProto[OutputT, SourceContextT],
-		onCompleteRequestFromProto[OutputT, SourceContextT],
+func (SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		systemnexus_onCompleteRequestToProto[OutputT, SourceContextT],
+		systemnexus_onCompleteRequestFromProto[OutputT, SourceContextT],
 	)
 }
 
 // OnCompleteResponse - An empty response that acknowledges a completion notification.
 //
 // NOTE: Experimental
-type OnCompleteResponse struct {
+//
+// Exposed as: [go.temporal.io/sdk/advanced/samples/go/notificationservice_facade.OnCompleteResponse]
+type SystemNexus_OnCompleteResponse struct {
 }
 
-func onCompleteResponseToProto(m *OnCompleteResponse) (*notificationservice.OnCompleteResponse, error) {
+func systemnexus_onCompleteResponseToProto(cfg *commonconverter.SystemNexusContext, m *SystemNexus_OnCompleteResponse) (*notificationservice.OnCompleteResponse, error) {
 	message := &notificationservice.OnCompleteResponse{}
 	return message, nil
 }
 
-func onCompleteResponseFromProto(proto *notificationservice.OnCompleteResponse, out *OnCompleteResponse) error {
-	*out = OnCompleteResponse{}
+func systemnexus_onCompleteResponseFromProto(cfg *commonconverter.SystemNexusContext, proto *notificationservice.OnCompleteResponse, out *SystemNexus_OnCompleteResponse) error {
+	*out = SystemNexus_OnCompleteResponse{}
 	return nil
 }
 
-func (OnCompleteResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
-	return converter.NewTransferTypeConverter(
-		onCompleteResponseToProto,
-		onCompleteResponseFromProto,
+func (SystemNexus_OnCompleteResponse) TransferTypeConverter() (converter.TransferTypeConverter, error) {
+	return commonconverter.NewSystemNexusTransferTypeConverter(
+		systemnexus_onCompleteResponseToProto,
+		systemnexus_onCompleteResponseFromProto,
 	)
 }

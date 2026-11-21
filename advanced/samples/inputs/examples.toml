@@ -31,6 +31,7 @@ descriptors = "temporal"
 
 [notification-service]
 languages = ["python", "dotnet", "typescript", "go"]
+system_nexus = ["go"]
 descriptors = "temporal"
 
 # The Stream service WIT of temporalio/api#895, on the Stream protos of that PR. Its .NET output

@@ -2784,30 +2784,17 @@ fn build_service(
     let facade = directive(&directives, "facade", path, &context)?
         .map(directive_language_string)
         .unwrap_or_default();
-    if facade.for_language(language).is_some() {
-        if namespace.for_language(language).is_none() {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.clone(),
-                directive: "@nexus.facade".to_string(),
-                reason: format!(
-                    "`@nexus.facade` must be used with `@nexus.namespace` for {}",
-                    language_key(language),
-                ),
-            });
-        }
-        if !crate::nexgen_config::current()
-            .targets
-            .contains(&GenerationTarget::Workflow)
-        {
-            return Err(Error::InvalidWitDirective {
-                path: path.to_path_buf(),
-                context: context.clone(),
-                directive: "@nexus.facade".to_string(),
-                reason: "`@nexus.facade` requires the workflow target (--targets workflow)"
-                    .to_string(),
-            });
-        }
+    let has_facade = facade.for_language(language).is_some();
+    if has_facade && namespace.for_language(language).is_none() {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.clone(),
+            directive: "@nexus.facade".to_string(),
+            reason: format!(
+                "`@nexus.facade` must be used with `@nexus.namespace` for {}",
+                language_key(language),
+            ),
+        });
     }
     let operations_class = directive(&directives, "operations-class", path, &context)?
         .map(directive_language_string)
@@ -2838,6 +2825,21 @@ fn build_service(
         resources.push(build_resource(
             resolve, interface, *type_id, type_def, path, &context, language,
         )?);
+    }
+
+    if has_facade
+        && (!operations.is_empty() || !resources.is_empty())
+        && !crate::nexgen_config::current()
+            .targets
+            .contains(&GenerationTarget::Workflow)
+    {
+        return Err(Error::InvalidWitDirective {
+            path: path.to_path_buf(),
+            context: context.clone(),
+            directive: "@nexus.facade".to_string(),
+            reason: "`@nexus.facade` requires the workflow target (--targets workflow) for interfaces with operations or resources"
+                .to_string(),
+        });
     }
 
     Ok(ServiceSpec {

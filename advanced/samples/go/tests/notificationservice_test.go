@@ -6,11 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 	notificationpb "go.temporal.io/api/notificationservice/v1"
 	"go.temporal.io/sdk/converter"
+	commonconverter "go.temporal.io/sdk/internal/common/converter"
 	"go.temporal.io/sdk/temporal"
 	"google.golang.org/protobuf/proto"
 
-	ns "go.temporal.io/sdk/advanced/samples/go/notificationservice"
+	ns "go.temporal.io/sdk/advanced/samples/go/notificationservice_facade"
 )
+
+func notificationDataConverter() converter.DataConverter {
+	dc := converter.GetDefaultDataConverter()
+	return commonconverter.WithDataConverterSystemNexusContext(commonconverter.MakeTransferAware(dc), dc)
+}
 
 type completion struct {
 	Message string
@@ -21,7 +27,7 @@ type sourceContext struct {
 }
 
 func TestNotificationServiceSuccess(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	dc := notificationDataConverter()
 	for _, result := range []ns.OnCompleteRequestResult[completion]{
 		ns.OnCompleteRequestResultSuccess[completion]{Value: completion{"completed"}},
 		&ns.OnCompleteRequestResultSuccess[completion]{Value: completion{"completed"}},
@@ -56,7 +62,7 @@ func TestNotificationServiceSuccess(t *testing.T) {
 }
 
 func TestNotificationServiceFailure(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	dc := notificationDataConverter()
 	model := ns.OnCompleteRequest[completion, sourceContext]{
 		Result: ns.OnCompleteRequestResultFailure[completion]{
 			Value: temporal.NewApplicationError("operation failed", "CompletionFailure", "detail"),
@@ -82,7 +88,7 @@ func TestNotificationServiceFailure(t *testing.T) {
 }
 
 func TestNotificationServiceRequiredFields(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	dc := notificationDataConverter()
 	value, err := dc.ToPayload(completion{"completed"})
 	require.NoError(t, err)
 	context, err := dc.ToPayload(sourceContext{"workflow-id"})
@@ -114,7 +120,7 @@ func TestNotificationServiceRequiredFields(t *testing.T) {
 }
 
 func TestNotificationServiceEmptyResponse(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	dc := notificationDataConverter()
 	payload, err := dc.ToPayload(ns.OnCompleteResponse{})
 	require.NoError(t, err)
 	var wire notificationpb.OnCompleteResponse
@@ -125,7 +131,7 @@ func TestNotificationServiceEmptyResponse(t *testing.T) {
 }
 
 func TestNotificationServiceNilOutput(t *testing.T) {
-	dc := converter.GetDefaultDataConverter()
+	dc := notificationDataConverter()
 	model := ns.OnCompleteRequest[*completion, sourceContext]{
 		Result:        ns.OnCompleteRequestResultSuccess[*completion]{},
 		SourceContext: sourceContext{"workflow-id"},

@@ -25,12 +25,19 @@ struct ExampleConfig {
 
 #[derive(Clone, Default, Deserialize)]
 struct ExampleOptions {
-    languages: Option<Vec<String>>,
-    system_nexus: Option<bool>,
+    languages: Option<Vec<Language>>,
+    system_nexus: Option<ExampleSystemNexus>,
     targets: Option<Vec<GenerationTarget>>,
     // Each example plans against only the protos it declares, so one sample's protos can't
     // change how another example resolves a proto name.
     descriptors: Option<ExampleDescriptors>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(untagged)]
+enum ExampleSystemNexus {
+    Enabled(bool),
+    Languages(Vec<Language>),
 }
 
 /// Opt-in, as in the compiler rejection fixtures. An example with no `descriptors` gets none.
@@ -120,13 +127,35 @@ impl ExampleOptions {
     fn overridden_by(&self, child: &Self) -> Self {
         Self {
             languages: child.languages.clone().or_else(|| self.languages.clone()),
-            system_nexus: child.system_nexus.or(self.system_nexus),
+            system_nexus: child
+                .system_nexus
+                .clone()
+                .or_else(|| self.system_nexus.clone()),
             targets: child.targets.clone().or_else(|| self.targets.clone()),
             descriptors: child
                 .descriptors
                 .clone()
                 .or_else(|| self.descriptors.clone()),
         }
+    }
+
+    fn system_nexus(&self, language: Language) -> bool {
+        match &self.system_nexus {
+            Some(ExampleSystemNexus::Enabled(enabled)) => *enabled,
+            Some(ExampleSystemNexus::Languages(languages)) => languages.contains(&language),
+            None => false,
+        }
+    }
+
+    fn validate_system_nexus(&self, section: &str) -> std::result::Result<(), String> {
+        if let Some(ExampleSystemNexus::Languages(languages)) = &self.system_nexus
+            && let Some(language) = languages.iter().find(|&&language| !self.supports(language))
+        {
+            return Err(format!(
+                "`[{section}]`: `system_nexus` lists `{language}`, which is not in `languages`"
+            ));
+        }
+        Ok(())
     }
 
     fn targets(&self) -> &[GenerationTarget] {
@@ -136,7 +165,7 @@ impl ExampleOptions {
     fn supports(&self, language: Language) -> bool {
         self.languages
             .as_ref()
-            .is_none_or(|languages| languages.iter().any(|name| name == language.as_str()))
+            .is_none_or(|languages| languages.contains(&language))
     }
 }
 
@@ -414,6 +443,16 @@ fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, 
     let config = ExamplesConfig::from_table(table)?;
     for (name, example) in &config.examples {
         validate_child_names(name, example)?;
+        if example.children.is_empty() {
+            example.options.validate_system_nexus(name)?;
+        } else {
+            for (child_name, child) in &example.children {
+                example
+                    .options
+                    .overridden_by(&child.options)
+                    .validate_system_nexus(&format!("{name}.{child_name}"))?;
+            }
+        }
     }
     Ok(config)
 }
@@ -687,7 +726,7 @@ fn build_example_configuration(
     input_paths.extend(example_linked_input_paths(repo_root, &input_path)?);
     let output_path = example_output_path(repo_root, language, output_id);
     let language_root = advanced_language_root(repo_root, language);
-    let system_nexus = options.system_nexus.unwrap_or_default();
+    let system_nexus = options.system_nexus(language);
     let generate_request = GenerateRequest {
         config: NexgenConfig {
             system_nexus,
@@ -1105,6 +1144,7 @@ descriptors = []
 
 [sample.replaced]
 languages = ["go"]
+system_nexus = ["go"]
 targets = ["workflow"]
 descriptors = ["streams.bin"]
 "#,
@@ -1123,7 +1163,7 @@ descriptors = ["streams.bin"]
             ]
         );
         let cleared = &configurations[0].1;
-        assert_eq!(cleared.system_nexus, Some(false));
+        assert!(!cleared.system_nexus(Language::Python));
         assert_eq!(cleared.targets(), &[]);
         assert_eq!(
             cleared.descriptors,
@@ -1133,7 +1173,7 @@ descriptors = ["streams.bin"]
         assert!(!cleared.supports(Language::Go));
 
         let inherited = &configurations[1].1;
-        assert_eq!(inherited.system_nexus, Some(true));
+        assert!(inherited.system_nexus(Language::Python));
         assert_eq!(
             inherited.targets(),
             &[GenerationTarget::Workflow, GenerationTarget::Client]
@@ -1144,7 +1184,8 @@ descriptors = ["streams.bin"]
         );
 
         let replaced = &configurations[2].1;
-        assert_eq!(replaced.system_nexus, Some(true));
+        assert!(replaced.system_nexus(Language::Go));
+        assert!(!replaced.system_nexus(Language::Dotnet));
         assert_eq!(replaced.targets(), &[GenerationTarget::Workflow]);
         assert_eq!(
             replaced.descriptors,
@@ -1163,9 +1204,52 @@ descriptors = ["streams.bin"]
         assert_eq!(configurations.len(), 1);
         assert_eq!(configurations[0].0, Path::new("sample"));
         assert_eq!(configurations[0].1.targets(), &[]);
-        assert!(!configurations[0].1.system_nexus.unwrap_or_default());
+        assert!(!configurations[0].1.system_nexus(Language::Python));
         assert!(configurations[0].1.descriptors.is_none());
         assert!(configurations[0].1.supports(Language::Python));
+    }
+
+    #[test]
+    fn configuration_rejects_system_nexus_languages_outside_effective_languages() {
+        for (source, section) in [
+            (
+                "[sample]\nlanguages = [\"python\"]\nsystem_nexus = [\"go\"]\n",
+                "sample",
+            ),
+            (
+                "[sample]\nlanguages = [\"python\"]\n[sample.child]\nsystem_nexus = [\"go\"]\n",
+                "sample.child",
+            ),
+            (
+                "[sample]\nlanguages = [\"go\"]\nsystem_nexus = [\"go\"]\n[sample.child]\nlanguages = [\"python\"]\n",
+                "sample.child",
+            ),
+        ] {
+            let error = parse_examples_config(source).err().unwrap_or_default();
+            assert_eq!(
+                error,
+                format!("`[{section}]`: `system_nexus` lists `go`, which is not in `languages`")
+            );
+        }
+    }
+
+    #[test]
+    fn configuration_accepts_system_nexus_languages_without_a_filter_or_after_child_overrides() {
+        assert!(parse_examples_config("[sample]\nsystem_nexus = [\"go\"]\n").is_ok());
+        assert!(
+            parse_examples_config(
+                "[sample]\nlanguages = [\"python\"]\nsystem_nexus = [\"go\"]\n[sample.child]\nlanguages = [\"go\"]\n"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn configuration_rejects_unknown_languages_in_both_settings() {
+        for key in ["languages", "system_nexus"] {
+            let source = format!("[sample]\n{key} = [\"golang\"]\n");
+            assert!(parse_examples_config(&source).is_err(), "{source}");
+        }
     }
 
     #[test]

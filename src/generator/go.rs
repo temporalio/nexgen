@@ -1415,10 +1415,13 @@ impl GoExternalModels {
         &mut self,
         api_plan: &PlannedSpec,
         models: &IndexMap<String, RenderedModel>,
+        visibility: &GoVisibility,
     ) -> Result<()> {
         match self {
             Self::Json(_) => Ok(()),
-            Self::Proto(backend) => backend.populate_model_wire_conversions(api_plan, models),
+            Self::Proto(backend) => {
+                backend.populate_model_wire_conversions(api_plan, models, visibility)
+            }
         }
     }
 
@@ -1616,7 +1619,11 @@ impl<'a> ApiPlanner<'a> {
         // Second pass: compute backend wire metadata for rendered models and
         // collect any aliased imports they require. This runs after visibility
         // so the backend renders final Go names directly.
-        self.populate_model_wire_conversions()?;
+        self.external_models.populate_model_wire_conversions(
+            self.api_plan,
+            &self.models,
+            &visibility,
+        )?;
         self.populate_operation_bindings(&mut services)?;
         for operation in services.iter().flat_map(|service| &service.operations) {
             if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
@@ -2583,11 +2590,6 @@ impl<'a> ApiPlanner<'a> {
         ensure_generic_result(&mut self.models);
     }
 
-    fn populate_model_wire_conversions(&mut self) -> Result<()> {
-        self.external_models
-            .populate_model_wire_conversions(self.api_plan, &self.models)
-    }
-
     fn populate_operation_bindings(&self, services: &mut [RenderedService<'_>]) -> Result<()> {
         self.external_models
             .populate_operation_bindings(self.api_plan, services)
@@ -3042,7 +3044,7 @@ struct ResolvedGoType {
 
 /// Visibility decisions for local generated Go datatypes.
 #[derive(Debug, Clone, Default)]
-struct GoVisibility {
+pub(in crate::generator) struct GoVisibility {
     public_keys: BTreeSet<String>,
     type_name_replacements: BTreeMap<String, String>,
 }
@@ -3065,7 +3067,7 @@ impl GoVisibility {
             })
     }
 
-    fn rewrite_go_expr(&self, expr: &str) -> String {
+    pub(in crate::generator) fn rewrite_go_expr(&self, expr: &str) -> String {
         if self.type_name_replacements.is_empty() {
             return expr.to_string();
         }
@@ -4909,6 +4911,7 @@ fn render_variant(output: &mut String, variant: &RenderedVariant, package: &GoPa
         ));
         if let Some(payload_type) = &case.payload_type {
             output.push_str(" struct {\n");
+            output.push_str("\t// Value carries the payload for this case.\n");
             output.push_str("\tValue ");
             output.push_str(payload_type);
             output.push('\n');

@@ -65,12 +65,14 @@ type OperationCompletionResult[OutputT any] interface {
 }
 
 type OperationCompletionResultSuccess[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value OperationCompletionSuccess[OutputT]
 }
 
 func (OperationCompletionResultSuccess[OutputT]) isOperationCompletionResult(OutputT) {}
 
 type OperationCompletionResultFailure[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value OperationCompletionFailure
 }
 
