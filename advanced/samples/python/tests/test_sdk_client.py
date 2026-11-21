@@ -38,7 +38,6 @@ from wit.stream_service.client.client import (
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
     ActivityAttempt,
-    ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -57,6 +56,7 @@ from wit.stream_service.both.models import (
     StreamRecord,
     StreamRef,
     Timestamp,
+    WorkflowActivityProducer,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -73,8 +73,7 @@ SYSTEM_CONVERTER = temporalio.nexus.system._SystemNexusPayloadConverter(
 
 # The Producer that the sample's `default_producer` source gives outside an Activity.
 CLIENT_PRODUCER = Producer(
-    id="client:sample",
-    kind=ProducerKindClient(ClientProducer()),
+    kind=ProducerKindClient(ClientProducer(namespace="default", id="client:sample")),
 )
 
 
@@ -466,7 +465,9 @@ async def test_an_optional_producer_parameter_replaces_its_default(
         return CLIENT_PRODUCER
 
     monkeypatch.setattr(temporal_support, "default_producer", default_producer)
-    given = Producer(id="given", kind=ProducerKindClient(ClientProducer()))
+    given = Producer(
+        kind=ProducerKindClient(ClientProducer(namespace="default", id="given"))
+    )
     client, answers = connect(
         Client,
         {
@@ -529,6 +530,8 @@ async def test_a_create_takes_the_fields_of_the_ref(
 
 @dataclasses.dataclass
 class FakeActivityInfo:
+    workflow_namespace: str
+    workflow_id: str
     workflow_run_id: str
     activity_id: str
     attempt: int
@@ -543,7 +546,9 @@ async def test_a_client_append_sends_the_producer_of_its_activity(
     )
     monkeypatch.setattr(temporalio.activity, "in_activity", lambda: True)
     monkeypatch.setattr(
-        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7", 2, scheduled)
+        temporalio.activity,
+        "info",
+        lambda: FakeActivityInfo("ns", "w1", "r1", "7", 2, scheduled),
     )
     client, answers = connect(
         Client, {"AppendRecords": AppendRecordsResponse(last_offset=_offset(1))}
@@ -560,9 +565,14 @@ async def test_a_client_append_sends_the_producer_of_its_activity(
         attempt=2,
     )
     producer = Producer(
-        id="act:r1:7",
         kind=ProducerKindWorkflowActivity(
-            ActivityProducer(run_id="r1", attempt=attempt)
+            WorkflowActivityProducer(
+                namespace="ns",
+                workflow_id="w1",
+                run_id="r1",
+                activity_id="7",
+                attempt=attempt,
+            )
         ),
     )
     assert append.arg == AppendRecordsRequest(
@@ -574,7 +584,7 @@ async def test_a_client_append_sends_the_producer_of_its_activity(
     # The Producer has the Activity's attempt, so a retry fences the attempt before it.
     converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
     wire = converter.to_transfer_type(append.arg)
-    assert wire.producer.id == "act:r1:7"
+    assert wire.producer.workflow_activity.activity_id == "7"
     assert wire.producer.workflow_activity.run_id == "r1"
     assert wire.producer.workflow_activity.attempt.attempt == 2
 

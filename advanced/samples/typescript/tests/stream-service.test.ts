@@ -54,6 +54,10 @@ function _offset(n: number): Uint8Array {
   return bytes;
 }
 
+const clientProducer: Producer = {
+  kind: { tag: "client", value: { namespace: "ns", id: "c1" } },
+};
+
 class Turn {
   constructor(readonly role: string) {}
 }
@@ -117,7 +121,12 @@ describe("stream-service generated output", () => {
       records: [
         {
           body: "hi",
-          producer: { id: "wf:r1", kind: { tag: "workflow", value: { runId: "r1" } } },
+          producer: {
+            kind: {
+              tag: "workflow",
+              value: { namespace: "ns", workflowId: "w1", runId: "r1" },
+            },
+          },
           offset: _offset(1),
         },
       ],
@@ -173,7 +182,7 @@ describe("stream-service generated output", () => {
     const proto = appendRecordsRequestTransferTypeConverter.toTransferType({
       ref: { id: "stream-1" },
       records: ["a", "b"],
-      producer: { id: "client:sample" },
+      producer: clientProducer,
     });
 
     // `append-record` flattens, so the model holds the values and the proto holds the records.
@@ -226,7 +235,7 @@ describe("stream-service generated output", () => {
   test("passes the arguments of a Workflow append and close to their operations", async () => {
     const { Stream } = await loadWorkflowStream();
     const stream = new Stream({ id: "stream-1" }, undefined);
-    const producer: Producer = { id: "la:r2:1" };
+    const producer = clientProducer;
 
     await stream.append(["a", "b"]);
     await stream.close(producer);
@@ -258,7 +267,7 @@ describe("stream-service generated output", () => {
     const input = {
       ref: { id: "stream-1" },
       records: ["a"],
-      producer: { id: "wf:r1" },
+      producer: clientProducer,
     };
 
     await appendRecords(input);

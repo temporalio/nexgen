@@ -166,8 +166,14 @@ class WorkflowProducer(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
     """Required. The id of this run, not the first run id of its chain. Each run is a separate
     Producer.
@@ -181,12 +187,14 @@ class WorkflowProducer(_message.Message):
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
         attempt: Global___WorkflowTaskAttempt | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "workflow_id", b"workflow_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -195,15 +203,24 @@ Global___WorkflowProducer: _TypeAlias = WorkflowProducer  # noqa: Y015
 @_typing.final
 class LocalActivityProducer(_message.Message):
     """Experimental. Might change in the future.
-    The Producer of one Local Activity call of a Workflow run.
+    The Producer of one Local Activity of a Workflow run.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required. The namespace of the Workflow that made the call."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
-    """Required. The id of the Workflow run that made the call."""
+    """Required."""
+    activity_id: _builtins.str
+    """Required."""
     @_builtins.property
     def attempt(self) -> Global___LocalActivityAttempt:
         """Required."""
@@ -211,30 +228,42 @@ class LocalActivityProducer(_message.Message):
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
+        activity_id: _builtins.str = ...,
         attempt: Global___LocalActivityAttempt | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "workflow_id", b"workflow_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___LocalActivityProducer: _TypeAlias = LocalActivityProducer  # noqa: Y015
 
 @_typing.final
-class ActivityProducer(_message.Message):
+class WorkflowActivityProducer(_message.Message):
     """Experimental. Might change in the future.
-    The Producer of an Activity that a Workflow scheduled, or of a Standalone Activity.
+    The Producer of one Activity that a Workflow scheduled.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required. The namespace of the Workflow that scheduled the Activity."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
-    """The id of the Workflow run that scheduled the Activity. It's empty for a Standalone
-    Activity, whose own run id is part of the Producer id.
+    """Required."""
+    activity_id: _builtins.str
+    """Required. A run can use an Activity id again after the first Activity ended. The second
+    Activity is then a later attempt of the same Producer.
     """
     @_builtins.property
     def attempt(self) -> Global___ActivityAttempt:
@@ -243,16 +272,58 @@ class ActivityProducer(_message.Message):
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
+        run_id: _builtins.str = ...,
+        activity_id: _builtins.str = ...,
+        attempt: Global___ActivityAttempt | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "workflow_id", b"workflow_id"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___WorkflowActivityProducer: _TypeAlias = WorkflowActivityProducer  # noqa: Y015
+
+@_typing.final
+class StandaloneActivityProducer(_message.Message):
+    """Experimental. Might change in the future.
+    The Producer of a Standalone Activity. Its attempts compare as those of a Workflow's Activity
+    do.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
+    RUN_ID_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    activity_id: _builtins.str
+    """Required."""
+    run_id: _builtins.str
+    """Required. The run id of the Activity itself."""
+    @_builtins.property
+    def attempt(self) -> Global___ActivityAttempt:
+        """Required."""
+
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        activity_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
         attempt: Global___ActivityAttempt | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___ActivityProducer: _TypeAlias = ActivityProducer  # noqa: Y015
+Global___StandaloneActivityProducer: _TypeAlias = StandaloneActivityProducer  # noqa: Y015
 
 @_typing.final
 class ClientProducer(_message.Message):
@@ -263,12 +334,23 @@ class ClientProducer(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    ID_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    id: _builtins.str
+    """Required. The caller can set it, for example to the id of the Nexus operation that
+    writes. Without one, the SDK makes an id for each client object.
+    """
     def __init__(
         self,
+        *,
+        namespace: _builtins.str = ...,
+        id: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["id", b"id", "namespace", b"namespace"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -278,8 +360,9 @@ Global___ClientProducer: _TypeAlias = ClientProducer  # noqa: Y015
 class Producer(_message.Message):
     """Experimental. Might change in the future.
     The writer of a batch of Records. A Producer is one unit of work, such as one Activity or one
-    Workflow run. Its `id` is the same on every attempt, and every kind except a client also has
-    the attempt that made the write.
+    Workflow run. Two Producers are the same when they have the same kind and the same ids.
+    Every kind except a client also has the attempt that made the write, and the attempt is not
+    part of what identifies the Producer.
 
     A Store that fences fails a write with `FENCED` when a later attempt of the same Producer has
     already written. A Store that doesn't fence accepts the write. Each Record has its Producer
@@ -291,46 +374,33 @@ class Producer(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    ID_FIELD_NUMBER: _builtins.int
     WORKFLOW_FIELD_NUMBER: _builtins.int
     LOCAL_ACTIVITY_FIELD_NUMBER: _builtins.int
     WORKFLOW_ACTIVITY_FIELD_NUMBER: _builtins.int
     STANDALONE_ACTIVITY_FIELD_NUMBER: _builtins.int
     CLIENT_FIELD_NUMBER: _builtins.int
-    id: _builtins.str
-    """Required. The same on every attempt, for example `wf:<run id>` for the Producer of a
-    Workflow run. It's unique within one Stream. The id of a kind with a run contains the run
-    id, so it stays unique when Producers from several namespaces write to one Stream.
-    """
     @_builtins.property
     def workflow(self) -> Global___WorkflowProducer: ...
     @_builtins.property
     def local_activity(self) -> Global___LocalActivityProducer: ...
     @_builtins.property
-    def workflow_activity(self) -> Global___ActivityProducer:
-        """An Activity that a Workflow scheduled."""
-
+    def workflow_activity(self) -> Global___WorkflowActivityProducer: ...
     @_builtins.property
-    def standalone_activity(self) -> Global___ActivityProducer:
-        """A Standalone Activity. Its attempts compare as those of a Workflow's Activity do. It's a
-        separate case because it has no Workflow run.
-        """
-
+    def standalone_activity(self) -> Global___StandaloneActivityProducer: ...
     @_builtins.property
     def client(self) -> Global___ClientProducer: ...
     def __init__(
         self,
         *,
-        id: _builtins.str = ...,
         workflow: Global___WorkflowProducer | None = ...,
         local_activity: Global___LocalActivityProducer | None = ...,
-        workflow_activity: Global___ActivityProducer | None = ...,
-        standalone_activity: Global___ActivityProducer | None = ...,
+        workflow_activity: Global___WorkflowActivityProducer | None = ...,
+        standalone_activity: Global___StandaloneActivityProducer | None = ...,
         client: Global___ClientProducer | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "id", b"id", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType_kind: _TypeAlias = _typing.Literal["workflow", "local_activity", "workflow_activity", "standalone_activity", "client"]  # noqa: Y015
     _WhichOneofArgType_kind: _TypeAlias = _typing.Literal["kind", b"kind"]  # noqa: Y015
