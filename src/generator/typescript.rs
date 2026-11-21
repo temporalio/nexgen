@@ -1952,28 +1952,13 @@ pub(in crate::generator) fn required_from_wire_expr(
     generated_field_name: &str,
     field: &RecordFieldSpec<PlannedFamily>,
 ) -> String {
-    let wire_value_expr = if field_has_presence(field) {
-        wire_value_expr.to_string()
-    } else if matches!(&field.field_type, PlannedType::Bool) {
-        format!("{wire_value_expr} ?? false")
-    } else if matches!(&field.field_type, PlannedType::Int(_) | PlannedType::Float) {
-        let zero = match field.field_type {
-            PlannedType::Int(IntSpec::I64) => "Long.ZERO",
-            PlannedType::Int(IntSpec::U64) => "Long.UZERO",
-            _ => "0",
-        };
-        format!("{wire_value_expr} ?? {zero}")
-    } else if matches!(&field.field_type, PlannedType::String) {
-        format!("{wire_value_expr} === '' ? undefined : {wire_value_expr}")
-    } else if matches!(&field.field_type, PlannedType::Bytes) {
-        format!(
-            "{wire_value_expr} == null || {wire_value_expr}.length === 0 ? undefined : {wire_value_expr}"
-        )
-    } else {
-        format!("{wire_value_expr} ?? undefined")
-    };
-    let required_wire_expr =
-        required_field_expr(&wire_value_expr, owner_name, generated_field_name);
+    let required_wire_expr = required_wire_value_expr(
+        owner_name,
+        wire_value_expr,
+        generated_field_name,
+        field,
+        &field.field_type,
+    );
 
     match resolved_type.kind {
         ResolvedFieldKind::Message => {
@@ -1996,6 +1981,38 @@ pub(in crate::generator) fn required_from_wire_expr(
         ),
         _ => required_wire_expr,
     }
+}
+
+/// The required proto value of a field, before any conversion. `value_type` is the type of the
+/// proto value.
+pub(in crate::generator) fn required_wire_value_expr(
+    owner_name: &str,
+    wire_value_expr: &str,
+    generated_field_name: &str,
+    field: &RecordFieldSpec<PlannedFamily>,
+    value_type: &PlannedType,
+) -> String {
+    let wire_value_expr = if field_has_presence(field) {
+        wire_value_expr.to_string()
+    } else if matches!(value_type, PlannedType::Bool) {
+        format!("{wire_value_expr} ?? false")
+    } else if matches!(value_type, PlannedType::Int(_) | PlannedType::Float) {
+        let zero = match value_type {
+            PlannedType::Int(IntSpec::I64) => "Long.ZERO",
+            PlannedType::Int(IntSpec::U64) => "Long.UZERO",
+            _ => "0",
+        };
+        format!("{wire_value_expr} ?? {zero}")
+    } else if matches!(value_type, PlannedType::String) {
+        format!("{wire_value_expr} === '' ? undefined : {wire_value_expr}")
+    } else if matches!(value_type, PlannedType::Bytes) {
+        format!(
+            "{wire_value_expr} == null || {wire_value_expr}.length === 0 ? undefined : {wire_value_expr}"
+        )
+    } else {
+        format!("{wire_value_expr} ?? undefined")
+    };
+    required_field_expr(&wire_value_expr, owner_name, generated_field_name)
 }
 
 pub(in crate::generator) fn required_to_wire_expr(

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use heck::ToLowerCamelCase;
 use prost_types::FieldDescriptorProto;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
     RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
@@ -12,8 +12,9 @@ use crate::generator::typescript::{
     flattened_message_to_wire_expr, generic_model_annotation, map_value_from_wire_expr,
     map_value_to_wire_expr_from_expr, optional_from_wire_expr, optional_to_wire_expr,
     render_named_generic_function_start, repeated_from_wire_expr, repeated_to_wire_expr,
-    required_field_expr, required_from_wire_expr, required_to_wire_expr, support_reference,
-    typescript_authored_type_annotation, typescript_generated_field_name, typescript_ident,
+    required_field_expr, required_from_wire_expr, required_to_wire_expr, required_wire_value_expr,
+    support_reference, typescript_authored_type_annotation, typescript_generated_field_name,
+    typescript_ident,
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
@@ -31,20 +32,6 @@ impl ExternalModelBackend for ModelBackend {
     type WireConversion = WireValueConversion;
 
     fn prepare(&mut self, api_plan: &PlannedSpec) -> Result<()> {
-        for (_, record) in api_plan.records() {
-            for (field_name, field) in &record.fields {
-                if let Some(PlannedWireFieldBinding::Converted { .. }) = &field.data.wire_binding {
-                    return Err(Error::InvalidTypeOverrideField {
-                        message: record.name.clone(),
-                        field: field_name.clone(),
-                        property: "type",
-                        reason:
-                            "a field with conversion helpers is not generated for TypeScript yet"
-                                .to_string(),
-                    });
-                }
-            }
-        }
         self.enum_conversions = api_plan
             .enums()
             .filter_map(|(name, model)| {
@@ -199,6 +186,44 @@ fn generic_carrier_expressions(
     Some((from_wire_expr, to_wire_expr))
 }
 
+/// Calls the support helpers that convert the model value and the proto field.
+fn conversion_expressions(
+    record: &RecordSpec<PlannedFamily>,
+    field: &RecordFieldSpec<PlannedFamily>,
+    generated_field_name: &str,
+    wire_field_expr: &str,
+) -> Option<(String, String)> {
+    let PlannedWireFieldBinding::Converted {
+        wire_name,
+        wire_type,
+        conversion,
+    } = field.data.wire_binding.as_ref()?
+    else {
+        return None;
+    };
+    let from_wire_expr = format!(
+        "{}({})",
+        typescript_from_proto_converter(wire_name, conversion),
+        required_wire_value_expr(
+            &record.name,
+            wire_field_expr,
+            generated_field_name,
+            field,
+            wire_type,
+        )
+    );
+    let to_wire_expr = format!(
+        "{}({})",
+        typescript_to_proto_converter(wire_name, conversion),
+        required_field_expr(
+            &format!("model.{generated_field_name}"),
+            &record.name,
+            generated_field_name,
+        )
+    );
+    Some((from_wire_expr, to_wire_expr))
+}
+
 /// Bind only the parameters used by the nested record. Parameter identity is
 /// shared across records, but the nested converter may use a subset or order.
 fn bind_nested_type_info(
@@ -330,6 +355,14 @@ fn model_wire_fields<'a>(
             let wire_expr = format!("{{wire}}.{}", rendered.wire_name);
             if let Some((from_wire, to_wire)) =
                 generic_carrier_expressions(record, field, &rendered.name, &wire_expr)
+            {
+                let mut wire_field = rendered.clone();
+                wire_field.from_wire_expr = from_wire;
+                wire_field.to_wire_expr = to_wire;
+                return ModelWireField::Value(Cow::Owned(wire_field));
+            }
+            if let Some((from_wire, to_wire)) =
+                conversion_expressions(record, field, &rendered.name, &wire_expr)
             {
                 let mut wire_field = rendered.clone();
                 wire_field.from_wire_expr = from_wire;
