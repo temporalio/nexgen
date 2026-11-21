@@ -2,7 +2,7 @@
 
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
-import type { AppendRecordsResponse, AppendRecordsRequest, Producer } from "../models";
+import type { Producer, AppendRecordsResponse, AppendRecordsRequest } from "../models";
 import * as support from "../../../../support/temporal_model_converters";
 
 type AppendRecordsInput<BodyT> =

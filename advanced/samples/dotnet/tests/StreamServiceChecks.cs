@@ -13,13 +13,38 @@ using WireAppendRecordsRequest = Streams::Temporalio.Api.StreamService.V1.Append
 using WireCreateStreamRequest = Streams::Temporalio.Api.StreamService.V1.CreateStreamRequest;
 using WireDescribeStreamRequest = Streams::Temporalio.Api.StreamService.V1.DescribeStreamRequest;
 using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
+using WireProducer = Streams::Temporalio.Api.Stream.V1.Producer;
 using WireReadRecordsRequest = Streams::Temporalio.Api.StreamService.V1.ReadRecordsRequest;
+using WireStreamRecord = Streams::Temporalio.Api.Stream.V1.StreamRecord;
 
 namespace Nexgen.DotNetExamples.Tests
 {
     public class StreamServiceChecks
     {
         public sealed record Turn(string Role);
+
+        private static readonly StreamServiceExample.Producer ClientProducer =
+            new StreamServiceExample.Producer.Client(
+                new StreamServiceExample.ClientProducer("ns", "c1"));
+
+        private static StreamServiceExample.AppendRecordsRequest<Turn> AppendRequest(
+            StreamServiceExample.Producer producer, string? requestId = null) =>
+            new(
+                new StreamServiceExample.StreamRef<Turn>("stream-1"),
+                new StreamServiceExample.AppendRecord<Turn>[0],
+                producer,
+                requestId);
+
+        // A body decodes with the converter context of the stream assembly, which is internal.
+        private static IDisposable PushStreamConverterContext() =>
+            (IDisposable)typeof(StreamServiceExample.Stream<Turn>).Assembly
+                .GetType("Nexgen.Support.SystemNexusConverterContext")!
+                .GetMethod("Push", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, new object[]
+                {
+                    DataConverter.Default.PayloadConverter,
+                    DataConverter.Default.FailureConverter,
+                })!;
 
         [Fact]
         public void StreamWithItsHandleRoundTrips()
@@ -89,11 +114,7 @@ namespace Nexgen.DotNetExamples.Tests
         [InlineData(null)]
         public void AnAppendSendsItsRequestId(string? requestId)
         {
-            var model = new StreamServiceExample.AppendRecordsRequest<Turn>(
-                new StreamServiceExample.StreamRef<Turn>("stream-1"),
-                new StreamServiceExample.AppendRecord<Turn>[0],
-                new StreamServiceExample.Producer("wf:r1"),
-                requestId);
+            var model = AppendRequest(ClientProducer, requestId);
 
             var wire = Assert.IsType<WireAppendRecordsRequest>(
                 CreateSdkConverter(typeof(StreamServiceExample.AppendRecordsRequest<Turn>))
@@ -103,6 +124,59 @@ namespace Nexgen.DotNetExamples.Tests
             var decoded = FromPayload<StreamServiceExample.AppendRecordsRequest<Turn>>(
                 ToPayload(model));
             Assert.Equal(requestId, decoded.RequestId);
+        }
+
+        [Theory]
+        [InlineData(WireProducer.KindOneofCase.Workflow)]
+        [InlineData(WireProducer.KindOneofCase.Client)]
+        public void ARequestSendsItsProducerAsTheMemberOfItsCase(WireProducer.KindOneofCase kind)
+        {
+            var producer = kind == WireProducer.KindOneofCase.Client
+                ? ClientProducer
+                : new StreamServiceExample.Producer.Workflow(
+                    new StreamServiceExample.WorkflowProducer("ns", "w1", "r1"));
+            var model = AppendRequest(producer);
+
+            var wire = Assert.IsType<WireAppendRecordsRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.AppendRecordsRequest<Turn>))
+                    .ToTransferType(model));
+            Assert.Equal(kind, wire.Producer.KindCase);
+
+            var decoded = FromPayload<StreamServiceExample.AppendRecordsRequest<Turn>>(
+                ToPayload(model));
+            Assert.Equal(producer, decoded.Producer);
+        }
+
+        // A newer server can send a kind in field 6, which this code doesn't know.
+        [Theory]
+        [InlineData(null)]
+        [InlineData(new byte[0])]
+        [InlineData(new byte[] { 0x32, 0x00 })]
+        public void AProducerWithNoKnownMemberIsAbsent(byte[]? producer)
+        {
+            using var converterContext = PushStreamConverterContext();
+            var wireProducer = producer == null ? null : WireProducer.Parser.ParseFrom(producer);
+            var record = new WireStreamRecord
+            {
+                Producer = wireProducer,
+                Body = DataConverter.Default.PayloadConverter.ToPayload(new Turn("user")),
+                Offset = ByteString.CopyFrom(1),
+            };
+
+            var decoded = Assert.IsType<StreamServiceExample.StreamRecord<Turn>>(
+                CreateSdkConverter(typeof(StreamServiceExample.StreamRecord<Turn>))
+                    .FromTransferType(record));
+            Assert.Null(decoded.Producer);
+
+            // A request can't go without its Producer, so the same message fails there.
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                CreateSdkConverter(typeof(StreamServiceExample.AppendRecordsRequest<Turn>))
+                    .FromTransferType(new WireAppendRecordsRequest
+                    {
+                        StreamId = "stream-1",
+                        Producer = wireProducer,
+                    }));
+            Assert.Equal("missing required field AppendRecordsRequest.Producer", error.Message);
         }
 
         // A newer server can send a Stream status that this code doesn't know.

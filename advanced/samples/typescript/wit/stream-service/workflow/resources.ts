@@ -2,9 +2,9 @@
 
 import type * as common from "@temporalio/common";
 import type {
+  Producer,
   StreamRef,
   AppendRecordsResponse,
-  Producer,
   ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";

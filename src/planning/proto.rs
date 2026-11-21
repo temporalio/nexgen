@@ -2,7 +2,9 @@ use heck::ToUpperCamelCase;
 use prost_types::FieldDescriptorProto;
 use prost_types::field_descriptor_proto::{Label, Type};
 
-use crate::descriptors::{DescriptorIndex, EnumMetadata, MessageMetadata, real_oneof_groups};
+use crate::descriptors::{
+    DescriptorIndex, EnumMetadata, MessageMetadata, ProtoOneofGroup, real_oneof_groups,
+};
 use crate::spec::{
     ApiSpec, ExternalTypeSourceSpec, ExternalTypeSpec, IntSpec, ProtoTypeSpec, RecordSpec,
     TypeDeclSpec, TypeSpec,
@@ -14,7 +16,7 @@ use super::type_planning::TypePlanningContext;
 use super::{
     PlannedEnumType, PlannedFieldData, PlannedProtoEnumType, PlannedProtoMessageType,
     PlannedProtoType, PlannedProtoTypeInfo, PlannedType, PlannedWireFieldBinding,
-    PlannedWireVariantMember, materialize_selected_replacement,
+    PlannedWireOneofMessage, PlannedWireVariantMember, materialize_selected_replacement,
 };
 
 impl PlannedProtoTypeInfo {
@@ -234,21 +236,12 @@ pub(super) fn planned_record_field_data(
     let message = planner.descriptors.message(proto_name)?.clone();
     let oneofs = real_oneof_groups(&message).ok()?;
     if let Some(oneof) = oneofs.iter().find(|oneof| oneof.name == field_name) {
-        let members = oneof
-            .fields
-            .iter()
-            .map(|(_, member)| {
-                Some(PlannedWireVariantMember {
-                    wire_name: member.name.clone()?,
-                    wire_type: planned_wire_field_type(member, planner),
-                })
-            })
-            .collect::<Option<Vec<_>>>()?;
         return Some(PlannedFieldData {
             has_presence: Some(true),
             wire_binding: Some(PlannedWireFieldBinding::VariantMembers {
                 wire_name: oneof.name.to_string(),
-                members,
+                members: planned_oneof_members(oneof, planner)?,
+                message: None,
             }),
             ..Default::default()
         });
@@ -260,19 +253,28 @@ pub(super) fn planned_record_field_data(
         .find(|field| field.name.as_deref() == Some(field_name))?;
     let wire_name = field.name.clone()?;
     let wire_type = planned_wire_field_type(field, planner);
-    let wire_binding = match record
-        .fields
-        .get(field_name)
-        .and_then(|authored_field| authored_field.conversion.as_ref())
-    {
+    let authored_field = record.fields.get(field_name);
+    let wire_binding = match authored_field.and_then(|authored| authored.conversion.as_ref()) {
         Some(conversion) => PlannedWireFieldBinding::Converted {
             wire_name,
             wire_type,
             conversion: materialize_selected_replacement(conversion),
         },
-        None => PlannedWireFieldBinding::Value {
-            wire_name,
-            wire_type,
+        None => match authored_field
+            .and_then(|authored| oneof_of_field_message(&authored.field_type, field, planner))
+        {
+            Some((oneof_name, members)) => PlannedWireFieldBinding::VariantMembers {
+                wire_name: oneof_name,
+                members,
+                message: Some(PlannedWireOneofMessage {
+                    wire_name,
+                    wire_type,
+                }),
+            },
+            None => PlannedWireFieldBinding::Value {
+                wire_name,
+                wire_type,
+            },
         },
     };
     Some(PlannedFieldData {
@@ -280,6 +282,51 @@ pub(super) fn planned_record_field_data(
         wire_binding: Some(wire_binding),
         ..Default::default()
     })
+}
+
+fn planned_oneof_members(
+    oneof: &ProtoOneofGroup<'_>,
+    planner: &mut TypePlanningContext<'_>,
+) -> Option<Vec<PlannedWireVariantMember>> {
+    oneof
+        .fields
+        .iter()
+        .map(|(_, member)| {
+            Some(PlannedWireVariantMember {
+                wire_name: member.name.clone()?,
+                wire_type: planned_wire_field_type(member, planner),
+            })
+        })
+        .collect()
+}
+
+/// The oneof of a variant field whose proto field has the message of that oneof, as the name
+/// and the members of the oneof.
+fn oneof_of_field_message(
+    authored_type: &TypeSpec<OperationLoweredFamily>,
+    field: &FieldDescriptorProto,
+    planner: &mut TypePlanningContext<'_>,
+) -> Option<(String, Vec<PlannedWireVariantMember>)> {
+    let TypeSpec::Variant(variant_name) = authored_type.without_option().validation_type() else {
+        return None;
+    };
+    let source = planner
+        .spec
+        .variant(variant_name.as_str())?
+        .source
+        .as_ref()?
+        .proto_oneof()?
+        .clone();
+    if field.type_name.as_deref()?.trim_start_matches('.') != source.message.as_str() {
+        return None;
+    }
+    let message = planner
+        .descriptors
+        .message(source.message.as_str())?
+        .clone();
+    let oneofs = real_oneof_groups(&message).ok()?;
+    let oneof = oneofs.iter().find(|oneof| oneof.name == source.name)?;
+    Some((source.name, planned_oneof_members(oneof, planner)?))
 }
 
 pub(super) fn planned_record_field_type(
@@ -293,11 +340,12 @@ pub(super) fn planned_record_field_type(
         let authored_type = record.fields.get(field_name)?.field_type.without_option();
         return Some(planner.planned_type_from_authored(authored_type));
     };
+    // The descriptor gives a variant field the message of its oneof, not the variant.
     if record.fields.get(field_name).is_some_and(|authored_field| {
         authored_field.conversion.is_some()
             || matches!(
                 authored_field.field_type.without_option().validation_type(),
-                TypeSpec::TypeParameter(_)
+                TypeSpec::TypeParameter(_) | TypeSpec::Variant(_)
             )
     }) {
         let authored_type = record.fields.get(field_name)?.field_type.without_option();

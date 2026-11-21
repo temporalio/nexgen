@@ -6,8 +6,8 @@ import type { Producer, StreamRef } from "../wit/stream-service/workflow/models"
 
 /** The run's Workflow Producer. */
 export function workflowProducer(): Producer {
-  const runId = workflow.workflowInfo().runId;
-  return { id: `wf:${runId}`, kind: { tag: "workflow", value: { runId } } };
+  const { namespace, workflowId, runId } = workflow.workflowInfo();
+  return { tag: "workflow", value: { namespace, workflowId, runId } };
 }
 
 /** A new id for each create call. A Workflow's replay gives the same id. */

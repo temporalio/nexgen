@@ -18,10 +18,13 @@ def _models() -> typing.Any:
 def workflow_producer() -> typing.Any:
     """The run's Workflow Producer."""
     models = _models()
-    run_id = temporalio.workflow.info().run_id
-    return models.Producer(
-        id=f"wf:{run_id}",
-        kind=models.ProducerKindWorkflow(models.WorkflowProducer(run_id=run_id)),
+    info = temporalio.workflow.info()
+    return models.ProducerWorkflow(
+        models.WorkflowProducer(
+            namespace=info.namespace,
+            workflow_id=info.workflow_id,
+            run_id=info.run_id,
+        )
     )
 
 
@@ -39,15 +42,17 @@ def default_producer(nexus_client: object) -> typing.Any:
             ),
             attempt=info.attempt,
         )
-        return models.Producer(
-            id=f"act:{info.workflow_run_id}:{info.activity_id}",
-            kind=models.ProducerKindWorkflowActivity(
-                models.ActivityProducer(run_id=info.workflow_run_id, attempt=attempt)
-            ),
+        return models.ProducerWorkflowActivity(
+            models.WorkflowActivityProducer(
+                namespace=info.workflow_namespace,
+                workflow_id=info.workflow_id,
+                run_id=info.workflow_run_id,
+                activity_id=info.activity_id,
+                attempt=attempt,
+            )
         )
-    return models.Producer(
-        id="client:sample",
-        kind=models.ProducerKindClient(models.ClientProducer()),
+    return models.ProducerClient(
+        models.ClientProducer(namespace="default", id="client:sample")
     )
 
 

@@ -1744,9 +1744,15 @@ fn build_field_conversions(
         )
         .enumerate()
         .map(|(index, (field_name, field))| {
-            if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
+            if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members, message }) =
                 &field.data.wire_binding
             {
+                if message.is_some() {
+                    return Err(Error::UnsupportedGoProtoConversion {
+                        context: format!("{}.{}", planned_model.name, go_field_name(field_name)),
+                        reason: "a variant for a message field has no Go conversion".to_string(),
+                    });
+                }
                 return build_oneof_conversion(
                     planned_model, field_name, field, wire_name, members, api_plan, backend,
                 );

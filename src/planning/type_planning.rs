@@ -1781,8 +1781,11 @@ interface alerts {
         let field = record.fields.get("value").expect("grouped field");
         assert!(matches!(field.field_type, PlannedType::Variant(_)));
         assert_eq!(field.data.has_presence, Some(true));
-        let Some(super::PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
-            &field.data.wire_binding
+        let Some(super::PlannedWireFieldBinding::VariantMembers {
+            wire_name,
+            members,
+            message: None,
+        }) = &field.data.wire_binding
         else {
             panic!("grouped field should retain its wire variant members");
         };

@@ -7,10 +7,8 @@ namespace Nexgen.Support
     {
         // The run's Workflow Producer.
         internal static Temporalio.Workflows.Producer Producer() =>
-            new($"wf:{Workflow.Info.RunId}")
-            {
-                Kind = new ProducerKind.Workflow(new WorkflowProducer(Workflow.Info.RunId)),
-            };
+            new Temporalio.Workflows.Producer.Workflow(new WorkflowProducer(
+                Workflow.Info.Namespace, Workflow.Info.WorkflowId, Workflow.Info.RunId));
 
         // A new id for each create call. A Workflow's replay gives the same id.
         internal static string RequestId() =>

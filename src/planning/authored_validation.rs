@@ -14,7 +14,8 @@ use crate::generator::{dotnet, python};
 use crate::language::Language;
 use crate::spec::{
     ApiSpec, AuthoredFamily, ExternalTypeBindingSpec, ExternalTypeSourceSpec, ExternalTypeSpec,
-    FieldPolicy, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
+    ExternalVariantSourceSpec, FieldPolicy, RecordFieldSpec, RecordSpec, ServiceSpec, TypeSpec,
+    VariantSpec,
 };
 use crate::spec::{ApiSpecLeaf, CompilerPass};
 
@@ -378,75 +379,125 @@ fn validate_oneof_model_config(
             });
         };
         validate_oneof_variant_source(message_name, oneof, variant)?;
+        validate_oneof_variant_cases(message_name, oneof, variant)?;
+    }
+    Ok(())
+}
 
-        for (_, member) in &oneof.fields {
-            if field_label(member) == Some(Label::Repeated) {
-                return Err(Error::InvalidTypeOverrideField {
-                    message: message_name.to_string(),
-                    field: oneof.name.to_string(),
-                    property: "oneof",
-                    reason: "protobuf oneof members cannot be repeated".to_string(),
-                });
-            }
-            let member_name = member
-                .name
-                .as_deref()
-                .expect("descriptor fields should be named");
-            let Some(case) = variant
-                .cases
-                .iter()
-                .find(|case| case.wire_name == member_name)
-            else {
-                return Err(Error::InvalidTypeOverrideField {
-                    message: message_name.to_string(),
-                    field: oneof.name.to_string(),
-                    property: "type",
-                    reason: format!(
-                        "variant `{}` is missing wire case `{member_name}`",
-                        variant.name
-                    ),
-                });
-            };
-            let Some(payload) = case.payload.as_ref() else {
-                return Err(Error::InvalidTypeOverrideField {
-                    message: message_name.to_string(),
-                    field: oneof.name.to_string(),
-                    property: "type",
-                    reason: format!(
-                        "variant case `{}` must carry the protobuf member value",
-                        case.name
-                    ),
-                });
-            };
-            if !authored_field_matches_singular_proto(payload, member)? {
-                return Err(Error::InvalidTypeOverrideField {
-                    message: message_name.to_string(),
-                    field: oneof.name.to_string(),
-                    property: "type",
-                    reason: format!(
-                        "variant case `{}` payload `{}` does not match protobuf member `{member_name}`",
-                        case.name,
-                        payload.to_type_string()
-                    ),
-                });
-            }
+fn validate_oneof_variant_cases(
+    message_name: &str,
+    oneof: &ProtoOneofGroup<'_>,
+    variant: &VariantSpec,
+) -> Result<()> {
+    for (_, member) in &oneof.fields {
+        if field_label(member) == Some(Label::Repeated) {
+            return Err(Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: oneof.name.to_string(),
+                property: "oneof",
+                reason: "protobuf oneof members cannot be repeated".to_string(),
+            });
         }
-        for case in &variant.cases {
-            if !oneof
-                .fields
-                .iter()
-                .any(|(_, member)| member.name.as_deref() == Some(case.wire_name.as_str()))
-            {
-                return Err(Error::InvalidTypeOverrideField {
-                    message: message_name.to_string(),
-                    field: oneof.name.to_string(),
-                    property: "type",
-                    reason: format!("variant `{}` has extra case `{}`", variant.name, case.name),
-                });
-            }
+        let member_name = member
+            .name
+            .as_deref()
+            .expect("descriptor fields should be named");
+        let Some(case) = variant
+            .cases
+            .iter()
+            .find(|case| case.wire_name == member_name)
+        else {
+            return Err(Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: oneof.name.to_string(),
+                property: "type",
+                reason: format!(
+                    "variant `{}` is missing wire case `{member_name}`",
+                    variant.name
+                ),
+            });
+        };
+        let Some(payload) = case.payload.as_ref() else {
+            return Err(Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: oneof.name.to_string(),
+                property: "type",
+                reason: format!(
+                    "variant case `{}` must carry the protobuf member value",
+                    case.name
+                ),
+            });
+        };
+        if !authored_field_matches_singular_proto(payload, member)? {
+            return Err(Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: oneof.name.to_string(),
+                property: "type",
+                reason: format!(
+                    "variant case `{}` payload `{}` does not match protobuf member `{member_name}`",
+                    case.name,
+                    payload.to_type_string()
+                ),
+            });
+        }
+    }
+    for case in &variant.cases {
+        if !oneof
+            .fields
+            .iter()
+            .any(|(_, member)| member.name.as_deref() == Some(case.wire_name.as_str()))
+        {
+            return Err(Error::InvalidTypeOverrideField {
+                message: message_name.to_string(),
+                field: oneof.name.to_string(),
+                property: "type",
+                reason: format!("variant `{}` has extra case `{}`", variant.name, case.name),
+            });
         }
     }
     Ok(())
+}
+
+/// Checks a variant field whose proto field has the message of the variant's oneof. The
+/// conversion builds that message from the case alone, so the message must be only the oneof.
+fn validate_oneof_message_field(
+    message_name: &str,
+    field_name: &str,
+    variant: &VariantSpec,
+    oneof_name: &str,
+    oneof_message: &MessageMetadata,
+) -> Result<()> {
+    let oneof_message_name = oneof_message.full_name.as_str();
+    let oneofs = validated_real_oneofs(oneof_message_name, oneof_message)?;
+    // The check of the variant's own mapping reports a oneof that the message doesn't have.
+    let Some(oneof) = oneof_by_name(&oneofs, oneof_name) else {
+        return Ok(());
+    };
+    let other_oneof = oneofs
+        .iter()
+        .find(|other| other.name != oneof_name)
+        .map(|other| format!("oneof `{}`", other.name));
+    let other = other_oneof.or_else(|| {
+        let fields = oneof_message.descriptor.field.iter().enumerate();
+        fields
+            .filter(|(index, _)| !oneof.fields.iter().any(|(member, _)| member == index))
+            .map(|(_, field)| format!("field `{}`", field.name()))
+            .next()
+    });
+    if let Some(other) = other {
+        return Err(Error::InvalidTypeOverrideField {
+            message: message_name.to_string(),
+            field: field_name.to_string(),
+            property: "type",
+            reason: format!(
+                "variant `{}` maps to oneof `{oneof_name}`, but `{oneof_message_name}` also has \
+                 {other}; declare a record for `{oneof_message_name}` with the variant as the \
+                 type of its field `{oneof_name}`",
+                variant.name
+            ),
+        });
+    }
+    validate_oneof_variant_cases(oneof_message_name, oneof, variant)
 }
 
 fn validate_oneof_variant_source(
@@ -529,7 +580,14 @@ fn validate_message_model_config(
         usage,
         language,
     )?;
-    validate_authored_field_types(message_name, model_config, message, &oneofs, descriptors)?;
+    validate_authored_field_types(
+        spec,
+        message_name,
+        model_config,
+        message,
+        &oneofs,
+        descriptors,
+    )?;
     validate_invocation_fields(message_name, model_config, message, descriptors, usage)?;
     for (field_name, _) in model_config
         .record
@@ -697,6 +755,7 @@ fn validate_record_fields(
 }
 
 fn validate_authored_field_types(
+    spec: &ApiSpec,
     message_name: &str,
     model_config: ModelConfig<'_>,
     message: &MessageMetadata,
@@ -720,6 +779,31 @@ fn validate_authored_field_types(
         }
         // The helper converts, and the compiler of the target language checks the helper.
         if field_spec.conversion.is_some() {
+            continue;
+        }
+        // A variant is the type of a singular field with the message of the variant's oneof.
+        if let TypeSpec::Variant(variant_name) =
+            field_spec.field_type.without_option().validation_type()
+            && let Some(variant) = spec.variant(variant_name.as_str())
+            && let Some(source) = variant
+                .source
+                .as_ref()
+                .and_then(ExternalVariantSourceSpec::proto_oneof)
+            && field_label(field) != Some(Label::Repeated)
+            && field
+                .type_name
+                .as_deref()
+                .map(|name| name.trim_start_matches('.'))
+                == Some(source.message.as_str())
+            && let Some(oneof_message) = descriptors.message(source.message.as_str())
+        {
+            validate_oneof_message_field(
+                message_name,
+                field_name,
+                variant,
+                &source.name,
+                oneof_message,
+            )?;
             continue;
         }
 

@@ -1111,7 +1111,15 @@ impl<'a> ProtoWitBuilder<'a> {
             }
             return Ok(());
         }
-        let expected = self.render_message_field_for_comparison(message, field)?;
+        // A variant for the oneof of a message that is only that oneof can be the type of a
+        // singular field of that message.
+        let variant_name = self
+            .descriptors
+            .message(field.type_name().trim_start_matches('.'))
+            .filter(|_| field.label != Some(Label::Repeated as i32))
+            .and_then(|field_message| self.oneof_message_variant(field_message))
+            .filter(|variant_name| base_type_expr(&existing.type_expr) == variant_name);
+        let expected = self.render_message_field_for_comparison(message, field, variant_name)?;
         let name_matches = existing.wit_name == expected.wit_name || existing.explicit_proto_field;
         let type_matches = self.type_is_compatible(&existing.type_expr, &expected.type_expr);
         if !name_matches || !type_matches {
@@ -1218,6 +1226,11 @@ impl<'a> ProtoWitBuilder<'a> {
         let (record, owned) = if let Some(record) = self.existing_records_by_proto.get(proto_name) {
             (record.clone(), true)
         } else if self.available_type_names.contains_key(proto_name) {
+            return Ok(());
+        } else if let Some(variant_name) = self.oneof_message_variant(message) {
+            // The cases of the variant get the checks of a record's oneof field.
+            let oneofs = self.real_oneof_groups(message)?;
+            self.render_or_reuse_oneof_variant(message, &variant_name, &oneofs[0])?;
             return Ok(());
         } else if let Some(linked_type) = self.linked_wit.proto_types.get(proto_name) {
             let Some(fields) = &linked_type.record_fields else {
@@ -1531,20 +1544,7 @@ impl<'a> ProtoWitBuilder<'a> {
         record_name: &str,
         oneof: &ProtoOneofGroup<'_>,
     ) -> Result<String> {
-        let existing_name = self
-            .existing_oneofs_by_variant
-            .iter()
-            .chain(
-                self.linked_wit
-                    .oneofs_by_variant
-                    .iter()
-                    .filter(|(name, _)| !self.existing_declared_type_names.contains(*name)),
-            )
-            .find(|(_, metadata)| {
-                metadata.source.message == message.full_name && metadata.source.name == oneof.name
-            })
-            .map(|(name, _)| name.clone());
-        if let Some(name) = existing_name {
+        if let Some(name) = self.existing_oneof_variant(&message.full_name, oneof.name) {
             let record = ExistingRecord {
                 wit_name: record_name.to_string(),
                 fields: BTreeMap::from([(
@@ -1573,6 +1573,33 @@ impl<'a> ProtoWitBuilder<'a> {
         let definition = self.render_oneof_variant(message, &name, oneof)?;
         self.rendered_definitions.push(definition);
         Ok(name)
+    }
+
+    fn existing_oneof_variant(&self, message_name: &str, oneof_name: &str) -> Option<String> {
+        self.existing_oneofs_by_variant
+            .iter()
+            .chain(
+                self.linked_wit
+                    .oneofs_by_variant
+                    .iter()
+                    .filter(|(name, _)| !self.existing_declared_type_names.contains(*name)),
+            )
+            .find(|(_, metadata)| {
+                metadata.source.message == message_name && metadata.source.name == oneof_name
+            })
+            .map(|(name, _)| name.clone())
+    }
+
+    /// The existing variant for the oneof of a message that is only that oneof.
+    fn oneof_message_variant(&self, message: &MessageMetadata) -> Option<String> {
+        let oneofs = real_oneof_groups(message).ok()?;
+        let [oneof] = oneofs.as_slice() else {
+            return None;
+        };
+        if oneof.fields.len() != message.descriptor.field.len() {
+            return None;
+        }
+        self.existing_oneof_variant(&message.full_name, oneof.name)
     }
 
     fn reserve_oneof_variant_name(
@@ -1676,9 +1703,13 @@ impl<'a> ProtoWitBuilder<'a> {
         &self,
         message: &MessageMetadata,
         field: &FieldDescriptorProto,
+        variant_name: Option<String>,
     ) -> Result<RenderedFieldSpec> {
         let name = field_name(field, &message.full_name)?;
-        let base_type = self.field_base_type_for_comparison(field, &message.full_name, name)?;
+        let base_type = match variant_name {
+            Some(variant_name) => variant_name,
+            None => self.field_base_type_for_comparison(field, &message.full_name, name)?,
+        };
         let type_expr = self.field_type_with_base(field, &message.full_name, name, base_type)?;
         let wit_name = name.to_kebab_case();
         Ok(RenderedFieldSpec {

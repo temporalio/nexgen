@@ -1,0 +1,19 @@
+package temporal:nexus@1.0.0;
+
+world system { export models; }
+
+interface models {
+  use nexus:temporal-types/model@1.0.0.{failure, payloads};
+
+  /// @nexus.proto "temporal.api.activity.v1.ActivityExecutionOutcome.value"
+  variant outcome {
+    %result(payloads),
+    failure(failure),
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.PollActivityExecutionResponse"
+  record poll-activity-execution-response {
+    run-id: string,
+    outcome: option<outcome>,
+  }
+}

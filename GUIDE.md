@@ -466,6 +466,10 @@ Python represents WIT variants as tagged tuples. A variant backed by a protobuf
 `oneof` uses case dataclasses, as described under [`@nexus.proto`](#nexusproto).
 TypeScript represents variants as tagged object unions.
 
+A variant backed by a protobuf `oneof` can also be the type of a field whose
+protobuf message is only that oneof. See
+[a variant for a message that is only its oneof](#a-variant-for-a-message-that-is-only-its-oneof).
+
 ```wit
 variant notification-target {
   email(string),
@@ -2105,6 +2109,94 @@ invalid values passed from JavaScript.
 
 Other targets reject a reachable model containing a oneof they cannot convert.
 Unreachable declarations and omitted oneofs remain valid.
+
+#### A variant for a message that is only its oneof
+
+Some messages have one oneof and no field outside it. The variant of that oneof
+is then the whole message. So the variant can be the type of a field of any
+proto-backed record whose proto field has that message type, and the WIT needs
+no record for the message.
+
+```proto
+message Producer {
+    oneof kind {
+        WorkflowProducer workflow = 1;
+        ClientProducer client = 5;
+    }
+}
+
+message AppendRecordsRequest {
+    string stream_id = 1;
+    Producer producer = 2;
+}
+```
+
+```wit
+/// @nexus.proto "temporal.api.stream.v1.Producer.kind"
+variant producer {
+  workflow(workflow-producer),
+  client(client-producer),
+}
+
+/// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
+record append-records-request {
+  producer: producer,
+}
+```
+
+The conversion of the record builds and reads the `Producer` message around the
+oneof.
+
+```python
+# To the proto.
+match value.producer:
+    case ProducerWorkflow():
+        message.producer.workflow.CopyFrom(
+            _WorkflowProducerTransferTypeConverter().to_transfer_type(
+                value.producer.value
+            )
+        )
+    case ProducerClient():
+        message.producer.client.CopyFrom(
+            _ClientProducerTransferTypeConverter().to_transfer_type(
+                value.producer.value
+            )
+        )
+
+# From the proto.
+match value.producer.WhichOneof("kind"):
+    case "workflow":
+        _oneof_producer = ProducerWorkflow(
+            _WorkflowProducerTransferTypeConverter().from_transfer_type(
+                value.producer.workflow, WorkflowProducer
+            )
+        )
+    case "client":
+        _oneof_producer = ProducerClient(
+            _ClientProducerTransferTypeConverter().from_transfer_type(
+                value.producer.client, ClientProducer
+            )
+        )
+    case None:
+        raise ValueError("missing required field AppendRecordsRequest.producer")
+```
+
+- The field can be required (`producer: producer`) or optional
+  (`producer: option<producer>`).
+- A required field fails to decode, as a missing required field does, when the
+  message is missing or has no member set. An optional field is then absent
+  (`None`, `undefined` or `null`).
+- A member that the generated code doesn't know, such as one that a newer server
+  sends, reads as no member.
+- The variant can still be the type of the oneof's field in a record for the
+  message. One WIT can use it both ways.
+- A message with a field outside the oneof, or with a second oneof, needs a
+  record. The compiler refuses the variant as the type of a field with that
+  message type.
+- `list<variant>` for a repeated message field is not supported.
+- `@nexus.default`, `@nexus.source` and `@nexus.api-omit` work on such a field,
+  and a resource method parameter can bind to it.
+- Python, TypeScript and .NET convert such a field. Go refuses it.
 
 ---
 

@@ -278,6 +278,8 @@ pub(crate) enum PlannedWireFieldBinding {
     VariantMembers {
         wire_name: String,
         members: Vec<PlannedWireVariantMember>,
+        /// The field whose message holds the oneof. Without one, the record's message holds it.
+        message: Option<PlannedWireOneofMessage>,
     },
     /// Helpers of the support package convert the model value and the proto field.
     Converted {
@@ -289,6 +291,13 @@ pub(crate) enum PlannedWireFieldBinding {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PlannedWireVariantMember {
+    pub(crate) wire_name: String,
+    pub(crate) wire_type: PlannedType,
+}
+
+/// A proto field whose message is only one oneof.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PlannedWireOneofMessage {
     pub(crate) wire_name: String,
     pub(crate) wire_type: PlannedType,
 }

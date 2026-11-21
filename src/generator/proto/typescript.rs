@@ -7,8 +7,8 @@ use prost_types::FieldDescriptorProto;
 use crate::error::Result;
 use crate::generator::ExternalModelBackend;
 use crate::generator::typescript::{
-    RenderedExternalModelFragments, RenderedField, RenderedModel, ResolvedFieldType,
-    WireFunctionNames, WireValueConversion, flattened_field_from_wire_expr,
+    RenderedExternalModelFragments, RenderedField, RenderedModel, RenderedSourcedField,
+    ResolvedFieldType, WireFunctionNames, WireValueConversion, flattened_field_from_wire_expr,
     flattened_message_to_wire_expr, generic_model_annotation, map_value_from_wire_expr,
     map_value_to_wire_expr_from_expr, optional_from_wire_expr, optional_to_wire_expr,
     render_named_generic_function_start, repeated_from_wire_expr, repeated_to_wire_expr,
@@ -87,32 +87,40 @@ enum ModelWireField<'a> {
     Oneof(OneofField<'a>),
 }
 
-impl ModelWireField<'_> {
-    fn field(&self) -> &RenderedField {
-        match self {
-            Self::Value(field) => field,
-            Self::Oneof(oneof) => oneof.field,
-        }
-    }
-}
-
 struct OneofField<'a> {
-    field: &'a RenderedField,
+    name: &'a str,
+    annotation: &'a str,
     local_name: String,
     wire_group: String,
+    /// The field whose message holds the oneof, with the interface of that message.
+    message: Option<(String, String)>,
     required: bool,
     cases: Vec<OneofCase>,
+}
+
+impl OneofField<'_> {
+    /// The local that holds the message of the oneof. The record's message is `proto`.
+    fn owner(&self) -> String {
+        match &self.message {
+            Some(_) => format!("{}Message", self.local_name),
+            None => "proto".to_string(),
+        }
+    }
 }
 
 fn oneof_wire_field<'a>(
     api_plan: &PlannedSpec,
     field: &RecordFieldSpec<PlannedFamily>,
-    rendered: &'a RenderedField,
+    name: &'a str,
+    annotation: &'a str,
     local_name: String,
     resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
 ) -> Option<OneofField<'a>> {
-    let PlannedWireFieldBinding::VariantMembers { wire_name, members } =
-        field.data.wire_binding.as_ref()?
+    let PlannedWireFieldBinding::VariantMembers {
+        wire_name,
+        members,
+        message,
+    } = field.data.wire_binding.as_ref()?
     else {
         return None;
     };
@@ -139,9 +147,16 @@ fn oneof_wire_field<'a>(
         });
     }
     Some(OneofField {
-        field: rendered,
+        name,
+        annotation,
         local_name,
         wire_group: typescript_generated_field_name(wire_name),
+        message: message.as_ref().and_then(|message| {
+            Some((
+                typescript_generated_field_name(&message.wire_name),
+                model_typescript_interface_ref(&message.wire_type, api_plan)?,
+            ))
+        }),
         required: field.required,
         cases,
     })
@@ -333,7 +348,7 @@ fn model_wire_fields<'a>(
     api_plan: &PlannedSpec,
     resolve_type: &impl Fn(&PlannedType) -> ResolvedFieldType,
 ) -> Vec<ModelWireField<'a>> {
-    model
+    let mut fields = model
         .fields
         .iter()
         .enumerate()
@@ -347,9 +362,14 @@ fn model_wire_fields<'a>(
             } else {
                 format!("result{index}")
             };
-            if let Some(oneof) =
-                oneof_wire_field(api_plan, field, rendered, local_name, resolve_type)
-            {
+            if let Some(oneof) = oneof_wire_field(
+                api_plan,
+                field,
+                &rendered.name,
+                &rendered.annotation,
+                local_name,
+                resolve_type,
+            ) {
                 return ModelWireField::Oneof(oneof);
             }
             let wire_expr = format!("{{wire}}.{}", rendered.wire_name);
@@ -435,7 +455,40 @@ fn model_wire_fields<'a>(
             }
             ModelWireField::Value(wire_field)
         })
-        .collect()
+        .collect::<Vec<_>>();
+    // A model converts a sourced field as data, so its oneof converts as that of a field does.
+    for (index, rendered) in model.sourced_fields.iter().enumerate() {
+        let field = record
+            .sourced_fields()
+            .map(|(_, field, _)| field)
+            .find(|field| typescript_generated_field_name(&field.name) == rendered.name);
+        let local_name = format!("result{}", model.fields.len() + index);
+        if let Some(oneof) = field.and_then(|field| {
+            oneof_wire_field(
+                api_plan,
+                field,
+                &rendered.name,
+                &rendered.annotation,
+                local_name,
+                resolve_type,
+            )
+        }) {
+            fields.push(ModelWireField::Oneof(oneof));
+        }
+    }
+    fields
+}
+
+/// The sourced fields that convert as values. A oneof is one of the wire fields.
+fn sourced_value_fields<'a>(
+    model: &'a RenderedModel,
+    fields: &'a [ModelWireField<'_>],
+) -> impl Iterator<Item = &'a RenderedSourcedField> {
+    model.sourced_fields.iter().filter(|field| {
+        !fields
+            .iter()
+            .any(|wire| matches!(wire, ModelWireField::Oneof(oneof) if oneof.name == field.name))
+    })
 }
 
 fn generic_carrier_conversion(
@@ -493,16 +546,26 @@ struct OneofCase {
 
 fn render_oneof_from_proto(output: &mut String, owner: &str, oneof: &OneofField<'_>) {
     let name = &oneof.local_name;
-    let field = &oneof.field.name;
+    let field = oneof.name;
+    let proto = oneof.owner();
+    // An unset message reads as an empty one, so it has no discriminator either.
+    if let Some((message_field, message_type)) = &oneof.message {
+        output.push_str(&format!(
+            "  const {proto}: {message_type} = proto.{message_field} ?? {{}};\n"
+        ));
+    }
     output.push_str(&format!(
-        "  let {name}: {}{};\n  switch (proto.{}) {{\n",
-        oneof.field.annotation,
+        "  let {name}: {}{};\n  switch ({proto}.{}) {{\n",
+        oneof.annotation,
         if oneof.required { "" } else { " | undefined" },
         oneof.wire_group,
     ));
     for case in &oneof.cases {
-        let wire =
-            required_field_expr(&format!("proto.{}", case.wire_name), owner, &case.wire_name);
+        let wire = required_field_expr(
+            &format!("{proto}.{}", case.wire_name),
+            owner,
+            &case.wire_name,
+        );
         let decoded = case
             .conversion
             .as_ref()
@@ -523,14 +586,14 @@ fn render_oneof_from_proto(output: &mut String, owner: &str, oneof: &OneofField<
         ));
     }
     output.push_str(&format!(
-        "    default:\n      proto.{} satisfies never;\n      throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n  }}\n",
+        "    default:\n      {proto}.{} satisfies never;\n      throw new Error(\"invalid oneof discriminator for {owner}.{field}\");\n  }}\n",
         oneof.wire_group,
     ));
 }
 
 fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_>) {
     let name = &oneof.local_name;
-    let field = &oneof.field.name;
+    let field = oneof.name;
     let value = format!("model.{field}");
     if oneof.required {
         output.push_str(&format!(
@@ -543,6 +606,13 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
         ));
     }
     let indent = if oneof.required { "  " } else { "    " };
+    let proto = oneof.owner();
+    if let Some((message_field, message_type)) = &oneof.message {
+        output.push_str(&format!(
+            "{indent}const {proto}: {message_type} = {{}};\n\
+             {indent}proto.{message_field} = {proto};\n"
+        ));
+    }
     output.push_str(&format!("{indent}switch ({name}.tag) {{\n"));
     for case in &oneof.cases {
         let encoded = case
@@ -551,7 +621,7 @@ fn render_oneof_to_proto(output: &mut String, owner: &str, oneof: &OneofField<'_
             .map(|c| c.to_wire_expr(&format!("{name}.value")))
             .unwrap_or_else(|| format!("{name}.value"));
         output.push_str(&format!(
-            "{indent}  case {:?}:\n{indent}    proto.{} = {:?};\n{indent}    proto.{} = {encoded};\n{indent}    break;\n",
+            "{indent}  case {:?}:\n{indent}    {proto}.{} = {:?};\n{indent}    {proto}.{} = {encoded};\n{indent}    break;\n",
             case.tag, oneof.wire_group, case.wire_name, case.wire_name,
         ));
     }
@@ -1030,7 +1100,7 @@ fn render_model_to_proto_function(
                 }
             }
         }
-        for field in &model.sourced_fields {
+        for field in sourced_value_fields(model, fields) {
             output.push_str(&format!(
                 "  proto.{} = {};\n",
                 field.wire_name, field.to_wire_expr
@@ -1042,8 +1112,10 @@ fn render_model_to_proto_function(
     } else {
         output.push_str("  return {\n");
         for field in fields {
+            let ModelWireField::Value(field) = field else {
+                continue;
+            };
             output.push_str("    ");
-            let field = field.field();
             output.push_str(&field.wire_name);
             output.push_str(": ");
             output.push_str(&field.to_wire_expr);
@@ -1101,18 +1173,17 @@ fn render_model_from_proto_function(
         }
         output.push_str("  return {\n");
         for field in fields {
-            if let ModelWireField::Oneof(oneof) = field {
-                if oneof.field.name == oneof.local_name {
-                    output.push_str(&format!("    {},\n", oneof.local_name));
-                } else {
-                    output.push_str(&format!(
-                        "    {}: {},\n",
-                        oneof.field.name, oneof.local_name
-                    ));
+            let field = match field {
+                ModelWireField::Oneof(oneof) => {
+                    if oneof.name == oneof.local_name {
+                        output.push_str(&format!("    {},\n", oneof.local_name));
+                    } else {
+                        output.push_str(&format!("    {}: {},\n", oneof.name, oneof.local_name));
+                    }
+                    continue;
                 }
-                continue;
-            }
-            let field = field.field();
+                ModelWireField::Value(field) => field,
+            };
             if field.flattened_fields.is_empty() {
                 output.push_str("    ");
                 output.push_str(&field.name);
@@ -1129,7 +1200,7 @@ fn render_model_from_proto_function(
                 }
             }
         }
-        for field in &model.sourced_fields {
+        for field in sourced_value_fields(model, fields) {
             output.push_str("    ");
             output.push_str(&field.name);
             output.push_str(": ");

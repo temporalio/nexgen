@@ -1,0 +1,8 @@
+inputs = ["input.wit", "../../../inputs/deps"]
+descriptors = "temporal"
+
+[error]
+kind = "invalid-type-override-field"
+contains = [
+  "type override for `temporal.api.workflowservice.v1.PollActivityExecutionResponse.outcome` has invalid field `type`: variant `Outcome` maps to oneof `value`, but `temporal.api.activity.v1.ActivityExecutionOutcome` also has field `retry_state`; declare a record for `temporal.api.activity.v1.ActivityExecutionOutcome` with the variant as the type of its field `value`",
+]

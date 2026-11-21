@@ -2389,9 +2389,14 @@ fn collect_typescript_language_imports(api_plan: &PlannedSpec) -> Vec<LanguageIm
                 ) => {
                     collect_value_type_imports(wire_type, &mut imports);
                 }
-                Some(PlannedWireFieldBinding::VariantMembers { members, .. }) => {
+                Some(PlannedWireFieldBinding::VariantMembers {
+                    members, message, ..
+                }) => {
                     for member in members {
                         collect_value_type_imports(&member.wire_type, &mut imports);
+                    }
+                    if let Some(message) = message {
+                        collect_value_type_imports(&message.wire_type, &mut imports);
                     }
                 }
                 None => {}
@@ -3516,7 +3521,7 @@ pub(in crate::generator) struct RenderedFlattenedField {
 pub(in crate::generator) struct RenderedSourcedField {
     pub(in crate::generator) name: String,
     pub(in crate::generator) wire_name: String,
-    annotation: String,
+    pub(in crate::generator) annotation: String,
     doc: Option<String>,
     optional: bool,
     source_expressions: BTreeMap<GenerationTarget, String>,

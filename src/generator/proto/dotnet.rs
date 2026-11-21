@@ -8,7 +8,7 @@ use crate::generator::dotnet::{
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoMessageType, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec,
-    PlannedType, PlannedWireFieldBinding, PlannedWireVariantMember,
+    PlannedType, PlannedWireFieldBinding, PlannedWireOneofMessage, PlannedWireVariantMember,
 };
 use crate::spec::{
     AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec,
@@ -384,8 +384,9 @@ fn validate_record_conversion(
         .iter()
         .filter(|(_, field)| !field.origin.as_ref().is_some_and(FieldPolicy::is_omitted))
     {
-        if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
-            &field.data.wire_binding
+        if let Some(PlannedWireFieldBinding::VariantMembers {
+            wire_name, members, ..
+        }) = &field.data.wire_binding
         {
             oneof_cases(api_plan, &proto.full_name, field, wire_name, members)?;
         }
@@ -918,7 +919,11 @@ fn render_field_from_wire_setup(
     support_namespace: Option<&str>,
 ) {
     match &field.data.wire_binding {
-        Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) => {
+        Some(PlannedWireFieldBinding::VariantMembers {
+            wire_name,
+            members,
+            message,
+        }) => {
             render_oneof_from_wire_setup(
                 output,
                 model,
@@ -926,6 +931,7 @@ fn render_field_from_wire_setup(
                 field,
                 wire_name,
                 members,
+                message.as_ref(),
                 raw_type,
                 api_plan,
                 support_namespace,
@@ -984,6 +990,7 @@ fn render_oneof_from_wire_setup(
     field: &RecordFieldSpec<PlannedFamily>,
     wire_name: &str,
     members: &[PlannedWireVariantMember],
+    message: Option<&PlannedWireOneofMessage>,
     raw_type: &str,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
@@ -997,17 +1004,29 @@ fn render_oneof_from_wire_setup(
         .expect("oneof cases are validated during prepare");
     let variant_type = variant_type_name(&field.field_type, api_plan);
     let local_name = oneof_local_name(field_name);
-    let oneof_case_type = format!("{raw_type}.{}OneofCase", csharp_type_name(wire_name));
+    // An unset message is null. Its case is then null too, which the default branch takes.
+    let (oneof_type, oneof_owner, case_owner) = match message {
+        Some(message) => {
+            let owner = format!("wire.{}", csharp_type_name(&message.wire_name));
+            (
+                dotnet_proto_type_name_for_message(&message.wire_type),
+                owner.clone(),
+                format!("{owner}?"),
+            )
+        }
+        None => (raw_type.to_string(), "wire".to_string(), "wire".to_string()),
+    };
+    let oneof_case_type = format!("{oneof_type}.{}OneofCase", csharp_type_name(wire_name));
     output.push_str(&format!(
         "        {variant_type}{} {local_name};\n",
         if field.required { "" } else { "?" }
     ));
     output.push_str(&format!(
-        "        switch (wire.{}Case)\n        {{\n",
+        "        switch ({case_owner}.{}Case)\n        {{\n",
         csharp_type_name(wire_name)
     ));
     for case in &cases {
-        let member_expr = format!("wire.{}", csharp_type_name(&case.member.wire_name));
+        let member_expr = format!("{oneof_owner}.{}", csharp_type_name(&case.member.wire_name));
         let value_expr = match generic_carrier(case.payload, &case.member.wire_type) {
             Some((type_parameter, carrier)) => generic_carrier_from_wire_expr(
                 carrier,
@@ -1266,8 +1285,11 @@ fn render_field_to_proto_assignment(
 ) {
     let property_name = field_property_name(field);
     let source_expr = property_name.to_string();
-    if let Some(PlannedWireFieldBinding::VariantMembers { wire_name, members }) =
-        &field.data.wire_binding
+    if let Some(PlannedWireFieldBinding::VariantMembers {
+        wire_name,
+        members,
+        message,
+    }) = &field.data.wire_binding
     {
         render_oneof_to_proto_assignment(
             backend,
@@ -1277,6 +1299,7 @@ fn render_field_to_proto_assignment(
             field,
             wire_name,
             members,
+            message.as_ref(),
             &source_expr,
             api_plan,
             support_namespace,
@@ -1336,6 +1359,7 @@ fn render_oneof_to_proto_assignment(
     field: &RecordFieldSpec<PlannedFamily>,
     wire_name: &str,
     members: &[PlannedWireVariantMember],
+    message: Option<&PlannedWireOneofMessage>,
     source_expr: &str,
     api_plan: &PlannedSpec,
     support_namespace: Option<&str>,
@@ -1373,10 +1397,15 @@ fn render_oneof_to_proto_assignment(
             "            case {variant_type}.{} {case_variable}:\n",
             case.case_name
         ));
-        output.push_str(&format!(
-            "                proto.{} = {converted};\n",
-            csharp_type_name(&case.member.wire_name)
-        ));
+        let member = csharp_type_name(&case.member.wire_name);
+        output.push_str(&match message {
+            Some(message) => format!(
+                "                proto.{} = new {} {{ {member} = {converted} }};\n",
+                csharp_type_name(&message.wire_name),
+                dotnet_proto_type_name_for_message(&message.wire_type)
+            ),
+            None => format!("                proto.{member} = {converted};\n"),
+        });
         output.push_str("                break;\n");
     }
     // A required oneof has no null value. A forced null (for example `null!`) must not

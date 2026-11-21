@@ -41,9 +41,15 @@ def _offset(n: int) -> bytes:
     return n.to_bytes(8, "big")
 
 
+def _client_producer(models: types.ModuleType) -> typing.Any:
+    return models.ProducerClient(models.ClientProducer(namespace="ns", id="c1"))
+
+
 @dataclasses.dataclass
 class FakeWorkflowInfo:
     run_id: str
+    namespace: str = "ns"
+    workflow_id: str = "w1"
     attempt: int = 1
 
 
@@ -81,19 +87,19 @@ def test_a_read_response_round_trips_with_its_records(models: types.ModuleType) 
         records=[
             models.StreamRecord(
                 body={"text": "hi"},
-                producer=models.Producer(
-                    id="la:r1:1",
-                    kind=models.ProducerKindLocalActivity(
-                        models.LocalActivityProducer(
-                            run_id="r1",
-                            attempt=models.LocalActivityAttempt(
-                                task=models.WorkflowTaskAttempt(
-                                    started_event_id=4, attempt=1
-                                ),
-                                attempt=2,
+                producer=models.ProducerLocalActivity(
+                    models.LocalActivityProducer(
+                        namespace="ns",
+                        workflow_id="w1",
+                        run_id="r1",
+                        activity_id="1",
+                        attempt=models.LocalActivityAttempt(
+                            task=models.WorkflowTaskAttempt(
+                                started_event_id=4, attempt=1
                             ),
-                        )
-                    ),
+                            attempt=2,
+                        ),
+                    )
                 ),
                 offset=_offset(1),
             ),
@@ -118,7 +124,7 @@ def test_a_request_keeps_only_the_stream_id_of_its_ref(
     wire = converter.to_transfer_type(
         models.AppendRecordsRequest(
             ref=models.StreamRef(id="s-1", store="redis"),
-            producer=models.Producer(id="client:sample"),
+            producer=_client_producer(models),
             records=[],
         )
     )
@@ -136,13 +142,74 @@ def test_a_request_keeps_only_the_stream_id_of_its_ref(
 def test_a_request_without_its_stream_id_is_refused(models: types.ModuleType) -> None:
     converter = models._AppendRecordsRequestTransferTypeConverter[object]()
     wire = request_response_pb2.AppendRecordsRequest(
-        producer=message_pb2.Producer(id="client:sample")
+        producer=message_pb2.Producer(
+            client=message_pb2.ClientProducer(namespace="ns", id="c1")
+        )
     )
 
     with pytest.raises(
         ValueError, match="missing required field AppendRecordsRequest.ref"
     ):
         _ = converter.from_transfer_type(wire, models.AppendRecordsRequest)
+
+
+@pytest.mark.parametrize("kind", ["workflow", "standalone_activity", "client"])
+def test_a_request_sends_its_producer_as_the_member_of_its_case(
+    models: types.ModuleType, kind: str
+) -> None:
+    attempt = models.ActivityAttempt(
+        attempt_scheduled_time=models.Timestamp(seconds=5, nanos=0), attempt=2
+    )
+    producer = {
+        "workflow": models.ProducerWorkflow(
+            models.WorkflowProducer(namespace="ns", workflow_id="w1", run_id="r1")
+        ),
+        "standalone_activity": models.ProducerStandaloneActivity(
+            models.StandaloneActivityProducer(
+                namespace="ns", activity_id="a1", run_id="r1", attempt=attempt
+            )
+        ),
+        "client": _client_producer(models),
+    }[kind]
+    converter = models._AppendRecordsRequestTransferTypeConverter[str]()
+    model = models.AppendRecordsRequest(
+        ref=models.StreamRef(id="s-1"), records=[], producer=producer
+    )
+
+    wire = converter.to_transfer_type(model)
+
+    # The variant is the whole Producer message, so the member is the only field that it sets.
+    assert wire.producer.WhichOneof("kind") == kind
+    assert [field.name for field, _ in wire.producer.ListFields()] == [kind]
+    assert converter.from_transfer_type(wire, models.AppendRecordsRequest[str]) == model
+
+
+# A newer server can send a kind in field 6, which this code doesn't know.
+@pytest.mark.parametrize("producer", [None, b"", b"\x32\x00"], ids=repr)
+def test_a_producer_with_no_known_member_is_absent(
+    models: types.ModuleType, producer: bytes | None
+) -> None:
+    wire_producer = (
+        None if producer is None else message_pb2.Producer.FromString(producer)
+    )
+    record = message_pb2.StreamRecord(producer=wire_producer, offset=_offset(1))
+    record.body.CopyFrom(PayloadConverter.default.to_payload("a"))
+    request = request_response_pb2.AppendRecordsRequest(
+        stream_id="s-1", producer=wire_producer
+    )
+
+    decoded = models._StreamRecordTransferTypeConverter[str]().from_transfer_type(
+        record, models.StreamRecord[str]
+    )
+
+    assert decoded.producer is None
+    # A request can't go without its Producer, so the same message fails there.
+    with pytest.raises(
+        ValueError, match="missing required field AppendRecordsRequest.producer"
+    ):
+        _ = models._AppendRecordsRequestTransferTypeConverter[str]().from_transfer_type(
+            request, models.AppendRecordsRequest[str]
+        )
 
 
 def test_an_unknown_enum_number_decodes_as_the_fallback_case(
@@ -244,11 +311,8 @@ async def test_workflow_apis_call_the_stream_service(
     await stream.close()
     # The Workflow API fills the request id of the create, and the Producer from its default.
     # An append sends no request id, since the SDK sets it.
-    producer = model_types.Producer(
-        id="wf:r2",
-        kind=model_types.ProducerKindWorkflow(
-            model_types.WorkflowProducer(run_id="r2")
-        ),
+    producer = model_types.ProducerWorkflow(
+        model_types.WorkflowProducer(namespace="ns", workflow_id="w1", run_id="r2")
     )
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [
@@ -326,7 +390,7 @@ async def test_workflow_handle_appends_with_its_type_parameter(
     else:
         stream = WorkflowStream[Turn](ref=ref, created=None)
     # A call that passes its own Producer keeps it, so the test needs no Workflow info.
-    producer = workflow_models.Producer(id="wf:r1")
+    producer = _client_producer(workflow_models)
 
     _ = await stream.append(Turn(role="model"), producer=producer)
 
@@ -635,7 +699,7 @@ async def test_a_workflow_stream_closes_at_the_end_of_async_with(
         assert created.ref == ref
         assert [name for name, _ in calls] == ["CreateStream"]
     assert [name for name, _ in calls] == ["CreateStream", "CloseStream"]
-    assert calls[-1][1].producer.id == "wf:r2"
+    assert calls[-1][1].producer.value.run_id == "r2"
 
 
 @pytest.mark.parametrize(

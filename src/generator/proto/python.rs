@@ -12,7 +12,8 @@ use crate::generator::python::{
 };
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedProtoTypeInfo, PlannedSpec, PlannedType,
-    PlannedWireFieldBinding, PlannedWireVariantMember, relative_descriptor_name,
+    PlannedWireFieldBinding, PlannedWireOneofMessage, PlannedWireVariantMember,
+    relative_descriptor_name,
 };
 use crate::spec::{
     EnumSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec, RecordSpec, TypeReplacementSpec,
@@ -55,6 +56,8 @@ struct ProtoOneofCase {
 #[derive(Debug, Clone)]
 struct ProtoOneof {
     name: String,
+    /// The path from the record's message to the message of the oneof, with a `.` at its end.
+    message_path: String,
     cases: Vec<ProtoOneofCase>,
 }
 
@@ -223,6 +226,7 @@ fn build_oneof(
     field: &RecordFieldSpec<PlannedFamily>,
     wire_name: &str,
     members: &[PlannedWireVariantMember],
+    message: Option<&PlannedWireOneofMessage>,
     resolve_type: &impl Fn(&PlannedType) -> Result<ResolvedFieldType>,
 ) -> Result<ProtoOneof> {
     let PlannedType::Variant(variant_type) = field.field_type.validation_type() else {
@@ -286,6 +290,7 @@ fn build_oneof(
     }
     Ok(ProtoOneof {
         name: wire_name.to_string(),
+        message_path: message.map_or_else(String::new, |message| format!("{}.", message.wire_name)),
         cases,
     })
 }
@@ -322,16 +327,22 @@ impl ModelBackend {
             _ => None,
         };
         let oneof = match (&record.data.proto, &field.data.wire_binding) {
-            (Some(proto), Some(PlannedWireFieldBinding::VariantMembers { wire_name, members })) => {
-                Some(build_oneof(
-                    api_plan,
-                    &proto.full_name,
-                    field,
+            (
+                Some(proto),
+                Some(PlannedWireFieldBinding::VariantMembers {
                     wire_name,
                     members,
-                    resolve_type,
-                )?)
-            }
+                    message,
+                }),
+            ) => Some(build_oneof(
+                api_plan,
+                &proto.full_name,
+                field,
+                wire_name,
+                members,
+                message.as_ref(),
+                resolve_type,
+            )?),
             _ => None,
         };
         let conversion = match &field.data.wire_binding {
@@ -1570,10 +1581,12 @@ fn oneof_field_read(
     if !required {
         annotation.push_str(" | None");
     }
+    // An unset message reads as an empty one, so it has no member either.
+    let message = format!("value.{}", oneof.message_path);
     let mut setup_lines = vec![
         format!("{local_var}: {annotation}"),
         format!(
-            "match value.WhichOneof({}):",
+            "match {message}WhichOneof({}):",
             python_string_literal(&oneof.name)
         ),
     ];
@@ -1585,7 +1598,7 @@ fn oneof_field_read(
         if case.generic_carrier == Some(ProtoGenericCarrier::Payloads) {
             setup_lines.extend(
                 payloads_cardinality_check(
-                    &format!("value.{}", case.proto_name),
+                    &format!("{message}{}", case.proto_name),
                     &format!("{model_name}.{attr_name}"),
                 )
                 .into_iter()
@@ -1599,12 +1612,12 @@ fn oneof_field_read(
                 Some(carrier) => generic_carrier_from_proto_expr(
                     carrier,
                     &case.payload_type,
-                    &format!("value.{}", case.proto_name),
+                    &format!("{message}{}", case.proto_name),
                     type_arguments,
                 ),
                 None => from_proto_value_expr(
                     &case.payload_type,
-                    &format!("value.{}", case.proto_name),
+                    &format!("{message}{}", case.proto_name),
                     type_arguments,
                 ),
             }
@@ -1637,16 +1650,12 @@ fn oneof_field_write(oneof: &ProtoOneof, value_expr: &str, required: bool) -> Re
     for case in &oneof.cases {
         lines.push(format!("{case_indent}    case {}():", case.class_name));
         let case_value_expr = format!("{value_expr}.value");
+        let proto_name = format!("{}{}", oneof.message_path, case.proto_name);
         let case_lines = match case.generic_carrier {
             Some(carrier) => {
-                generic_carrier_to_proto_lines(carrier, &case_value_expr, &case.proto_name, false)
+                generic_carrier_to_proto_lines(carrier, &case_value_expr, &proto_name, false)
             }
-            None => value_to_proto_lines(
-                &case.payload_type,
-                &case_value_expr,
-                &case.proto_name,
-                false,
-            ),
+            None => value_to_proto_lines(&case.payload_type, &case_value_expr, &proto_name, false),
         };
         for line in case_lines {
             lines.push(format!("{case_indent}        {line}"));
