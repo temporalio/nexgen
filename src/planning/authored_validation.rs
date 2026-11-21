@@ -718,6 +718,10 @@ fn validate_authored_field_types(
         if model_config.is_field_omitted(field_name) {
             continue;
         }
+        // The helper converts, and the compiler of the target language checks the helper.
+        if field_spec.conversion.is_some() {
+            continue;
+        }
 
         validate_authored_field_type(
             message_name,

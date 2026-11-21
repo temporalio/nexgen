@@ -111,18 +111,34 @@ def test_a_read_response_round_trips_with_its_records(models: types.ModuleType) 
     assert converter.from_transfer_type(wire, models.ReadRecordsResponse) == model
 
 
-def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> None:
-    converter = models._AppendRecordsRequestTransferTypeConverter[object]()
+def test_a_request_keeps_only_the_stream_id_of_its_ref(
+    models: types.ModuleType,
+) -> None:
+    converter = models._AppendRecordsRequestTransferTypeConverter[Turn]()
     wire = converter.to_transfer_type(
         models.AppendRecordsRequest(
-            ref=models.StreamRef(id="s-1"),
+            ref=models.StreamRef(id="s-1", store="redis"),
             producer=models.Producer(id="client:sample"),
             records=[],
         )
     )
-    assert wire.ref.id == "s-1"
+    assert wire.stream_id == "s-1"
+    # The Store name is for the SDK, so no field of the message holds it.
+    assert b"redis" not in wire.SerializeToString()
 
-    wire.ClearField("ref")
+    decoded = converter.from_transfer_type(wire, models.AppendRecordsRequest[Turn])
+
+    assert decoded.ref == models.StreamRef(id="s-1")
+    assert decoded.ref.store is None
+    assert typing.get_args(getattr(decoded.ref, "__orig_class__", None)) == (Turn,)
+
+
+def test_a_request_without_its_stream_id_is_refused(models: types.ModuleType) -> None:
+    converter = models._AppendRecordsRequestTransferTypeConverter[object]()
+    wire = request_response_pb2.AppendRecordsRequest(
+        producer=message_pb2.Producer(id="client:sample")
+    )
+
     with pytest.raises(
         ValueError, match="missing required field AppendRecordsRequest.ref"
     ):
@@ -148,7 +164,7 @@ def test_an_unknown_number_of_an_enum_with_no_fallback_fails_the_message(
 ) -> None:
     converter = models._CreateStreamRequestTransferTypeConverter()
     wire = request_response_pb2.CreateStreamRequest(
-        stream_ref=message_pb2.StreamRef(id="s-1"),
+        stream_id="s-1",
         id_conflict_policy=stream_pb2.StreamIdConflictPolicy.ValueType(9),
     )
 
@@ -166,7 +182,7 @@ async def test_workflow_apis_call_the_stream_service(
     api: types.ModuleType,
     model_types: types.ModuleType,
 ) -> None:
-    ref = model_types.StreamRef(id="workflow-stream")
+    ref = model_types.StreamRef(id="workflow-stream", store="redis-a")
     pages = [
         model_types.ReadRecordsResponse(
             records=[
@@ -179,7 +195,7 @@ async def test_workflow_apis_call_the_stream_service(
         model_types.ReadRecordsResponse(records=[], done=True),
     ]
     replies: dict[str, typing.Any] = {
-        "CreateStream": model_types.CreateStreamResult(ref=ref, created=True),
+        "CreateStream": model_types.CreateStreamResult(created=True),
         "AppendRecords": model_types.AppendRecordsResponse(
             first_offset=_offset(2), last_offset=_offset(3)
         ),
@@ -216,7 +232,11 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
     request_id = uuid.UUID(int=7)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
-    stream = await api.create_stream(id=ref.id, body_type=str)
+    stream = await api.create_stream(id=ref.id, store=ref.store, body_type=str)
+    # The ref of the Stream is the ref of the request, since the response has none.
+    assert stream.ref == ref
+    assert stream.body_type is str
+    assert stream.created is True
     assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
     read = stream.read(from_offset=_offset(1))
     assert [record.body async for record in read] == ["a", "b"]
@@ -233,7 +253,7 @@ async def test_workflow_apis_call_the_stream_service(
     expected = [
         (
             "CreateStream",
-            model_types.CreateStreamRequest(stream_ref=ref, request_id=str(request_id)),
+            model_types.CreateStreamRequest(ref=ref, request_id=str(request_id)),
         ),
         (
             "AppendRecords",
@@ -286,7 +306,7 @@ async def test_workflow_handle_appends_with_its_type_parameter(
                 asyncio.get_running_loop().create_future()
             )
             if operation == "CreateStream":
-                future.set_result(workflow_models.CreateStreamResult(ref=ref))
+                future.set_result(workflow_models.CreateStreamResult())
             else:
                 future.set_result(
                     workflow_models.AppendRecordsResponse(
@@ -310,6 +330,7 @@ async def test_workflow_handle_appends_with_its_type_parameter(
 
     _ = await stream.append(Turn(role="model"), producer=producer)
 
+    assert stream.ref == ref
     assert stream.body_type is Turn
     assert inputs[-1].records == [workflow_models.AppendRecord(body=Turn(role="model"))]
     assert inputs[-1].producer == producer
@@ -429,12 +450,10 @@ def test_the_ref_of_a_workflow_handle_keeps_its_type_argument() -> None:
 
 def test_declared_ref_parameters_propagate_through_wire_models() -> None:
     ref = both_models.StreamRef[Turn](id="typed-stream")
-    create = both_models.CreateStreamRequest(stream_ref=ref)
+    create = both_models.CreateStreamRequest(ref=ref)
     read = both_models.ReadRecordsRequest(ref=ref)
-    result = both_models.CreateStreamResult(ref=ref, created=True)
     _ = assert_type(create, both_models.CreateStreamRequest[Turn])
     _ = assert_type(read, both_models.ReadRecordsRequest[Turn])
-    _ = assert_type(result, both_models.CreateStreamResult[Turn])
 
     decoded_create = SYSTEM_CONVERTER.from_payload(
         SYSTEM_CONVERTER.to_payload(create), both_models.CreateStreamRequest[Turn]
@@ -442,14 +461,7 @@ def test_declared_ref_parameters_propagate_through_wire_models() -> None:
     decoded_read = SYSTEM_CONVERTER.from_payload(
         SYSTEM_CONVERTER.to_payload(read), both_models.ReadRecordsRequest[Turn]
     )
-    decoded_result = SYSTEM_CONVERTER.from_payload(
-        SYSTEM_CONVERTER.to_payload(result), both_models.CreateStreamResult[Turn]
-    )
-    for decoded_ref in (
-        decoded_create.stream_ref,
-        decoded_read.ref,
-        decoded_result.ref,
-    ):
+    for decoded_ref in (decoded_create.ref, decoded_read.ref):
         assert decoded_ref == ref
         assert typing.get_args(getattr(decoded_ref, "__orig_class__", None)) == (Turn,)
 
@@ -606,7 +618,7 @@ async def test_a_workflow_stream_closes_at_the_end_of_async_with(
                 asyncio.get_running_loop().create_future()
             )
             if operation == "CreateStream":
-                future.set_result(model_types.CreateStreamResult(ref=ref))
+                future.set_result(model_types.CreateStreamResult())
             else:
                 future.set_result(model_types.CloseStreamResponse())
             return future
@@ -704,4 +716,4 @@ def test_root_service_contract_uses_shared_wire_models(package: str) -> None:
     assert definition is not None
     operation = definition.operation_definitions["CreateStream"]
     assert operation.input_type == shared.CreateStreamRequest[typing.Any]
-    assert operation.output_type == shared.CreateStreamResult[typing.Any]
+    assert operation.output_type == shared.CreateStreamResult

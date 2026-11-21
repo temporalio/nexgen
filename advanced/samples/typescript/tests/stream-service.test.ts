@@ -36,6 +36,16 @@ vi.mock("../wit/stream-service/workflow/operations/close-stream.ts", () => ({
 }));
 vi.mock("../wit/stream-service/workflow/operations/read-records.ts", () => ({}));
 vi.mock("../wit/stream-service/workflow/operations/describe-stream.ts", () => ({}));
+// `createStream` runs as generated, and a Nexus client of this test answers it. The path is the
+// one that the operation module imports, since vitest can't resolve a module that is missing.
+vi.mock("../../../../nexus", () => ({
+  createNexusServiceClient: () => ({
+    startOperation: async (_operation: unknown, input: unknown) => {
+      captured.calls.push({ operation: "createStream", input });
+      return { result: async () => ({ created: true }) };
+    },
+  }),
+}));
 
 function _offset(n: number): Uint8Array {
   // Big-endian bytes, so a bytes compare keeps the int order these tests assert.
@@ -60,6 +70,7 @@ beforeEach(() => {
   captured.calls.length = 0;
   vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
     payloadConverter: common.defaultPayloadConverter,
+    currentRandom: Math.random,
   });
 });
 
@@ -86,17 +97,17 @@ async function loadWorkflowStream(): Promise<{
 }
 
 describe("stream-service generated output", () => {
-  test("carries a declared ref parameter through a create request", () => {
-    const ref: StreamRef<Turn> = { id: "typed-stream" };
-    const request: CreateStreamRequest<Turn> = {
-      streamRef: ref,
-      requestId: "request-1",
-    };
+  test("sends only the id of a ref through a create request", () => {
+    const ref: StreamRef<Turn> = { id: "typed-stream", store: "redis-a" };
+    const request: CreateStreamRequest<Turn> = { ref, requestId: "request-1" };
     const converter = createCreateStreamRequestTransferTypeConverter<Turn>();
-    const decoded: CreateStreamRequest<Turn> = converter.fromTransferType(
-      converter.toTransferType(request),
-    );
-    expect(decoded.streamRef).toEqual(ref);
+
+    const proto = converter.toTransferType(request);
+    const decoded: CreateStreamRequest<Turn> = converter.fromTransferType(proto);
+
+    expect(proto.streamId).toBe("typed-stream");
+    // The Store name has no field in the message.
+    expect(decoded.ref).toEqual({ id: "typed-stream" });
   });
 
   // No SDK has these protos yet, so proto/streams.d.ts declares them. The converters fail to
@@ -143,7 +154,7 @@ describe("stream-service generated output", () => {
 
   test("maps every field of a read request through its proto", () => {
     const proto: temporal.api.streamservice.v1.IReadRecordsRequest = {
-      ref: { id: "stream-1" },
+      streamId: "stream-1",
       fromOffset: _offset(7),
       maxRecords: 10,
     };
@@ -154,7 +165,7 @@ describe("stream-service generated output", () => {
     expect(model.fromOffset).toEqual(_offset(7));
     expect(model.maxRecords).toBe(10);
     const wire = readRecordsRequestTransferTypeConverter.toTransferType(model);
-    expect(wire.ref?.id).toBe("stream-1");
+    expect(wire.streamId).toBe("stream-1");
     expect(wire.fromOffset).toEqual(_offset(7));
   });
 
@@ -174,6 +185,33 @@ describe("stream-service generated output", () => {
     expect(
       appendRecordsRequestTransferTypeConverter.fromTransferType(proto).records,
     ).toEqual(["a", "b"]);
+  });
+
+  test("gives a created Stream the ref of its request", async () => {
+    const operation = "../wit/stream-service/workflow/operations/create-stream.ts";
+    const { createStream } = (await import(operation)) as {
+      createStream(
+        request: { id: string; store?: string },
+        bodyType: common.TypeInfo<Turn>,
+      ): Promise<{
+        ref: StreamRef<Turn>;
+        created: boolean | undefined;
+        bodyType: common.TypeInfo<Turn> | undefined;
+      }>;
+    };
+
+    const stream = await createStream({ id: "chat-42", store: "redis-a" }, turnType);
+
+    // The response of a create has only `created`, so the ref comes from the request.
+    expect(stream.ref).toEqual({ id: "chat-42", store: "redis-a" });
+    expect(stream.created).toBe(true);
+    expect(stream.bodyType).toBe(turnType);
+    expect(captured.calls).toMatchObject([
+      {
+        operation: "createStream",
+        input: { ref: { id: "chat-42", store: "redis-a" } },
+      },
+    ]);
   });
 
   test("gives the Workflow Stream append, close and read", async () => {

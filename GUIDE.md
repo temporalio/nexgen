@@ -1878,10 +1878,10 @@ recognized prefixes are `dotnet`, `go`, `java`, `python`, `ruby`, and
 `typescript`. Prefixes are accepted only for options that the annotation
 actually consumes, not arbitrarily on every directive. For example, `name` takes
 language names, `proto` takes `<lang>-type` and `<lang>-import`, and `type` on
-an external binding also takes `<lang>-from` and `<lang>-to`. Field `type`
-annotations do not take conversion helpers. `doc` return overrides are only
-valid on freestanding functions, and `function` signatures belong on type
-aliases, not record fields.
+an external binding also takes `<lang>-from` and `<lang>-to`. On a record field,
+`type` takes them for `python`, `typescript` and `dotnet` only. `doc` return
+overrides are only valid on freestanding functions, and `function` signatures
+belong on type aliases, not record fields.
 
 ### Language and System Nexus restrictions
 
@@ -2374,6 +2374,47 @@ record timing {
   elapsed: u64,
 }
 ```
+
+On a record field of a proto-backed record, `<lang>-to` and `<lang>-from` give
+two helpers of the support package, for `python`, `typescript` and `dotnet`. The
+model field keeps its WIT type, and the helpers convert between that type and
+the proto field.
+
+```wit
+/// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
+record append-records-request {
+  /// @nexus.proto-field "stream_id"
+  /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+  ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
+  ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
+  ref: stream-ref,
+  records: list<append-record>,
+}
+```
+
+```python
+# To the proto.
+message.stream_id = _support.stream_ref_to_id(value.ref)
+
+# From the proto.
+if not value.stream_id:
+    raise ValueError("missing required field AppendRecordsRequest.ref")
+ref = typing.cast(
+    StreamRef[BodyT],
+    _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
+)
+```
+
+In Python, the `from` helper of a record field gets the proto value and the
+model type of the field. So it builds the class and the type argument of the
+generated package, and the support package imports no generated code.
+
+- A language needs both helpers or none. A language with none converts the field
+  as it does without helpers.
+- A field with helpers for a language skips the check of its type against the
+  proto field type. The compiler of the target language checks the helpers.
+- The field can't have `@nexus.function`. Its type can't be `option<T>` or
+  `list<T>`, and its record can't have `@nexus.flatten-in-api`.
 
 ---
 

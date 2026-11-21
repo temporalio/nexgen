@@ -28,50 +28,46 @@ namespace Temporalio.Api.StreamService.V1 {
             "bnNlLnByb3RvEh10ZW1wb3JhbC5hcGkuc3RyZWFtc2VydmljZS52MRoeZ29v",
             "Z2xlL3Byb3RvYnVmL2R1cmF0aW9uLnByb3RvGiJ0ZW1wb3JhbC9hcGkvZW51",
             "bXMvdjEvc3RyZWFtLnByb3RvGiR0ZW1wb3JhbC9hcGkvc3RyZWFtL3YxL21l",
-            "c3NhZ2UucHJvdG8ivgEKE0NyZWF0ZVN0cmVhbVJlcXVlc3QSEQoJbmFtZXNw",
-            "YWNlGAEgASgJEjUKCnN0cmVhbV9yZWYYAiABKAsyIS50ZW1wb3JhbC5hcGku",
-            "c3RyZWFtLnYxLlN0cmVhbVJlZhJJChJpZF9jb25mbGljdF9wb2xpY3kYAyAB",
-            "KA4yLS50ZW1wb3JhbC5hcGkuZW51bXMudjEuU3RyZWFtSWRDb25mbGljdFBv",
-            "bGljeRISCgpyZXF1ZXN0X2lkGAQgASgJIlcKFENyZWF0ZVN0cmVhbVJlc3Bv",
-            "bnNlEi4KA3JlZhgBIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuU3Ry",
-            "ZWFtUmVmEg8KB2NyZWF0ZWQYAiABKAgi1gEKFEFwcGVuZFJlY29yZHNSZXF1",
-            "ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIuCgNyZWYYAiABKAsyIS50ZW1wb3Jh",
-            "bC5hcGkuc3RyZWFtLnYxLlN0cmVhbVJlZhIyCghwcm9kdWNlchgDIAEoCzIg",
-            "LnRlbXBvcmFsLmFwaS5zdHJlYW0udjEuUHJvZHVjZXISEAoIc2VxdWVuY2UY",
-            "BCABKAMSNQoHcmVjb3JkcxgFIAMoCzIkLnRlbXBvcmFsLmFwaS5zdHJlYW0u",
-            "djEuQXBwZW5kUmVjb3JkIkIKFUFwcGVuZFJlY29yZHNSZXNwb25zZRIUCgxm",
-            "aXJzdF9vZmZzZXQYASABKAwSEwoLbGFzdF9vZmZzZXQYAiABKAwiiwEKEkNs",
-            "b3NlU3RyZWFtUmVxdWVzdBIRCgluYW1lc3BhY2UYASABKAkSLgoDcmVmGAIg",
-            "ASgLMiEudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSMgoIcHJv",
-            "ZHVjZXIYAyABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLlByb2R1Y2Vy",
-            "IhUKE0Nsb3NlU3RyZWFtUmVzcG9uc2UivQEKElJlYWRSZWNvcmRzUmVxdWVz",
-            "dBIRCgluYW1lc3BhY2UYASABKAkSLgoDcmVmGAIgASgLMiEudGVtcG9yYWwu",
-            "YXBpLnN0cmVhbS52MS5TdHJlYW1SZWYSEwoLZnJvbV9vZmZzZXQYAyABKAwS",
-            "EwoLbWF4X3JlY29yZHMYBCABKAUSJwoEd2FpdBgFIAEoCzIZLmdvb2dsZS5w",
-            "cm90b2J1Zi5EdXJhdGlvbhIRCgltYXhfYnl0ZXMYBiABKAMibwoTUmVhZFJl",
-            "Y29yZHNSZXNwb25zZRI1CgdyZWNvcmRzGAEgAygLMiQudGVtcG9yYWwuYXBp",
-            "LnN0cmVhbS52MS5TdHJlYW1SZWNvcmQSEwoLbGFzdF9vZmZzZXQYAiABKAwS",
-            "DAoEZG9uZRgDIAEoCCJaChVEZXNjcmliZVN0cmVhbVJlcXVlc3QSEQoJbmFt",
-            "ZXNwYWNlGAEgASgJEi4KA3JlZhgCIAEoCzIhLnRlbXBvcmFsLmFwaS5zdHJl",
-            "YW0udjEuU3RyZWFtUmVmImIKFkRlc2NyaWJlU3RyZWFtUmVzcG9uc2USMwoG",
-            "c3RhdHVzGAEgASgOMiMudGVtcG9yYWwuYXBpLmVudW1zLnYxLlN0cmVhbVN0",
-            "YXR1cxITCgtsYXN0X29mZnNldBgCIAEoDEK0AQogaW8udGVtcG9yYWwuYXBp",
-            "LnN0cmVhbXNlcnZpY2UudjFCFFJlcXVlc3RSZXNwb25zZVByb3RvUAFaMWdv",
-            "LnRlbXBvcmFsLmlvL2FwaS9zdHJlYW1zZXJ2aWNlL3YxO3N0cmVhbXNlcnZp",
-            "Y2WqAh9UZW1wb3JhbGlvLkFwaS5TdHJlYW1TZXJ2aWNlLlYx6gIiVGVtcG9y",
-            "YWxpbzo6QXBpOjpTdHJlYW1TZXJ2aWNlOjpWMWIGcHJvdG8z"));
+            "c3NhZ2UucHJvdG8imgEKE0NyZWF0ZVN0cmVhbVJlcXVlc3QSEQoJbmFtZXNw",
+            "YWNlGAEgASgJEhEKCXN0cmVhbV9pZBgCIAEoCRJJChJpZF9jb25mbGljdF9w",
+            "b2xpY3kYAyABKA4yLS50ZW1wb3JhbC5hcGkuZW51bXMudjEuU3RyZWFtSWRD",
+            "b25mbGljdFBvbGljeRISCgpyZXF1ZXN0X2lkGAQgASgJIicKFENyZWF0ZVN0",
+            "cmVhbVJlc3BvbnNlEg8KB2NyZWF0ZWQYAiABKAgiuQEKFEFwcGVuZFJlY29y",
+            "ZHNSZXF1ZXN0EhEKCW5hbWVzcGFjZRgBIAEoCRIRCglzdHJlYW1faWQYAiAB",
+            "KAkSMgoIcHJvZHVjZXIYAyABKAsyIC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYx",
+            "LlByb2R1Y2VyEhAKCHNlcXVlbmNlGAQgASgDEjUKB3JlY29yZHMYBSADKAsy",
+            "JC50ZW1wb3JhbC5hcGkuc3RyZWFtLnYxLkFwcGVuZFJlY29yZCJCChVBcHBl",
+            "bmRSZWNvcmRzUmVzcG9uc2USFAoMZmlyc3Rfb2Zmc2V0GAEgASgMEhMKC2xh",
+            "c3Rfb2Zmc2V0GAIgASgMIm4KEkNsb3NlU3RyZWFtUmVxdWVzdBIRCgluYW1l",
+            "c3BhY2UYASABKAkSEQoJc3RyZWFtX2lkGAIgASgJEjIKCHByb2R1Y2VyGAMg",
+            "ASgLMiAudGVtcG9yYWwuYXBpLnN0cmVhbS52MS5Qcm9kdWNlciIVChNDbG9z",
+            "ZVN0cmVhbVJlc3BvbnNlIqABChJSZWFkUmVjb3Jkc1JlcXVlc3QSEQoJbmFt",
+            "ZXNwYWNlGAEgASgJEhEKCXN0cmVhbV9pZBgCIAEoCRITCgtmcm9tX29mZnNl",
+            "dBgDIAEoDBITCgttYXhfcmVjb3JkcxgEIAEoBRInCgR3YWl0GAUgASgLMhku",
+            "Z29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEhEKCW1heF9ieXRlcxgGIAEoAyJv",
+            "ChNSZWFkUmVjb3Jkc1Jlc3BvbnNlEjUKB3JlY29yZHMYASADKAsyJC50ZW1w",
+            "b3JhbC5hcGkuc3RyZWFtLnYxLlN0cmVhbVJlY29yZBITCgtsYXN0X29mZnNl",
+            "dBgCIAEoDBIMCgRkb25lGAMgASgIIj0KFURlc2NyaWJlU3RyZWFtUmVxdWVz",
+            "dBIRCgluYW1lc3BhY2UYASABKAkSEQoJc3RyZWFtX2lkGAIgASgJImIKFkRl",
+            "c2NyaWJlU3RyZWFtUmVzcG9uc2USMwoGc3RhdHVzGAEgASgOMiMudGVtcG9y",
+            "YWwuYXBpLmVudW1zLnYxLlN0cmVhbVN0YXR1cxITCgtsYXN0X29mZnNldBgC",
+            "IAEoDEK0AQogaW8udGVtcG9yYWwuYXBpLnN0cmVhbXNlcnZpY2UudjFCFFJl",
+            "cXVlc3RSZXNwb25zZVByb3RvUAFaMWdvLnRlbXBvcmFsLmlvL2FwaS9zdHJl",
+            "YW1zZXJ2aWNlL3YxO3N0cmVhbXNlcnZpY2WqAh9UZW1wb3JhbGlvLkFwaS5T",
+            "dHJlYW1TZXJ2aWNlLlYx6gIiVGVtcG9yYWxpbzo6QXBpOjpTdHJlYW1TZXJ2",
+            "aWNlOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Temporalio.Api.Enums.V1.StreamReflection.Descriptor, global::Temporalio.Api.Stream.V1.MessageReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamRequest), global::Temporalio.Api.StreamService.V1.CreateStreamRequest.Parser, new[]{ "Namespace", "StreamRef", "IdConflictPolicy", "RequestId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamResponse), global::Temporalio.Api.StreamService.V1.CreateStreamResponse.Parser, new[]{ "Ref", "Created" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "Ref", "Producer", "Sequence", "Records" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamRequest), global::Temporalio.Api.StreamService.V1.CreateStreamRequest.Parser, new[]{ "Namespace", "StreamId", "IdConflictPolicy", "RequestId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CreateStreamResponse), global::Temporalio.Api.StreamService.V1.CreateStreamResponse.Parser, new[]{ "Created" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsRequest), global::Temporalio.Api.StreamService.V1.AppendRecordsRequest.Parser, new[]{ "Namespace", "StreamId", "Producer", "Sequence", "Records" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.AppendRecordsResponse), global::Temporalio.Api.StreamService.V1.AppendRecordsResponse.Parser, new[]{ "FirstOffset", "LastOffset" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "Ref", "Producer" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamRequest), global::Temporalio.Api.StreamService.V1.CloseStreamRequest.Parser, new[]{ "Namespace", "StreamId", "Producer" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.CloseStreamResponse), global::Temporalio.Api.StreamService.V1.CloseStreamResponse.Parser, null, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "Ref", "FromOffset", "MaxRecords", "Wait", "MaxBytes" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsRequest), global::Temporalio.Api.StreamService.V1.ReadRecordsRequest.Parser, new[]{ "Namespace", "StreamId", "FromOffset", "MaxRecords", "Wait", "MaxBytes" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.ReadRecordsResponse), global::Temporalio.Api.StreamService.V1.ReadRecordsResponse.Parser, new[]{ "Records", "LastOffset", "Done" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamRequest), global::Temporalio.Api.StreamService.V1.DescribeStreamRequest.Parser, new[]{ "Namespace", "Ref" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamRequest), global::Temporalio.Api.StreamService.V1.DescribeStreamRequest.Parser, new[]{ "Namespace", "StreamId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Temporalio.Api.StreamService.V1.DescribeStreamResponse), global::Temporalio.Api.StreamService.V1.DescribeStreamResponse.Parser, new[]{ "Status", "LastOffset" }, null, null, null, null)
           }));
     }
@@ -125,7 +121,7 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CreateStreamRequest(CreateStreamRequest other) : this() {
       namespace_ = other.namespace_;
-      streamRef_ = other.streamRef_ != null ? other.streamRef_.Clone() : null;
+      streamId_ = other.streamId_;
       idConflictPolicy_ = other.idConflictPolicy_;
       requestId_ = other.requestId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -153,18 +149,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "stream_ref" field.</summary>
-    public const int StreamRefFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.StreamRef streamRef_;
+    /// <summary>Field number for the "stream_id" field.</summary>
+    public const int StreamIdFieldNumber = 2;
+    private string streamId_ = "";
     /// <summary>
-    /// Required. The ref of the Stream to create. Its id is the Stream id, and is never empty.
+    /// Required. The id of the Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef StreamRef {
-      get { return streamRef_; }
+    public string StreamId {
+      get { return streamId_; }
       set {
-        streamRef_ = value;
+        streamId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -215,7 +211,7 @@ namespace Temporalio.Api.StreamService.V1 {
         return true;
       }
       if (Namespace != other.Namespace) return false;
-      if (!object.Equals(StreamRef, other.StreamRef)) return false;
+      if (StreamId != other.StreamId) return false;
       if (IdConflictPolicy != other.IdConflictPolicy) return false;
       if (RequestId != other.RequestId) return false;
       return Equals(_unknownFields, other._unknownFields);
@@ -226,7 +222,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
-      if (streamRef_ != null) hash ^= StreamRef.GetHashCode();
+      if (StreamId.Length != 0) hash ^= StreamId.GetHashCode();
       if (IdConflictPolicy != global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy.Unspecified) hash ^= IdConflictPolicy.GetHashCode();
       if (RequestId.Length != 0) hash ^= RequestId.GetHashCode();
       if (_unknownFields != null) {
@@ -251,9 +247,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (streamRef_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(StreamRef);
+        output.WriteString(StreamId);
       }
       if (IdConflictPolicy != global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy.Unspecified) {
         output.WriteRawTag(24);
@@ -277,9 +273,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (streamRef_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(StreamRef);
+        output.WriteString(StreamId);
       }
       if (IdConflictPolicy != global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy.Unspecified) {
         output.WriteRawTag(24);
@@ -302,8 +298,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Namespace);
       }
-      if (streamRef_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(StreamRef);
+      if (StreamId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(StreamId);
       }
       if (IdConflictPolicy != global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy.Unspecified) {
         size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) IdConflictPolicy);
@@ -326,11 +322,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (other.Namespace.Length != 0) {
         Namespace = other.Namespace;
       }
-      if (other.streamRef_ != null) {
-        if (streamRef_ == null) {
-          StreamRef = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        StreamRef.MergeFrom(other.StreamRef);
+      if (other.StreamId.Length != 0) {
+        StreamId = other.StreamId;
       }
       if (other.IdConflictPolicy != global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy.Unspecified) {
         IdConflictPolicy = other.IdConflictPolicy;
@@ -362,10 +355,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (streamRef_ == null) {
-              StreamRef = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(StreamRef);
+            StreamId = input.ReadString();
             break;
           }
           case 24: {
@@ -400,10 +390,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (streamRef_ == null) {
-              StreamRef = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(StreamRef);
+            StreamId = input.ReadString();
             break;
           }
           case 24: {
@@ -460,7 +447,6 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CreateStreamResponse(CreateStreamResponse other) : this() {
-      ref_ = other.ref_ != null ? other.ref_.Clone() : null;
       created_ = other.created_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -469,23 +455,6 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CreateStreamResponse Clone() {
       return new CreateStreamResponse(this);
-    }
-
-    /// <summary>Field number for the "ref" field.</summary>
-    public const int RefFieldNumber = 1;
-    private global::Temporalio.Api.Stream.V1.StreamRef ref_;
-    /// <summary>
-    /// The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
-    /// Store that it picked, also when the request left the name empty. The server gives the ref
-    /// back as the request had it, since it doesn't know that name.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef Ref {
-      get { return ref_; }
-      set {
-        ref_ = value;
-      }
     }
 
     /// <summary>Field number for the "created" field.</summary>
@@ -518,7 +487,6 @@ namespace Temporalio.Api.StreamService.V1 {
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (!object.Equals(Ref, other.Ref)) return false;
       if (Created != other.Created) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -527,7 +495,6 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (ref_ != null) hash ^= Ref.GetHashCode();
       if (Created != false) hash ^= Created.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -547,10 +514,6 @@ namespace Temporalio.Api.StreamService.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (ref_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Ref);
-      }
       if (Created != false) {
         output.WriteRawTag(16);
         output.WriteBool(Created);
@@ -565,10 +528,6 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (ref_ != null) {
-        output.WriteRawTag(10);
-        output.WriteMessage(Ref);
-      }
       if (Created != false) {
         output.WriteRawTag(16);
         output.WriteBool(Created);
@@ -583,9 +542,6 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (ref_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
-      }
       if (Created != false) {
         size += 1 + 1;
       }
@@ -600,12 +556,6 @@ namespace Temporalio.Api.StreamService.V1 {
     public void MergeFrom(CreateStreamResponse other) {
       if (other == null) {
         return;
-      }
-      if (other.ref_ != null) {
-        if (ref_ == null) {
-          Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        Ref.MergeFrom(other.Ref);
       }
       if (other.Created != false) {
         Created = other.Created;
@@ -629,13 +579,6 @@ namespace Temporalio.Api.StreamService.V1 {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
-          case 10: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
-            break;
-          }
           case 16: {
             Created = input.ReadBool();
             break;
@@ -659,13 +602,6 @@ namespace Temporalio.Api.StreamService.V1 {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
-          case 10: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
-            break;
-          }
           case 16: {
             Created = input.ReadBool();
             break;
@@ -718,7 +654,7 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AppendRecordsRequest(AppendRecordsRequest other) : this() {
       namespace_ = other.namespace_;
-      ref_ = other.ref_ != null ? other.ref_.Clone() : null;
+      streamId_ = other.streamId_;
       producer_ = other.producer_ != null ? other.producer_.Clone() : null;
       sequence_ = other.sequence_;
       records_ = other.records_.Clone();
@@ -747,18 +683,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "ref" field.</summary>
-    public const int RefFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.StreamRef ref_;
+    /// <summary>Field number for the "stream_id" field.</summary>
+    public const int StreamIdFieldNumber = 2;
+    private string streamId_ = "";
     /// <summary>
-    /// Required.
+    /// Required. The id of the Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef Ref {
-      get { return ref_; }
+    public string StreamId {
+      get { return streamId_; }
       set {
-        ref_ = value;
+        streamId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -821,7 +757,7 @@ namespace Temporalio.Api.StreamService.V1 {
         return true;
       }
       if (Namespace != other.Namespace) return false;
-      if (!object.Equals(Ref, other.Ref)) return false;
+      if (StreamId != other.StreamId) return false;
       if (!object.Equals(Producer, other.Producer)) return false;
       if (Sequence != other.Sequence) return false;
       if(!records_.Equals(other.records_)) return false;
@@ -833,7 +769,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
-      if (ref_ != null) hash ^= Ref.GetHashCode();
+      if (StreamId.Length != 0) hash ^= StreamId.GetHashCode();
       if (producer_ != null) hash ^= Producer.GetHashCode();
       if (Sequence != 0L) hash ^= Sequence.GetHashCode();
       hash ^= records_.GetHashCode();
@@ -859,9 +795,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (producer_ != null) {
         output.WriteRawTag(26);
@@ -886,9 +822,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (producer_ != null) {
         output.WriteRawTag(26);
@@ -912,8 +848,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Namespace);
       }
-      if (ref_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
+      if (StreamId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(StreamId);
       }
       if (producer_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
@@ -937,11 +873,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (other.Namespace.Length != 0) {
         Namespace = other.Namespace;
       }
-      if (other.ref_ != null) {
-        if (ref_ == null) {
-          Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        Ref.MergeFrom(other.Ref);
+      if (other.StreamId.Length != 0) {
+        StreamId = other.StreamId;
       }
       if (other.producer_ != null) {
         if (producer_ == null) {
@@ -977,10 +910,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -1022,10 +952,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -1330,7 +1257,7 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CloseStreamRequest(CloseStreamRequest other) : this() {
       namespace_ = other.namespace_;
-      ref_ = other.ref_ != null ? other.ref_.Clone() : null;
+      streamId_ = other.streamId_;
       producer_ = other.producer_ != null ? other.producer_.Clone() : null;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -1357,18 +1284,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "ref" field.</summary>
-    public const int RefFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.StreamRef ref_;
+    /// <summary>Field number for the "stream_id" field.</summary>
+    public const int StreamIdFieldNumber = 2;
+    private string streamId_ = "";
     /// <summary>
-    /// Required.
+    /// Required. The id of the Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef Ref {
-      get { return ref_; }
+    public string StreamId {
+      get { return streamId_; }
       set {
-        ref_ = value;
+        streamId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -1403,7 +1330,7 @@ namespace Temporalio.Api.StreamService.V1 {
         return true;
       }
       if (Namespace != other.Namespace) return false;
-      if (!object.Equals(Ref, other.Ref)) return false;
+      if (StreamId != other.StreamId) return false;
       if (!object.Equals(Producer, other.Producer)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -1413,7 +1340,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
-      if (ref_ != null) hash ^= Ref.GetHashCode();
+      if (StreamId.Length != 0) hash ^= StreamId.GetHashCode();
       if (producer_ != null) hash ^= Producer.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -1437,9 +1364,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (producer_ != null) {
         output.WriteRawTag(26);
@@ -1459,9 +1386,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (producer_ != null) {
         output.WriteRawTag(26);
@@ -1480,8 +1407,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Namespace);
       }
-      if (ref_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
+      if (StreamId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(StreamId);
       }
       if (producer_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Producer);
@@ -1501,11 +1428,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (other.Namespace.Length != 0) {
         Namespace = other.Namespace;
       }
-      if (other.ref_ != null) {
-        if (ref_ == null) {
-          Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        Ref.MergeFrom(other.Ref);
+      if (other.StreamId.Length != 0) {
+        StreamId = other.StreamId;
       }
       if (other.producer_ != null) {
         if (producer_ == null) {
@@ -1537,10 +1461,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -1574,10 +1495,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -1800,7 +1718,7 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public ReadRecordsRequest(ReadRecordsRequest other) : this() {
       namespace_ = other.namespace_;
-      ref_ = other.ref_ != null ? other.ref_.Clone() : null;
+      streamId_ = other.streamId_;
       fromOffset_ = other.fromOffset_;
       maxRecords_ = other.maxRecords_;
       wait_ = other.wait_ != null ? other.wait_.Clone() : null;
@@ -1830,18 +1748,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "ref" field.</summary>
-    public const int RefFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.StreamRef ref_;
+    /// <summary>Field number for the "stream_id" field.</summary>
+    public const int StreamIdFieldNumber = 2;
+    private string streamId_ = "";
     /// <summary>
-    /// Required.
+    /// Required. The id of the Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef Ref {
-      get { return ref_; }
+    public string StreamId {
+      get { return streamId_; }
       set {
-        ref_ = value;
+        streamId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -1927,7 +1845,7 @@ namespace Temporalio.Api.StreamService.V1 {
         return true;
       }
       if (Namespace != other.Namespace) return false;
-      if (!object.Equals(Ref, other.Ref)) return false;
+      if (StreamId != other.StreamId) return false;
       if (FromOffset != other.FromOffset) return false;
       if (MaxRecords != other.MaxRecords) return false;
       if (!object.Equals(Wait, other.Wait)) return false;
@@ -1940,7 +1858,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
-      if (ref_ != null) hash ^= Ref.GetHashCode();
+      if (StreamId.Length != 0) hash ^= StreamId.GetHashCode();
       if (FromOffset.Length != 0) hash ^= FromOffset.GetHashCode();
       if (MaxRecords != 0) hash ^= MaxRecords.GetHashCode();
       if (wait_ != null) hash ^= Wait.GetHashCode();
@@ -1967,9 +1885,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (FromOffset.Length != 0) {
         output.WriteRawTag(26);
@@ -2001,9 +1919,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (FromOffset.Length != 0) {
         output.WriteRawTag(26);
@@ -2034,8 +1952,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Namespace);
       }
-      if (ref_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
+      if (StreamId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(StreamId);
       }
       if (FromOffset.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(FromOffset);
@@ -2064,11 +1982,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (other.Namespace.Length != 0) {
         Namespace = other.Namespace;
       }
-      if (other.ref_ != null) {
-        if (ref_ == null) {
-          Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        Ref.MergeFrom(other.Ref);
+      if (other.StreamId.Length != 0) {
+        StreamId = other.StreamId;
       }
       if (other.FromOffset.Length != 0) {
         FromOffset = other.FromOffset;
@@ -2109,10 +2024,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -2158,10 +2070,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
           case 26: {
@@ -2506,7 +2415,7 @@ namespace Temporalio.Api.StreamService.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public DescribeStreamRequest(DescribeStreamRequest other) : this() {
       namespace_ = other.namespace_;
-      ref_ = other.ref_ != null ? other.ref_.Clone() : null;
+      streamId_ = other.streamId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2532,18 +2441,18 @@ namespace Temporalio.Api.StreamService.V1 {
       }
     }
 
-    /// <summary>Field number for the "ref" field.</summary>
-    public const int RefFieldNumber = 2;
-    private global::Temporalio.Api.Stream.V1.StreamRef ref_;
+    /// <summary>Field number for the "stream_id" field.</summary>
+    public const int StreamIdFieldNumber = 2;
+    private string streamId_ = "";
     /// <summary>
-    /// Required.
+    /// Required. The id of the Stream.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Temporalio.Api.Stream.V1.StreamRef Ref {
-      get { return ref_; }
+    public string StreamId {
+      get { return streamId_; }
       set {
-        ref_ = value;
+        streamId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -2563,7 +2472,7 @@ namespace Temporalio.Api.StreamService.V1 {
         return true;
       }
       if (Namespace != other.Namespace) return false;
-      if (!object.Equals(Ref, other.Ref)) return false;
+      if (StreamId != other.StreamId) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2572,7 +2481,7 @@ namespace Temporalio.Api.StreamService.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (Namespace.Length != 0) hash ^= Namespace.GetHashCode();
-      if (ref_ != null) hash ^= Ref.GetHashCode();
+      if (StreamId.Length != 0) hash ^= StreamId.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2595,9 +2504,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -2613,9 +2522,9 @@ namespace Temporalio.Api.StreamService.V1 {
         output.WriteRawTag(10);
         output.WriteString(Namespace);
       }
-      if (ref_ != null) {
+      if (StreamId.Length != 0) {
         output.WriteRawTag(18);
-        output.WriteMessage(Ref);
+        output.WriteString(StreamId);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -2630,8 +2539,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (Namespace.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Namespace);
       }
-      if (ref_ != null) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Ref);
+      if (StreamId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(StreamId);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2648,11 +2557,8 @@ namespace Temporalio.Api.StreamService.V1 {
       if (other.Namespace.Length != 0) {
         Namespace = other.Namespace;
       }
-      if (other.ref_ != null) {
-        if (ref_ == null) {
-          Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-        }
-        Ref.MergeFrom(other.Ref);
+      if (other.StreamId.Length != 0) {
+        StreamId = other.StreamId;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2678,10 +2584,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
         }
@@ -2708,10 +2611,7 @@ namespace Temporalio.Api.StreamService.V1 {
             break;
           }
           case 18: {
-            if (ref_ == null) {
-              Ref = new global::Temporalio.Api.Stream.V1.StreamRef();
-            }
-            input.ReadMessage(Ref);
+            StreamId = input.ReadString();
             break;
           }
         }

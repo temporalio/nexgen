@@ -279,6 +279,12 @@ pub(crate) enum PlannedWireFieldBinding {
         wire_name: String,
         members: Vec<PlannedWireVariantMember>,
     },
+    /// Helpers of the support package convert the model value and the proto field.
+    Converted {
+        wire_name: String,
+        wire_type: PlannedType,
+        conversion: TypeReplacementSpec<PlannedFamily>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

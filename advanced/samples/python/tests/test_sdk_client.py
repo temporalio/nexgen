@@ -208,7 +208,7 @@ async def test_sdk_factory_needs_no_adapter() -> None:
     client, answers = connect(
         SdkClient,
         {
-            "CreateStream": CreateStreamResult(ref=ref, created=True),
+            "CreateStream": CreateStreamResult(created=True),
             "DescribeStream": DescribeStreamResponse(last_offset=_offset(5)),
         },
     )
@@ -273,7 +273,7 @@ async def test_an_untyped_factory_retains_untyped_decoding(construction: str) ->
     client, _ = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=ref),
+            "CreateStream": CreateStreamResult(),
             "ReadRecords": SYSTEM_CONVERTER.to_payload(
                 ReadRecordsResponse[Turn](
                     records=[StreamRecord(body=Turn(role="model"), offset=_offset(1))],
@@ -297,7 +297,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     client, answers = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1"), created=True),
+            "CreateStream": CreateStreamResult(created=True),
             "AppendRecords": AppendRecordsResponse(
                 first_offset=_offset(7), last_offset=_offset(7)
             ),
@@ -326,11 +326,11 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
     )
     # A client create fills a new request id from its source.
     assert create.arg == CreateStreamRequest(
-        stream_ref=StreamRef(id="s1"), request_id=create.arg.request_id
+        ref=StreamRef(id="s1"), request_id=create.arg.request_id
     )
     assert uuid.UUID(create.arg.request_id)
     assert uuid.UUID(create.id)
-    assert create.result_type == CreateStreamResult[str]
+    assert create.result_type is CreateStreamResult
     assert (append.service, append.endpoint, append.operation) == (
         "temporal.api.streamservice.v1.StreamService",
         "__temporal_system",
@@ -355,7 +355,7 @@ def closing_client() -> tuple[Client, Answers]:
     return connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "CreateStream": CreateStreamResult(),
             "CloseStream": CloseStreamResponse(),
         },
     )
@@ -480,6 +480,17 @@ async def test_an_optional_producer_parameter_replaces_its_default(
     ]
 
 
+async def test_a_create_returns_the_stream_of_its_request() -> None:
+    client, _ = connect(Client, {"CreateStream": CreateStreamResult(created=True)})
+
+    stream = await client.create_stream(id="chat-42", store="redis-a", body_type=Turn)
+
+    # The response has no ref, so the Stream takes the ref and its type from the request.
+    assert stream.ref == StreamRef(id="chat-42", store="redis-a")
+    assert stream.body_type is Turn
+    assert stream.created is True
+
+
 @pytest.mark.parametrize(
     ("fields", "ref"),
     [
@@ -490,15 +501,16 @@ async def test_an_optional_producer_parameter_replaces_its_default(
 async def test_a_create_takes_the_fields_of_the_ref(
     fields: dict[str, typing.Any], ref: StreamRef
 ) -> None:
-    client, answers = connect(Client, {"CreateStream": CreateStreamResult(ref=ref)})
+    client, answers = connect(Client, {"CreateStream": CreateStreamResult()})
 
     _ = await client.create_stream(id="s1", **fields)
 
     request = answers.started[0].arg
-    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
+    assert request == CreateStreamRequest(ref=ref, request_id=request.request_id)
     wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
-    assert wire.stream_ref.id == "s1"
-    assert wire.stream_ref.store == fields.get("store", "")
+    assert wire.stream_id == "s1"
+    # The Store name stays in the model, so the message has no field for it.
+    assert b"redis" not in wire.SerializeToString()
 
 
 @dataclasses.dataclass
@@ -587,7 +599,7 @@ async def test_client_only_calls_need_no_workflow_context(
     client, answers = connect(
         ClientOnly,
         {
-            "CreateStream": client_models.CreateStreamResult(ref=ref, created=True),
+            "CreateStream": client_models.CreateStreamResult(created=True),
             "DescribeStream": client_models.DescribeStreamResponse(
                 last_offset=_offset(8)
             ),
@@ -599,7 +611,7 @@ async def test_client_only_calls_need_no_workflow_context(
     assert len(client.created_clients) == 1
     create, describe = answers.started
     assert create.arg == client_models.CreateStreamRequest(
-        stream_ref=ref, request_id=create.arg.request_id
+        ref=ref, request_id=create.arg.request_id
     )
     assert describe.arg == client_models.DescribeStreamRequest(ref=ref)
     assert describe.result_type is client_models.DescribeStreamResponse
@@ -609,7 +621,7 @@ async def test_each_call_gets_a_new_operation_id() -> None:
     client, answers = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1"), created=True),
+            "CreateStream": CreateStreamResult(created=True),
             "DescribeStream": DescribeStreamResponse(last_offset=_offset(7)),
         },
     )
@@ -717,7 +729,7 @@ async def test_a_read_from_the_beginning_resumes_after_its_first_last_offset() -
     ]
     client, answers = connect(
         Client,
-        {"CreateStream": CreateStreamResult(ref=ref), "ReadRecords": list(pages)},
+        {"CreateStream": CreateStreamResult(), "ReadRecords": list(pages)},
     )
     stream = await client.create_stream(id="s1", body_type=str)
 
@@ -988,7 +1000,7 @@ async def test_a_call_and_a_resource_method_pass_their_rpc_options() -> None:
     client, answers = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "CreateStream": CreateStreamResult(),
             "DescribeStream": DescribeStreamResponse(last_offset=_offset(5)),
         },
     )
@@ -1014,7 +1026,7 @@ async def test_a_handle_decodes_its_bodies_with_its_type_parameter(
     client, _ = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=ref),
+            "CreateStream": CreateStreamResult(),
             "ReadRecords": SYSTEM_CONVERTER.to_payload(
                 ReadRecordsResponse[Turn](records=[record], done=True)
             ),
@@ -1054,7 +1066,7 @@ async def test_a_typed_ref_round_trips_into_a_typed_handle() -> None:
     client, _ = connect(
         Client,
         {
-            "CreateStream": CreateStreamResult(ref=StreamRef(id="s1")),
+            "CreateStream": CreateStreamResult(),
             "ReadRecords": turn_pages(),
         },
     )

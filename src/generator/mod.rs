@@ -1089,6 +1089,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
   record read-records-request {
+    /// @nexus.proto-field "stream_id"
     /// @nexus.omit
     ref: placeholder,
     /// @nexus.omit

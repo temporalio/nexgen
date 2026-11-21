@@ -3,10 +3,14 @@ extern alias Streams;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using Google.Protobuf;
 using Temporalio.Converters;
 using Xunit;
 using static Nexgen.DotNetExamples.Tests.TransferTypeTestSupport;
 using StreamServiceExample = Streams::Temporalio.Workflows;
+using WireCreateStreamRequest = Streams::Temporalio.Api.StreamService.V1.CreateStreamRequest;
+using WireDescribeStreamRequest = Streams::Temporalio.Api.StreamService.V1.DescribeStreamRequest;
 using WireDescribeStreamResponse = Streams::Temporalio.Api.StreamService.V1.DescribeStreamResponse;
 using WireReadRecordsRequest = Streams::Temporalio.Api.StreamService.V1.ReadRecordsRequest;
 
@@ -30,13 +34,32 @@ namespace Nexgen.DotNetExamples.Tests
         }
 
         [Fact]
-        public void DeclaredRefParametersPropagateThroughRequests()
+        public void ARequestKeepsOnlyTheStreamIdOfItsRef()
         {
-            var reference = new StreamServiceExample.StreamRef<Turn>("stream-1");
-            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null);
+            var request = new StreamServiceExample.CreateStreamRequest<Turn>(
+                new StreamServiceExample.StreamRef<Turn>("chat-42") { Store = "redis-a" }, null);
+
+            var wire = Assert.IsType<WireCreateStreamRequest>(
+                CreateSdkConverter(typeof(StreamServiceExample.CreateStreamRequest<Turn>))
+                    .ToTransferType(request));
+            Assert.Equal("chat-42", wire.StreamId);
+            // The Store name is for the SDK, so no field of the message holds it.
+            Assert.DoesNotContain("redis-a", Encoding.UTF8.GetString(wire.ToByteArray()));
+
             var decoded = FromPayload<StreamServiceExample.CreateStreamRequest<Turn>>(ToPayload(request));
-            Assert.Equal(reference, decoded.StreamRef);
-            Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.StreamRef);
+            Assert.Equal(new StreamServiceExample.StreamRef<Turn>("chat-42"), decoded.Ref);
+            Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.Ref);
+        }
+
+        [Fact]
+        public void ARequestWithoutItsStreamIdIsRefused()
+        {
+            var converter = CreateSdkConverter(typeof(StreamServiceExample.DescribeStreamRequest<Turn>));
+
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                converter.FromTransferType(new WireDescribeStreamRequest()));
+
+            Assert.Equal("missing required field DescribeStreamRequest.Ref", error.Message);
         }
 
         [Fact]

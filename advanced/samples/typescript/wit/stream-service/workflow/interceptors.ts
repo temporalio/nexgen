@@ -20,8 +20,8 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
     input: CreateStreamRequest<unknown>,
     next: (
       input: CreateStreamRequest<unknown>,
-    ) => Promise<nexus.NexusOperationHandle<CreateStreamResult<unknown>>>,
-  ) => Promise<nexus.NexusOperationHandle<CreateStreamResult<unknown>>>;
+    ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>,
+  ) => Promise<nexus.NexusOperationHandle<CreateStreamResult>>;
   appendRecords?: (
     input: AppendRecordsRequest<unknown>,
     next: (
@@ -61,7 +61,7 @@ export function dispatchSystemNexusSpecificInterceptors(
       switch (operation) {
         case "CreateStream":
           return composeInterceptors(interceptors, "createStream", (request) =>
-            next<CreateStreamRequest<unknown>, CreateStreamResult<unknown>>(request),
+            next<CreateStreamRequest<unknown>, CreateStreamResult>(request),
           )(input as CreateStreamRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;

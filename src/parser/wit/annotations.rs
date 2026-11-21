@@ -428,7 +428,10 @@ impl Annotation {
             && site == Site::Field
             && (key.ends_with("-from") || key.ends_with("-to"))
         {
-            return false;
+            return matches!(
+                self.argument_language(key),
+                Some(Language::Python | Language::TypeScript | Language::Dotnet)
+            );
         }
         // These options have different consumers at the two function sites.
         if self.name == "function"
@@ -785,7 +788,13 @@ mod tests {
             let prefix = language_key(language);
             let conversion = format!("{prefix}-from");
             assert!(rule("type").accepts_key(&conversion, Site::Alias));
-            assert!(!rule("type").accepts_key(&conversion, Site::Field));
+            assert_eq!(
+                rule("type").accepts_key(&conversion, Site::Field),
+                matches!(
+                    language,
+                    Language::Python | Language::TypeScript | Language::Dotnet
+                )
+            );
             assert!(rule("name").accepts_key(prefix, Site::Field));
             assert!(!rule("name").accepts_key(&conversion, Site::Field));
             assert!(rule("proto").accepts_key(&format!("{prefix}-type"), Site::Record));

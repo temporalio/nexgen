@@ -99,17 +99,16 @@ declare module "@temporalio/proto" {
   namespace temporal.api.streamservice.v1 {
     interface ICreateStreamRequest {
       namespace?: string | null;
-      streamRef?: temporal.api.stream.v1.IStreamRef | null;
+      streamId?: string | null;
       idConflictPolicy?: temporal.api.enums.v1.StreamIdConflictPolicy | null;
       requestId?: string | null;
     }
     interface ICreateStreamResponse {
-      ref?: temporal.api.stream.v1.IStreamRef | null;
       created?: boolean | null;
     }
     interface IAppendRecordsRequest {
       namespace?: string | null;
-      ref?: temporal.api.stream.v1.IStreamRef | null;
+      streamId?: string | null;
       producer?: temporal.api.stream.v1.IProducer | null;
       sequence?: Long | null;
       records?: temporal.api.stream.v1.IAppendRecord[] | null;
@@ -120,13 +119,13 @@ declare module "@temporalio/proto" {
     }
     interface ICloseStreamRequest {
       namespace?: string | null;
-      ref?: temporal.api.stream.v1.IStreamRef | null;
+      streamId?: string | null;
       producer?: temporal.api.stream.v1.IProducer | null;
     }
     interface ICloseStreamResponse {}
     interface IReadRecordsRequest {
       namespace?: string | null;
-      ref?: temporal.api.stream.v1.IStreamRef | null;
+      streamId?: string | null;
       fromOffset?: Uint8Array | null;
       maxRecords?: number | null;
       wait?: google.protobuf.IDuration | null;
@@ -139,7 +138,7 @@ declare module "@temporalio/proto" {
     }
     interface IDescribeStreamRequest {
       namespace?: string | null;
-      ref?: temporal.api.stream.v1.IStreamRef | null;
+      streamId?: string | null;
     }
     interface IDescribeStreamResponse {
       status?: temporal.api.enums.v1.StreamStatus | null;

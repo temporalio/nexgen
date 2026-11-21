@@ -77,6 +77,7 @@ struct LinkedRecordFieldMetadata {
     type_expr: String,
     explicit_proto_field: bool,
     omitted: bool,
+    has_conversion: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -412,6 +413,9 @@ fn load_linked_wit_metadata_from_inputs(input_paths: &[PathBuf]) -> Result<Linke
                             &field_context,
                             "value",
                         )?;
+                        let has_conversion =
+                            directive(&field_directives, "type", &origin_path, &field_context)?
+                                .is_some_and(|directive| directive.has_conversion_helper());
                         let field_proto_name = explicit_proto_name
                             .clone()
                             .unwrap_or_else(|| field.name.replace('-', "_"));
@@ -428,6 +432,7 @@ fn load_linked_wit_metadata_from_inputs(input_paths: &[PathBuf]) -> Result<Linke
                                     &field_context,
                                 )?
                                 .is_some(),
+                                has_conversion,
                             },
                         );
                     }
@@ -673,7 +678,7 @@ impl ExistingInterface {
             if let TypeDefKind::Record(record) = &type_def.kind {
                 records_by_proto.insert(
                     proto_name,
-                    ExistingRecord::from_resolve(resolve, type_name, record),
+                    ExistingRecord::from_resolve(resolve, type_name, record, path, &context)?,
                 );
             }
         }
@@ -765,10 +770,20 @@ struct ExistingRecord {
 }
 
 impl ExistingRecord {
-    fn from_resolve(resolve: &Resolve, wit_name: &str, record: &Record) -> Self {
+    fn from_resolve(
+        resolve: &Resolve,
+        wit_name: &str,
+        record: &Record,
+        path: &Path,
+        context: &str,
+    ) -> Result<Self> {
         let mut fields = BTreeMap::new();
         for field in &record.fields {
             let docs = field.docs.contents.as_deref();
+            let field_context = format!("{context} field `{}`", field.name);
+            let field_directives = parse_directives(docs, path, &field_context)?;
+            let has_conversion = directive(&field_directives, "type", path, &field_context)?
+                .is_some_and(|directive| directive.has_conversion_helper());
             let explicit_proto_name = proto_field_name_from_docs(docs);
             let proto_name = explicit_proto_name
                 .clone()
@@ -780,14 +795,15 @@ impl ExistingRecord {
                     type_expr: render_wit_type(resolve, &field.ty),
                     explicit_proto_field: explicit_proto_name.is_some(),
                     omitted: field_has_omit_directive(docs),
+                    has_conversion,
                 },
             );
         }
 
-        Self {
+        Ok(Self {
             wit_name: wit_name.to_string(),
             fields,
-        }
+        })
     }
 }
 
@@ -797,6 +813,8 @@ struct ExistingField {
     type_expr: String,
     explicit_proto_field: bool,
     omitted: bool,
+    /// Conversion helpers on `@nexus.type` make the field keep its WIT type, not the proto type.
+    has_conversion: bool,
 }
 
 struct ProtoWitBuilder<'a> {
@@ -1081,7 +1099,7 @@ impl<'a> ProtoWitBuilder<'a> {
             missing.push(expected.line.clone());
             return Ok(());
         };
-        if existing.omitted {
+        if existing.omitted || existing.has_conversion {
             return Ok(());
         }
         if self.field_uses_type_parameter(&existing.type_expr, field) {
@@ -1218,6 +1236,7 @@ impl<'a> ProtoWitBuilder<'a> {
                                     type_expr: field.type_expr.clone(),
                                     explicit_proto_field: field.explicit_proto_field,
                                     omitted: field.omitted,
+                                    has_conversion: field.has_conversion,
                                 },
                             )
                         })
@@ -1535,6 +1554,7 @@ impl<'a> ProtoWitBuilder<'a> {
                         type_expr: format!("option<{name}>"),
                         explicit_proto_field: false,
                         omitted: false,
+                        has_conversion: false,
                     },
                 )]),
             };
@@ -2233,16 +2253,14 @@ fn collect_used_type_names(interface_source: &str) -> BTreeSet<String> {
     used_names
 }
 
+/// The first quoted value of `@nexus.proto-field`, which is the proto field name.
 fn proto_field_name_from_docs(docs: Option<&str>) -> Option<String> {
-    let docs = docs?;
-    for line in docs.lines() {
-        let line = line.trim();
-        let Some(rest) = line.strip_prefix("@nexus.proto-field") else {
+    for line in docs?.lines() {
+        let Some(rest) = line.trim().strip_prefix("@nexus.proto-field") else {
             continue;
         };
-        let rest = rest.trim();
-        if rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2 {
-            return Some(rest[1..rest.len() - 1].to_string());
+        if let Some((name, _)) = rest.trim().strip_prefix('"')?.split_once('"') {
+            return Some(name.to_string());
         }
     }
     None

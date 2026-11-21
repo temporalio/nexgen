@@ -2895,7 +2895,12 @@ impl<'a> ApiPlanner<'a> {
             .collect::<BTreeSet<_>>();
         let unpacked_input = unpacked_input_name
             .map(|name| {
-                self.build_unpacked_input(name, GenerationTarget::Workflow, &operation_parameters)
+                self.build_unpacked_input(
+                    name,
+                    GenerationTarget::Workflow,
+                    &operation_parameters,
+                    &runtime_type_arguments,
+                )
             })
             .transpose()?;
         let client_unpacked_input = unpacked_input_name
@@ -2905,7 +2910,12 @@ impl<'a> ApiPlanner<'a> {
                     .contains(&GenerationTarget::Client)
             })
             .map(|name| {
-                self.build_unpacked_input(name, GenerationTarget::Client, &operation_parameters)
+                self.build_unpacked_input(
+                    name,
+                    GenerationTarget::Client,
+                    &operation_parameters,
+                    &runtime_type_arguments,
+                )
             })
             .transpose()?;
         let output_type_parameters = unpacked_input
@@ -3063,6 +3073,7 @@ impl<'a> ApiPlanner<'a> {
         input_full_name: &str,
         target: GenerationTarget,
         operation_parameters: &BTreeSet<String>,
+        runtime_type_arguments: &[String],
     ) -> Result<RenderedUnpackedInput> {
         let model = self
             .models
@@ -3097,9 +3108,12 @@ impl<'a> ApiPlanner<'a> {
                 continue;
             }
             let default_kind = rendered_field.default_kind.clone();
-            if let Some(flattened) =
-                self.build_flattened_message(planned_field, rendered_field, target)
-            {
+            if let Some(flattened) = self.build_flattened_message(
+                planned_field,
+                rendered_field,
+                target,
+                runtime_type_arguments,
+            ) {
                 request_fields.push(RenderedUnpackedRequestField {
                     attr_name: flattened.local_name.clone(),
                     value_expr: flattened.local_name.clone(),
@@ -3277,6 +3291,7 @@ impl<'a> ApiPlanner<'a> {
         planned_field: &RecordFieldSpec<PlannedFamily>,
         rendered_field: &RenderedField,
         target: GenerationTarget,
+        runtime_type_arguments: &[String],
     ) -> Option<RenderedFlattenedMessage> {
         let model_type = &planned_field.field_type;
         let PlannedType::Record(record) = model_type else {
@@ -3288,10 +3303,30 @@ impl<'a> ApiPlanner<'a> {
             return None;
         }
         let nested_rendered_model = self.models.get(full_name)?;
+        // A generic resource reads its type from the type argument of this record.
+        let type_parameters = self.api_plan.record_type_parameters(full_name);
+        let type_arguments = if type_parameters
+            .iter()
+            .any(|usage| runtime_type_arguments.contains(&usage.parameter.name))
+        {
+            type_parameters
+                .iter()
+                .map(|usage| {
+                    if runtime_type_arguments.contains(&usage.parameter.name) {
+                        python_runtime_type_argument_name(&usage.parameter.name)
+                    } else {
+                        "typing.Any".to_string()
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         Some(RenderedFlattenedMessage {
             local_name: rendered_field.attr_name.clone(),
             model_name: nested_rendered_model.name.clone(),
+            type_arguments,
             required: planned_field.required,
             fields: nested_planned_model
                 .fields
@@ -4712,8 +4747,16 @@ struct RenderedUnpackedRequestField {
 struct RenderedFlattenedMessage {
     local_name: String,
     model_name: String,
+    /// The type arguments of a generic record. Empty when the call has no runtime type for it.
+    type_arguments: Vec<String>,
     required: bool,
     fields: Vec<RenderedFlattenedMessageField>,
+}
+
+impl RenderedFlattenedMessage {
+    fn constructor(&self) -> String {
+        python_type_annotation_with_arguments(&self.model_name, &self.type_arguments)
+    }
 }
 
 #[derive(Debug)]
@@ -11886,7 +11929,7 @@ fn render_flattened_message_setup(
     output.push_str(&flattened_message.local_name);
     output.push_str(" = ");
     if always_construct {
-        output.push_str(&flattened_message.model_name);
+        output.push_str(&flattened_message.constructor());
         output.push_str("(\n");
         for field in &flattened_message.fields {
             output.push_str(indent);
@@ -11916,7 +11959,7 @@ fn render_flattened_message_setup(
     output.push_str("\n");
     output.push_str(indent);
     output.push_str("    else ");
-    output.push_str(&flattened_message.model_name);
+    output.push_str(&flattened_message.constructor());
     output.push_str("(\n");
     for field in &flattened_message.fields {
         output.push_str(indent);

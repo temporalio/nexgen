@@ -16,4 +16,12 @@ namespace Nexgen.Support
         internal static string RequestId() =>
             (Workflow.InWorkflow ? Workflow.NewGuid() : System.Guid.NewGuid()).ToString();
     }
+
+    // A request message holds the Stream id of its ref, and no Store name.
+    internal static class StreamSupport
+    {
+        internal static string RefToId<TBody>(StreamRef<TBody> reference) => reference.Id;
+
+        internal static StreamRef<TBody> RefFromId<TBody>(string id) => new(id);
+    }
 }

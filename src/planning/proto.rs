@@ -258,12 +258,26 @@ pub(super) fn planned_record_field_data(
         .field
         .iter()
         .find(|field| field.name.as_deref() == Some(field_name))?;
+    let wire_name = field.name.clone()?;
+    let wire_type = planned_wire_field_type(field, planner);
+    let wire_binding = match record
+        .fields
+        .get(field_name)
+        .and_then(|authored_field| authored_field.conversion.as_ref())
+    {
+        Some(conversion) => PlannedWireFieldBinding::Converted {
+            wire_name,
+            wire_type,
+            conversion: materialize_selected_replacement(conversion),
+        },
+        None => PlannedWireFieldBinding::Value {
+            wire_name,
+            wire_type,
+        },
+    };
     Some(PlannedFieldData {
         has_presence: Some(field_has_presence(field, field_type(field))),
-        wire_binding: Some(PlannedWireFieldBinding::Value {
-            wire_name: field.name.clone()?,
-            wire_type: planned_wire_field_type(field, planner),
-        }),
+        wire_binding: Some(wire_binding),
         ..Default::default()
     })
 }
@@ -280,10 +294,11 @@ pub(super) fn planned_record_field_type(
         return Some(planner.planned_type_from_authored(authored_type));
     };
     if record.fields.get(field_name).is_some_and(|authored_field| {
-        matches!(
-            authored_field.field_type.without_option().validation_type(),
-            TypeSpec::TypeParameter(_)
-        )
+        authored_field.conversion.is_some()
+            || matches!(
+                authored_field.field_type.without_option().validation_type(),
+                TypeSpec::TypeParameter(_)
+            )
     }) {
         let authored_type = record.fields.get(field_name)?.field_type.without_option();
         return Some(planner.planned_type_from_authored(authored_type));

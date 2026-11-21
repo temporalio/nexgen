@@ -147,8 +147,8 @@ namespace Temporalio.Workflows
         private static async Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamRequest<TBody> request)
         {
             var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<CreateStreamResult<TBody>>("CreateStream", request).ConfigureAwait(true);
-            return new Stream<TBody>((result.Ref ?? throw new System.InvalidOperationException("CreateStream answered without `ref`")), result.Created);
+            var result = await client.ExecuteNexusOperationAsync<CreateStreamResult>("CreateStream", request).ConfigureAwait(true);
+            return new Stream<TBody>(request.Ref, result.Created);
         }
 
         /// <param name="options">Create a Stream. If it exists, fail, or with use-existing get the open one.</param>

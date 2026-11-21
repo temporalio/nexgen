@@ -34,10 +34,9 @@ namespace Temporalio.Worker
                 {
                     throw new System.ArgumentException("System Nexus operation expects a CreateStreamRequest<> request.", nameof(arg));
                 }
-                if (!typeof(TResult).IsGenericType ||
-                    typeof(TResult).GetGenericTypeDefinition() != typeof(CreateStreamResult<>))
+                if (typeof(TResult) != typeof(CreateStreamResult))
                 {
-                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamResult<> result.");
+                    throw new System.ArgumentException("System Nexus operation expects a CreateStreamResult result.");
                 }
                 throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }

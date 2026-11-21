@@ -12,7 +12,7 @@ use crate::planning::{
 };
 use crate::spec::{
     AliasTypeSpec, ExternalTypeSourceSpec, ExternalTypeSpec, FieldPolicy, RecordFieldSpec,
-    RecordSpec, TypeReplacementSpec,
+    RecordSpec, SelectedTextSpec, TypeParameterUsage, TypeReplacementSpec,
 };
 
 #[derive(Debug, Default)]
@@ -533,18 +533,22 @@ fn generic_carrier_to_wire_expr(
 fn model_type_name(model: &RecordSpec<PlannedFamily>, api_plan: &PlannedSpec) -> String {
     let base = csharp_type_name(&model.name);
     let parameters = api_plan.record_type_parameters(&model.full_name);
+    format!("{base}{}", type_arguments(&parameters))
+}
+
+/// Returns the type arguments of a generic model, such as `<T1, T2>`, or nothing.
+fn type_arguments(parameters: &[TypeParameterUsage]) -> String {
     if parameters.is_empty() {
-        base
-    } else {
-        format!(
-            "{base}<{}>",
-            parameters
-                .iter()
-                .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
+        return String::new();
     }
+    format!(
+        "<{}>",
+        parameters
+            .iter()
+            .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 /// Returns the open generic C# name for a generated model, such as `Model<,>`.
@@ -564,18 +568,7 @@ fn variant_type_name(variant_type: &PlannedType, api_plan: &PlannedSpec) -> Stri
     };
     let base = csharp_type_name(&variant.name);
     let parameters = api_plan.variant_type_parameters(&variant.full_name);
-    if parameters.is_empty() {
-        base
-    } else {
-        format!(
-            "{base}<{}>",
-            parameters
-                .iter()
-                .map(|usage| csharp_type_parameter_name(&usage.parameter.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    }
+    format!("{base}{}", type_arguments(&parameters))
 }
 
 pub(crate) fn dotnet_message_type(model_type: &PlannedType) -> String {
@@ -874,6 +867,20 @@ fn field_from_wire_expr(
                 };
             }
         }
+        Some(PlannedWireFieldBinding::Converted { conversion, .. }) => {
+            let parameters = match field.field_type.validation_type() {
+                PlannedType::Record(record) => api_plan.record_type_parameters(&record.full_name),
+                PlannedType::Variant(variant) => {
+                    api_plan.variant_type_parameters(&variant.full_name)
+                }
+                _ => Vec::new(),
+            };
+            return format!(
+                "{}{}({source_expr})",
+                conversion_helper(&conversion.from_proto, support_namespace),
+                type_arguments(&parameters)
+            );
+        }
         None => {}
     }
     value_from_wire_expr(
@@ -949,6 +956,21 @@ fn render_field_from_wire_setup(
                 );
                 output.push('\n');
             }
+        }
+        Some(PlannedWireFieldBinding::Converted { wire_type, .. }) => {
+            let source_expr = format!("wire.{}", csharp_type_name(field_name));
+            // The model type is not the type of the proto field, so the check is on the proto
+            // field. A proto field that the sender did not set reads as empty.
+            let missing = match wire_type {
+                PlannedType::String => format!("string.IsNullOrEmpty({source_expr})"),
+                PlannedType::Bytes => format!("{source_expr}.IsEmpty"),
+                _ => return,
+            };
+            output.push_str(&format!("        if ({missing})\n        {{\n"));
+            output.push_str(&format!(
+                "            throw new System.InvalidOperationException({});\n        }}\n\n",
+                missing_required_field_message(model, &field.name)
+            ));
         }
         None => {}
     }
@@ -1408,6 +1430,10 @@ fn field_to_proto_expr(
     {
         return generic_carrier_to_wire_expr(carrier, wire_type, source_expr, support_namespace);
     }
+    if let Some(PlannedWireFieldBinding::Converted { conversion, .. }) = &field.data.wire_binding {
+        let helper = conversion_helper(&conversion.to_proto, support_namespace);
+        return format!("{helper}({source_expr})");
+    }
     backend.field_kind_to_wire_expr(
         &field.field_type,
         source_expr,
@@ -1415,6 +1441,15 @@ fn field_to_proto_expr(
         api_plan,
         support_namespace,
     )
+}
+
+/// Returns the support helper of a field conversion. The parser needs a helper for each
+/// direction, so a field of a language has both.
+fn conversion_helper(helper: &SelectedTextSpec, support_namespace: Option<&str>) -> String {
+    let helper = helper
+        .value()
+        .expect("a field conversion has both helpers of its language");
+    qualify_dotnet_support_reference(helper, support_namespace)
 }
 
 fn function_args_field_uses_logical_storage(
