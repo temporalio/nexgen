@@ -52,24 +52,40 @@ declare module "@temporalio/proto" {
       attempt?: number | null;
     }
     interface IWorkflowProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
       runId?: string | null;
       attempt?: temporal.api.stream.v1.IWorkflowTaskAttempt | null;
     }
     interface ILocalActivityProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
       runId?: string | null;
+      activityId?: string | null;
       attempt?: temporal.api.stream.v1.ILocalActivityAttempt | null;
     }
-    interface IActivityProducer {
+    interface IWorkflowActivityProducer {
+      namespace?: string | null;
+      workflowId?: string | null;
+      runId?: string | null;
+      activityId?: string | null;
+      attempt?: temporal.api.stream.v1.IActivityAttempt | null;
+    }
+    interface IStandaloneActivityProducer {
+      namespace?: string | null;
+      activityId?: string | null;
       runId?: string | null;
       attempt?: temporal.api.stream.v1.IActivityAttempt | null;
     }
-    interface IClientProducer {}
-    interface IProducer {
+    interface IClientProducer {
+      namespace?: string | null;
       id?: string | null;
+    }
+    interface IProducer {
       workflow?: temporal.api.stream.v1.IWorkflowProducer | null;
       localActivity?: temporal.api.stream.v1.ILocalActivityProducer | null;
-      workflowActivity?: temporal.api.stream.v1.IActivityProducer | null;
-      standaloneActivity?: temporal.api.stream.v1.IActivityProducer | null;
+      workflowActivity?: temporal.api.stream.v1.IWorkflowActivityProducer | null;
+      standaloneActivity?: temporal.api.stream.v1.IStandaloneActivityProducer | null;
       client?: temporal.api.stream.v1.IClientProducer | null;
       kind?:
         | "workflow"

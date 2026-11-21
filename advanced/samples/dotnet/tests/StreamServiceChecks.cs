@@ -92,7 +92,11 @@ namespace Nexgen.DotNetExamples.Tests
             var model = new StreamServiceExample.AppendRecordsRequest<Turn>(
                 new StreamServiceExample.StreamRef<Turn>("stream-1"),
                 new StreamServiceExample.AppendRecord<Turn>[0],
-                new StreamServiceExample.Producer("wf:r1"),
+                new StreamServiceExample.Producer
+                {
+                    Kind = new StreamServiceExample.ProducerKind.Client(
+                        new StreamServiceExample.ClientProducer("ns", "c1")),
+                },
                 requestId);
 
             var wire = Assert.IsType<WireAppendRecordsRequest>(

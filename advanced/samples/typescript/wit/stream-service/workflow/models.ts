@@ -37,13 +37,13 @@ function streamStatusFromNumber(value: number): StreamStatus {
 }
 
 /**
- * The kind of a Producer, with its run and attempt.
+ * The kind of a Producer, with its ids and its attempt.
  */
 export type ProducerKind =
   | { tag: "workflow"; value: WorkflowProducer }
   | { tag: "local-activity"; value: LocalActivityProducer }
-  | { tag: "workflow-activity"; value: ActivityProducer }
-  | { tag: "standalone-activity"; value: ActivityProducer }
+  | { tag: "workflow-activity"; value: WorkflowActivityProducer }
+  | { tag: "standalone-activity"; value: StandaloneActivityProducer }
   | { tag: "client"; value: ClientProducer };
 
 export interface CreateStreamResult {
@@ -421,20 +421,16 @@ export function createAppendRecordTransferTypeConverter<BodyT>(
 }
 export interface Producer {
   /**
-   * The same on every attempt, such as wf:<run id> for a Workflow run.
-   */
-  id: string;
-  /**
    * Required. The kind of the Producer.
    */
   kind?: ProducerKind;
 }
 
 function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
-  let result1: ProducerKind | undefined;
+  let result: ProducerKind | undefined;
   switch (proto.kind) {
     case "workflow":
-      result1 = {
+      result = {
         tag: "workflow",
         value: workflowProducerFromProto(
           requiredField(proto.workflow, "Producer", "workflow"),
@@ -442,7 +438,7 @@ function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
       };
       break;
     case "localActivity":
-      result1 = {
+      result = {
         tag: "local-activity",
         value: localActivityProducerFromProto(
           requiredField(proto.localActivity, "Producer", "localActivity"),
@@ -450,23 +446,23 @@ function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
       };
       break;
     case "workflowActivity":
-      result1 = {
+      result = {
         tag: "workflow-activity",
-        value: activityProducerFromProto(
+        value: workflowActivityProducerFromProto(
           requiredField(proto.workflowActivity, "Producer", "workflowActivity"),
         ),
       };
       break;
     case "standaloneActivity":
-      result1 = {
+      result = {
         tag: "standalone-activity",
-        value: activityProducerFromProto(
+        value: standaloneActivityProducerFromProto(
           requiredField(proto.standaloneActivity, "Producer", "standaloneActivity"),
         ),
       };
       break;
     case "client":
-      result1 = {
+      result = {
         tag: "client",
         value: clientProducerFromProto(
           requiredField(proto.client, "Producer", "client"),
@@ -474,46 +470,44 @@ function producerFromProto(proto: temporal.api.stream.v1.IProducer): Producer {
       };
       break;
     case undefined:
-      result1 = undefined;
+      result = undefined;
       break;
     default:
       proto.kind satisfies never;
       throw new Error("invalid oneof discriminator for Producer.kind");
   }
   return {
-    id: requiredField(proto.id === "" ? undefined : proto.id, "Producer", "id"),
-    kind: result1,
+    kind: result,
   };
 }
 
 function producerToProto(model: Producer): temporal.api.stream.v1.IProducer {
   const proto: temporal.api.stream.v1.IProducer = {};
-  proto.id = requiredField(model.id, "Producer", "id");
-  const result1 = model.kind;
-  if (result1 != null) {
-    switch (result1.tag) {
+  const result = model.kind;
+  if (result != null) {
+    switch (result.tag) {
       case "workflow":
         proto.kind = "workflow";
-        proto.workflow = workflowProducerToProto(result1.value);
+        proto.workflow = workflowProducerToProto(result.value);
         break;
       case "local-activity":
         proto.kind = "localActivity";
-        proto.localActivity = localActivityProducerToProto(result1.value);
+        proto.localActivity = localActivityProducerToProto(result.value);
         break;
       case "workflow-activity":
         proto.kind = "workflowActivity";
-        proto.workflowActivity = activityProducerToProto(result1.value);
+        proto.workflowActivity = workflowActivityProducerToProto(result.value);
         break;
       case "standalone-activity":
         proto.kind = "standaloneActivity";
-        proto.standaloneActivity = activityProducerToProto(result1.value);
+        proto.standaloneActivity = standaloneActivityProducerToProto(result.value);
         break;
       case "client":
         proto.kind = "client";
-        proto.client = clientProducerToProto(result1.value);
+        proto.client = clientProducerToProto(result.value);
         break;
       default:
-        result1 satisfies never;
+        result satisfies never;
         throw new Error("invalid oneof tag for Producer.kind");
     }
   }
@@ -530,6 +524,8 @@ export const producerTransferTypeConverter = {
   },
 };
 export interface WorkflowProducer {
+  namespace: string;
+  workflowId: string;
   /**
    * The id of this run, not the first run id of its chain.
    */
@@ -541,6 +537,16 @@ function workflowProducerFromProto(
   proto: temporal.api.stream.v1.IWorkflowProducer,
 ): WorkflowProducer {
   return {
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "WorkflowProducer",
+      "namespace",
+    ),
+    workflowId: requiredField(
+      proto.workflowId === "" ? undefined : proto.workflowId,
+      "WorkflowProducer",
+      "workflowId",
+    ),
     runId: requiredField(
       proto.runId === "" ? undefined : proto.runId,
       "WorkflowProducer",
@@ -555,6 +561,8 @@ function workflowProducerToProto(
   model: WorkflowProducer,
 ): temporal.api.stream.v1.IWorkflowProducer {
   return {
+    namespace: requiredField(model.namespace, "WorkflowProducer", "namespace"),
+    workflowId: requiredField(model.workflowId, "WorkflowProducer", "workflowId"),
     runId: requiredField(model.runId, "WorkflowProducer", "runId"),
     attempt:
       model.attempt == null ? undefined : workflowTaskAttemptToProto(model.attempt),
@@ -654,7 +662,10 @@ export const timestampTransferTypeConverter = {
   },
 };
 export interface LocalActivityProducer {
+  namespace: string;
+  workflowId: string;
   runId: string;
+  activityId: string;
   attempt: LocalActivityAttempt;
 }
 
@@ -662,10 +673,25 @@ function localActivityProducerFromProto(
   proto: temporal.api.stream.v1.ILocalActivityProducer,
 ): LocalActivityProducer {
   return {
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "LocalActivityProducer",
+      "namespace",
+    ),
+    workflowId: requiredField(
+      proto.workflowId === "" ? undefined : proto.workflowId,
+      "LocalActivityProducer",
+      "workflowId",
+    ),
     runId: requiredField(
       proto.runId === "" ? undefined : proto.runId,
       "LocalActivityProducer",
       "runId",
+    ),
+    activityId: requiredField(
+      proto.activityId === "" ? undefined : proto.activityId,
+      "LocalActivityProducer",
+      "activityId",
     ),
     attempt: localActivityAttemptFromProto(
       requiredField(proto.attempt, "LocalActivityProducer", "attempt"),
@@ -677,7 +703,10 @@ function localActivityProducerToProto(
   model: LocalActivityProducer,
 ): temporal.api.stream.v1.ILocalActivityProducer {
   return {
+    namespace: requiredField(model.namespace, "LocalActivityProducer", "namespace"),
+    workflowId: requiredField(model.workflowId, "LocalActivityProducer", "workflowId"),
     runId: requiredField(model.runId, "LocalActivityProducer", "runId"),
+    activityId: requiredField(model.activityId, "LocalActivityProducer", "activityId"),
     attempt: localActivityAttemptToProto(
       requiredField(model.attempt, "LocalActivityProducer", "attempt"),
     ),
@@ -743,43 +772,77 @@ export const localActivityAttemptTransferTypeConverter = {
     return localActivityAttemptToProto(value);
   },
 };
-export interface ActivityProducer {
-  /**
-   * The Workflow run that scheduled the Activity. Empty for a Standalone Activity.
-   */
-  runId?: string;
+export interface WorkflowActivityProducer {
+  namespace: string;
+  workflowId: string;
+  runId: string;
+  activityId: string;
   attempt: ActivityAttempt;
 }
 
-function activityProducerFromProto(
-  proto: temporal.api.stream.v1.IActivityProducer,
-): ActivityProducer {
+function workflowActivityProducerFromProto(
+  proto: temporal.api.stream.v1.IWorkflowActivityProducer,
+): WorkflowActivityProducer {
   return {
-    runId: proto.runId ?? undefined,
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "WorkflowActivityProducer",
+      "namespace",
+    ),
+    workflowId: requiredField(
+      proto.workflowId === "" ? undefined : proto.workflowId,
+      "WorkflowActivityProducer",
+      "workflowId",
+    ),
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "WorkflowActivityProducer",
+      "runId",
+    ),
+    activityId: requiredField(
+      proto.activityId === "" ? undefined : proto.activityId,
+      "WorkflowActivityProducer",
+      "activityId",
+    ),
     attempt: activityAttemptFromProto(
-      requiredField(proto.attempt, "ActivityProducer", "attempt"),
+      requiredField(proto.attempt, "WorkflowActivityProducer", "attempt"),
     ),
   };
 }
 
-function activityProducerToProto(
-  model: ActivityProducer,
-): temporal.api.stream.v1.IActivityProducer {
+function workflowActivityProducerToProto(
+  model: WorkflowActivityProducer,
+): temporal.api.stream.v1.IWorkflowActivityProducer {
   return {
-    runId: model.runId,
+    namespace: requiredField(model.namespace, "WorkflowActivityProducer", "namespace"),
+    workflowId: requiredField(
+      model.workflowId,
+      "WorkflowActivityProducer",
+      "workflowId",
+    ),
+    runId: requiredField(model.runId, "WorkflowActivityProducer", "runId"),
+    activityId: requiredField(
+      model.activityId,
+      "WorkflowActivityProducer",
+      "activityId",
+    ),
     attempt: activityAttemptToProto(
-      requiredField(model.attempt, "ActivityProducer", "attempt"),
+      requiredField(model.attempt, "WorkflowActivityProducer", "attempt"),
     ),
   };
 }
 
-export const activityProducerTransferTypeConverter = {
-  fromTransferType(value: temporal.api.stream.v1.IActivityProducer): ActivityProducer {
-    return activityProducerFromProto(value);
+export const workflowActivityProducerTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.stream.v1.IWorkflowActivityProducer,
+  ): WorkflowActivityProducer {
+    return workflowActivityProducerFromProto(value);
   },
 
-  toTransferType(value: ActivityProducer): temporal.api.stream.v1.IActivityProducer {
-    return activityProducerToProto(value);
+  toTransferType(
+    value: WorkflowActivityProducer,
+  ): temporal.api.stream.v1.IWorkflowActivityProducer {
+    return workflowActivityProducerToProto(value);
   },
 };
 export interface ActivityAttempt {
@@ -832,18 +895,103 @@ export const activityAttemptTransferTypeConverter = {
     return activityAttemptToProto(value);
   },
 };
-export type ClientProducer = Record<string, never>;
+export interface StandaloneActivityProducer {
+  namespace: string;
+  activityId: string;
+  /**
+   * The run id of the Activity itself.
+   */
+  runId: string;
+  attempt: ActivityAttempt;
+}
+
+function standaloneActivityProducerFromProto(
+  proto: temporal.api.stream.v1.IStandaloneActivityProducer,
+): StandaloneActivityProducer {
+  return {
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "StandaloneActivityProducer",
+      "namespace",
+    ),
+    activityId: requiredField(
+      proto.activityId === "" ? undefined : proto.activityId,
+      "StandaloneActivityProducer",
+      "activityId",
+    ),
+    runId: requiredField(
+      proto.runId === "" ? undefined : proto.runId,
+      "StandaloneActivityProducer",
+      "runId",
+    ),
+    attempt: activityAttemptFromProto(
+      requiredField(proto.attempt, "StandaloneActivityProducer", "attempt"),
+    ),
+  };
+}
+
+function standaloneActivityProducerToProto(
+  model: StandaloneActivityProducer,
+): temporal.api.stream.v1.IStandaloneActivityProducer {
+  return {
+    namespace: requiredField(
+      model.namespace,
+      "StandaloneActivityProducer",
+      "namespace",
+    ),
+    activityId: requiredField(
+      model.activityId,
+      "StandaloneActivityProducer",
+      "activityId",
+    ),
+    runId: requiredField(model.runId, "StandaloneActivityProducer", "runId"),
+    attempt: activityAttemptToProto(
+      requiredField(model.attempt, "StandaloneActivityProducer", "attempt"),
+    ),
+  };
+}
+
+export const standaloneActivityProducerTransferTypeConverter = {
+  fromTransferType(
+    value: temporal.api.stream.v1.IStandaloneActivityProducer,
+  ): StandaloneActivityProducer {
+    return standaloneActivityProducerFromProto(value);
+  },
+
+  toTransferType(
+    value: StandaloneActivityProducer,
+  ): temporal.api.stream.v1.IStandaloneActivityProducer {
+    return standaloneActivityProducerToProto(value);
+  },
+};
+export interface ClientProducer {
+  namespace: string;
+  /**
+   * The id of the client as a writer. The SDK makes one for each client object.
+   */
+  id: string;
+}
 
 function clientProducerFromProto(
   proto: temporal.api.stream.v1.IClientProducer,
 ): ClientProducer {
-  return {};
+  return {
+    namespace: requiredField(
+      proto.namespace === "" ? undefined : proto.namespace,
+      "ClientProducer",
+      "namespace",
+    ),
+    id: requiredField(proto.id === "" ? undefined : proto.id, "ClientProducer", "id"),
+  };
 }
 
 function clientProducerToProto(
   model: ClientProducer,
 ): temporal.api.stream.v1.IClientProducer {
-  return {};
+  return {
+    namespace: requiredField(model.namespace, "ClientProducer", "namespace"),
+    id: requiredField(model.id, "ClientProducer", "id"),
+  };
 }
 
 export const clientProducerTransferTypeConverter = {
