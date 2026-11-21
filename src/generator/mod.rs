@@ -1100,8 +1100,6 @@ interface stream-service {
     /// @nexus.name typescript="limit"
     /// @nexus.source targets="workflow" typescript="startLimit()"
     max-bytes: option<s64>,
-    /// @nexus.omit
-    namespace: placeholder,
   }
 
   read-records: func(request: read-records-request);

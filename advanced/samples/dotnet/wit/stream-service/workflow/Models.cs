@@ -24,11 +24,10 @@ namespace Temporalio.Workflows
         StreamStatusUnspecified = 0,
         StreamStatusOpen = 1,
         StreamStatusClosed = 2,
-        StreamStatusExpired = 3,
     }
 
     /// <summary>
-    /// The kind of a Producer, with its run and epoch.
+    /// The kind of a Producer, with its run and attempt.
     /// </summary>
     [GeneratedCode("nexgen", null)]
     public abstract record ProducerKind
@@ -52,38 +51,38 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// An Activity or Standalone Activity attempt.
+    /// One attempt of an Activity or a Standalone Activity.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityEpoch.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityAttempt.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record ActivityEpoch
+    public record ActivityAttempt
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ActivityEpoch"/> class.
+        /// Initializes a new instance of the <see cref="ActivityAttempt"/> class.
         /// </summary>
-        public ActivityEpoch(Timestamp attemptScheduledTime, int attempt)
+        public ActivityAttempt(Timestamp attemptScheduledTime, int attempt)
         {
             AttemptScheduledTime = attemptScheduledTime;
             Attempt = attempt;
         }
 
         /// <summary>
-        /// When the server scheduled this attempt. A reset makes it later.
+        /// When the server scheduled this attempt. It orders attempts across a reset.
         /// </summary>
         public Timestamp AttemptScheduledTime { get; init; }
         /// <summary>
-        /// 1 or more.
+        /// The attempt number, starting at 1. A reset starts it at 1 again.
         /// </summary>
         public int Attempt { get; init; }
 
-        internal static ActivityEpoch FromTransferType(Temporalio.Api.Stream.V1.ActivityEpoch wire)
+        internal static ActivityAttempt FromTransferType(Temporalio.Api.Stream.V1.ActivityAttempt wire)
         {
-            return new ActivityEpoch(Timestamp.FromTransferType(wire.AttemptScheduledTime), wire.Attempt);
+            return new ActivityAttempt(Timestamp.FromTransferType(wire.AttemptScheduledTime), wire.Attempt);
         }
 
-        internal Temporalio.Api.Stream.V1.ActivityEpoch ToTransferType()
+        internal Temporalio.Api.Stream.V1.ActivityAttempt ToTransferType()
         {
-            var proto = new Temporalio.Api.Stream.V1.ActivityEpoch();
+            var proto = new Temporalio.Api.Stream.V1.ActivityAttempt();
             proto.AttemptScheduledTime = (Google.Protobuf.WellKnownTypes.Timestamp)AttemptScheduledTime.ToTransferType();
             proto.Attempt = Attempt;
             return proto;
@@ -95,19 +94,19 @@ namespace Temporalio.Workflows
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.ActivityEpoch);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.ActivityAttempt);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((ActivityEpoch)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((ActivityAttempt)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : ActivityEpoch.FromTransferType((Temporalio.Api.Stream.V1.ActivityEpoch)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : ActivityAttempt.FromTransferType((Temporalio.Api.Stream.V1.ActivityAttempt)transferType);
         }
 
     }
 
     /// <summary>
-    /// An Activity Producer.
+    /// The Producer of an Activity.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ActivityProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -116,20 +115,20 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivityProducer"/> class.
         /// </summary>
-        public ActivityProducer(ActivityEpoch epoch)
+        public ActivityProducer(ActivityAttempt attempt)
         {
-            Epoch = epoch;
+            Attempt = attempt;
         }
 
         /// <summary>
-        /// The run of the Workflow that scheduled the Activity. Empty when standalone.
+        /// The Workflow run that scheduled the Activity. Empty for a Standalone Activity.
         /// </summary>
         public string? RunId { get; init; }
-        public ActivityEpoch Epoch { get; init; }
+        public ActivityAttempt Attempt { get; init; }
 
         internal static ActivityProducer FromTransferType(Temporalio.Api.Stream.V1.ActivityProducer wire)
         {
-            return new ActivityProducer(ActivityEpoch.FromTransferType(wire.Epoch))
+            return new ActivityProducer(ActivityAttempt.FromTransferType(wire.Attempt))
             {
                 RunId = string.IsNullOrEmpty(wire.RunId) ? null : wire.RunId,
             };
@@ -142,7 +141,7 @@ namespace Temporalio.Workflows
             {
                 proto.RunId = runId;
             }
-            proto.Epoch = (Temporalio.Api.Stream.V1.ActivityEpoch)Epoch.ToTransferType();
+            proto.Attempt = (Temporalio.Api.Stream.V1.ActivityAttempt)Attempt.ToTransferType();
             return proto;
         }
 
@@ -218,7 +217,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.
+    /// Append one batch. The Store writes a batch that arrives again only once.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(AppendRecordsRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -227,11 +226,12 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="AppendRecordsRequest{TBody}"/> class.
         /// </summary>
-        public AppendRecordsRequest(StreamRef<TBody> @ref, IReadOnlyList<AppendRecord<TBody>> records, Producer producer)
+        public AppendRecordsRequest(StreamRef<TBody> @ref, IReadOnlyList<AppendRecord<TBody>> records, Producer producer, string? requestId)
         {
             Ref = @ref;
             Records = records;
             Producer = producer;
+            RequestId = requestId;
         }
 
         public StreamRef<TBody> Ref { get; init; }
@@ -241,9 +241,9 @@ namespace Temporalio.Workflows
         /// </summary>
         public Producer Producer { get; init; }
         /// <summary>
-        /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
+        /// Unique for each append call, and the same on its retries.
         /// </summary>
-        public long? Sequence { get; init; }
+        public string? RequestId { get; init; }
 
         internal static AppendRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.AppendRecordsRequest wire)
         {
@@ -252,22 +252,19 @@ namespace Temporalio.Workflows
                 throw new System.InvalidOperationException("missing required field AppendRecordsRequest.Ref");
             }
 
-            return new AppendRecordsRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), Producer.FromTransferType(wire.Producer))
-            {
-                Sequence = wire.Sequence == 0 ? null : wire.Sequence,
-            };
+            return new AppendRecordsRequest<TBody>(Nexgen.Support.StreamSupport.RefFromId<TBody>(wire.StreamId), System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(wire.Records, item => AppendRecord<TBody>.FromTransferType(item))), Producer.FromTransferType(wire.Producer), string.IsNullOrEmpty(wire.RequestId) ? null : wire.RequestId);
         }
 
         internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
+            if (RequestId is { } requestId)
+            {
+                proto.RequestId = requestId;
+            }
             proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
             proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
-            if (Sequence is { } sequence)
-            {
-                proto.Sequence = sequence;
-            }
             return proto;
         }
 
@@ -336,7 +333,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A client Producer. It has no run and no epoch, so nothing fences it.
+    /// The Producer of a client. It has no run and no attempt.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(ClientProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -371,7 +368,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Close a Stream. Readers drain what is left, then end. Later appends are refused.
+    /// Close a Stream. Readers get the Records that are left. Later appends fail.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CloseStreamRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -460,7 +457,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Create a Stream. If it exists, fail, or with use-existing get the open one.
+    /// Create a Stream. If it already exists, fail, or return it with use-existing.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(CreateStreamRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -476,11 +473,11 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// The ref of the Stream to create. Its id is the Stream id.
+        /// The Stream to create. Its id must not be empty.
         /// </summary>
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// What the create does when the Stream exists. Unspecified is fail.
+        /// What the create does if the Stream already exists. Unspecified means fail.
         /// </summary>
         public StreamIdConflictPolicy? IdConflictPolicy { get; init; }
         /// <summary>
@@ -628,7 +625,7 @@ namespace Temporalio.Workflows
     {
         public StreamStatus? Status { get; init; }
         /// <summary>
-        /// The newest offset, of a Record. Empty for none.
+        /// The offset of the newest Record. Empty when the Stream has none.
         /// </summary>
         public byte[]? LastOffset { get; init; }
 
@@ -673,16 +670,16 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A Local Activity attempt. Its Workflow Task orders it first.
+    /// One attempt of a Local Activity. Attempts compare by Workflow Task first.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(LocalActivityEpoch.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(LocalActivityAttempt.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record LocalActivityEpoch
+    public record LocalActivityAttempt
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="LocalActivityEpoch"/> class.
+        /// Initializes a new instance of the <see cref="LocalActivityAttempt"/> class.
         /// </summary>
-        public LocalActivityEpoch(WorkflowTaskEpoch task, int attempt)
+        public LocalActivityAttempt(WorkflowTaskAttempt task, int attempt)
         {
             Task = task;
             Attempt = attempt;
@@ -691,21 +688,21 @@ namespace Temporalio.Workflows
         /// <summary>
         /// The Workflow Task attempt that dispatched the Local Activity.
         /// </summary>
-        public WorkflowTaskEpoch Task { get; init; }
+        public WorkflowTaskAttempt Task { get; init; }
         /// <summary>
-        /// The Local Activity's own attempt in that Workflow Task, 1 or more.
+        /// The Local Activity's own attempt number in that Workflow Task, from 1.
         /// </summary>
         public int Attempt { get; init; }
 
-        internal static LocalActivityEpoch FromTransferType(Temporalio.Api.Stream.V1.LocalActivityEpoch wire)
+        internal static LocalActivityAttempt FromTransferType(Temporalio.Api.Stream.V1.LocalActivityAttempt wire)
         {
-            return new LocalActivityEpoch(WorkflowTaskEpoch.FromTransferType(wire.Task), wire.Attempt);
+            return new LocalActivityAttempt(WorkflowTaskAttempt.FromTransferType(wire.Task), wire.Attempt);
         }
 
-        internal Temporalio.Api.Stream.V1.LocalActivityEpoch ToTransferType()
+        internal Temporalio.Api.Stream.V1.LocalActivityAttempt ToTransferType()
         {
-            var proto = new Temporalio.Api.Stream.V1.LocalActivityEpoch();
-            proto.Task = (Temporalio.Api.Stream.V1.WorkflowTaskEpoch)Task.ToTransferType();
+            var proto = new Temporalio.Api.Stream.V1.LocalActivityAttempt();
+            proto.Task = (Temporalio.Api.Stream.V1.WorkflowTaskAttempt)Task.ToTransferType();
             proto.Attempt = Attempt;
             return proto;
         }
@@ -716,19 +713,19 @@ namespace Temporalio.Workflows
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.LocalActivityEpoch);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.LocalActivityAttempt);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((LocalActivityEpoch)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((LocalActivityAttempt)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : LocalActivityEpoch.FromTransferType((Temporalio.Api.Stream.V1.LocalActivityEpoch)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : LocalActivityAttempt.FromTransferType((Temporalio.Api.Stream.V1.LocalActivityAttempt)transferType);
         }
 
     }
 
     /// <summary>
-    /// A Local Activity Producer.
+    /// The Producer of one Local Activity call.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(LocalActivityProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -737,25 +734,25 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Initializes a new instance of the <see cref="LocalActivityProducer"/> class.
         /// </summary>
-        public LocalActivityProducer(string runId, LocalActivityEpoch epoch)
+        public LocalActivityProducer(string runId, LocalActivityAttempt attempt)
         {
             RunId = runId;
-            Epoch = epoch;
+            Attempt = attempt;
         }
 
         public string RunId { get; init; }
-        public LocalActivityEpoch Epoch { get; init; }
+        public LocalActivityAttempt Attempt { get; init; }
 
         internal static LocalActivityProducer FromTransferType(Temporalio.Api.Stream.V1.LocalActivityProducer wire)
         {
-            return new LocalActivityProducer(wire.RunId, LocalActivityEpoch.FromTransferType(wire.Epoch));
+            return new LocalActivityProducer(wire.RunId, LocalActivityAttempt.FromTransferType(wire.Attempt));
         }
 
         internal Temporalio.Api.Stream.V1.LocalActivityProducer ToTransferType()
         {
             var proto = new Temporalio.Api.Stream.V1.LocalActivityProducer();
             proto.RunId = RunId;
-            proto.Epoch = (Temporalio.Api.Stream.V1.LocalActivityEpoch)Epoch.ToTransferType();
+            proto.Attempt = (Temporalio.Api.Stream.V1.LocalActivityAttempt)Attempt.ToTransferType();
             return proto;
         }
 
@@ -777,7 +774,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// The code that wrote a batch. A higher epoch fences and supersedes a lower one.
+    /// The writer of a batch. A later attempt supersedes an earlier one.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Producer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -792,11 +789,11 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// Stable across attempts, such as wf:&lt;run id&gt; for a Workflow run.
+        /// The same on every attempt, such as wf:&lt;run id&gt; for a Workflow run.
         /// </summary>
         public string Id { get; init; }
         /// <summary>
-        /// Required. The case is the kind of the Producer.
+        /// Required. The kind of the Producer.
         /// </summary>
         public ProducerKind? Kind { get; init; }
 
@@ -890,21 +887,21 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; init; }
         /// <summary>
-        /// Read after this offset. Empty is the beginning. A too high offset fails.
+        /// Read after this offset. Empty means from the beginning.
         /// </summary>
         public byte[]? FromOffset { get; init; }
         /// <summary>
-        /// About this many Records per page, 1 to 1000.
+        /// The maximum number of Records in one page.
         /// </summary>
         public int? MaxRecords { get; init; }
         /// <summary>
-        /// How long to wait for a new Record before an empty answer. At most 60 s.
-        /// </summary>
-        public System.TimeSpan? Wait { get; init; }
-        /// <summary>
-        /// The maximum Record bytes in a page. A larger Record is still returned alone.
+        /// The maximum bytes of Records in a page. A larger Record is returned alone.
         /// </summary>
         public long? MaxBytes { get; init; }
+        /// <summary>
+        /// How long to wait for a new Record before the read returns an empty page.
+        /// </summary>
+        public System.TimeSpan? Wait { get; init; }
 
         internal static ReadRecordsRequest<TBody> FromTransferType(Temporalio.Api.StreamService.V1.ReadRecordsRequest wire)
         {
@@ -917,8 +914,8 @@ namespace Temporalio.Workflows
             {
                 FromOffset = wire.FromOffset.ToByteArray(),
                 MaxRecords = wire.MaxRecords == 0 ? null : wire.MaxRecords,
-                Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
                 MaxBytes = wire.MaxBytes == 0 ? null : wire.MaxBytes,
+                Wait = wire.Wait == null ? null : Nexgen.Support.ProtoExtensions.FromDurationProto(wire.Wait),
             };
         }
 
@@ -934,13 +931,13 @@ namespace Temporalio.Workflows
             {
                 proto.MaxRecords = maxRecords;
             }
-            if (Wait is { } wait)
-            {
-                proto.Wait = wait.ToProto();
-            }
             if (MaxBytes is { } maxBytes)
             {
                 proto.MaxBytes = maxBytes;
+            }
+            if (Wait is { } wait)
+            {
+                proto.Wait = wait.ToProto();
             }
             return proto;
         }
@@ -977,11 +974,11 @@ namespace Temporalio.Workflows
 
         public IReadOnlyList<StreamRecord<TBody>> Records { get; init; }
         /// <summary>
-        /// The last offset that this read covered. The next read starts after it.
+        /// The offset of the last Record in this page. The next read starts after it.
         /// </summary>
         public byte[]? LastOffset { get; init; }
         /// <summary>
-        /// True when the Stream is closed and this read gave its last Record.
+        /// True when the Stream is closed and this page has its last Record.
         /// </summary>
         public bool Done { get; init; }
 
@@ -1023,7 +1020,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// One Record that a Producer appended, as a read gives it.
+    /// One Record of a Stream, as a read returns it.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRecord<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -1044,7 +1041,7 @@ namespace Temporalio.Workflows
         public TBody Body { get; init; }
         public Producer? Producer { get; init; }
         /// <summary>
-        /// The place of this Record in the Stream. Ordered and unique, with gaps.
+        /// The position of this Record in the Stream. Offsets are ordered, with gaps.
         /// </summary>
         public byte[] Offset { get; init; }
 
@@ -1091,7 +1088,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Identifies one Stream. The id is opaque to callers.
+    /// A reference to one Stream. Callers treat the id as opaque.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(StreamRef<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -1110,7 +1107,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; init; }
         /// <summary>
-        /// Registered Store name. With none, the SDK picks one. Only an SDK reads it.
+        /// The registered name of the Store. If empty, the SDK picks a Store.
         /// </summary>
         public string? Store { get; init; }
 
@@ -1197,7 +1194,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A Workflow run Producer.
+    /// The Producer of a Workflow run.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowProducer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -1212,16 +1209,16 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// The run id of the Workflow run, not of its chain.
+        /// The id of this run, not the first run id of its chain.
         /// </summary>
         public string RunId { get; init; }
-        public WorkflowTaskEpoch? Epoch { get; init; }
+        public WorkflowTaskAttempt? Attempt { get; init; }
 
         internal static WorkflowProducer FromTransferType(Temporalio.Api.Stream.V1.WorkflowProducer wire)
         {
             return new WorkflowProducer(wire.RunId)
             {
-                Epoch = wire.Epoch == null ? null : WorkflowTaskEpoch.FromTransferType(wire.Epoch),
+                Attempt = wire.Attempt == null ? null : WorkflowTaskAttempt.FromTransferType(wire.Attempt),
             };
         }
 
@@ -1229,9 +1226,9 @@ namespace Temporalio.Workflows
         {
             var proto = new Temporalio.Api.Stream.V1.WorkflowProducer();
             proto.RunId = RunId;
-            if (Epoch is { } epoch)
+            if (Attempt is { } attempt)
             {
-                proto.Epoch = (Temporalio.Api.Stream.V1.WorkflowTaskEpoch)epoch.ToTransferType();
+                proto.Attempt = (Temporalio.Api.Stream.V1.WorkflowTaskAttempt)attempt.ToTransferType();
             }
             return proto;
         }
@@ -1254,16 +1251,16 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A Workflow Task attempt of the run.
+    /// One attempt of a Workflow Task.
     /// </summary>
-    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowTaskEpoch.TransferTypeConverter))]
+    [Temporalio.Converters.TemporalTransferTypeConverter(typeof(WorkflowTaskAttempt.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
-    public record WorkflowTaskEpoch
+    public record WorkflowTaskAttempt
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="WorkflowTaskEpoch"/> class.
+        /// Initializes a new instance of the <see cref="WorkflowTaskAttempt"/> class.
         /// </summary>
-        public WorkflowTaskEpoch(long startedEventId, int attempt)
+        public WorkflowTaskAttempt(long startedEventId, int attempt)
         {
             StartedEventId = startedEventId;
             Attempt = attempt;
@@ -1271,25 +1268,25 @@ namespace Temporalio.Workflows
 
         public long StartedEventId { get; init; }
         /// <summary>
-        /// 1 or more.
+        /// The attempt number of the task, starting at 1. Every task starts at 1 again.
         /// </summary>
         public int Attempt { get; init; }
         /// <summary>
-        /// When the Workflow Task attempt started. It tells a reused started id apart.
+        /// When this attempt started. It distinguishes two tasks with one started id.
         /// </summary>
         public Timestamp? StartedTime { get; init; }
 
-        internal static WorkflowTaskEpoch FromTransferType(Temporalio.Api.Stream.V1.WorkflowTaskEpoch wire)
+        internal static WorkflowTaskAttempt FromTransferType(Temporalio.Api.Stream.V1.WorkflowTaskAttempt wire)
         {
-            return new WorkflowTaskEpoch(wire.StartedEventId, wire.Attempt)
+            return new WorkflowTaskAttempt(wire.StartedEventId, wire.Attempt)
             {
                 StartedTime = wire.StartedTime == null ? null : Timestamp.FromTransferType(wire.StartedTime),
             };
         }
 
-        internal Temporalio.Api.Stream.V1.WorkflowTaskEpoch ToTransferType()
+        internal Temporalio.Api.Stream.V1.WorkflowTaskAttempt ToTransferType()
         {
-            var proto = new Temporalio.Api.Stream.V1.WorkflowTaskEpoch();
+            var proto = new Temporalio.Api.Stream.V1.WorkflowTaskAttempt();
             proto.StartedEventId = StartedEventId;
             proto.Attempt = Attempt;
             if (StartedTime is { } startedTime)
@@ -1305,13 +1302,13 @@ namespace Temporalio.Workflows
         public sealed class TransferTypeConverter : Temporalio.Converters.ITemporalTransferTypeConverter
         {
             /// <summary>Gets the generated transfer type.</summary>
-            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.WorkflowTaskEpoch);
+            public System.Type TransferType => typeof(Temporalio.Api.Stream.V1.WorkflowTaskAttempt);
 
             /// <summary>Converts a model value to its transfer type.</summary>
-            public object? ToTransferType(object? value) => value is null ? null : ((WorkflowTaskEpoch)value).ToTransferType();
+            public object? ToTransferType(object? value) => value is null ? null : ((WorkflowTaskAttempt)value).ToTransferType();
 
             /// <summary>Converts a transfer-type value to this model.</summary>
-            public object? FromTransferType(object? transferType) => transferType is null ? null : WorkflowTaskEpoch.FromTransferType((Temporalio.Api.Stream.V1.WorkflowTaskEpoch)transferType);
+            public object? FromTransferType(object? transferType) => transferType is null ? null : WorkflowTaskAttempt.FromTransferType((Temporalio.Api.Stream.V1.WorkflowTaskAttempt)transferType);
         }
 
     }

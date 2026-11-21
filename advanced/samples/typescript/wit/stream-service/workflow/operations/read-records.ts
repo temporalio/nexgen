@@ -9,7 +9,7 @@ import "../resources";
 import type { Stream } from "../resources";
 
 /**
- * A long poll. NOT_FOUND for an uncreated Stream.
+ * A long poll. It fails with NOT_FOUND for a Stream that was never created.
  *
  * @param request - Request for the operation.
  */

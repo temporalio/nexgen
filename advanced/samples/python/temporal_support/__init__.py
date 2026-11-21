@@ -2,6 +2,7 @@
 
 from .poll import next_read_request as next_read_request
 from .poll import resume_read_request as resume_read_request
+from .streams import append_request_id as append_request_id
 from .streams import default_producer as default_producer
 from .streams import request_id as request_id
 from .streams import stream_ref_from_id as stream_ref_from_id

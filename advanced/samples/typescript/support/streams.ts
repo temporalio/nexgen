@@ -15,6 +15,11 @@ export function requestId(): string {
   return workflow.inWorkflowContext() ? workflow.uuid4() : crypto.randomUUID();
 }
 
+/** A new id for each append call, or none in a Workflow, where the SDK sets it. */
+export function appendRequestId(): string | undefined {
+  return workflow.inWorkflowContext() ? undefined : crypto.randomUUID();
+}
+
 /** The proto of a request has the id of its ref, and no Store name. */
 export function streamRefToId(ref: StreamRef<unknown>): string {
   return ref.id;

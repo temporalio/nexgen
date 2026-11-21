@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .models import (
-    ActivityEpoch,
+    ActivityAttempt,
     ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
@@ -15,7 +15,7 @@ from .models import (
     CreateStreamResult,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    LocalActivityEpoch,
+    LocalActivityAttempt,
     LocalActivityProducer,
     Producer,
     ProducerKind,
@@ -32,12 +32,12 @@ from .models import (
     StreamStatus,
     Timestamp,
     WorkflowProducer,
-    WorkflowTaskEpoch,
+    WorkflowTaskAttempt,
 )
 from .services import StreamService
 
 __all__ = [
-    "ActivityEpoch",
+    "ActivityAttempt",
     "ActivityProducer",
     "AppendRecord",
     "AppendRecordsRequest",
@@ -49,7 +49,7 @@ __all__ = [
     "CreateStreamResult",
     "DescribeStreamRequest",
     "DescribeStreamResponse",
-    "LocalActivityEpoch",
+    "LocalActivityAttempt",
     "LocalActivityProducer",
     "Producer",
     "ProducerKind",
@@ -66,6 +66,6 @@ __all__ = [
     "StreamStatus",
     "Timestamp",
     "WorkflowProducer",
-    "WorkflowTaskEpoch",
+    "WorkflowTaskAttempt",
     "StreamService",
 ]

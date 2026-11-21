@@ -25,13 +25,15 @@ def workflow_producer() -> typing.Any:
     )
 
 
-def default_producer() -> typing.Any:
+def default_producer(nexus_client: object) -> typing.Any:
     """An Activity's attempt, or a client."""
+    # The sample has one client Producer, so it doesn't read the client.
+    del nexus_client
     models = _models()
     if temporalio.activity.in_activity():
         info = temporalio.activity.info()
         scheduled = info.current_attempt_scheduled_time.timestamp()
-        epoch = models.ActivityEpoch(
+        attempt = models.ActivityAttempt(
             attempt_scheduled_time=models.Timestamp(
                 seconds=int(scheduled), nanos=round(scheduled % 1 * 1e9)
             ),
@@ -40,7 +42,7 @@ def default_producer() -> typing.Any:
         return models.Producer(
             id=f"act:{info.workflow_run_id}:{info.activity_id}",
             kind=models.ProducerKindWorkflowActivity(
-                models.ActivityProducer(run_id=info.workflow_run_id, epoch=epoch)
+                models.ActivityProducer(run_id=info.workflow_run_id, attempt=attempt)
             ),
         )
     return models.Producer(
@@ -53,6 +55,13 @@ def request_id() -> str:
     """A new id for each create call. A Workflow's replay gives the same id."""
     if temporalio.workflow.in_workflow():
         return str(temporalio.workflow.uuid4())
+    return str(uuid.uuid4())
+
+
+def append_request_id() -> str | None:
+    """A new id for each append call, or none in a Workflow, where the SDK sets it."""
+    if temporalio.workflow.in_workflow():
+        return None
     return str(uuid.uuid4())
 
 

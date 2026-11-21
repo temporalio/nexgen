@@ -2566,7 +2566,11 @@ caller passes no value. Go and Java pass an optional parameter as it is, and so
 does a .NET resource method that builds the request itself.
 
 ```python
-producer=((_support.default_producer()) if producer is None else producer)
+producer=(
+    (_support.default_producer(self._nexus_client))
+    if producer is None
+    else producer
+)
 ```
 
 A default cannot be combined with `@nexus.source` for the same language.
@@ -2589,7 +2593,6 @@ enum stream-status {
   stream-status-unspecified,
   stream-status-open,
   stream-status-closed,
-  stream-status-expired,
 }
 ```
 
