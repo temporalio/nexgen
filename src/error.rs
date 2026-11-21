@@ -291,6 +291,12 @@ pub enum Error {
     IncompleteOperationOutputTransform { service: String, operation: String },
 
     #[error(
+        "service `{service}` operation `{operation}` states resource field bindings, but it \
+         returns no resource"
+    )]
+    ResourceBindingWithoutResource { service: String, operation: String },
+
+    #[error(
         "service `{service}` operation `{operation}` references unknown input proto type `{type_name}`"
     )]
     UnknownOperationInputProto {

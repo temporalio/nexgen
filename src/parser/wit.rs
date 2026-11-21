@@ -2175,6 +2175,15 @@ fn is_valid_support_helper_path(name: &str) -> bool {
     name.split('.').all(is_valid_support_helper_name)
 }
 
+fn is_wit_field_name(name: &str) -> bool {
+    name.split('-').all(|word| {
+        word.starts_with(|c: char| c.is_ascii_lowercase())
+            && word
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    })
+}
+
 fn build_function_field(
     resolve: &Resolve,
     owner: TypeOwner,
@@ -3344,6 +3353,7 @@ fn build_operation(
     let context_propagation_header =
         build_operation_context_propagation(resolve, function, &directives, path, &context)?;
     let poll = build_operation_poll(resolve, function, &directives, path, &context)?;
+    let resource_binding = build_operation_resource_binding(&directives, path, &context)?;
     // On a free func, `@nexus.api-omit` hides the operation's public top-level function for its
     // targets while keeping the operation registered and bindable by resource methods. Only the
     // workflow target has a top-level function, so a workflow-excluding `targets` does nothing and
@@ -3406,6 +3416,7 @@ fn build_operation(
         serialization_context,
         context_propagation_header,
         poll,
+        resource_binding,
         api_omitted,
         data: (),
     })
@@ -3616,6 +3627,51 @@ fn build_operation_poll(
         items,
         resume,
     }))
+}
+
+/// Planning checks the keys and the source fields, since only it finds the returned resource
+/// through a result record.
+fn build_operation_resource_binding(
+    directives: &[Directive],
+    path: &Path,
+    context: &str,
+) -> Result<Option<OperationResourceBindingSpec>> {
+    let Some(directive) = directive(directives, "resource-binding", path, context)? else {
+        return Ok(None);
+    };
+    let invalid = |reason: String| Error::InvalidWitDirective {
+        path: path.to_path_buf(),
+        context: context.to_string(),
+        directive: "@nexus.resource-binding".to_string(),
+        reason,
+    };
+    if directive.args.is_empty() {
+        return Err(invalid(
+            "needs a source for each constructor field".to_string(),
+        ));
+    }
+    let sources = directive
+        .args
+        .iter()
+        .map(|(field, value)| {
+            let source = match value.split_once('.') {
+                Some(("request", name)) if is_wit_field_name(name) => {
+                    ResourceFieldSourceSpec::RequestField(name.to_string())
+                }
+                Some(("result", name)) if is_wit_field_name(name) => {
+                    ResourceFieldSourceSpec::ResultField(name.to_string())
+                }
+                _ => {
+                    return Err(invalid(format!(
+                        "the source of `{field}` is `{value}`, but it must be \
+                         `request.<field>` or `result.<field>`"
+                    )));
+                }
+            };
+            Ok((field.clone(), source))
+        })
+        .collect::<Result<_>>()?;
+    Ok(Some(OperationResourceBindingSpec { sources }))
 }
 
 fn build_operation_serialization_context(

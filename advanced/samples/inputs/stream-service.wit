@@ -148,8 +148,6 @@ interface stream-service {
   ///   "Create a Stream. If it exists, fail, or with use-existing get the open one."
   /// @nexus.proto "temporal.api.streamservice.v1.CreateStreamRequest"
   record create-stream-request {
-    // The field is called ref, so the created Stream takes its ref from the request. The
-    // response has none.
     /// @nexus.doc "The ref of the Stream to create. Its id is the Stream id."
     /// @nexus.proto-field "stream_id"
     /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
@@ -338,6 +336,7 @@ interface stream-service {
 
   // The Workflow API has no other way to create a Stream, so this function stays public.
   /// @nexus.operation name="CreateStream"
+  /// @nexus.resource-binding ref="request.ref" created="result.created"
   create-stream: func(request: create-stream-request) -> create-stream-result;
 
   /// @nexus.doc "Append one batch. For Workflow code, Core makes the call."
