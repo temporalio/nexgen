@@ -421,7 +421,7 @@ export function createAppendRecordTransferTypeConverter<BodyT>(
 }
 export interface Producer {
   /**
-   * Required. The kind of the Producer.
+   * The kind of the Producer. A write must set it.
    */
   kind?: ProducerKind;
 }
@@ -1109,7 +1109,7 @@ export function createCloseStreamRequestTransferTypeConverter<BodyT>(
 export interface ReadRecordsResponse<BodyT> {
   records: StreamRecord<BodyT>[];
   /**
-   * The offset of the last Record in this page. The next read starts after it.
+   * Where the next read goes on. It is never before the last Record in this page.
    */
   lastOffset?: Uint8Array;
   /**
@@ -1278,7 +1278,7 @@ export interface ReadRecordsRequest<BodyT> {
    */
   maxBytes?: Long;
   /**
-   * How long to wait for a new Record before the read returns an empty page.
+   * How long the read waits for a new Record or a close before an empty page.
    */
   wait?: common.Duration;
 }
@@ -1355,7 +1355,7 @@ export function createReadRecordsRequestTransferTypeConverter<BodyT>(
 export interface DescribeStreamResponse {
   status?: StreamStatus;
   /**
-   * The offset of the newest Record. Empty when the Stream has none.
+   * The newest offset. A read from it gives only later Records. Empty with none.
    */
   lastOffset?: Uint8Array;
 }

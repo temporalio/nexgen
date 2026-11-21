@@ -585,7 +585,7 @@ namespace Temporalio.Workflows
     {
         public StreamStatus? Status { get; init; }
         /// <summary>
-        /// The offset of the newest Record. Empty when the Stream has none.
+        /// The newest offset. A read from it gives only later Records. Empty with none.
         /// </summary>
         public byte[]? LastOffset { get; init; }
 
@@ -750,7 +750,7 @@ namespace Temporalio.Workflows
     public record Producer
     {
         /// <summary>
-        /// Required. The kind of the Producer.
+        /// The kind of the Producer. A write must set it.
         /// </summary>
         public ProducerKind? Kind { get; init; }
 
@@ -855,7 +855,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? MaxBytes { get; init; }
         /// <summary>
-        /// How long to wait for a new Record before the read returns an empty page.
+        /// How long the read waits for a new Record or a close before an empty page.
         /// </summary>
         public System.TimeSpan? Wait { get; init; }
 
@@ -930,7 +930,7 @@ namespace Temporalio.Workflows
 
         public IReadOnlyList<StreamRecord<TBody>> Records { get; init; }
         /// <summary>
-        /// The offset of the last Record in this page. The next read starts after it.
+        /// Where the next read goes on. It is never before the last Record in this page.
         /// </summary>
         public byte[]? LastOffset { get; init; }
         /// <summary>

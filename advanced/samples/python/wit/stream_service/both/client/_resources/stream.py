@@ -166,7 +166,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long to wait for a new Record before the read returns an empty
+            wait: How long the read waits for a new Record or a close before an empty
                 page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
@@ -215,7 +215,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long to wait for a new Record before the read returns an empty
+            wait: How long the read waits for a new Record or a close before an empty
                 page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
