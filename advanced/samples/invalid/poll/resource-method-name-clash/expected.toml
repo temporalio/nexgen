@@ -3,7 +3,7 @@ system_nexus = true
 targets = ["workflow", "client"]
 
 [error]
-kind = "python-generated-name-conflict"
+kind = "generated-name-conflict"
 contains = [
-  "Python generated name `read_page` for the page call of resource method `Cursor.read` conflicts with method `Cursor.read-page`",
+  "python generated name `read_page` for the page call of resource method `Cursor.read` conflicts with method `Cursor.read-page`",
 ]

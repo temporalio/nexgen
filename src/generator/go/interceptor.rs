@@ -215,16 +215,18 @@ pub(super) fn render(
     let mut names = BTreeSet::new();
     for (_, operation) in &operations {
         if !operation.model_type_parameters.is_empty() {
-            return Err(Error::UnsupportedGoType {
+            return Err(Error::UnsupportedType {
+                language: crate::language::Language::Go,
                 context: format!("interceptor for `{}`", operation.name),
                 reason: "Go interceptor methods require concrete types".to_string(),
             });
         }
         if !names.insert(go_field_name(operation.name)) {
-            return Err(Error::UnsupportedGoType {
-                context: format!("interceptor for `{}`", operation.name),
-                reason: "operation names must be distinct across SDK interceptor services"
-                    .to_string(),
+            return Err(Error::GeneratedNameConflict {
+                language: crate::language::Language::Go,
+                name: go_field_name(operation.name),
+                generated_by: format!("interceptor method for operation `{}`", operation.name),
+                conflicting_declaration: "another SDK interceptor method".to_string(),
             });
         }
     }

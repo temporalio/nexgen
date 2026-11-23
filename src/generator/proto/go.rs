@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 
 use crate::error::{Error, Result};
 use crate::generator::ExternalModelBackend;
+use crate::language::Language;
 use crate::planning::ResolvedResourceBindingSource;
 use crate::planning::{
     PlannedFamily, PlannedProtoType, PlannedResource, PlannedResourceField, PlannedSpec,
@@ -877,7 +878,8 @@ impl ModelBackend {
                     authored_type: None,
                     source: PlannedMessageSource::Proto,
                 })
-                .ok_or_else(|| Error::UnsupportedGoProtoConversion {
+                .ok_or_else(|| Error::UnsupportedProtoConversion {
+                    language: Language::Go,
                     context: format!("model `{}`", proto_info.full_name),
                     reason: "its proto descriptor has no `go_package` option".to_string(),
                 })?;
@@ -943,7 +945,8 @@ impl ModelBackend {
                     None
                 } else {
                     if system_nexus && rendered_op.serialization_context_expr.is_some() {
-                        return Err(Error::UnsupportedGoProtoConversion {
+                        return Err(Error::UnsupportedProtoConversion {
+                            language: Language::Go,
                             context: format!(
                                 "operation `{}` input `{}`",
                                 planned_op.name, rendered_op.input_type
@@ -1257,11 +1260,13 @@ fn operation_message_binding(
     };
     let conversion = backend
         .wire_conversion(&PlannedValueType::Message(message.clone()), None)
-        .ok_or_else(|| Error::UnsupportedGoProtoConversion {
+        .ok_or_else(|| Error::UnsupportedProtoConversion {
+            language: Language::Go,
             context: format!("operation `{operation_name}` {direction}"),
             reason: "message values have no Go proto conversion".to_string(),
         })?
-        .map_err(|reason| Error::UnsupportedGoProtoConversion {
+        .map_err(|reason| Error::UnsupportedProtoConversion {
+            language: Language::Go,
             context: format!("operation `{operation_name}` {direction}"),
             reason,
         })?;
@@ -1310,7 +1315,8 @@ fn build_rendered_resource_return(
                 // unexported fields (populated at the call site), so they read
                 // the same way as public fields.
                 if origin.as_ref().is_some_and(FieldPolicy::is_omitted) {
-                    return Err(Error::UnsupportedGoProtoConversion {
+                    return Err(Error::UnsupportedProtoConversion {
+                        language: Language::Go,
                         context: format!(
                             "resource return field `{}.{}`",
                             resource_return.resource_type_name, binding.field_name
@@ -1334,7 +1340,8 @@ fn build_rendered_resource_return(
                     backend,
                     package,
                 )
-                .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                .map_err(|reason| Error::UnsupportedProtoConversion {
+                    language: Language::Go,
                     context: format!(
                         "resource return field `{}.{}`",
                         resource_return.resource_type_name, binding.field_name
@@ -1395,7 +1402,8 @@ fn build_rendered_resource_return(
                     backend,
                     package,
                 )
-                .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                .map_err(|reason| Error::UnsupportedProtoConversion {
+                    language: Language::Go,
                     context: format!("result record field `{}.{}`", holder.model_name, field.name),
                     reason,
                 })?;
@@ -1795,7 +1803,8 @@ fn build_field_conversions(
             }
             let planned_field = planned_field(planned_model, field_name, field, api_plan);
             build_field_conversion(&planned_field, &native_fields[index], api_plan, backend)
-                .map_err(|reason| Error::UnsupportedGoProtoConversion {
+                .map_err(|reason| Error::UnsupportedProtoConversion {
+                    language: Language::Go,
                     context: format!(
                         "field `{}.{}`",
                         planned_model.name, planned_field.authored_name
@@ -1946,7 +1955,8 @@ fn build_oneof_conversion(
                 &backend.package,
                 Some("cfg"),
             )
-            .map_err(|reason| Error::UnsupportedGoProtoConversion {
+            .map_err(|reason| Error::UnsupportedProtoConversion {
+                language: Language::Go,
                 context: context.clone(),
                 reason,
             })?;

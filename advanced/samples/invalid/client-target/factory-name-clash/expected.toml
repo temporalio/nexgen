@@ -3,5 +3,5 @@ system_nexus = true
 targets = ["client"]
 
 [error]
-kind = "python-generated-name-conflict"
-contains = ["Python generated name `get_job` for the client factory of resource `Job` conflicts with a client method of service `Scheduler`"]
+kind = "generated-name-conflict"
+contains = ["python generated name `get_job` for the client factory of resource `Job` conflicts with a client method of service `Scheduler`"]

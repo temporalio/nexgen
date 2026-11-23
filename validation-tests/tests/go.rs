@@ -822,18 +822,22 @@ interface service {
         .replace("primary=true", "primary=false");
     let error = render_go_descriptor_fixture(&wit).unwrap_err();
     match error.downcast_ref::<nexgen::error::Error>().unwrap() {
-        nexgen::error::Error::UnsupportedGoType { context, reason } => {
-            assert!(context.to_lowercase().contains("run"), "{error}");
+        nexgen::error::Error::TypeParameterNameConflict {
+            language: nexgen::language::Language::Go,
+            declaration,
+            parameter,
+            name,
+            conflicting,
+        } => {
+            assert_eq!(declaration, "Run wrapper");
+            assert_eq!(parameter, "WorkflowF");
+            assert_eq!(name, "WorkflowF");
             assert!(
-                reason.contains("model type parameter `WorkflowF`"),
-                "{error}"
-            );
-            assert!(
-                reason.contains("generated reserved name `WorkflowF`"),
+                conflicting.contains("model type parameter `WorkflowF`"),
                 "{error}"
             );
         }
-        other => panic!("expected early UnsupportedGoType, got {other:?}"),
+        other => panic!("expected early TypeParameterNameConflict for Go, got {other:?}"),
     }
 }
 
