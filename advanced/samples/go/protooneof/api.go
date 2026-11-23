@@ -19,12 +19,14 @@ type OutcomeValue[OutputT any] interface {
 }
 
 type OutcomeValueSuccess[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value OutputT
 }
 
 func (OutcomeValueSuccess[OutputT]) isOutcomeValue(OutputT) {}
 
 type OutcomeValueFailure[OutputT any] struct {
+	// Value carries the payload for this case.
 	Value error
 }
 
@@ -42,12 +44,14 @@ type ActivitySelection interface {
 }
 
 type ActivitySelectionID struct {
+	// Value carries the payload for this case.
 	Value string
 }
 
 func (ActivitySelectionID) isActivitySelection() {}
 
 type ActivitySelectionType struct {
+	// Value carries the payload for this case.
 	Value string
 }
 

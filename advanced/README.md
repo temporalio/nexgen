@@ -73,10 +73,12 @@ These outputs are placed in `stream-service/models`, `stream-service/workflow`,
 `stream-service/client`, and `stream-service/both`, with language-specific
 casing. Each child can override any of the parent's settings. Lists replace the
 inherited list; `targets = []` selects no APIs and `descriptors = []` selects no
-descriptors. An explicit `system_nexus = false` overrides `true`. Language
-filtering uses the resolved child settings. Child tables cannot contain further
-child tables. The sample builder clears the example's output directory once
-before generating its children.
+descriptors. `system_nexus` accepts a boolean for all languages or a list such
+as `["go"]` to enable System Nexus only for the listed languages. If `languages`
+is set, every language in the `system_nexus` list must also appear in
+`languages`. This check and language filtering use the resolved child settings.
+Child tables cannot contain further child tables. The sample builder clears the
+example's output directory once before generating its children.
 
 The linked `nexus:temporal-types` WIT package describes semantic types, while
 authored language-specific Temporal converters live in each sample project:
