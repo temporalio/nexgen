@@ -2509,6 +2509,9 @@ Repeated source directives must have disjoint target sets. A directive without
 `targets` covers all targets, so it overlaps any other source directive on the
 same field. Overlaps are errors, not declaration-order overrides.
 
+In Python, a source of the client target can pass `nexus_client` to its helper,
+as a [default](#nexusdefault) can.
+
 Cannot be combined with `@nexus.default` for the same language.
 
 ---
@@ -2567,11 +2570,26 @@ does a .NET resource method that builds the request itself.
 
 ```python
 producer=(
-    (_support.default_producer(self._nexus_client))
+    (_support.default_producer(nexus_client))
     if producer is None
     else producer
 )
 ```
+
+In Python, a default of the client target can name `nexus_client`. It is the
+Nexus client of the resource whose method builds the request. Each client
+resource method reads it before it builds the request, so a helper can take it
+as an argument.
+
+```wit
+/// @nexus.default targets="client" python="_support.default_producer(nexus_client)"
+producer: producer,
+```
+
+Only a method of a client resource has the name. Workflow code has no such
+client, and a client extension method makes its Nexus client after it builds the
+request. nexgen refuses a resource method of the client target with a parameter
+called `nexus_client`, since the name would hide the parameter.
 
 A default cannot be combined with `@nexus.source` for the same language.
 

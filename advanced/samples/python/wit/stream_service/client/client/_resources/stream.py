@@ -77,17 +77,18 @@ class Stream(typing.Generic[BodyT]):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> AppendRecordsResponse:
         """Append values, and return the offsets of the batch."""
+        nexus_client = self._nexus_client
         request = AppendRecordsRequest(
             ref=self.ref,
             producer=(
-                (_support.default_producer(self._nexus_client))
+                (_support.default_producer(nexus_client))
                 if producer is None
                 else producer
             ),
             records=[AppendRecord(body=value) for value in records],
             request_id=_support.append_request_id(),
         )
-        handle = await self._nexus_client.start_operation(
+        handle = await nexus_client.start_operation(
             operation=StreamService.append_records,
             arg=request,
             id=f"{_uuid.uuid4()}",
@@ -104,15 +105,16 @@ class Stream(typing.Generic[BodyT]):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> None:
         """Close the Stream. Readers get the Records that are left, then end."""
+        nexus_client = self._nexus_client
         request = CloseStreamRequest(
             ref=self.ref,
             producer=(
-                (_support.default_producer(self._nexus_client))
+                (_support.default_producer(nexus_client))
                 if producer is None
                 else producer
             ),
         )
-        handle = await self._nexus_client.start_operation(
+        handle = await nexus_client.start_operation(
             operation=StreamService.close_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",
@@ -132,6 +134,7 @@ class Stream(typing.Generic[BodyT]):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> ReadRecordsResponse[BodyT]:
         """Read one page of Records. The poll iterator reads them all."""
+        nexus_client = self._nexus_client
         request = ReadRecordsRequest(
             ref=self.ref,
             from_offset=from_offset,
@@ -139,7 +142,7 @@ class Stream(typing.Generic[BodyT]):
             max_bytes=max_bytes,
             wait=wait,
         )
-        handle = await self._nexus_client.start_operation(
+        handle = await nexus_client.start_operation(
             operation="ReadRecords",
             arg=request,
             id=f"{_uuid.uuid4()}",
@@ -171,6 +174,7 @@ class Stream(typing.Generic[BodyT]):
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
+        nexus_client = self._nexus_client
         request = ReadRecordsRequest(
             ref=self.ref,
             from_offset=from_offset,
@@ -178,7 +182,6 @@ class Stream(typing.Generic[BodyT]):
             max_bytes=max_bytes,
             wait=wait,
         )
-        nexus_client = self._nexus_client
         while True:
             operation_handle = await nexus_client.start_operation(
                 operation="ReadRecords",
@@ -249,10 +252,11 @@ class Stream(typing.Generic[BodyT]):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> DescribeStreamResponse:
         """Return the status and the newest offset of the Stream."""
+        nexus_client = self._nexus_client
         request = DescribeStreamRequest(
             ref=self.ref,
         )
-        handle = await self._nexus_client.start_operation(
+        handle = await nexus_client.start_operation(
             operation=StreamService.describe_stream,
             arg=request,
             id=f"{_uuid.uuid4()}",

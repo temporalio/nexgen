@@ -1,0 +1,21 @@
+package test:nexus-client-parameter@1.0.0;
+
+world system { export job-service; }
+
+// A method of a client resource reads the Nexus client of its resource into `nexus_client`, so a
+// parameter of that name would lose its value.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func(nexus-client: string);
+  }
+
+  record restart-request {
+    job-id: string,
+    nexus-client: string,
+  }
+
+  restart: func(request: restart-request);
+}

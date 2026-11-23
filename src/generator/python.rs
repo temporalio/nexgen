@@ -677,6 +677,7 @@ impl<'a> ApiPlanner<'a> {
         if targets.contains(&GenerationTarget::Client) {
             validate_client_names(services)?;
             validate_rpc_option_names(services)?;
+            validate_resource_nexus_client_name(services)?;
         }
         let mut files = GeneratedFileMap::default();
         files.insert_multi(
@@ -2169,16 +2170,13 @@ impl<'a> ApiPlanner<'a> {
                     target,
                 );
                 if client {
+                    render_resource_nexus_client(output, resource);
                     render_resource_method_request(output, &request_expr);
-                    let client = format!(
-                        "self.{}",
-                        resource_client_identifier(resource, "_nexus_client")
-                    );
                     render_client_operation_body(
                         output,
                         service,
                         operation,
-                        Some(&client),
+                        Some(RESOURCE_NEXUS_CLIENT),
                         result_annotation == "None",
                     );
                 } else if service.endpoint.is_none() {
@@ -2405,11 +2403,11 @@ impl<'a> ApiPlanner<'a> {
             self.api_plan,
             target,
         );
+        if client {
+            render_resource_nexus_client(output, resource);
+        }
         render_resource_method_request(output, &request_expr);
         if client {
-            output.push_str("        nexus_client = self.");
-            output.push_str(&resource_client_identifier(resource, "_nexus_client"));
-            output.push('\n');
             render_client_poll_loop(output, service, operation, &next_expr, "self.");
         } else {
             render_workflow_poll_loop(output, service, operation, &next_expr);
@@ -2438,6 +2436,10 @@ impl<'a> ApiPlanner<'a> {
             None,
             operation.experimental,
         );
+        // The item iterator makes no call, so it reads the client only for a request that names it.
+        if client && body_uses_python_symbol(&request_expr, RESOURCE_NEXUS_CLIENT) {
+            render_resource_nexus_client(output, resource);
+        }
         render_resource_method_request(output, &request_expr);
         let page_args = method
             .params
@@ -5483,6 +5485,20 @@ fn resource_data_type(type_name: &str) -> String {
     format!("{type_name}Data")
 }
 
+/// The name that a default or a source of the client target has for the Nexus client of the
+/// resource whose method builds the request.
+const RESOURCE_NEXUS_CLIENT: &str = "nexus_client";
+
+/// Reads the Nexus client of a client resource into a local at the start of a method. The method
+/// starts its operation with it, and a default or a source of the request can pass it to a helper.
+fn render_resource_nexus_client(output: &mut String, resource: &PlannedResource) {
+    output.push_str("        ");
+    output.push_str(RESOURCE_NEXUS_CLIENT);
+    output.push_str(" = self.");
+    output.push_str(&resource_client_identifier(resource, "_nexus_client"));
+    output.push('\n');
+}
+
 fn resource_client_identifier(resource: &PlannedResource, base: &str) -> String {
     let mut name = base.to_string();
     while resource
@@ -7735,6 +7751,31 @@ fn validate_rpc_option_names(services: &[RenderedService<'_>]) -> Result<()> {
                         ),
                     ));
                 }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A method of a client resource reads the Nexus client of its resource into a local, so a
+/// parameter with the name of that local would lose its value, and the request would be wrong
+/// with no error.
+fn validate_resource_nexus_client_name(services: &[RenderedService<'_>]) -> Result<()> {
+    for resource in services.iter().flat_map(|service| &service.resources) {
+        for method in resource.methods_for(GenerationTarget::Client) {
+            if let Some(param) = method
+                .params
+                .iter()
+                .find(|param| python_field_name(&param.name) == RESOURCE_NEXUS_CLIENT)
+            {
+                return Err(Error::PythonGeneratedNameConflict {
+                    name: RESOURCE_NEXUS_CLIENT.to_string(),
+                    generated_by: "the Nexus client of a client resource method".to_string(),
+                    conflicting_declaration: format!(
+                        "parameter `{}` of method `{}` of resource `{}`",
+                        param.name, method.name, resource.name
+                    ),
+                });
             }
         }
     }

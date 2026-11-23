@@ -215,7 +215,7 @@ interface stream-service {
     /// @nexus.doc "The Producer of the batch. Defaults to the Producer of the calling context."
     /// @nexus.default targets="workflow" python="_support.workflow_producer()"
     ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.default targets="client" python="_support.default_producer(self._nexus_client)"
+    /// @nexus.default targets="client" python="_support.default_producer(nexus_client)"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
     // A resend of a batch has the id of its first send, so the Store writes the batch once. For
@@ -244,7 +244,7 @@ interface stream-service {
     ///   "The Producer that closes the Stream. Defaults to the Producer of the calling context."
     /// @nexus.default targets="workflow" python="_support.workflow_producer()"
     ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
-    /// @nexus.default targets="client" python="_support.default_producer(self._nexus_client)"
+    /// @nexus.default targets="client" python="_support.default_producer(nexus_client)"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
   }

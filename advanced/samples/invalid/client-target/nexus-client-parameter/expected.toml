@@ -1,0 +1,7 @@
+languages = ["python"]
+system_nexus = true
+targets = ["workflow", "client"]
+
+[error]
+kind = "python-generated-name-conflict"
+contains = ["Python generated name `nexus_client` for the Nexus client of a client resource method conflicts with parameter `nexus-client` of method `restart` of resource `job`"]
