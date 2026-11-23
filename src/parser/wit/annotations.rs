@@ -59,10 +59,12 @@ pub(super) struct Annotation {
     /// None leaves language support unrestricted.
     languages: Option<&'static [Language]>,
     system_nexus: bool,
+    conflicts: &'static [Conflict],
 }
 
 // Keep each rule here, rather than maintaining per-builder allowlists.
 const CATALOG: &[Annotation] = {
+    use ConflictScope::*;
     use Site::*;
     &[
         Annotation {
@@ -73,6 +75,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "namespace",
@@ -82,6 +85,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: Some(&[Language::Dotnet, Language::Go]),
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "facade",
@@ -91,6 +95,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: Some(&[Language::Go]),
             system_nexus: true,
+            conflicts: &[],
         },
         Annotation {
             name: "operations-class",
@@ -100,6 +105,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: Some(&[Language::Dotnet]),
             system_nexus: true,
+            conflicts: &[],
         },
         Annotation {
             name: "service-name",
@@ -109,6 +115,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "delay-load-temporalio-workflow",
@@ -118,6 +125,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: true,
+            conflicts: &[],
         },
         Annotation {
             name: "proto",
@@ -127,6 +135,10 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("type", &[Record, Enum, Flags, Variant], Any),
+                Conflict::new("type-parameter", &[Alias], Any),
+            ],
         },
         Annotation {
             name: "type-parameter",
@@ -136,6 +148,11 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("proto", &[Alias], Any),
+                Conflict::new("type", &[Alias], Any),
+                Conflict::new("function", &[Alias], Any),
+            ],
         },
         Annotation {
             name: "generic",
@@ -145,6 +162,7 @@ const CATALOG: &[Annotation] = {
             repeatable: true,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "proto-field",
@@ -154,6 +172,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "name",
@@ -163,6 +182,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "type",
@@ -172,6 +192,11 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("proto", &[Record, Enum, Flags, Variant], Any),
+                Conflict::new("type-parameter", &[Alias], Any),
+                Conflict::new("omit", &[Field], Any),
+            ],
         },
         Annotation {
             name: "omit",
@@ -181,6 +206,15 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("api-omit", &[Field], Any),
+                Conflict::new("source", &[Field], Any),
+                Conflict::new("type", &[Field], Any),
+                Conflict::new("flattened-type", &[Field], Any),
+                Conflict::new("function", &[Field], Any),
+                Conflict::new("default", &[Field], Any),
+                Conflict::new("flatten-in-api", &[Field], Any),
+            ],
         },
         Annotation {
             name: "api-omit",
@@ -190,6 +224,11 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("omit", &[Field], Any),
+                Conflict::new("default", &[Field], Any),
+                Conflict::new("source", &[Field], SameTarget),
+            ],
         },
         Annotation {
             name: "source",
@@ -199,6 +238,13 @@ const CATALOG: &[Annotation] = {
             repeatable: true,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("omit", &[Field], Any),
+                Conflict::new("api-omit", &[Field], SameTarget),
+                Conflict::new("default", &[Field], SameLanguage),
+                Conflict::new("function", &[Field], Any),
+                Conflict::new("source", &[Field], SameTarget),
+            ],
         },
         Annotation {
             name: "default",
@@ -208,6 +254,12 @@ const CATALOG: &[Annotation] = {
             repeatable: true,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("omit", &[Field], Any),
+                Conflict::new("api-omit", &[Field], Any),
+                Conflict::new("source", &[Field], SameLanguage),
+                Conflict::new("default", &[Field], SameTarget),
+            ],
         },
         Annotation {
             name: "fallback",
@@ -217,6 +269,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "experimental",
@@ -226,6 +279,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "doc",
@@ -243,6 +297,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "operation",
@@ -252,6 +307,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "poll",
@@ -261,6 +317,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: Some(&[Language::Python]),
             system_nexus: true,
+            conflicts: &[],
         },
         Annotation {
             name: "serialization-context",
@@ -270,6 +327,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "context-propagation",
@@ -279,6 +337,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: Some(&[Language::Go]),
             system_nexus: true,
+            conflicts: &[],
         },
         Annotation {
             name: "storage-target",
@@ -297,6 +356,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "flatten-in-api",
@@ -306,6 +366,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[Conflict::new("omit", &[Field], Any)],
         },
         Annotation {
             name: "flattened-type",
@@ -315,6 +376,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[Conflict::new("omit", &[Field], Any)],
         },
         Annotation {
             name: "function",
@@ -345,6 +407,11 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[
+                Conflict::new("type-parameter", &[Alias], Any),
+                Conflict::new("omit", &[Field], Any),
+                Conflict::new("source", &[Field], Any),
+            ],
         },
         Annotation {
             name: "function-args",
@@ -354,6 +421,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "add-rpc-compatible-with",
@@ -363,6 +431,7 @@ const CATALOG: &[Annotation] = {
             repeatable: true,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "close",
@@ -375,6 +444,7 @@ const CATALOG: &[Annotation] = {
             // stream-service WIT, instead of ignoring it.
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "varargs",
@@ -384,9 +454,112 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
     ]
 };
+
+/// Each relationship is listed on both annotations. Catalog tests enforce
+/// symmetry, including placement and overlap semantics.
+#[derive(Debug, PartialEq, Eq)]
+struct Conflict {
+    with: &'static str,
+    sites: &'static [Site],
+    scope: ConflictScope,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ConflictScope {
+    Any,
+    SameLanguage,
+    SameTarget,
+}
+
+impl Conflict {
+    const fn new(with: &'static str, sites: &'static [Site], scope: ConflictScope) -> Self {
+        Self { with, sites, scope }
+    }
+
+    fn reason(
+        &self,
+        annotation: &Directive,
+        incompatible: &Directive,
+        path: &Path,
+        context: &str,
+    ) -> Result<Option<String>> {
+        let suffix = match self.scope {
+            ConflictScope::Any => "",
+            ConflictScope::SameLanguage => {
+                if !all_languages().into_iter().any(|language| {
+                    directive_language_value(annotation, language)
+                        .or_else(|| annotation.value("value"))
+                        .is_some()
+                        && directive_language_value(incompatible, language)
+                            .or_else(|| incompatible.value("value"))
+                            .is_some()
+                }) {
+                    return Ok(None);
+                }
+                " for the same language"
+            }
+            ConflictScope::SameTarget => {
+                let targets = build_origin_targets(annotation, path, context, annotation.name())?;
+                let other_targets =
+                    build_origin_targets(incompatible, path, context, incompatible.name())?;
+                let Some(target) = other_targets.iter().find(|target| targets.contains(target))
+                else {
+                    return Ok(None);
+                };
+                if annotation.name() == incompatible.name() {
+                    let target = match target {
+                        GenerationTarget::Workflow => "workflow",
+                        GenerationTarget::Client => "client",
+                    };
+                    return Ok(Some(format!(
+                        "overlapping target `{target}`; repeated `@nexus.{}` directives must have disjoint target sets",
+                        annotation.name()
+                    )));
+                }
+                " for the same target"
+            }
+        };
+        Ok(Some(format!(
+            "cannot be combined with `@nexus.{}`{suffix}",
+            incompatible.name()
+        )))
+    }
+}
+
+fn validate_conflicts(
+    directives: &[Directive],
+    site: Site,
+    path: &Path,
+    context: &str,
+) -> Result<()> {
+    for (index, annotation) in directives.iter().enumerate() {
+        for rule in annotation
+            .rule
+            .conflicts
+            .iter()
+            .filter(|rule| rule.sites.contains(&site))
+        {
+            for incompatible in &directives[index + 1..] {
+                if incompatible.name() != rule.with {
+                    continue;
+                }
+                if let Some(reason) = rule.reason(annotation, incompatible, path, context)? {
+                    return Err(Error::InvalidWitDirective {
+                        path: path.to_path_buf(),
+                        context: context.to_string(),
+                        directive: format!("@nexus.{}", annotation.name()),
+                        reason,
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
 impl Annotation {
     fn supports_language(&self, language: Language) -> bool {
@@ -470,9 +643,7 @@ fn validate_docs(
     generation: Option<GenerationContext>,
 ) -> Result<()> {
     let directives = parse_directives(docs, path, context)?;
-    let proto_backed = directives
-        .iter()
-        .any(|directive| directive.name() == "proto");
+    validate_conflicts(&directives, site, path, context)?;
     for directive in directives {
         let fail = |reason: String| Error::InvalidWitDirective {
             path: path.to_path_buf(),
@@ -485,15 +656,6 @@ fn validate_docs(
             let reason = match rule.name {
                 "type-parameter" => "is only supported on WIT type aliases".to_string(),
                 "fallback" => "is only supported on enum cases".to_string(),
-                "type"
-                    if proto_backed
-                        && matches!(
-                            site,
-                            Site::Record | Site::Enum | Site::Flags | Site::Variant
-                        ) =>
-                {
-                    "cannot be combined with `@nexus.proto` on a native WIT declaration".to_string()
-                }
                 "omit" if site == Site::Record => {
                     "mark record fields with `@nexus.omit`; type-level omit is no longer supported"
                         .to_string()
@@ -746,6 +908,184 @@ mod tests {
             for site in rule.sites {
                 assert!(!sites.contains(site));
                 sites.push(*site);
+            }
+        }
+    }
+
+    #[test]
+    fn catalog_conflicts_are_symmetric() {
+        for annotation in CATALOG {
+            for (index, conflict) in annotation.conflicts.iter().enumerate() {
+                let other = CATALOG
+                    .iter()
+                    .find(|other| other.name == conflict.with)
+                    .expect("conflict references an unknown annotation");
+                assert!(!conflict.sites.is_empty());
+                assert!(
+                    !annotation.conflicts[..index].contains(conflict),
+                    "duplicate conflict on {}: {conflict:?}",
+                    annotation.name
+                );
+                for (site_index, site) in conflict.sites.iter().enumerate() {
+                    assert!(!conflict.sites[..site_index].contains(site));
+                    assert!(annotation.sites.contains(site) || other.sites.contains(site));
+                }
+                assert!(
+                    other.conflicts.iter().any(|reverse| {
+                        reverse.with == annotation.name
+                            && reverse.scope == conflict.scope
+                            && reverse.sites.len() == conflict.sites.len()
+                            && reverse
+                                .sites
+                                .iter()
+                                .all(|site| conflict.sites.contains(site))
+                    }),
+                    "{} -> {} lacks a matching reverse conflict",
+                    annotation.name,
+                    other.name
+                );
+                if annotation.name == other.name {
+                    assert!(annotation.repeatable);
+                    assert_eq!(conflict.scope, ConflictScope::SameTarget);
+                }
+            }
+        }
+    }
+
+    fn annotation(name: &str, args: &[(&str, &str)]) -> Directive {
+        Directive {
+            rule: CATALOG.iter().find(|rule| rule.name == name).unwrap(),
+            args: args
+                .iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn conflict_rules_apply_in_both_orders_and_only_at_declared_sites() {
+        let path = Path::new("test.wit");
+        for rule in CATALOG {
+            for conflict in rule.conflicts {
+                let first = annotation(rule.name, &[("python", "value"), ("targets", "workflow")]);
+                let second = annotation(
+                    conflict.with,
+                    &[("python", "value"), ("targets", "workflow")],
+                );
+                for directives in [[first.clone(), second.clone()], [second, first]] {
+                    for site in conflict.sites {
+                        assert!(
+                            validate_conflicts(&directives, *site, path, "test").is_err(),
+                            "{} and {} at {site:?}",
+                            rule.name,
+                            conflict.with
+                        );
+                    }
+                    validate_conflicts(&directives, Site::Package, path, "test").unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn conflict_scopes_distinguish_languages_and_targets() {
+        let path = Path::new("test.wit");
+        for (scope, first_args, second_args, overlaps) in [
+            (
+                ConflictScope::SameLanguage,
+                vec![("python", "value")],
+                vec![("go", "value")],
+                false,
+            ),
+            (
+                ConflictScope::SameLanguage,
+                vec![("value", "value")],
+                vec![("go", "value")],
+                true,
+            ),
+            // Source/default conflict even when their targets are disjoint.
+            (
+                ConflictScope::SameLanguage,
+                vec![("python", "value"), ("targets", "client")],
+                vec![("python", "value"), ("targets", "workflow")],
+                true,
+            ),
+            (
+                ConflictScope::SameTarget,
+                vec![("targets", "client")],
+                vec![("targets", "workflow")],
+                false,
+            ),
+            (
+                ConflictScope::SameTarget,
+                vec![],
+                vec![("targets", "workflow")],
+                true,
+            ),
+            (
+                ConflictScope::SameTarget,
+                vec![("targets", "client,workflow")],
+                vec![("targets", "workflow")],
+                true,
+            ),
+        ] {
+            let first = annotation("source", &first_args);
+            let second = annotation("default", &second_args);
+            let conflict = Conflict::new("default", &[Site::Field], scope);
+            assert_eq!(
+                conflict
+                    .reason(&first, &second, path, "test")
+                    .unwrap()
+                    .is_some(),
+                overlaps
+            );
+            assert_eq!(
+                conflict
+                    .reason(&second, &first, path, "test")
+                    .unwrap()
+                    .is_some(),
+                overlaps
+            );
+        }
+    }
+
+    #[test]
+    fn compatible_annotations_remain_valid() {
+        let path = Path::new("test.wit");
+        for (site, first, second) in [
+            (
+                Site::Field,
+                annotation("source", &[("python", "value()")]),
+                annotation("default", &[("go", "\"value\"")]),
+            ),
+            (
+                Site::Field,
+                annotation("api-omit", &[("targets", "workflow")]),
+                annotation("source", &[("targets", "client"), ("python", "value()")]),
+            ),
+            (
+                Site::Field,
+                annotation("source", &[("targets", "workflow"), ("python", "first()")]),
+                annotation("source", &[("targets", "client"), ("python", "second()")]),
+            ),
+            (
+                Site::Field,
+                annotation("default", &[("targets", "workflow"), ("python", "'first'")]),
+                annotation("default", &[("targets", "client"), ("python", "'second'")]),
+            ),
+            (
+                Site::Alias,
+                annotation("proto", &[("value", "example.Value")]),
+                annotation("type", &[("python", "Value")]),
+            ),
+            (
+                Site::Resource,
+                annotation("proto", &[("value", "example.Value")]),
+                annotation("type", &[("python", "Value")]),
+            ),
+        ] {
+            for directives in [[first.clone(), second.clone()], [second, first]] {
+                validate_conflicts(&directives, site, path, "test").unwrap();
             }
         }
     }

@@ -1,0 +1,8 @@
+package test:conflict-linked;
+
+world system { export models; }
+
+interface models {
+  use test:dependency/types.{value};
+  record request { value: value }
+}

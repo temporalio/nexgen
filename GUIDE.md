@@ -1885,6 +1885,28 @@ annotations do not take conversion helpers. `doc` return overrides are only
 valid on freestanding functions, and `function` signatures belong on type
 aliases, not record fields.
 
+### Incompatible annotations
+
+The annotation catalog also rejects incompatible combinations on unused
+declarations and in linked packages. Conflicts are checked regardless of
+annotation order, including by scaffolding commands.
+
+- `type-parameter` cannot accompany `proto`, `type`, or `function`.
+- Native records, enums, flags, and variants cannot combine `proto` and `type`.
+- Field `omit` cannot accompany `api-omit`, `source`, `type`, `flattened-type`,
+  `function`, `default`, or `flatten-in-api`.
+- Field `api-omit` cannot accompany `default`, even with disjoint targets. It
+  cannot accompany `source` when their API targets overlap.
+- Field `source` cannot accompany `function`. It cannot accompany `default` when
+  they supply values for the same language, even with disjoint targets.
+- Repeated `source` or `default` annotations must have disjoint target sets,
+  even when they supply values for different languages.
+
+Language overlap includes positional defaults and all authored languages, not
+only the selected output language. Omitted `targets` means both `workflow` and
+`client`. Disjoint-language `source` and `default` annotations and
+disjoint-target `api-omit` and `source` annotations remain valid.
+
 ### Language and System Nexus restrictions
 
 Catalog entries can restrict the languages in which an annotation is valid and

@@ -1,3 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = ["overlapping target `workflow`; repeated `@nexus.default` directives must have disjoint target sets"]
