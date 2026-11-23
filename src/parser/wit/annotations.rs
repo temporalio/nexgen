@@ -281,6 +281,15 @@ const CATALOG: &[Annotation] = {
             system_nexus: true,
         },
         Annotation {
+            name: "storage-target",
+            sites: &[Function],
+            keys: &["value", "import"],
+            language_keys: &["", "import"],
+            repeatable: false,
+            languages: None,
+            system_nexus: false,
+        },
+        Annotation {
             name: "output-transform",
             sites: &[Function],
             keys: &["value", "import"],

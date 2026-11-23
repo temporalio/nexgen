@@ -1,0 +1,3 @@
+[error]
+kind = "invalid-wit-directive"
+contains = ["@nexus.storage-target", "invalid `python` support helper `requestTarget()`"]

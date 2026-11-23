@@ -1856,6 +1856,7 @@ below, such as protobuf bindings, function signatures, and conflicting options.
 | `@nexus.poll`                           | freestanding function                                                                         |
 | `@nexus.serialization-context`          | freestanding function                                                                         |
 | `@nexus.context-propagation`            | freestanding function                                                                         |
+| `@nexus.storage-target`                 | freestanding function                                                                         |
 | `@nexus.output-transform`               | freestanding function                                                                         |
 | `@nexus.flatten-in-api`                 | record, record field                                                                          |
 | `@nexus.flattened-type`                 | record field                                                                                  |
@@ -2760,6 +2761,35 @@ def signal_with_start_workflow_serialization_context(
 
 The referenced helper must be available from the package specified by
 `--support-package`.
+
+---
+
+### @nexus.storage-target
+
+**Placement:** Operation (function) **Syntax:**
+`@nexus.storage-target python="<support-helper>"`
+
+Supplies a support helper that identifies the destination workflow for external
+storage routing. Currently supported by the Python backend. The generated
+operation registry exposes the helper as `storage_target`; it receives the
+actual generated request model and returns a
+`temporalio.converter.StorageDriverWorkflowInfo`.
+
+Use this alongside `@nexus.serialization-context` when embedded user payloads
+are sent to another workflow. The SDK preserves the storing client or worker
+namespace separately from the target namespace. Leave `run_id` unset when the
+request does not identify a particular run, including signal-with-start.
+
+```wit
+/// @nexus.serialization-context python="signal_with_start_workflow_serialization_context"
+/// @nexus.storage-target python="signal_with_start_workflow_storage_target"
+signal-with-start-workflow: func(
+  request: signal-with-start-workflow-request,
+) -> signal-with-start-workflow-response;
+```
+
+The helper must be available from `--support-package`. Operations without a
+storage-target helper retain the SDK's default storage routing.
 
 ---
 
