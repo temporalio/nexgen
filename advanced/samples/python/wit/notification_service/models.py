@@ -24,7 +24,7 @@ class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):
     """
 
     result: OnCompleteRequestResult[OutputT]
-    source_context: SourceContextT
+    source_context: SourceContextT | None = None
 
 
 class _OnCompleteRequestTransferTypeConverter(
@@ -66,15 +66,14 @@ class _OnCompleteRequestTransferTypeConverter(
                 )
             case None:
                 raise ValueError("missing required field OnCompleteRequest.result")
-        if not value.HasField("source_context"):
-            raise ValueError("missing required field OnCompleteRequest.source_context")
-        source_context = typing.cast(
-            SourceContextT,
-            _support.payload_from_proto(value.source_context, source_context_type),
-        )
         return OnCompleteRequest(
             result=_oneof_result,
-            source_context=source_context,
+            source_context=typing.cast(
+                SourceContextT,
+                _support.payload_from_proto(value.source_context, source_context_type),
+            )
+            if value.HasField("source_context")
+            else None,
         )
 
     @typing_extensions.override
@@ -88,7 +87,10 @@ class _OnCompleteRequestTransferTypeConverter(
                 message.success.CopyFrom(_support.payload_to_proto(value.result.value))
             case OnCompleteRequestResultFailure():
                 message.failure.CopyFrom(_support.failure_to_proto(value.result.value))
-        message.source_context.CopyFrom(_support.payload_to_proto(value.source_context))
+        if value.source_context is not None:
+            message.source_context.CopyFrom(
+                _support.payload_to_proto(value.source_context)
+            )
         return message
 
 

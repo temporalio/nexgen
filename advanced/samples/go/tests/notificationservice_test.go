@@ -33,7 +33,7 @@ func TestNotificationServiceSuccess(t *testing.T) {
 		&ns.OnCompleteRequestResultSuccess[completion]{Value: completion{"completed"}},
 	} {
 		model := ns.OnCompleteRequest[completion, sourceContext]{
-			Result: result, SourceContext: sourceContext{"workflow-id"},
+			Result: result, SourceContext: &sourceContext{"workflow-id"},
 		}
 		payload, err := dc.ToPayload(model)
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestNotificationServiceFailure(t *testing.T) {
 		Result: ns.OnCompleteRequestResultFailure[completion]{
 			Value: temporal.NewApplicationError("operation failed", "CompletionFailure", "detail"),
 		},
-		SourceContext: sourceContext{"workflow-id"},
+		SourceContext: &sourceContext{"workflow-id"},
 	}
 	payload, err := dc.ToPayload(&model)
 	require.NoError(t, err)
@@ -89,25 +89,12 @@ func TestNotificationServiceFailure(t *testing.T) {
 
 func TestNotificationServiceRequiredFields(t *testing.T) {
 	dc := notificationDataConverter()
-	value, err := dc.ToPayload(completion{"completed"})
-	require.NoError(t, err)
 	context, err := dc.ToPayload(sourceContext{"workflow-id"})
 	require.NoError(t, err)
-	for _, tt := range []struct {
-		name  string
-		wire  notificationpb.OnCompleteRequest
-		field string
-	}{
-		{"missing result", notificationpb.OnCompleteRequest{SourceContext: context}, "Result"},
-		{"missing context", notificationpb.OnCompleteRequest{Result: &notificationpb.OnCompleteRequest_Success{Success: value}}, "SourceContext"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			payload, err := dc.ToPayload(&tt.wire)
-			require.NoError(t, err)
-			var decoded ns.OnCompleteRequest[completion, sourceContext]
-			require.ErrorContains(t, dc.FromPayload(payload, &decoded), "OnCompleteRequest."+tt.field)
-		})
-	}
+	payload, err := dc.ToPayload(&notificationpb.OnCompleteRequest{SourceContext: context})
+	require.NoError(t, err)
+	var decoded ns.OnCompleteRequest[completion, sourceContext]
+	require.ErrorContains(t, dc.FromPayload(payload, &decoded), "OnCompleteRequest.Result")
 	for _, result := range []ns.OnCompleteRequestResult[completion]{
 		nil,
 		(*ns.OnCompleteRequestResultSuccess[completion])(nil),
@@ -117,6 +104,21 @@ func TestNotificationServiceRequiredFields(t *testing.T) {
 		_, err := dc.ToPayload(ns.OnCompleteRequest[completion, sourceContext]{Result: result})
 		require.ErrorContains(t, err, "OnCompleteRequest.Result")
 	}
+}
+
+func TestNotificationServiceWithoutSourceContext(t *testing.T) {
+	dc := notificationDataConverter()
+	model := ns.OnCompleteRequest[completion, sourceContext]{
+		Result: ns.OnCompleteRequestResultSuccess[completion]{Value: completion{"completed"}},
+	}
+	payload, err := dc.ToPayload(model)
+	require.NoError(t, err)
+	var wire notificationpb.OnCompleteRequest
+	require.NoError(t, dc.FromPayload(payload, &wire))
+	require.Nil(t, wire.GetSourceContext())
+	var decoded ns.OnCompleteRequest[completion, sourceContext]
+	require.NoError(t, dc.FromPayload(payload, &decoded))
+	require.Equal(t, model, decoded)
 }
 
 func TestNotificationServiceEmptyResponse(t *testing.T) {
@@ -134,7 +136,7 @@ func TestNotificationServiceNilOutput(t *testing.T) {
 	dc := notificationDataConverter()
 	model := ns.OnCompleteRequest[*completion, sourceContext]{
 		Result:        ns.OnCompleteRequestResultSuccess[*completion]{},
-		SourceContext: sourceContext{"workflow-id"},
+		SourceContext: &sourceContext{"workflow-id"},
 	}
 	payload, err := dc.ToPayload(model)
 	require.NoError(t, err)

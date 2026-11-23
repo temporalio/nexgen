@@ -774,7 +774,7 @@ fn add_message_reconciles_missing_proto_field_without_replacing_type_parameters(
         fs::read_to_string(root.join("advanced/samples/inputs/notification-service.wit")).unwrap();
     let input_path = write_temp_wit(
         "add-message-removed-source-context",
-        &source.replace("    source-context: source-context-t,\n", ""),
+        &source.replace("    source-context: option<source-context-t>,\n", ""),
     );
     let rendered = add_message_to_string(
         &[descriptor_path(&root)],

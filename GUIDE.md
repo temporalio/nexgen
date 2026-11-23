@@ -2002,9 +2002,10 @@ interface workflow-service { ... }
 ```
 
 Nexgen emits `<name>.go` and `<name>_facade.go` side by side under `--output`.
-Place them into their respective packages before compiling. Each import path's
-final segment determines its package name. Facade names omit the
-implementation's `SystemNexus_` prefix.
+`<name>` comes from the service or models-only interface name (for example,
+`notificationservice`). Place the files into their respective packages before
+compiling. Each import path's final segment determines its package name. Facade
+names omit the implementation's `SystemNexus_` prefix.
 
 Facades use the implementation package's name as its import qualifier, such as
 `internal`. Generator-provided SDK types use their local names when the facade

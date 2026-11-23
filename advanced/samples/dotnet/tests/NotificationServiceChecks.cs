@@ -18,8 +18,10 @@ namespace Nexgen.DotNetExamples.Tests
         {
             using var converterContext = PushConverterContext();
             var model = new OnCompleteRequest<Completion, SourceContext>(
-                new OnCompleteRequestResult<Completion>.Success(new Completion("completed")),
-                new SourceContext("workflow-id"));
+                new OnCompleteRequestResult<Completion>.Success(new Completion("completed")))
+            {
+                SourceContext = new SourceContext("workflow-id"),
+            };
             var converter = CreateSdkConverter(typeof(OnCompleteRequest<Completion, SourceContext>));
 
             Assert.Equal(typeof(WireOnCompleteRequest), converter.TransferType);
@@ -42,8 +44,10 @@ namespace Nexgen.DotNetExamples.Tests
                 new OnCompleteRequestResult<Completion>.Failure(
                     new Temporalio.Exceptions.ApplicationFailureException(
                         "operation failed",
-                        errorType: "CompletionFailure")),
-                new SourceContext("workflow-id"));
+                        errorType: "CompletionFailure")))
+            {
+                SourceContext = new SourceContext("workflow-id"),
+            };
             var converter = new OnCompleteRequest<Completion, SourceContext>.TransferTypeConverter();
 
             var wire = Assert.IsType<WireOnCompleteRequest>(converter.ToTransferType(model));
@@ -61,7 +65,7 @@ namespace Nexgen.DotNetExamples.Tests
         }
 
         [Fact]
-        public void OnCompleteRequestRejectsMissingRequiredFields()
+        public void OnCompleteRequestRejectsMissingResult()
         {
             using var converterContext = PushConverterContext();
             var converter = new OnCompleteRequest<Completion, SourceContext>.TransferTypeConverter();
@@ -73,23 +77,25 @@ namespace Nexgen.DotNetExamples.Tests
                         new SourceContext("workflow-id")),
                 }));
             Assert.Contains("OnCompleteRequest.Result", missingResult.Message);
+        }
 
-            var missingSourceContext = Assert.Throws<InvalidOperationException>(() =>
-                converter.FromTransferType(new WireOnCompleteRequest
-                {
-                    Success = DataConverter.Default.PayloadConverter.ToPayload(
-                        new Completion("completed")),
-                }));
-            Assert.Contains("OnCompleteRequest.SourceContext", missingSourceContext.Message);
+        [Fact]
+        public void OnCompleteRequestRoundTripsWithoutSourceContext()
+        {
+            using var converterContext = PushConverterContext();
+            var model = new OnCompleteRequest<Completion, SourceContext>(
+                new OnCompleteRequestResult<Completion>.Success(new Completion("completed")));
+            var converter = CreateSdkConverter(typeof(OnCompleteRequest<Completion, SourceContext>));
+            var wire = Assert.IsType<WireOnCompleteRequest>(converter.ToTransferType(model));
+            Assert.Null(wire.SourceContext);
+            Assert.Equal(model, converter.FromTransferType(wire));
         }
 
         [Fact]
         public void OnCompleteRequestRejectsNullRequiredOneofWhenEncoding()
         {
             using var converterContext = PushConverterContext();
-            var model = new OnCompleteRequest<Completion, SourceContext>(
-                null!,
-                new SourceContext("workflow-id"));
+            var model = new OnCompleteRequest<Completion, SourceContext>(null!);
             var converter = CreateSdkConverter(typeof(OnCompleteRequest<Completion, SourceContext>));
 
             var error = Assert.Throws<InvalidOperationException>(

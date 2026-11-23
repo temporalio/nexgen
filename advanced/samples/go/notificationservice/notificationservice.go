@@ -60,17 +60,18 @@ type SystemNexus_OnCompleteRequest[OutputT any, SourceContextT any] struct {
 	//
 	// Required.
 	Result SystemNexus_OnCompleteRequestResult[OutputT]
-	// SourceContext - User-supplied data associated with the source invocation.
+	// SourceContext - User-supplied data associated with the source invocation, if
+	// provided.
 	//
-	// Required.
-	SourceContext SourceContextT
+	// Optional.
+	SourceContext *SourceContextT
 }
 
 func (m SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) GetResult() SystemNexus_OnCompleteRequestResult[OutputT] {
 	return m.Result
 }
 
-func (m SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) GetSourceContext() SourceContextT {
+func (m SystemNexus_OnCompleteRequest[OutputT, SourceContextT]) GetSourceContext() *SourceContextT {
 	return m.SourceContext
 }
 
@@ -124,7 +125,7 @@ func systemnexus_onCompleteRequestToProto[OutputT any, SourceContextT any](cfg *
 	default:
 		return nil, fmt.Errorf("invalid oneof field OnCompleteRequest.Result: %T", value)
 	}
-	{
+	if m.SourceContext != nil {
 		converted, err := cfg.DataConverter.ToPayload(m.SourceContext)
 		if err != nil {
 			return nil, err
@@ -172,9 +173,6 @@ func systemnexus_onCompleteRequestFromProto[OutputT any, SourceContextT any](cfg
 		return fmt.Errorf("missing required field OnCompleteRequest.Result")
 	default:
 		return fmt.Errorf("invalid oneof field OnCompleteRequest.Result: %T", value)
-	}
-	if proto.GetSourceContext() == nil {
-		return fmt.Errorf("missing required field OnCompleteRequest.SourceContext")
 	}
 	if proto.GetSourceContext() != nil {
 		if err := cfg.DataConverter.FromPayload(proto.GetSourceContext(), &out.SourceContext); err != nil {
