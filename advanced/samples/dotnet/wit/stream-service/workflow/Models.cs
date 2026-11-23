@@ -201,13 +201,13 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.AppendRecordsRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.AppendRecordsRequest();
+            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             if (RequestId is { } requestId)
             {
                 proto.RequestId = requestId;
             }
             proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             proto.Records.Add(System.Linq.Enumerable.Select(Records, item => (Temporalio.Api.Stream.V1.AppendRecord)item.ToTransferType()));
-            proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
             return proto;
         }
 
@@ -362,8 +362,8 @@ namespace Temporalio.Workflows
         internal Temporalio.Api.StreamService.V1.CloseStreamRequest ToTransferType()
         {
             var proto = new Temporalio.Api.StreamService.V1.CloseStreamRequest();
-            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             proto.Producer = (Temporalio.Api.Stream.V1.Producer)Producer.ToTransferType();
+            proto.StreamId = Nexgen.Support.StreamSupport.RefToId(Ref);
             return proto;
         }
 

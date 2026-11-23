@@ -84,8 +84,8 @@ afterEach(() => {
 });
 
 interface WorkflowStream {
-  append(records: string[], producer?: Producer): Promise<unknown>;
-  close(producer?: Producer): Promise<void>;
+  append(records: string[]): Promise<unknown>;
+  close(): Promise<void>;
 }
 
 // The tsconfig excludes the stream output, which doesn't typecheck here, so a test loads it at
@@ -235,59 +235,49 @@ describe("stream-service generated output", () => {
   test("passes the arguments of a Workflow append and close to their operations", async () => {
     const { Stream } = await loadWorkflowStream();
     const stream = new Stream({ id: "stream-1" }, undefined);
-    const producer = clientProducer;
 
     await stream.append(["a", "b"]);
-    await stream.close(producer);
+    await stream.close();
 
-    // A missing Producer stays missing here. The operation fills it from its default.
+    // A Workflow method takes no Producer. The operation fills it from its source.
     expect(captured.calls).toEqual([
       {
         operation: "appendRecords",
-        input: {
-          ref: { id: "stream-1" },
-          records: ["a", "b"],
-          producer: undefined,
-        },
+        input: { ref: { id: "stream-1" }, records: ["a", "b"] },
       },
-      { operation: "closeStream", input: { ref: { id: "stream-1" }, producer } },
+      { operation: "closeStream", input: { ref: { id: "stream-1" } } },
     ]);
   });
 
-  test("sends the request id of its helper with an append", async () => {
-    // The operation fills the request id, so this test runs it in place of its mock.
+  test("fills the Producer of the run and no request id in a Workflow append", async () => {
+    // The operation fills both fields, so this test runs it in place of its mock.
     const operation = "../wit/stream-service/workflow/operations/append-records.ts";
     const { appendRecords } = await vi.importActual<{
       appendRecords(input: {
         ref: StreamRef<string>;
         records: string[];
-        producer: Producer;
       }): Promise<unknown>;
     }>(operation);
-    const input = {
-      ref: { id: "stream-1" },
-      records: ["a"],
-      producer: clientProducer,
+    vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
+      payloadConverter: common.defaultPayloadConverter,
+      currentRandom: Math.random,
+      info: { namespace: "ns", workflowId: "w1", runId: "r1" },
+    });
+
+    await appendRecords({ ref: { id: "stream-1" }, records: ["a"] });
+
+    const request = captured.calls[0].input as {
+      producer: Producer;
+      requestId?: string;
     };
-
-    await appendRecords(input);
-    vi.unstubAllGlobals();
-    await appendRecords(input);
-    await appendRecords(input);
-
-    const ids = captured.calls.map(
-      (call) => (call.input as { requestId?: string }).requestId,
-    );
+    expect(request.producer).toEqual({
+      kind: {
+        tag: "workflow",
+        value: { namespace: "ns", workflowId: "w1", runId: "r1" },
+      },
+    });
     // Workflow code sends no id, since the SDK sets it when it sends the batch.
-    expect(ids[0]).toBeUndefined();
-    // Elsewhere each call has a new id, so the Store writes two equal batches twice.
-    const uuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-    expect(ids.slice(1)).toEqual([
-      expect.stringMatching(uuid),
-      expect.stringMatching(uuid),
-    ]);
-    expect(ids[1]).not.toBe(ids[2]);
+    expect(request.requestId).toBeUndefined();
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {

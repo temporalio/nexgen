@@ -580,7 +580,7 @@ impl<'a> ApiPlanner<'a> {
             output.push('\n');
         }
         for method in methods {
-            self.render_resource_method(output, service, &type_name, method);
+            self.render_resource_method(output, service, &type_name, &method);
         }
         output.push_str("}\n\n");
     }

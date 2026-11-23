@@ -295,7 +295,7 @@ function appendRecordsRequestFromProto<BodyT>(
       "records",
     ),
     producer: producerFromProto(
-      requiredField(proto.producer, "AppendRecordsRequest", "producer"),
+      requiredField(proto.producer, "sourced field", "producer"),
     ),
     requestId: proto.requestId ?? undefined,
   };
@@ -318,9 +318,7 @@ function appendRecordsRequestToProto<BodyT>(
       "AppendRecordsRequest",
       "records",
     ),
-    producer: producerToProto(
-      requiredField(model.producer, "AppendRecordsRequest", "producer"),
-    ),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
     requestId: model.requestId,
   };
 }
@@ -1054,7 +1052,7 @@ function closeStreamRequestFromProto<BodyT>(
       ),
     ),
     producer: producerFromProto(
-      requiredField(proto.producer, "CloseStreamRequest", "producer"),
+      requiredField(proto.producer, "sourced field", "producer"),
     ),
   };
 }
@@ -1069,9 +1067,7 @@ function closeStreamRequestToProto<BodyT>(
     streamId: support.streamRefToId(
       requiredField(model.ref, "CloseStreamRequest", "ref"),
     ),
-    producer: producerToProto(
-      requiredField(model.producer, "CloseStreamRequest", "producer"),
-    ),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 

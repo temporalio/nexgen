@@ -209,12 +209,13 @@ interface stream-service {
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
     records: list<append-record>,
-    // A call can pass its own Producer. Without one, the helper of the calling context returns
-    // the default. The client helper gets the client of the Stream, so each client object is a
-    // separate Producer.
+    // Workflow code never passes a Producer. Its helper returns the Producer of the run, and the
+    // SDK sets the Workflow Task attempt. A client or an Activity can pass its own Producer.
+    // Without one, the client helper returns the default. That helper gets the client of the
+    // Stream, so each client object is a separate Producer.
     /// @nexus.doc "The Producer of the batch. Defaults to the Producer of the calling context."
-    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
-    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.default targets="client" python="_support.default_producer(self._nexus_client)"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
@@ -242,8 +243,8 @@ interface stream-service {
     ref: stream-ref,
     /// @nexus.doc
     ///   "The Producer that closes the Stream. Defaults to the Producer of the calling context."
-    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
-    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.default targets="client" python="_support.default_producer(self._nexus_client)"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
@@ -302,6 +303,8 @@ interface stream-service {
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);
 
+    // The Workflow `append` and `close` have no `producer`, because the request field has a
+    // Workflow source.
     /// @nexus.doc "Append values, and return the offsets of the batch."
     /// @nexus.operation "append-records"
     /// @nexus.varargs "records"

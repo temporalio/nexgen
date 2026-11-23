@@ -1924,12 +1924,15 @@ fn build_field_policies(
                 }
             }
         }
-        if !source_expressions.is_empty() && !default_expressions.is_empty() {
+        if source_expressions
+            .keys()
+            .any(|target| default_expressions.contains_key(target))
+        {
             return Err(Error::InvalidWitDirective {
                 path: path.to_path_buf(),
                 context: context.to_string(),
                 directive: "@nexus.default".to_string(),
-                reason: "cannot be combined with `@nexus.source` for the same language".to_string(),
+                reason: "cannot be combined with `@nexus.source` for the same target".to_string(),
             });
         }
         if source_expressions.is_empty() && default_expressions.is_empty() {
@@ -4674,6 +4677,42 @@ interface example {
             assert_eq!(source.default_for(GenerationTarget::Workflow), None);
             assert_eq!(default.source_for(GenerationTarget::Client), None);
         }
+    }
+
+    #[test]
+    fn a_field_takes_a_source_in_one_target_and_a_default_in_the_other() {
+        let wit = r#"
+package test:origins@1.0.0;
+world system { export example; }
+interface example {
+  record request {
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    /// @nexus.default targets="client" python="_support.default_producer()"
+    producer: string,
+  }
+  submit: func(request: request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let record = spec
+            .records()
+            .find(|(_, record)| record.name == "Request")
+            .unwrap()
+            .1;
+        let origin = record.fields["producer"]
+            .origin
+            .for_language(Language::Python)
+            .unwrap();
+        assert_eq!(
+            origin.source_for(GenerationTarget::Workflow),
+            Some("workflow_producer()")
+        );
+        assert_eq!(origin.default_for(GenerationTarget::Workflow), None);
+        assert_eq!(
+            origin.default_for(GenerationTarget::Client),
+            Some("_support.default_producer()")
+        );
+        assert_eq!(origin.source_for(GenerationTarget::Client), None);
     }
 
     #[test]

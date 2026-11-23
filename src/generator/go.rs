@@ -5353,7 +5353,7 @@ fn render_resource_methods(
     if service.endpoint.is_none() {
         return;
     }
-    for method in &resource.methods {
+    for method in resource.methods_for(GenerationTarget::Workflow) {
         output.push('\n');
         let method_name = go_field_name(&method.name);
         if let Some(doc) = method.doc.as_deref() {

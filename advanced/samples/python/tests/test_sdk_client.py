@@ -10,6 +10,7 @@ import asyncio
 import collections.abc
 import dataclasses
 import datetime
+import inspect
 import typing
 import uuid
 
@@ -974,6 +975,16 @@ def test_both_streams_read_and_poll() -> None:
     ):
         assert hasattr(Stream, name)
         assert hasattr(workflow_stream_module.Stream, name)
+
+
+def test_only_the_client_stream_takes_a_producer() -> None:
+    # The Producer field has a Workflow source, so Workflow code can't pass a Producer. The
+    # client target has a default for the field, so its methods keep the parameter.
+    for name in ("append", "close"):
+        client_method = getattr(Stream, name)
+        workflow_method = getattr(workflow_stream_module.Stream, name)
+        assert "producer" in inspect.signature(client_method).parameters
+        assert "producer" not in inspect.signature(workflow_method).parameters
 
 
 async def test_each_workflow_page_is_the_call_of_the_workflow_read(

@@ -879,7 +879,7 @@ impl<'a> ApiPlanner<'a> {
                     .iter()
                     .flat_map(|resource| resource.methods_for(target))
                     .any(|method| {
-                        resource_method_returns_closable_resource(service, method, target)
+                        resource_method_returns_closable_resource(service, &method, target)
                     })
             })
         });
@@ -2027,7 +2027,7 @@ impl<'a> ApiPlanner<'a> {
                 output,
                 service,
                 resource,
-                method,
+                &method,
                 bound_operations,
                 target,
             );
@@ -2035,7 +2035,7 @@ impl<'a> ApiPlanner<'a> {
                 output,
                 service,
                 resource,
-                method,
+                &method,
                 bound_operations,
                 target,
             );

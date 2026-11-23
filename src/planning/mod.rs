@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use heck::ToUpperCamelCase;
@@ -193,18 +194,22 @@ pub(crate) struct PlannedResourceMethod {
     pub(crate) varargs: Option<String>,
     /// Targets whose resource class leaves this method out, from `@nexus.api-omit`.
     pub(crate) api_omitted: BTreeSet<GenerationTarget>,
+    /// The parameters that fill a request field with a `@nexus.source`, for each target of the
+    /// source.
+    pub(crate) sourced_params: BTreeMap<GenerationTarget, BTreeSet<String>>,
     pub(crate) binding: PlannedResourceMethodBindingSpec,
 }
 
 impl PlannedResource {
-    /// The methods of the resource class of `target`.
+    /// The methods of the resource class of `target`, each as that target has it.
     pub(crate) fn methods_for(
         &self,
         target: GenerationTarget,
-    ) -> impl Iterator<Item = &PlannedResourceMethod> {
+    ) -> impl Iterator<Item = Cow<'_, PlannedResourceMethod>> {
         self.methods
             .iter()
             .filter(move |method| !method.omitted_for(target))
+            .map(move |method| method.for_target(target, &self.fields))
     }
 
     /// A target without the close method has nothing to call at the end of a scope, so its
@@ -220,6 +225,50 @@ impl PlannedResource {
 impl PlannedResourceMethod {
     pub(crate) fn omitted_for(&self, target: GenerationTarget) -> bool {
         self.api_omitted.contains(&target)
+    }
+
+    /// Returns the method as `target` has it. A caller of the target never passes a field that
+    /// has a source there, so the method is the one that the WIT would declare with no parameter
+    /// for that field. A resource field of the same name then fills the request field, and
+    /// without one the plan leaves the field to its source.
+    fn for_target(
+        &self,
+        target: GenerationTarget,
+        resource_fields: &[PlannedResourceField],
+    ) -> Cow<'_, Self> {
+        let Some(sourced) = self
+            .sourced_params
+            .get(&target)
+            .filter(|params| !params.is_empty())
+        else {
+            return Cow::Borrowed(self);
+        };
+        let mut method = self.clone();
+        method.params.retain(|param| !sourced.contains(&param.name));
+        if let PlannedResourceMethodBindingSpec::Operation {
+            request_plan: RequestPlan::Construct { fields, .. },
+            ..
+        } = &mut method.binding
+        {
+            fields.retain_mut(|field| {
+                let RequestPlan::Source(RequestPlanSource::MethodParam(param)) = &field.value
+                else {
+                    return true;
+                };
+                if !sourced.contains(param) {
+                    return true;
+                }
+                let has_resource_field = resource_fields
+                    .iter()
+                    .any(|resource_field| resource_field.name == *param);
+                if has_resource_field {
+                    field.value =
+                        RequestPlan::Source(RequestPlanSource::ResourceField(param.clone()));
+                }
+                has_resource_field
+            });
+        }
+        Cow::Owned(method)
     }
 }
 
@@ -420,14 +469,15 @@ mod tests {
             result: None,
             varargs: None,
             api_omitted: api_omitted.iter().copied().collect(),
+            sourced_params: BTreeMap::new(),
             binding: PlannedResourceMethodBindingSpec::Stub,
         }
     }
 
-    fn method_names(resource: &PlannedResource, target: GenerationTarget) -> Vec<&str> {
+    fn method_names(resource: &PlannedResource, target: GenerationTarget) -> Vec<String> {
         resource
             .methods_for(target)
-            .map(|method| method.name.as_str())
+            .map(|method| method.name.clone())
             .collect()
     }
 
@@ -457,5 +507,64 @@ mod tests {
             ["append", "close", "read"]
         );
         assert_eq!(resource.close_for(GenerationTarget::Client), Some("close"));
+    }
+
+    #[test]
+    fn a_target_leaves_out_the_parameters_that_it_takes_from_a_source() {
+        let param = |name: &str| PlannedResourceField {
+            name: name.to_string(),
+            optional: false,
+            kind: PlannedType::String,
+            function: None,
+        };
+        let filled = |name: &str| RequestPlanField {
+            field_name: name.to_string(),
+            value: RequestPlan::Source(RequestPlanSource::MethodParam(name.to_string())),
+        };
+        let plan = |fields| PlannedResourceMethodBindingSpec::Operation {
+            operation_name: "AppendRecords".to_string(),
+            request_plan: RequestPlan::Construct {
+                message_name: "AppendRecordsRequest".to_string(),
+                fields,
+            },
+            direct_return: false,
+        };
+        let append = PlannedResourceMethod {
+            params: vec![param("records"), param("producer"), param("store")],
+            sourced_params: BTreeMap::from([(
+                GenerationTarget::Workflow,
+                BTreeSet::from(["producer".to_string(), "store".to_string()]),
+            )]),
+            binding: plan(vec![filled("records"), filled("producer"), filled("store")]),
+            ..method("append", &[])
+        };
+        let resource = PlannedResource {
+            name: "stream".to_string(),
+            doc: None,
+            type_name: "Stream".to_string(),
+            type_parameters: Vec::new(),
+            fields: vec![param("store")],
+            methods: vec![append.clone()],
+            close: None,
+        };
+
+        // The Workflow method has neither parameter. Its plan leaves `producer` to the source,
+        // and takes `store` from the resource field that the parameter had the name of.
+        let workflow = resource
+            .methods_for(GenerationTarget::Workflow)
+            .next()
+            .unwrap();
+        assert_eq!(workflow.params, [param("records")]);
+        let store = RequestPlanField {
+            field_name: "store".to_string(),
+            value: RequestPlan::Source(RequestPlanSource::ResourceField("store".to_string())),
+        };
+        assert_eq!(workflow.binding, plan(vec![filled("records"), store]));
+        // The client has no source for the fields, so its method is the declared one.
+        let client = resource
+            .methods_for(GenerationTarget::Client)
+            .next()
+            .unwrap();
+        assert_eq!(*client, append);
     }
 }
