@@ -151,8 +151,7 @@ interface stream-service {
     // The field is called ref, so the created Stream takes its ref from the request. The
     // response has none.
     /// @nexus.doc "The ref of the Stream to create. Its id is the Stream id."
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-to="stream_ref_to_id" python-from="stream_ref_from_id"
     ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     /// @nexus.flatten-in-api
@@ -191,8 +190,7 @@ interface stream-service {
   ///   "Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence."
   /// @nexus.proto "temporal.api.streamservice.v1.AppendRecordsRequest"
   record append-records-request {
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-to="stream_ref_to_id" python-from="stream_ref_from_id"
     ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
@@ -225,8 +223,7 @@ interface stream-service {
   /// @nexus.doc "Close a Stream. Readers drain what is left, then end. Later appends are refused."
   /// @nexus.proto "temporal.api.streamservice.v1.CloseStreamRequest"
   record close-stream-request {
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-to="stream_ref_to_id" python-from="stream_ref_from_id"
     ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
@@ -249,8 +246,7 @@ interface stream-service {
   /// @nexus.doc "Read Records after an offset."
   /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
   record read-records-request {
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-to="stream_ref_to_id" python-from="stream_ref_from_id"
     ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,
@@ -279,8 +275,7 @@ interface stream-service {
 
   /// @nexus.proto "temporal.api.streamservice.v1.DescribeStreamRequest"
   record describe-stream-request {
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-to="stream_ref_to_id" python-from="stream_ref_from_id"
     ///   typescript-to="streamRefToId" typescript-from="streamRefFromId"
     ///   dotnet-to="StreamSupport.RefToId" dotnet-from="StreamSupport.RefFromId"
     ref: stream-ref,

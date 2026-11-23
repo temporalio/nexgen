@@ -413,9 +413,13 @@ fn load_linked_wit_metadata_from_inputs(input_paths: &[PathBuf]) -> Result<Linke
                             &field_context,
                             "value",
                         )?;
-                        let has_conversion =
-                            directive(&field_directives, "type", &origin_path, &field_context)?
-                                .is_some_and(|directive| directive.has_conversion_helper());
+                        let has_conversion = directive(
+                            &field_directives,
+                            "proto-field",
+                            &origin_path,
+                            &field_context,
+                        )?
+                        .is_some_and(|directive| directive.has_conversion_helper());
                         let field_proto_name = explicit_proto_name
                             .clone()
                             .unwrap_or_else(|| field.name.replace('-', "_"));
@@ -782,7 +786,7 @@ impl ExistingRecord {
             let docs = field.docs.contents.as_deref();
             let field_context = format!("{context} field `{}`", field.name);
             let field_directives = parse_directives(docs, path, &field_context)?;
-            let has_conversion = directive(&field_directives, "type", path, &field_context)?
+            let has_conversion = directive(&field_directives, "proto-field", path, &field_context)?
                 .is_some_and(|directive| directive.has_conversion_helper());
             let explicit_proto_name = proto_field_name_from_docs(docs);
             let proto_name = explicit_proto_name
@@ -813,7 +817,7 @@ struct ExistingField {
     type_expr: String,
     explicit_proto_field: bool,
     omitted: bool,
-    /// Conversion helpers on `@nexus.type` make the field keep its WIT type, not the proto type.
+    /// With helpers on `@nexus.proto-field`, the field keeps its WIT type, not the proto type.
     has_conversion: bool,
 }
 

@@ -1,0 +1,6 @@
+[error]
+kind = "invalid-wit-directive"
+contains = [
+  "invalid WIT directive `@nexus.proto-field` on type `stream-service.request` field `ref`",
+  "`python-from` needs `python-to`",
+]

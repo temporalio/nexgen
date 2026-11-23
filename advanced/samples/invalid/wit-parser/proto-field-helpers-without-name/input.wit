@@ -1,0 +1,18 @@
+package test:proto-field-helpers-without-name@1.0.0;
+
+world system { export stream-service; }
+
+/// @nexus.endpoint "streams"
+interface stream-service {
+  /// @nexus.proto "acme.streams.v1.StreamRef"
+  record stream-ref {
+    id: string,
+  }
+
+  /// @nexus.proto "acme.streams.v1.Request"
+  record request {
+    // The helpers convert a proto field, so the directive names it, even when the names agree.
+    /// @nexus.proto-field python-to="stream_ref_to_id" python-from="stream_ref_from_id"
+    stream-id: stream-ref,
+  }
+}

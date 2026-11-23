@@ -1,6 +1,0 @@
-[error]
-kind = "invalid-wit-directive"
-contains = [
-  "invalid WIT directive `@nexus.type` on type `stream-service.request` field `ref`",
-  "`python-from` needs `python-to`",
-]

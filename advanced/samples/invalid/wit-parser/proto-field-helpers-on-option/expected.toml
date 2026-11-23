@@ -1,6 +1,6 @@
 [error]
 kind = "invalid-wit-directive"
 contains = [
-  "invalid WIT directive `@nexus.type` on type `stream-service.request` field `ref`",
+  "invalid WIT directive `@nexus.proto-field` on type `stream-service.request` field `ref`",
   "conversion helpers cannot be used on an `option<T>` or `list<T>` field",
 ]

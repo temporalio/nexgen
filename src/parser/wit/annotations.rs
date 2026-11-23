@@ -150,7 +150,7 @@ const CATALOG: &[Annotation] = {
             name: "proto-field",
             sites: &[Field],
             keys: &["value"],
-            language_keys: &[],
+            language_keys: &["to", "from"],
             repeatable: false,
             languages: None,
             system_nexus: false,
@@ -428,6 +428,9 @@ impl Annotation {
             && site == Site::Field
             && (key.ends_with("-from") || key.ends_with("-to"))
         {
+            return false;
+        }
+        if self.name == "proto-field" && (key.ends_with("-from") || key.ends_with("-to")) {
             return matches!(
                 self.argument_language(key),
                 Some(Language::Python | Language::TypeScript | Language::Dotnet)
@@ -788,8 +791,9 @@ mod tests {
             let prefix = language_key(language);
             let conversion = format!("{prefix}-from");
             assert!(rule("type").accepts_key(&conversion, Site::Alias));
+            assert!(!rule("type").accepts_key(&conversion, Site::Field));
             assert_eq!(
-                rule("type").accepts_key(&conversion, Site::Field),
+                rule("proto-field").accepts_key(&conversion, Site::Field),
                 matches!(
                     language,
                     Language::Python | Language::TypeScript | Language::Dotnet

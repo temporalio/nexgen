@@ -1,4 +1,4 @@
-package test:field-type-helper-without-pair@1.0.0;
+package test:proto-field-helper-without-pair@1.0.0;
 
 world system { export stream-service; }
 
@@ -12,8 +12,7 @@ interface stream-service {
   /// @nexus.proto "acme.streams.v1.Request"
   record request {
     // The helper that reads the message has no helper that writes it.
-    /// @nexus.proto-field "stream_id"
-    /// @nexus.type python-from="stream_ref_from_id"
+    /// @nexus.proto-field "stream_id" python-from="stream_ref_from_id"
     ref: stream-ref,
   }
 }

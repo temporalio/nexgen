@@ -828,7 +828,7 @@ fn add_message_keeps_a_field_with_conversion_helpers() {
     // The helpers convert `ref`, so the descriptor's `string` doesn't apply to its type.
     assert!(
         record_block(&rendered, "append-records-request")
-            .contains("    /// @nexus.type python-to=\"stream_ref_to_id\"")
+            .contains("    /// @nexus.proto-field \"stream_id\" python-to=\"stream_ref_to_id\"")
     );
     assert_eq!(rendered, source);
 }

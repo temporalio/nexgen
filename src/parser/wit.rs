@@ -1749,8 +1749,8 @@ fn record_field_key(
     )
 }
 
-/// The helpers of `<lang>-to` and `<lang>-from` on the `@nexus.type` of a record field, when the
-/// current language has them. A field with helpers keeps its WIT type, and they convert it.
+/// The helpers of `<lang>-to` and `<lang>-from` on the `@nexus.proto-field` of a record field,
+/// when the current language has them. The field keeps its WIT type, and the helpers convert it.
 fn build_field_conversion(
     resolve: &Resolve,
     field: &Field,
@@ -1759,20 +1759,25 @@ fn build_field_conversion(
     field_context: &str,
     language: Language,
 ) -> Result<Option<TypeReplacementSpec>> {
-    let Some(type_directive) = directive(directives, "type", path, field_context)? else {
+    let Some(proto_field) = directive(directives, "proto-field", path, field_context)? else {
         return Ok(None);
     };
-    let from_proto = directive_prefixed_language_string(type_directive, "from");
-    let to_proto = directive_prefixed_language_string(type_directive, "to");
+    let from_proto = directive_prefixed_language_string(proto_field, "from");
+    let to_proto = directive_prefixed_language_string(proto_field, "to");
     if from_proto.is_empty() && to_proto.is_empty() {
         return Ok(None);
     }
     let invalid = |reason: String| Error::InvalidWitDirective {
         path: path.to_path_buf(),
         context: field_context.to_string(),
-        directive: "@nexus.type".to_string(),
+        directive: "@nexus.proto-field".to_string(),
         reason,
     };
+    if proto_field.value("value").is_none() {
+        return Err(invalid(
+            "conversion helpers need the name of the proto field".to_string(),
+        ));
+    }
     // Each language is checked, so a WIT file is valid for every target or for none.
     for helper_language in [Language::Python, Language::TypeScript, Language::Dotnet] {
         let key = language_key(helper_language);
@@ -1824,7 +1829,7 @@ fn build_field_conversion(
         return Ok(None);
     }
     Ok(Some(TypeReplacementSpec {
-        type_name: directive_language_string(type_directive),
+        type_name: LanguageStringSpec::default(),
         from_proto,
         to_proto,
     }))
