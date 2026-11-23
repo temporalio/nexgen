@@ -34,16 +34,20 @@ namespace Temporalio.Workflows
         OperationDefinition Operation { get; }
 
         Func<object, ISerializationContext>? SerializationContext { get; }
+
+        Func<object, IStorageDriverTargetInfo>? StorageTarget { get; }
     }
 
     internal sealed class NexgenOperationInfo<TRequest, TResponse> : INexgenOperationInfo
     {
         internal NexgenOperationInfo(
             OperationDefinition operation,
-            Func<TRequest, ISerializationContext>? serializationContext = null)
+            Func<TRequest, ISerializationContext>? serializationContext = null,
+            Func<TRequest, IStorageDriverTargetInfo>? storageTarget = null)
         {
             Operation = operation;
             SerializationContext = serializationContext;
+            StorageTarget = storageTarget;
         }
 
         internal OperationDefinition Operation { get; }
@@ -53,6 +57,10 @@ namespace Temporalio.Workflows
         internal Func<TRequest, ISerializationContext>? SerializationContext { get; }
 
         Func<object, ISerializationContext>? INexgenOperationInfo.SerializationContext => SerializationContext == null ? null : request => SerializationContext((TRequest)request);
+
+        internal Func<TRequest, IStorageDriverTargetInfo>? StorageTarget { get; }
+
+        Func<object, IStorageDriverTargetInfo>? INexgenOperationInfo.StorageTarget => StorageTarget == null ? null : request => StorageTarget((TRequest)request);
     }
 
     internal static class NexgenOperationRegistry
@@ -63,7 +71,8 @@ namespace Temporalio.Workflows
         {
             [("temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution")] = new NexgenOperationInfo<SignalWithStartWorkflowRequest, SignalWithStartWorkflowResponse>(
                 WorkflowServiceServiceDefinition.Operations["SignalWithStartWorkflowExecution"],
-                serializationContext: Nexgen.Support.WorkflowServiceSerializationContexts.SignalWithStartWorkflow),
+                serializationContext: Nexgen.Support.WorkflowServiceSerializationContexts.SignalWithStartWorkflow,
+                storageTarget: Nexgen.Support.WorkflowServiceStorageTargets.SignalWithStartWorkflow),
         };
     }
 

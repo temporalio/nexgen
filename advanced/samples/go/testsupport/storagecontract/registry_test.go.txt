@@ -1,0 +1,35 @@
+package workflowservice
+
+import (
+	"testing"
+
+	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/internal"
+)
+
+func TestGeneratedStorageTargetFactory(t *testing.T) {
+	entry := systemnexus_nexusOperationRegistry[internal.SystemNexusRegistryKey{
+		Service:   "temporal.api.workflowservice.v1.WorkflowService",
+		Operation: "SignalWithStartWorkflowExecution",
+	}]
+	if entry.StorageTarget == nil || entry.SerializationContext == nil {
+		t.Fatal("generated registry must retain both factories")
+	}
+	for _, request := range []systemnexus_signalWithStartWorkflowRequest{
+		{Namespace: "namespace-a", ID: "destination-a", Workflow: "WorkflowA"},
+		{Namespace: "namespace-b", ID: "destination-b", Workflow: "WorkflowB"},
+	} {
+		want := converter.StorageDriverWorkflowInfo{
+			Namespace: request.Namespace, WorkflowID: request.ID, WorkflowType: request.Workflow,
+		}
+		if got := entry.StorageTarget(request); got != want {
+			t.Fatalf("storage target = %+v, want %+v with no run ID", got, want)
+		}
+		wantContext := converter.WorkflowSerializationContext{
+			Namespace: request.Namespace, WorkflowID: request.ID,
+		}
+		if got := entry.SerializationContext(request); got != wantContext {
+			t.Fatalf("serialization context = %+v, want %+v", got, wantContext)
+		}
+	}
+}

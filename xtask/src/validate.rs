@@ -313,7 +313,16 @@ fn validate_go(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
                 source: io::Error::other("gofmt found unformatted files"),
             });
         }
-        run(log, &root, "go", &["test", "./..."])?;
+        if root == repo_root.join("advanced/samples/go") {
+            run(
+                log,
+                &root,
+                "go",
+                &["run", "./testsupport/storagecontract", "test", "./..."],
+            )?;
+        } else {
+            run(log, &root, "go", &["test", "./..."])?;
+        }
     }
     Ok(())
 }

@@ -50,8 +50,23 @@ copy that import unchanged. Adapt those conversions using APIs available to your
 module. For `@nexus.source`, write the helper call without the package prefix.
 The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
 `support.WorkflowNamespace(ctx)`. The System Nexus support helper calls
-`internal.GetWorkflowInfo(ctx).Namespace`. Run `go test ./...` from this sample
-module after generation. Run the same command from your own module root. See
+`internal.GetWorkflowInfo(ctx).Namespace`. Run the sample tests after generation
+with:
+
+```sh
+go run ./testsupport/storagecontract test ./...
+```
+
+The test helper copies the pinned SDK into a temporary directory, then uses a
+build overlay to supply its missing storage-target registry field. It also adds
+native tests to the generated workflow-service package without putting authored
+files in a regenerated directory. It does not edit the SDK checkout, module
+cache, or checked-in dependency files. Remove the SDK registry replacement and
+`sdk-registry.go.txt` when the sample SDK pin includes
+[`sdk-go#2914`](https://github.com/temporalio/sdk-go/pull/2914), retaining the
+factory tests. `cargo validate go` runs this command automatically.
+
+Other projects can run `go test ./...` from their module root. See
 [the WIT guide](../../../GUIDE.md#go) for support contracts and
 [`@nexus.facade`](../../../GUIDE.md#nexusfacade) for facade generation. JSON
 Schema generation does not need user support.
