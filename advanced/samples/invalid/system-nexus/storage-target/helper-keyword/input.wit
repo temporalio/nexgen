@@ -1,0 +1,11 @@
+package test:storage-target-keyword;
+
+world system { export api; }
+
+/// @nexus.endpoint "__temporal_system"
+interface api {
+  record request { namespace: string }
+
+  /// @nexus.storage-target go="break"
+  send: func(request: request);
+}

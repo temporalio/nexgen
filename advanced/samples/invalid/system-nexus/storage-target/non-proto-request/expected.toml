@@ -1,0 +1,6 @@
+languages = ["go"]
+system_nexus = true
+
+[error]
+kind = "unsupported-proto-conversion"
+contains = ["storage-target requires a proto-backed operation"]

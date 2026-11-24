@@ -791,7 +791,7 @@ mod tests {
             package_name: "internal".to_string(),
             import_path: Some("example.org/sdk/internal".to_string()),
             workflow_package_alias: "workflow",
-            has_serialization_context: false,
+            has_context_helpers: false,
             support_package: None,
             facade: None,
             facade_exports: BTreeMap::new(),
