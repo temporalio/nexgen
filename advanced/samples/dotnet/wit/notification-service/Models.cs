@@ -44,10 +44,9 @@ namespace Nexgen.NotificationService
         /// <summary>
         /// Initializes a new instance of the <see cref="OnCompleteRequest{TOutput, TSourceContext}"/> class.
         /// </summary>
-        public OnCompleteRequest(OnCompleteRequestResult<TOutput> result, TSourceContext sourceContext)
+        public OnCompleteRequest(OnCompleteRequestResult<TOutput> result)
         {
             Result = result;
-            SourceContext = sourceContext;
         }
 
         /// <summary>
@@ -55,9 +54,9 @@ namespace Nexgen.NotificationService
         /// </summary>
         public OnCompleteRequestResult<TOutput> Result { get; init; }
         /// <summary>
-        /// User-supplied data associated with the source invocation.
+        /// User-supplied data associated with the source invocation, if provided.
         /// </summary>
-        public TSourceContext SourceContext { get; init; }
+        public TSourceContext? SourceContext { get; init; }
 
         internal static OnCompleteRequest<TOutput, TSourceContext> FromTransferType(Temporalio.Api.NotificationService.V1.OnCompleteRequest wire)
         {
@@ -74,12 +73,10 @@ namespace Nexgen.NotificationService
                     throw new System.InvalidOperationException("missing required field OnCompleteRequest.Result");
             }
 
-            if (wire.SourceContext == null)
+            return new OnCompleteRequest<TOutput, TSourceContext>(resultOneof)
             {
-                throw new System.InvalidOperationException("missing required field OnCompleteRequest.SourceContext");
-            }
-
-            return new OnCompleteRequest<TOutput, TSourceContext>(resultOneof, Nexgen.Support.ProtoExtensions.FromPayload<TSourceContext>(wire.SourceContext));
+                SourceContext = wire.SourceContext == null ? default : (Nexgen.Support.ProtoExtensions.FromPayload<TSourceContext>(wire.SourceContext)),
+            };
         }
 
         internal Temporalio.Api.NotificationService.V1.OnCompleteRequest ToTransferType()
@@ -96,7 +93,10 @@ namespace Nexgen.NotificationService
                 default:
                     throw new System.InvalidOperationException("missing required field OnCompleteRequest.Result");
             }
-            proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(SourceContext);
+            if (SourceContext is { } sourceContext)
+            {
+                proto.SourceContext = Nexgen.Support.ProtoExtensions.ToPayload(sourceContext);
+            }
             return proto;
         }
 

@@ -40,9 +40,9 @@ export interface OnCompleteRequest<OutputT, SourceContextT> {
    */
   result: OnCompleteRequestResult<OutputT>;
   /**
-   * User-supplied data associated with the source invocation.
+   * User-supplied data associated with the source invocation, if provided.
    */
-  sourceContext: SourceContextT;
+  sourceContext?: SourceContextT;
 }
 
 function onCompleteRequestFromProto<OutputT, SourceContextT>(
@@ -79,10 +79,13 @@ function onCompleteRequestFromProto<OutputT, SourceContextT>(
   }
   return {
     result,
-    sourceContext: support.payloadToValue<SourceContextT>(
-      requiredField(proto.sourceContext, "OnCompleteRequest", "sourceContext"),
-      typeInfo.sourceContextT,
-    ),
+    sourceContext:
+      proto.sourceContext == null
+        ? undefined
+        : support.payloadToValue<SourceContextT>(
+            proto.sourceContext,
+            typeInfo.sourceContextT,
+          ),
   };
 }
 
@@ -108,10 +111,10 @@ function onCompleteRequestToProto<OutputT, SourceContextT>(
       result satisfies never;
       throw new Error("invalid oneof tag for OnCompleteRequest.result");
   }
-  proto.sourceContext = support.valueToPayload(
-    model.sourceContext,
-    typeInfo.sourceContextT,
-  );
+  proto.sourceContext =
+    model.sourceContext == null
+      ? undefined
+      : support.valueToPayload(model.sourceContext, typeInfo.sourceContextT);
   return proto;
 }
 

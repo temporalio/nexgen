@@ -2621,17 +2621,21 @@ fn service_uses_manual_function_name_inlining(service: &RenderedService<'_>) -> 
     })
 }
 
-/// Derives the primary Go output filename from the first service name
-/// (`WorkflowService` -> `workflowservice.go`). Most WIT inputs export a single
-/// service; for empty plans, keep the historical `api.go` fallback.
+/// Uses the first service or models-only interface name for the Go output file.
+/// Plans without either keep the historical `api.go` fallback.
 fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
     let stem = api_plan
         .services
         .first()
-        .map(|service| {
-            service
-                .name
-                .chars()
+        .map(|service| service.name.as_str())
+        .or_else(|| {
+            api_plan
+                .model_scope
+                .as_ref()
+                .map(|scope| scope.name.as_str())
+        })
+        .map(|name| {
+            name.chars()
                 .filter(|c| c.is_ascii_alphanumeric())
                 .collect::<String>()
                 .to_lowercase()

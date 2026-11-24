@@ -51,3 +51,32 @@ def test_on_complete_request_round_trips_generic_values(
     )
     assert isinstance(decoded.result.value, Completion)
     assert isinstance(decoded.source_context, SourceContext)
+
+
+def test_on_complete_request_round_trips_without_source_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        temporalio.nexus.system,
+        "_current_user_payload_converter",
+        lambda: PayloadConverter.default,
+    )
+    model = notification_service.OnCompleteRequest[Completion, SourceContext](
+        result=notification_service.OnCompleteRequestResultSuccess(
+            Completion(message="completed")
+        ),
+    )
+    converter = models._OnCompleteRequestTransferTypeConverter[
+        Completion, SourceContext
+    ]()
+
+    wire = converter.to_transfer_type(model)
+
+    assert not wire.HasField("source_context")
+    assert (
+        converter.from_transfer_type(
+            wire,
+            notification_service.OnCompleteRequest[Completion, SourceContext],
+        )
+        == model
+    )
