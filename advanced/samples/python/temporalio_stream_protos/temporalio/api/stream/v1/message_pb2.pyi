@@ -22,8 +22,11 @@ DESCRIPTOR: _descriptor.FileDescriptor
 @_typing.final
 class StreamRef(_message.Message):
     """Experimental. Might change in the future.
-    Identifies one Stream. The id is opaque to callers. A Stream has no incarnations. A create of a
-    closed or expired Stream fails, and it doesn't make a second Stream with the same id.
+    A reference to one Stream, which code passes to other code as data. Callers treat the `id` as
+    opaque. An id is never used for a second Stream while the Store remembers the first one, so a
+    create for a closed or expired Stream fails. A Store can forget an expired Stream after a time
+    of its choice, and a create for its id succeeds after that. Every SDK encodes a ref in a
+    Payload with this message, so a ref that one SDK writes decodes in another.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -32,11 +35,10 @@ class StreamRef(_message.Message):
     STORE_FIELD_NUMBER: _builtins.int
     id: _builtins.str
     store: _builtins.str
-    """The name of the Store that holds the Stream, as the Worker and client config register it,
-    so every process routes a ref it receives. With no name, the SDK picks the Store from its
-    config. Only an SDK sets and reads it, since only the SDK knows the name that its config
-    gives a Store. A request carries the whole ref, and the server and a Store ignore this
-    field.
+    """The name under which the client and Worker config registered the Store of this Stream. An
+    SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
+    the Store from its config. Only an SDK sets and reads this field. The server and a Store
+    ignore it.
     """
     def __init__(
         self,
@@ -53,12 +55,12 @@ class StreamRef(_message.Message):
 Global___StreamRef: _TypeAlias = StreamRef  # noqa: Y015
 
 @_typing.final
-class WorkflowTaskEpoch(_message.Message):
+class WorkflowTaskAttempt(_message.Message):
     """Experimental. Might change in the future.
-    One Workflow Task attempt of a run. It orders by started_event_id, then attempt, then
-    started_time. An epoch orders the attempts of one Producer only, and a Producer belongs to one
-    run. So a reset run and the next run of a chain have other Producers, and their epochs start
-    again.
+    One attempt of a Workflow Task. Two attempts of the same Producer compare by
+    `started_event_id`, then `attempt`, then `started_time`. Attempts of different Producers have
+    no order. A Producer is for one run, so the attempts of a reset run or of the next run in a
+    chain have no order with the attempts of this run.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -69,11 +71,14 @@ class WorkflowTaskEpoch(_message.Message):
     started_event_id: _builtins.int
     """Required."""
     attempt: _builtins.int
-    """Required. 1 or more."""
+    """Required. The attempt number of the task, starting at 1. Every task starts at 1 again, so
+    this number alone can't order the writes of a run.
+    """
     @_builtins.property
     def started_time(self) -> _timestamp_pb2.Timestamp:
-        """Tells a reused started event id apart, for example after a dropped speculative task. Core
-        leaves it empty when the server gave the task no started time.
+        """When this attempt started. The server can use a started event id for a second task, for
+        example after it drops a speculative task, and this time distinguishes the two. It's empty
+        when the server sent no started time for the task.
         """
 
     def __init__(
@@ -89,14 +94,14 @@ class WorkflowTaskEpoch(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___WorkflowTaskEpoch: _TypeAlias = WorkflowTaskEpoch  # noqa: Y015
+Global___WorkflowTaskAttempt: _TypeAlias = WorkflowTaskAttempt  # noqa: Y015
 
 @_typing.final
-class LocalActivityEpoch(_message.Message):
+class LocalActivityAttempt(_message.Message):
     """Experimental. Might change in the future.
-    The attempt of a Local Activity. It orders by task, then attempt, so the same call in a later
-    Workflow Task is a higher epoch. The Producer carries the run. Records of two runs have no
-    order by epoch, only their order in the Stream.
+    One attempt of a Local Activity. Two attempts compare by `task`, then `attempt`, so the same
+    call in a later Workflow Task is a later attempt. Attempts of two runs have no order. Their
+    Records have only their order in the Stream.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -104,15 +109,15 @@ class LocalActivityEpoch(_message.Message):
     TASK_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
     attempt: _builtins.int
-    """Required. The Local Activity's own attempt in that Workflow Task, 1 or more."""
+    """Required. The Local Activity's own attempt number within that Workflow Task, starting at 1."""
     @_builtins.property
-    def task(self) -> Global___WorkflowTaskEpoch:
+    def task(self) -> Global___WorkflowTaskAttempt:
         """Required. The Workflow Task attempt that dispatched the Local Activity."""
 
     def __init__(
         self,
         *,
-        task: Global___WorkflowTaskEpoch | None = ...,
+        task: Global___WorkflowTaskAttempt | None = ...,
         attempt: _builtins.int = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["task", b"task"]  # noqa: Y015
@@ -121,12 +126,12 @@ class LocalActivityEpoch(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___LocalActivityEpoch: _TypeAlias = LocalActivityEpoch  # noqa: Y015
+Global___LocalActivityAttempt: _TypeAlias = LocalActivityAttempt  # noqa: Y015
 
 @_typing.final
-class ActivityEpoch(_message.Message):
+class ActivityAttempt(_message.Message):
     """Experimental. Might change in the future.
-    The attempt of an Activity. It orders by attempt_scheduled_time, then attempt.
+    One attempt of an Activity. Two attempts compare by `attempt_scheduled_time`, then `attempt`.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -134,11 +139,11 @@ class ActivityEpoch(_message.Message):
     ATTEMPT_SCHEDULED_TIME_FIELD_NUMBER: _builtins.int
     ATTEMPT_FIELD_NUMBER: _builtins.int
     attempt: _builtins.int
-    """Required. 1 or more."""
+    """Required. The attempt number, starting at 1."""
     @_builtins.property
     def attempt_scheduled_time(self) -> _timestamp_pb2.Timestamp:
-        """Required. When the server scheduled this attempt. An Activity reset starts the attempt count
-        again, so only this time orders the attempts across a reset.
+        """Required. When the server scheduled this attempt. A reset of the Activity starts the
+        attempt number at 1 again, so this time is what orders the attempts across a reset.
         """
 
     def __init__(
@@ -153,35 +158,47 @@ class ActivityEpoch(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___ActivityEpoch: _TypeAlias = ActivityEpoch  # noqa: Y015
+Global___ActivityAttempt: _TypeAlias = ActivityAttempt  # noqa: Y015
 
 @_typing.final
 class WorkflowProducer(_message.Message):
     """Experimental. Might change in the future.
-    A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
-    Workflow Task. On a Store, Workflow code writes through a Local Activity, so its writes carry a
-    Local Activity Producer.
+    The Producer of a Workflow run. Workflow code writes as this Producer when it appends or
+    closes in a Workflow Task. A write from one of its Local Activities uses a
+    `LocalActivityProducer`.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
-    EPOCH_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
-    """Required. The run id of the Workflow run, not of its chain. Each run is its own Producer."""
+    """Required. The id of this run, not the first run id of its chain. Each run is a separate
+    Producer.
+    """
     @_builtins.property
-    def epoch(self) -> Global___WorkflowTaskEpoch:
-        """The Workflow Task of the write."""
+    def attempt(self) -> Global___WorkflowTaskAttempt:
+        """The Workflow Task attempt that makes the write. Workflow code leaves it empty, and the SDK
+        sets it before it sends the write to the Store.
+        """
 
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
-        epoch: Global___WorkflowTaskEpoch | None = ...,
+        attempt: Global___WorkflowTaskAttempt | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "workflow_id", b"workflow_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -190,80 +207,162 @@ Global___WorkflowProducer: _TypeAlias = WorkflowProducer  # noqa: Y015
 @_typing.final
 class LocalActivityProducer(_message.Message):
     """Experimental. Might change in the future.
-    A Local Activity Producer, one for each call of a run.
+    The Producer of one Local Activity of a Workflow run.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
-    EPOCH_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required. The namespace of the Workflow that made the call."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
-    """Required. The run id of the Workflow run."""
+    """Required."""
+    activity_id: _builtins.str
+    """Required. The id that the SDK gives the call, because a Local Activity has no scheduled
+    event. Two Local Activities of one run must not share it, or the Store takes them as one
+    Producer. Each SDK makes it from a counter of its own, unless the user sets it.
+    """
     @_builtins.property
-    def epoch(self) -> Global___LocalActivityEpoch:
+    def attempt(self) -> Global___LocalActivityAttempt:
         """Required."""
 
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
-        epoch: Global___LocalActivityEpoch | None = ...,
+        activity_id: _builtins.str = ...,
+        attempt: Global___LocalActivityAttempt | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "workflow_id", b"workflow_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___LocalActivityProducer: _TypeAlias = LocalActivityProducer  # noqa: Y015
 
 @_typing.final
-class ActivityProducer(_message.Message):
+class WorkflowActivityProducer(_message.Message):
     """Experimental. Might change in the future.
-    An Activity Producer, for an Activity of a Workflow or a Standalone Activity.
+    The Producer of one Activity that a Workflow scheduled.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: _builtins.int
     RUN_ID_FIELD_NUMBER: _builtins.int
-    EPOCH_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required. The namespace of the Workflow that scheduled the Activity."""
+    workflow_id: _builtins.str
+    """Required."""
     run_id: _builtins.str
-    """The run id of the Workflow run that scheduled the Activity. Empty for a Standalone
-    Activity, whose own run id is in the Producer id.
+    """Required."""
+    activity_id: _builtins.str
+    """Required."""
+    scheduled_event_id: _builtins.int
+    """The id of the `ActivityTaskScheduled` event of the Activity in the History of its run. A run
+    can use an Activity id again after the first Activity ended, and this id separates the two
+    Activities, so they are separate Producers. It's zero when the SDK doesn't have it.
     """
     @_builtins.property
-    def epoch(self) -> Global___ActivityEpoch:
+    def attempt(self) -> Global___ActivityAttempt:
         """Required."""
 
     def __init__(
         self,
         *,
+        namespace: _builtins.str = ...,
+        workflow_id: _builtins.str = ...,
         run_id: _builtins.str = ...,
-        epoch: Global___ActivityEpoch | None = ...,
+        activity_id: _builtins.str = ...,
+        scheduled_event_id: _builtins.int = ...,
+        attempt: Global___ActivityAttempt | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["epoch", b"epoch", "run_id", b"run_id"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id", "scheduled_event_id", b"scheduled_event_id", "workflow_id", b"workflow_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___ActivityProducer: _TypeAlias = ActivityProducer  # noqa: Y015
+Global___WorkflowActivityProducer: _TypeAlias = WorkflowActivityProducer  # noqa: Y015
 
 @_typing.final
-class ClientProducer(_message.Message):
+class StandaloneActivityProducer(_message.Message):
     """Experimental. Might change in the future.
-    A client Producer. A client has no run and no epoch. So nothing fences a client's writes, and a
-    reader never hides them.
+    The Producer of a Standalone Activity. Its attempts compare as those of a Workflow's Activity
+    do.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: _builtins.int
+    RUN_ID_FIELD_NUMBER: _builtins.int
+    ATTEMPT_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    activity_id: _builtins.str
+    """Required."""
+    run_id: _builtins.str
+    """Required. The run id of the Activity itself."""
+    @_builtins.property
+    def attempt(self) -> Global___ActivityAttempt:
+        """Required."""
+
     def __init__(
         self,
+        *,
+        namespace: _builtins.str = ...,
+        activity_id: _builtins.str = ...,
+        run_id: _builtins.str = ...,
+        attempt: Global___ActivityAttempt | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attempt", b"attempt"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["activity_id", b"activity_id", "attempt", b"attempt", "namespace", b"namespace", "run_id", b"run_id"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___StandaloneActivityProducer: _TypeAlias = StandaloneActivityProducer  # noqa: Y015
+
+@_typing.final
+class ClientProducer(_message.Message):
+    """Experimental. Might change in the future.
+    The Producer of a client. A client has no run and no attempt, so a Store never fences its
+    writes and a reader never hides them.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    ID_FIELD_NUMBER: _builtins.int
+    namespace: _builtins.str
+    """Required."""
+    id: _builtins.str
+    """Required. The caller can set it, for example to the id of the Nexus operation that
+    writes. Without one, the SDK makes an id for each client object.
+    """
+    def __init__(
+        self,
+        *,
+        namespace: _builtins.str = ...,
+        id: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["id", b"id", "namespace", b"namespace"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -272,56 +371,48 @@ Global___ClientProducer: _TypeAlias = ClientProducer  # noqa: Y015
 @_typing.final
 class Producer(_message.Message):
     """Experimental. Might change in the future.
-    The code that wrote a batch, which is one unit of work. Its id stays the same across attempts,
-    and an epoch is one attempt. The kind's case orders its epochs. After a write of a higher epoch,
-    a write of a lower epoch of the same Producer fails with FENCED, and a reader may hide the
-    Records of the lower epoch. The rule is the same for every kind that has an epoch. A client has
-    none. The epochs of two Producers never compare. A new run has new Producers, so no write
-    fences or supersedes the Records of an earlier run, such as the base run of a reset.
+    The writer of a batch of Records. A Producer is one unit of work, such as one Activity or one
+    Workflow run. Two Producers are the same when they have the same kind and the same ids.
+    Every kind except a client also has the attempt that made the write, and the attempt is not
+    part of what identifies the Producer.
+
+    A Store that fences fails a write with `FENCED` when a later attempt of the same Producer has
+    already written. A Store that doesn't fence accepts the write. Each Record has its Producer
+    and attempt either way, so a reader can hide the Records of an earlier attempt.
+
+    Attempts of different Producers have no order. A new run has new Producers, so no write fences
+    or supersedes the Records of an earlier run, such as the base run of a reset.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
 
-    ID_FIELD_NUMBER: _builtins.int
     WORKFLOW_FIELD_NUMBER: _builtins.int
     LOCAL_ACTIVITY_FIELD_NUMBER: _builtins.int
     WORKFLOW_ACTIVITY_FIELD_NUMBER: _builtins.int
     STANDALONE_ACTIVITY_FIELD_NUMBER: _builtins.int
     CLIENT_FIELD_NUMBER: _builtins.int
-    id: _builtins.str
-    """Required. Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run.
-    It is unique in one Stream. The id of a run-based kind has its run id, so it stays unique
-    when Producers of more than one namespace write to one Stream.
-    """
     @_builtins.property
     def workflow(self) -> Global___WorkflowProducer: ...
     @_builtins.property
     def local_activity(self) -> Global___LocalActivityProducer: ...
     @_builtins.property
-    def workflow_activity(self) -> Global___ActivityProducer:
-        """An Activity that a Workflow scheduled."""
-
+    def workflow_activity(self) -> Global___WorkflowActivityProducer: ...
     @_builtins.property
-    def standalone_activity(self) -> Global___ActivityProducer:
-        """An Activity with no Workflow. Both Activity cases order their epochs the same way. The
-        case tells which identity the Producer has, since only the first has a Workflow run.
-        """
-
+    def standalone_activity(self) -> Global___StandaloneActivityProducer: ...
     @_builtins.property
     def client(self) -> Global___ClientProducer: ...
     def __init__(
         self,
         *,
-        id: _builtins.str = ...,
         workflow: Global___WorkflowProducer | None = ...,
         local_activity: Global___LocalActivityProducer | None = ...,
-        workflow_activity: Global___ActivityProducer | None = ...,
-        standalone_activity: Global___ActivityProducer | None = ...,
+        workflow_activity: Global___WorkflowActivityProducer | None = ...,
+        standalone_activity: Global___StandaloneActivityProducer | None = ...,
         client: Global___ClientProducer | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "id", b"id", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["client", b"client", "kind", b"kind", "local_activity", b"local_activity", "standalone_activity", b"standalone_activity", "workflow", b"workflow", "workflow_activity", b"workflow_activity"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType_kind: _TypeAlias = _typing.Literal["workflow", "local_activity", "workflow_activity", "standalone_activity", "client"]  # noqa: Y015
     _WhichOneofArgType_kind: _TypeAlias = _typing.Literal["kind", b"kind"]  # noqa: Y015
@@ -332,7 +423,8 @@ Global___Producer: _TypeAlias = Producer  # noqa: Y015
 @_typing.final
 class AppendRecord(_message.Message):
     """Experimental. Might change in the future.
-    One Record of a batch to append. The Store adds the batch's Producer and an offset.
+    One Record of a batch to append. The Store stores it with the Producer of the batch and
+    assigns its offset.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -358,8 +450,8 @@ Global___AppendRecord: _TypeAlias = AppendRecord  # noqa: Y015
 @_typing.final
 class StreamRecord(_message.Message):
     """Experimental. Might change in the future.
-    One Record that a Producer appended, as a read gives it. A read gives only Records. A close
-    stores no Record, so a read tells of it with the done flag of its response.
+    One Record of a Stream, as a read returns it. A read returns only Records. A close stores no
+    Record, so a read reports it with `done` in its response.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -368,11 +460,11 @@ class StreamRecord(_message.Message):
     BODY_FIELD_NUMBER: _builtins.int
     OFFSET_FIELD_NUMBER: _builtins.int
     offset: _builtins.bytes
-    """Required. The Record's offset. An offset is ordered and unique in one Stream, and it is
-    sparse. Offsets have gaps, so they don't count Records. Two offsets of one Stream compare
-    bytewise, as unsigned bytes, in the order of their Records. So a reader, a Store and the
-    server order them without decoding them. An offset is never empty. A read gives its
-    Stream, so the read checks the offset against that Stream.
+    """Required. The position of this Record in its Stream. It's never empty. Offsets are unique
+    and ordered within one Stream, but they have gaps, so they don't count Records. Two offsets
+    of one Stream compare as unsigned bytes, in the order of their Records, so a reader, a
+    Store and the server can order them without decoding them. An offset doesn't identify
+    its Stream, so a read checks it against the Stream of the request.
     """
     @_builtins.property
     def producer(self) -> Global___Producer: ...
@@ -396,8 +488,8 @@ Global___StreamRecord: _TypeAlias = StreamRecord  # noqa: Y015
 @_typing.final
 class StreamErrorDetails(_message.Message):
     """Experimental. Might change in the future.
-    The details of a failed Stream call, in the gRPC status details and in the details of the
-    application failure of a Nexus operation.
+    The details of a failed Stream call. They're in the gRPC status details, and in the details
+    of the application failure when the call is a Nexus operation.
     """
 
     DESCRIPTOR: _descriptor.Descriptor

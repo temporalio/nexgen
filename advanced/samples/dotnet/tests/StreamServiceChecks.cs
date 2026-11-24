@@ -33,7 +33,7 @@ namespace Nexgen.DotNetExamples.Tests
         public void DeclaredRefParametersPropagateThroughRequests()
         {
             var reference = new StreamServiceExample.StreamRef<Turn>("stream-1");
-            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference, null);
+            var request = new StreamServiceExample.CreateStreamRequest<Turn>(reference);
             var decoded = FromPayload<StreamServiceExample.CreateStreamRequest<Turn>>(ToPayload(request));
             Assert.Equal(reference, decoded.StreamRef);
             Assert.IsType<StreamServiceExample.StreamRef<Turn>>(decoded.StreamRef);

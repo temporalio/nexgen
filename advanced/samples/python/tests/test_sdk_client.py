@@ -38,8 +38,7 @@ from wit.stream_service.client.client import (
 )
 from wit.stream_service.client import models as client_models
 from wit.stream_service.both.models import (
-    ActivityEpoch,
-    ActivityProducer,
+    ActivityAttempt,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -58,6 +57,7 @@ from wit.stream_service.both.models import (
     StreamRecord,
     StreamRef,
     Timestamp,
+    WorkflowActivityProducer,
     _CreateStreamRequestTransferTypeConverter,
 )
 
@@ -72,10 +72,9 @@ SYSTEM_CONVERTER = temporalio.nexus.system._SystemNexusPayloadConverter(
 )
 
 
-# The Producer that the sample's `default_producer()` source gives outside an Activity.
+# The Producer that the sample's `default_producer` source gives outside an Activity.
 CLIENT_PRODUCER = Producer(
-    id="client:sample",
-    kind=ProducerKindClient(ClientProducer()),
+    kind=ProducerKindClient(ClientProducer(namespace="default", id="client:sample")),
 )
 
 
@@ -325,11 +324,7 @@ async def test_an_operation_starts_through_the_sdk_nexus_client() -> None:
         "__temporal_system",
         "CreateStream",
     )
-    # A client create fills a new request id from its source.
-    assert create.arg == CreateStreamRequest(
-        stream_ref=StreamRef(id="s1"), request_id=create.arg.request_id
-    )
-    assert uuid.UUID(create.arg.request_id)
+    assert create.arg == CreateStreamRequest(stream_ref=StreamRef(id="s1"))
     assert uuid.UUID(create.id)
     assert create.result_type == CreateStreamResult[str]
     assert (append.service, append.endpoint, append.operation) == (
@@ -411,7 +406,6 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
             "AppendRecords": [
                 AppendRecordsResponse(first_offset=_offset(4), last_offset=_offset(5)),
                 AppendRecordsResponse(),
-                AppendRecordsResponse(first_offset=_offset(6), last_offset=_offset(6)),
             ]
         },
     )
@@ -419,7 +413,6 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
 
     response = await stream.append("a", "b")
     empty = await stream.append()
-    _ = await stream.append("c", sequence=3)
 
     _ = assert_type(response, AppendRecordsResponse)
     assert response == AppendRecordsResponse(
@@ -432,13 +425,6 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
     )
     # An append that wrote no Record has no offsets.
     assert empty == AppendRecordsResponse()
-    # A sequence goes on the request, so the Store can dedupe a resent batch.
-    assert answers.started[2].arg == AppendRecordsRequest(
-        ref=ref,
-        records=[AppendRecord(body="c")],
-        producer=CLIENT_PRODUCER,
-        sequence=3,
-    )
     if typing.TYPE_CHECKING:
         # The items take the type argument, so a `Stream[str]` refuses an `int`.
         _ = stream.append(1)  # pyright: ignore[reportArgumentType]
@@ -447,14 +433,16 @@ async def test_an_append_wraps_each_value_and_returns_the_offsets() -> None:
 async def test_an_optional_producer_parameter_replaces_its_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    evaluated: list[Producer] = []
+    evaluated: list[object] = []
 
-    def default_producer() -> Producer:
-        evaluated.append(CLIENT_PRODUCER)
+    def default_producer(nexus_client: object) -> Producer:
+        evaluated.append(nexus_client)
         return CLIENT_PRODUCER
 
     monkeypatch.setattr(temporal_support, "default_producer", default_producer)
-    given = Producer(id="given", kind=ProducerKindClient(ClientProducer()))
+    given = Producer(
+        kind=ProducerKindClient(ClientProducer(namespace="default", id="given"))
+    )
     client, answers = connect(
         Client,
         {
@@ -472,7 +460,8 @@ async def test_an_optional_producer_parameter_replaces_its_default(
     _ = await stream.append("b")
     await stream.close()
 
-    assert len(evaluated) == 2
+    # The default gets the client of the Stream.
+    assert evaluated == client.created_clients * 2
     assert [call.arg.producer for call in answers.started] == [
         given,
         given,
@@ -496,7 +485,7 @@ async def test_a_create_takes_the_fields_of_the_ref(
     _ = await client.create_stream(id="s1", **fields)
 
     request = answers.started[0].arg
-    assert request == CreateStreamRequest(stream_ref=ref, request_id=request.request_id)
+    assert request == CreateStreamRequest(stream_ref=ref)
     wire = _CreateStreamRequestTransferTypeConverter().to_transfer_type(request)
     assert wire.stream_ref.id == "s1"
     assert wire.stream_ref.store == fields.get("store", "")
@@ -504,6 +493,8 @@ async def test_a_create_takes_the_fields_of_the_ref(
 
 @dataclasses.dataclass
 class FakeActivityInfo:
+    workflow_namespace: str
+    workflow_id: str
     workflow_run_id: str
     activity_id: str
     attempt: int
@@ -518,7 +509,9 @@ async def test_a_client_append_sends_the_producer_of_its_activity(
     )
     monkeypatch.setattr(temporalio.activity, "in_activity", lambda: True)
     monkeypatch.setattr(
-        temporalio.activity, "info", lambda: FakeActivityInfo("r1", "7", 2, scheduled)
+        temporalio.activity,
+        "info",
+        lambda: FakeActivityInfo("ns", "w1", "r1", "7", 2, scheduled),
     )
     client, answers = connect(
         Client, {"AppendRecords": AppendRecordsResponse(last_offset=_offset(1))}
@@ -528,25 +521,34 @@ async def test_a_client_append_sends_the_producer_of_its_activity(
     _ = await stream.append()
 
     (append,) = answers.started
-    epoch = ActivityEpoch(
+    attempt = ActivityAttempt(
         attempt_scheduled_time=Timestamp(
             seconds=int(scheduled.timestamp()), nanos=500_000_000
         ),
         attempt=2,
     )
     producer = Producer(
-        id="act:r1:7",
-        kind=ProducerKindWorkflowActivity(ActivityProducer(run_id="r1", epoch=epoch)),
+        kind=ProducerKindWorkflowActivity(
+            WorkflowActivityProducer(
+                namespace="ns",
+                workflow_id="w1",
+                run_id="r1",
+                activity_id="7",
+                attempt=attempt,
+            )
+        ),
     )
     assert append.arg == AppendRecordsRequest(
         ref=StreamRef(id="s1"), records=[], producer=producer
     )
-    # The epoch is the Activity's attempt, so a retry fences the attempt before it.
+    # The Producer has the Activity's attempt, so a retry fences the attempt before it.
     converter = both_models._AppendRecordsRequestTransferTypeConverter[str]()
     wire = converter.to_transfer_type(append.arg)
-    assert wire.producer.id == "act:r1:7"
+    assert wire.producer.workflow_activity.activity_id == "7"
     assert wire.producer.workflow_activity.run_id == "r1"
-    assert wire.producer.workflow_activity.epoch.attempt == 2
+    assert wire.producer.workflow_activity.attempt.attempt == 2
+    # The Activity info has no scheduled event id, so the helper leaves it at zero.
+    assert wire.producer.workflow_activity.scheduled_event_id == 0
 
 
 async def test_a_stored_stream_ref_rebuilds_the_resource() -> None:
@@ -599,9 +601,7 @@ async def test_client_only_calls_need_no_workflow_context(
     assert response.last_offset == _offset(8)
     assert len(client.created_clients) == 1
     create, describe = answers.started
-    assert create.arg == client_models.CreateStreamRequest(
-        stream_ref=ref, request_id=create.arg.request_id
-    )
+    assert create.arg == client_models.CreateStreamRequest(stream_ref=ref)
     assert describe.arg == client_models.DescribeStreamRequest(ref=ref)
     assert describe.result_type is client_models.DescribeStreamResponse
 

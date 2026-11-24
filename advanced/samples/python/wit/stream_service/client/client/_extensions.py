@@ -20,7 +20,6 @@ from ..models import (
     StreamRef,
 )
 from ._resources.stream import Stream
-import temporal_support as _support
 from .._resource_context_manager import resource_context_manager
 
 
@@ -158,10 +157,9 @@ class StreamServiceClientExtension(abc.ABC):
         """
         Args:
             id: The Stream id, 1 to 4096 bytes.
-            store: Registered Store name. With none, the SDK picks one. Only an SDK
-                reads it.
-            id_conflict_policy: What the create does when the Stream exists. Unspecified
-                is fail.
+            store: The registered name of the Store. If empty, the SDK picks a Store.
+            id_conflict_policy: What the create does if the Stream already exists.
+                Unspecified means fail.
         """
         if body_type is None:
             body_type = typing.Any
@@ -172,7 +170,6 @@ class StreamServiceClientExtension(abc.ABC):
         request = CreateStreamRequest(
             stream_ref=stream_ref,
             id_conflict_policy=id_conflict_policy,
-            request_id=_support.request_id(),
         )
         return await self._stream_service_create_stream(
             request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout

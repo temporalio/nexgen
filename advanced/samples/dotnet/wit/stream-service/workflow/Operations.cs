@@ -31,11 +31,11 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// Registered Store name. With none, the SDK picks one. Only an SDK reads it.
+        /// The registered name of the Store. If empty, the SDK picks a Store.
         /// </summary>
         public string? Store { get; set; }
         /// <summary>
-        /// What the create does when the Stream exists. Unspecified is fail.
+        /// What the create does if the Stream already exists. Unspecified means fail.
         /// </summary>
         public StreamIdConflictPolicy? IdConflictPolicy { get; set; }
     }
@@ -57,10 +57,6 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; set; }
         public IReadOnlyList<TBody> Records { get; set; }
-        /// <summary>
-        /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
-        /// </summary>
-        public long? Sequence { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -78,7 +74,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// A long poll. NOT_FOUND for an uncreated Stream.
+    /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
     /// </summary>
     [GeneratedCode("nexgen", null)]
     internal class ReadRecordsOptions<TBody>
@@ -93,21 +89,21 @@ namespace Temporalio.Workflows
 
         public StreamRef<TBody> Ref { get; set; }
         /// <summary>
-        /// Read after this offset. Empty is the beginning. A too high offset fails.
+        /// Read after this offset. Empty means from the beginning.
         /// </summary>
         public byte[]? FromOffset { get; set; }
         /// <summary>
-        /// About this many Records per page, 1 to 1000.
+        /// The maximum number of Records in one page.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
-        /// How long to wait for a new Record before an empty answer. At most 60 s.
-        /// </summary>
-        public System.TimeSpan? Wait { get; set; }
-        /// <summary>
-        /// The maximum Record bytes in a page. A larger Record is still returned alone.
+        /// The maximum bytes of Records in a page. A larger Record is returned alone.
         /// </summary>
         public long? MaxBytes { get; set; }
+        /// <summary>
+        /// How long the read waits for a new Record or a close before an empty page.
+        /// </summary>
+        public System.TimeSpan? Wait { get; set; }
     }
 
     [GeneratedCode("nexgen", null)]
@@ -134,7 +130,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         private const string StreamServiceEndpoint = "__temporal_system";
 
-        /// <param name="request">Create a Stream. If it exists, fail, or with use-existing get the open one.</param>
+        /// <param name="request">Create a Stream. If it already exists, fail, or return it with use-existing.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamRequest<TBody> request)
         {
@@ -143,11 +139,11 @@ namespace Temporalio.Workflows
             return new Stream<TBody>((result.Ref ?? throw new System.InvalidOperationException("CreateStream answered without `ref`")), result.Created);
         }
 
-        /// <param name="options">Create a Stream. If it exists, fail, or with use-existing get the open one.</param>
+        /// <param name="options">Create a Stream. If it already exists, fail, or return it with use-existing.</param>
         [GeneratedCode("nexgen", null)]
         public static Task<Stream<TBody>> CreateStreamAsync<TBody>(CreateStreamOptions<TBody> options)
         {
-            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Store = options.Store }, Nexgen.Support.StreamWorkflowContext.RequestId())
+            var request = new CreateStreamRequest<TBody>(new StreamRef<TBody>(options.Id) { Store = options.Store })
             {
                 IdConflictPolicy = options.IdConflictPolicy,
             };
@@ -157,7 +153,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="request">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
+        /// <param name="request">Append one batch. The Store writes a batch that arrives again only once.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
         {
@@ -169,18 +165,15 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="options">Append one batch. The Store keeps a resent batch once, by Producer, epoch and sequence.</param>
+        /// <param name="options">Append one batch. The Store writes a batch that arrives again only once.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer())
-            {
-                Sequence = options.Sequence,
-            };
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer());
             return AppendRecordsAsync(request);
         }
 
-        /// <param name="request">Close a Stream. Readers drain what is left, then end. Later appends are refused.</param>
+        /// <param name="request">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamRequest<TBody> request)
         {
@@ -189,7 +182,7 @@ namespace Temporalio.Workflows
             return result;
         }
 
-        /// <param name="options">Close a Stream. Readers drain what is left, then end. Later appends are refused.</param>
+        /// <param name="options">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
         {
@@ -198,7 +191,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// A long poll. NOT_FOUND for an uncreated Stream.
+        /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
         /// </summary>
         /// <param name="request">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
@@ -210,7 +203,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// A long poll. NOT_FOUND for an uncreated Stream.
+        /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
         /// </summary>
         /// <param name="options">Read Records after an offset.</param>
         [GeneratedCode("nexgen", null)]
@@ -220,8 +213,8 @@ namespace Temporalio.Workflows
             {
                 FromOffset = options.FromOffset,
                 MaxRecords = options.MaxRecords,
-                Wait = options.Wait,
                 MaxBytes = options.MaxBytes,
+                Wait = options.Wait,
             };
             return ReadRecordsAsync<TBody>(request);
         }

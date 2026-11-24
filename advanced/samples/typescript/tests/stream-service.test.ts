@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type CreateStreamRequest,
+  type Producer,
   type ReadRecordsResponse,
   type StreamRef,
   StreamStatus,
@@ -35,6 +36,16 @@ vi.mock("../wit/stream-service/workflow/operations/close-stream.ts", () => ({
 }));
 vi.mock("../wit/stream-service/workflow/operations/read-records.ts", () => ({}));
 vi.mock("../wit/stream-service/workflow/operations/describe-stream.ts", () => ({}));
+// A test that runs an operation as generated gets this Nexus client, which keeps the request. The
+// path is the one that an operation module imports, since vitest can't resolve a missing module.
+vi.mock("../../../../nexus", () => ({
+  createNexusServiceClient: () => ({
+    startOperation: async (operation: { name: string }, input: unknown) => {
+      captured.calls.push({ operation: operation.name, input });
+      return { result: async () => ({}) };
+    },
+  }),
+}));
 
 function _offset(n: number): Uint8Array {
   // Big-endian bytes, so a bytes compare keeps the int order these tests assert.
@@ -42,6 +53,10 @@ function _offset(n: number): Uint8Array {
   new DataView(bytes.buffer).setBigUint64(0, BigInt(n));
   return bytes;
 }
+
+const clientProducer: Producer = {
+  kind: { tag: "client", value: { namespace: "ns", id: "c1" } },
+};
 
 class Turn {
   constructor(readonly role: string) {}
@@ -68,7 +83,7 @@ afterEach(() => {
 });
 
 interface WorkflowStream {
-  append(records: string[], sequence?: number): Promise<unknown>;
+  append(records: string[]): Promise<unknown>;
   close(): Promise<void>;
 }
 
@@ -87,10 +102,7 @@ async function loadWorkflowStream(): Promise<{
 describe("stream-service generated output", () => {
   test("carries a declared ref parameter through a create request", () => {
     const ref: StreamRef<Turn> = { id: "typed-stream" };
-    const request: CreateStreamRequest<Turn> = {
-      streamRef: ref,
-      requestId: "request-1",
-    };
+    const request: CreateStreamRequest<Turn> = { streamRef: ref };
     const converter = createCreateStreamRequestTransferTypeConverter<Turn>();
     const decoded: CreateStreamRequest<Turn> = converter.fromTransferType(
       converter.toTransferType(request),
@@ -105,7 +117,12 @@ describe("stream-service generated output", () => {
       records: [
         {
           body: "hi",
-          producer: { id: "wf:r1", kind: { tag: "workflow", value: { runId: "r1" } } },
+          producer: {
+            kind: {
+              tag: "workflow",
+              value: { namespace: "ns", workflowId: "w1", runId: "r1" },
+            },
+          },
           offset: _offset(1),
         },
       ],
@@ -161,7 +178,7 @@ describe("stream-service generated output", () => {
     const proto = appendRecordsRequestTransferTypeConverter.toTransferType({
       ref: { id: "stream-1" },
       records: ["a", "b"],
-      producer: { id: "client:sample" },
+      producer: clientProducer,
     });
 
     // `append-record` flattens, so the model holds the values and the proto holds the records.
@@ -188,17 +205,43 @@ describe("stream-service generated output", () => {
     const { Stream } = await loadWorkflowStream();
     const stream = new Stream({ id: "stream-1" }, undefined);
 
-    await stream.append(["a", "b"], 3);
+    await stream.append(["a", "b"]);
     await stream.close();
 
     // A Workflow method takes no Producer. The operation fills it from its source.
     expect(captured.calls).toEqual([
       {
         operation: "appendRecords",
-        input: { ref: { id: "stream-1" }, records: ["a", "b"], sequence: 3 },
+        input: { ref: { id: "stream-1" }, records: ["a", "b"] },
       },
       { operation: "closeStream", input: { ref: { id: "stream-1" } } },
     ]);
+  });
+
+  test("fills the Producer of the run in a Workflow append", async () => {
+    // The operation fills the Producer, so this test runs it in place of its mock.
+    const operation = "../wit/stream-service/workflow/operations/append-records.ts";
+    const { appendRecords } = await vi.importActual<{
+      appendRecords(input: {
+        ref: StreamRef<string>;
+        records: string[];
+      }): Promise<unknown>;
+    }>(operation);
+    vi.stubGlobal("__TEMPORAL_ACTIVATOR__", {
+      payloadConverter: common.defaultPayloadConverter,
+      currentRandom: Math.random,
+      info: { namespace: "ns", workflowId: "w1", runId: "r1" },
+    });
+
+    await appendRecords({ ref: { id: "stream-1" }, records: ["a"] });
+
+    const request = captured.calls[0].input as { producer: Producer };
+    expect(request.producer).toEqual({
+      kind: {
+        tag: "workflow",
+        value: { namespace: "ns", workflowId: "w1", runId: "r1" },
+      },
+    });
   });
 
   test("decodes an enum number that it doesn't know as the fallback case", () => {
