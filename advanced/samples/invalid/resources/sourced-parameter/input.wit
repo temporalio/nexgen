@@ -1,0 +1,22 @@
+package test:sourced-parameter@1.0.0;
+
+world system { export job-service; }
+
+// The source of `owner` has no `targets`, so no caller passes the field in any target. The
+// `owner` parameter of `restart` would be in no generated method.
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func(owner: string);
+  }
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source python="owner()" typescript="owner()" go="Owner(ctx)" dotnet="Owner()"
+    owner: string,
+  }
+
+  restart: func(request: restart-request);
+}

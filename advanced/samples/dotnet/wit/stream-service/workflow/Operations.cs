@@ -58,10 +58,6 @@ namespace Temporalio.Workflows
         public StreamRef<TBody> Ref { get; set; }
         public IReadOnlyList<TBody> Records { get; set; }
         /// <summary>
-        /// The Producer of the batch. Defaults to the Producer of the calling context.
-        /// </summary>
-        public Producer? Producer { get; set; }
-        /// <summary>
         /// The batch number in this epoch. Empty takes the next one, and a retry writes it again.
         /// </summary>
         public long? Sequence { get; set; }
@@ -79,10 +75,6 @@ namespace Temporalio.Workflows
         }
 
         public StreamRef<TBody> Ref { get; set; }
-        /// <summary>
-        /// The Producer that closes the Stream. Defaults to the Producer of the calling context.
-        /// </summary>
-        public Producer? Producer { get; set; }
     }
 
     /// <summary>
@@ -181,7 +173,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
-            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), ((options.Producer) ?? (StreamWorkflowContext.Producer())))
+            var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Nexgen.Support.StreamWorkflowContext.Producer())
             {
                 Sequence = options.Sequence,
             };
@@ -201,7 +193,7 @@ namespace Temporalio.Workflows
         [GeneratedCode("nexgen", null)]
         internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
         {
-            var request = new CloseStreamRequest<TBody>(options.Ref, ((options.Producer) ?? (StreamWorkflowContext.Producer())));
+            var request = new CloseStreamRequest<TBody>(options.Ref, Nexgen.Support.StreamWorkflowContext.Producer());
             return CloseStreamAsync(request);
         }
 

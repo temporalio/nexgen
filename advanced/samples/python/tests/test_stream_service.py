@@ -222,7 +222,7 @@ async def test_workflow_apis_call_the_stream_service(
     assert [record.body async for record in read] == ["a", "b"]
     assert read.next_request is None
     await stream.close()
-    # The Workflow API fills the request id, and the Producer from its default.
+    # The Workflow API fills the request id, and the Producer from its source.
     producer = model_types.Producer(
         id="wf:r2",
         kind=model_types.ProducerKindWorkflow(
@@ -301,18 +301,17 @@ async def test_workflow_handle_appends_with_its_type_parameter(
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
+    # A Workflow append takes its Producer from the run, so the test gives it one.
+    monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
     if construction == "create":
         stream = await workflow_only.create_stream(id=ref.id, body_type=Turn)
     else:
         stream = WorkflowStream[Turn](ref=ref, created=None)
-    # A call that passes its own Producer keeps it, so the test needs no Workflow info.
-    producer = workflow_models.Producer(id="wf:r1")
 
-    _ = await stream.append(Turn(role="model"), producer=producer)
+    _ = await stream.append(Turn(role="model"))
 
     assert stream.body_type is Turn
     assert inputs[-1].records == [workflow_models.AppendRecord(body=Turn(role="model"))]
-    assert inputs[-1].producer == producer
     wire = workflow_models._AppendRecordsRequestTransferTypeConverter[
         Turn
     ]().to_transfer_type(inputs[-1])

@@ -6396,7 +6396,7 @@ fn render_resource(
     }
 
     for method in methods {
-        let result_annotation = typescript_resource_method_result_annotation(method, api_plan);
+        let result_annotation = typescript_resource_method_result_annotation(&method, api_plan);
         output.push('\n');
         output.push_str("  public async ");
         output.push_str(&typescript_generated_field_name(&method.name));
@@ -6447,7 +6447,7 @@ fn render_resource(
                     .find(|operation| operation.name == operation_name)
                     .expect("bound operation should exist on the resource service");
                 let branchable_params =
-                    branchable_request_method_params(method, request_plan, operation, api_plan);
+                    branchable_request_method_params(&method, request_plan, operation, api_plan);
                 let endpoint_expr = None;
                 let client_expr = service
                     .endpoint

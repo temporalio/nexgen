@@ -241,7 +241,7 @@ const CATALOG: &[Annotation] = {
             conflicts: &[
                 Conflict::new("omit", &[Field], Any),
                 Conflict::new("api-omit", &[Field], SameTarget),
-                Conflict::new("default", &[Field], SameLanguage),
+                Conflict::new("default", &[Field], SameLanguageAndTarget),
                 Conflict::new("function", &[Field], Any),
                 Conflict::new("source", &[Field], SameTarget),
             ],
@@ -257,7 +257,7 @@ const CATALOG: &[Annotation] = {
             conflicts: &[
                 Conflict::new("omit", &[Field], Any),
                 Conflict::new("api-omit", &[Field], Any),
-                Conflict::new("source", &[Field], SameLanguage),
+                Conflict::new("source", &[Field], SameLanguageAndTarget),
                 Conflict::new("default", &[Field], SameTarget),
             ],
         },
@@ -472,7 +472,7 @@ struct Conflict {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ConflictScope {
     Any,
-    SameLanguage,
+    SameLanguageAndTarget,
     SameTarget,
 }
 
@@ -490,7 +490,7 @@ impl Conflict {
     ) -> Result<Option<String>> {
         let suffix = match self.scope {
             ConflictScope::Any => "",
-            ConflictScope::SameLanguage => {
+            ConflictScope::SameLanguageAndTarget => {
                 if !all_languages().into_iter().any(|language| {
                     directive_language_value(annotation, language)
                         .or_else(|| annotation.value("value"))
@@ -501,7 +501,13 @@ impl Conflict {
                 }) {
                     return Ok(None);
                 }
-                " for the same language"
+                let targets = build_origin_targets(annotation, path, context, annotation.name())?;
+                let other_targets =
+                    build_origin_targets(incompatible, path, context, incompatible.name())?;
+                if !other_targets.iter().any(|target| targets.contains(target)) {
+                    return Ok(None);
+                }
+                " for the same language and target"
             }
             ConflictScope::SameTarget => {
                 let targets = build_origin_targets(annotation, path, context, annotation.name())?;
@@ -993,23 +999,23 @@ mod tests {
         let path = Path::new("test.wit");
         for (scope, first_args, second_args, overlaps) in [
             (
-                ConflictScope::SameLanguage,
+                ConflictScope::SameLanguageAndTarget,
                 vec![("python", "value")],
                 vec![("go", "value")],
                 false,
             ),
             (
-                ConflictScope::SameLanguage,
+                ConflictScope::SameLanguageAndTarget,
                 vec![("value", "value")],
                 vec![("go", "value")],
                 true,
             ),
-            // Source/default conflict even when their targets are disjoint.
+            // A field can have a source in one target and a default in the other.
             (
-                ConflictScope::SameLanguage,
+                ConflictScope::SameLanguageAndTarget,
                 vec![("python", "value"), ("targets", "client")],
                 vec![("python", "value"), ("targets", "workflow")],
-                true,
+                false,
             ),
             (
                 ConflictScope::SameTarget,

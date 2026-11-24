@@ -4,7 +4,6 @@ import type * as common from "@temporalio/common";
 import type {
   StreamRef,
   AppendRecordsResponse,
-  Producer,
   ReadRecordsResponse,
   DescribeStreamResponse,
 } from "./models";
@@ -31,21 +30,15 @@ export class Stream<BodyT = unknown> {
 
   public async append(
     records: BodyT[],
-    producer?: Producer,
     sequence?: number,
   ): Promise<AppendRecordsResponse> {
-    const request = {
-      ref: this.ref,
-      producer: producer,
-      sequence: sequence,
-      records: records,
-    };
+    const request = { ref: this.ref, sequence: sequence, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
   }
 
-  public async close(producer?: Producer): Promise<void> {
-    const request = { ref: this.ref, producer: producer };
+  public async close(): Promise<void> {
+    const request = { ref: this.ref };
     const handle = await closeStream(request);
     await handle.result();
   }

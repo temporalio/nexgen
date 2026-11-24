@@ -783,6 +783,56 @@ interface support {
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
+/// A caller never passes a field that has a `@nexus.source`, so a resource method has no
+/// parameter for it, and the source fills the field.
+#[test]
+fn go_resource_method_leaves_out_a_parameter_whose_field_has_a_source() {
+    let temp_dir = unique_output_path("go-sourced-parameter");
+    fs::create_dir_all(&temp_dir).unwrap();
+    let input_path = temp_dir.join("jobs.wit");
+    fs::write(
+        &input_path,
+        r#"
+package temporal:jobs@1.0.0;
+
+world system {
+  export job-service;
+}
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func(owner: option<string>, reason: string);
+  }
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source targets="workflow" go="Owner(ctx)"
+    owner: string,
+    reason: string,
+  }
+
+  restart: func(request: restart-request);
+}
+"#,
+    )
+    .unwrap();
+    let rendered =
+        generate_to_string_with_inputs(nexgen::language::Language::Go, &[input_path], &[]).unwrap();
+    fs::remove_dir_all(temp_dir).unwrap();
+
+    assert!(
+        rendered.contains("func (u *Job) Restart(ctx workflow.Context, reason string)"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("Reason: reason, Owner: support.Owner(ctx)}"),
+        "{rendered}"
+    );
+}
+
 /// An inline **structured** object `oneOf` branch on a property: the branch is
 /// named `<Union>Object` and emitted as a full model (struct, `Validate`,
 /// (de)serialize) that implements the union's marker method, so the union's

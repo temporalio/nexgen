@@ -188,11 +188,12 @@ interface stream-service {
   record append-records-request {
     ref: stream-ref,
     records: list<append-record>,
-    // A call can pass its own Producer. A call that passes none gets the default, which the
-    // helper of each context picks for where it runs.
+    // Workflow code never passes a Producer. Its helper returns the Producer of the run. A client
+    // or an Activity can pass its own Producer, and a call that passes none gets the default,
+    // which the client helper picks for where it runs.
     /// @nexus.doc "The Producer of the batch. Defaults to the Producer of the calling context."
-    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
-    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.default targets="client" python="_support.default_producer()"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
@@ -219,8 +220,8 @@ interface stream-service {
     ref: stream-ref,
     /// @nexus.doc
     ///   "The Producer that closes the Stream. Defaults to the Producer of the calling context."
-    /// @nexus.default targets="workflow" python="_support.workflow_producer()"
-    ///   typescript="support.workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
+    /// @nexus.source targets="workflow" python="workflow_producer()"
+    ///   typescript="workflowProducer()" dotnet="StreamWorkflowContext.Producer()"
     /// @nexus.default targets="client" python="_support.default_producer()"
     ///   typescript="support.defaultProducer()" dotnet="StreamActivityContext.Producer()"
     producer: producer,
@@ -282,6 +283,8 @@ interface stream-service {
   resource %stream {
     constructor(ref: stream-ref, created: option<bool>);
 
+    // The Workflow `append` and `close` have no `producer`, because the request field has a
+    // Workflow source.
     /// @nexus.doc "Append values, and return the offsets of the batch."
     /// @nexus.operation "append-records"
     /// @nexus.varargs "records"

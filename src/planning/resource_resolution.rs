@@ -128,6 +128,7 @@ pub(crate) struct ResolvedResourceMethodSpec {
     pub(crate) result: Option<ResourceResultSpec<SelectedFamily>>,
     pub(crate) varargs: Option<String>,
     pub(crate) api_omitted: BTreeSet<GenerationTarget>,
+    pub(crate) sourced_params: BTreeMap<GenerationTarget, BTreeSet<String>>,
     pub(crate) binding: ResolvedResourceMethodBinding,
 }
 
@@ -438,6 +439,7 @@ fn resolve_resource_method(
             result: method.result.clone(),
             varargs: method.varargs.clone(),
             api_omitted: method.api_omitted.clone(),
+            sourced_params: sourced_params(spec, service, resource, method, &request_plan)?,
             binding: ResolvedResourceMethodBinding::Operation {
                 operation_name: operation.name.clone(),
                 request_plan,
@@ -497,11 +499,12 @@ fn resolve_resource_method(
         }
     };
 
-    let params = match &binding {
-        ResolvedResourceMethodBinding::Operation { request_plan, .. } => {
-            bytes_bound_params(spec, &method.params, request_plan)
-        }
-        ResolvedResourceMethodBinding::Stub => method.params.clone(),
+    let (params, sourced_params) = match &binding {
+        ResolvedResourceMethodBinding::Operation { request_plan, .. } => (
+            bytes_bound_params(spec, &method.params, request_plan),
+            sourced_params(spec, service, resource, method, request_plan)?,
+        ),
+        ResolvedResourceMethodBinding::Stub => (method.params.clone(), BTreeMap::new()),
     };
     Ok(ResolvedResourceMethodSpec {
         name: method.name.clone(),
@@ -510,8 +513,72 @@ fn resolve_resource_method(
         result: method.result.clone(),
         varargs: method.varargs.clone(),
         api_omitted: method.api_omitted.clone(),
+        sourced_params,
         binding,
     })
+}
+
+/// Returns the parameters that fill a top-level request field with a `@nexus.source`, for each
+/// target of the source. A caller of that target never passes the field, so the method of the
+/// target has no such parameter, and the source fills the field.
+fn sourced_params(
+    spec: &ApiSpec<SelectedFamily>,
+    service: &ServiceSpec<SelectedFamily>,
+    resource: &ResourceSpec<SelectedFamily>,
+    method: &ResourceMethodSpec<SelectedFamily>,
+    request_plan: &RequestPlan,
+) -> Result<BTreeMap<GenerationTarget, BTreeSet<String>>> {
+    let mut sourced = BTreeMap::<_, BTreeSet<String>>::new();
+    let RequestPlan::Construct {
+        message_name,
+        fields,
+    } = request_plan
+    else {
+        return Ok(sourced);
+    };
+    let Some(record) = spec
+        .record(message_name)
+        .or_else(|| spec.record_for_proto(message_name))
+    else {
+        return Ok(sourced);
+    };
+    let targets = [GenerationTarget::Workflow, GenerationTarget::Client];
+    for field in fields {
+        let RequestPlan::Source(RequestPlanSource::MethodParam(param)) = &field.value else {
+            continue;
+        };
+        let Some(record_field) = record
+            .fields
+            .values()
+            .find(|record_field| record_field.name == field.field_name)
+        else {
+            continue;
+        };
+        for target in targets {
+            if record_field.source_for(target).is_some() {
+                sourced.entry(target).or_default().insert(param.clone());
+            }
+        }
+        // A parameter that each target of the method leaves out would be in no generated method.
+        let kept = targets.iter().any(|target| {
+            !method.api_omitted.contains(target)
+                && !sourced
+                    .get(target)
+                    .is_some_and(|params| params.contains(param))
+        });
+        if !kept {
+            return Err(Error::InvalidResourceMethod {
+                service: service.name.clone(),
+                resource: resource.name.to_upper_camel_case(),
+                method: method.name.to_string(),
+                reason: format!(
+                    "parameter `{param}` fills a request field that has a `@nexus.source` in each \
+                     target of the method, so no target keeps the parameter; remove it"
+                ),
+            });
+        }
+    }
+    Ok(sourced)
 }
 
 /// A proto-backed record reads a `list<u8>` field as the proto `bytes`. A method parameter that
@@ -1215,7 +1282,8 @@ mod tests {
     };
 
     use super::{
-        RequestPlan, RequestPlanSource, ResolvedResourceMethodBinding, resolve_service_resources,
+        BTreeMap, BTreeSet, GenerationTarget, RequestPlan, RequestPlanSource,
+        ResolvedResourceMethodBinding, resolve_service_resources,
     };
 
     fn descriptors() -> DescriptorIndex {
@@ -1631,6 +1699,56 @@ interface api {
         assert_eq!(
             method.params[0].field_type,
             TypeSpec::Option(Box::new(TypeSpec::Bytes))
+        );
+    }
+
+    #[test]
+    fn a_parameter_is_sourced_in_the_targets_where_its_request_field_has_a_source() {
+        let wit = r#"
+package temporal:jobs@1.0.0;
+
+world system {
+  export job-service;
+}
+
+/// @nexus.endpoint "jobs"
+interface job-service {
+  resource job {
+    constructor(job-id: string);
+
+    restart: func(owner: option<string>, reason: string);
+  }
+
+  record restart-request {
+    job-id: string,
+    /// @nexus.source targets="workflow" python="workflow_owner()"
+    /// @nexus.default targets="client" python="_support.client_owner()"
+    owner: string,
+    reason: string,
+  }
+
+  restart: func(request: restart-request);
+}
+"#;
+        let spec = parse(Language::Python, wit);
+        let resolved = resolve_service_resources(
+            &spec,
+            &spec.services[0],
+            &empty_descriptors(),
+            &[GenerationTarget::Workflow, GenerationTarget::Client],
+        )
+        .unwrap();
+        let method = &resolved.resources[0].methods[0];
+
+        // The method keeps each declared parameter, so one binding serves both targets.
+        let params = method.params.iter().map(|param| param.name.as_str());
+        assert_eq!(params.collect::<Vec<_>>(), ["owner", "reason"]);
+        assert_eq!(
+            method.sourced_params,
+            BTreeMap::from([(
+                GenerationTarget::Workflow,
+                BTreeSet::from(["owner".to_string()])
+            )])
         );
     }
 

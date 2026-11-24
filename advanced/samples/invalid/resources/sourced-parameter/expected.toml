@@ -1,0 +1,5 @@
+targets = ["workflow"]
+
+[error]
+kind = "invalid-resource-method"
+contains = ["resource method `JobService.Job.restart` is invalid: parameter `owner` fills a request field that has a `@nexus.source` in each target of the method, so no target keeps the parameter; remove it"]
