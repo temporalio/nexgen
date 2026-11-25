@@ -8,7 +8,6 @@ import subprocess
 import sys
 import types
 import typing
-import uuid
 
 import nexusrpc
 import pytest
@@ -41,9 +40,17 @@ def _offset(n: int) -> bytes:
     return n.to_bytes(8, "big")
 
 
+def _client_producer(models: types.ModuleType) -> typing.Any:
+    return models.Producer(
+        kind=models.ProducerKindClient(models.ClientProducer(namespace="ns", id="c1"))
+    )
+
+
 @dataclasses.dataclass
 class FakeWorkflowInfo:
     run_id: str
+    namespace: str = "ns"
+    workflow_id: str = "w1"
     attempt: int = 1
 
 
@@ -82,12 +89,14 @@ def test_a_read_response_round_trips_with_its_records(models: types.ModuleType) 
             models.StreamRecord(
                 body={"text": "hi"},
                 producer=models.Producer(
-                    id="la:r1:1",
                     kind=models.ProducerKindLocalActivity(
                         models.LocalActivityProducer(
+                            namespace="ns",
+                            workflow_id="w1",
                             run_id="r1",
-                            epoch=models.LocalActivityEpoch(
-                                task=models.WorkflowTaskEpoch(
+                            activity_id="1",
+                            attempt=models.LocalActivityAttempt(
+                                task=models.WorkflowTaskAttempt(
                                     started_event_id=4, attempt=1
                                 ),
                                 attempt=2,
@@ -116,7 +125,7 @@ def test_a_request_without_its_handle_is_refused(models: types.ModuleType) -> No
     wire = converter.to_transfer_type(
         models.AppendRecordsRequest(
             ref=models.StreamRef(id="s-1"),
-            producer=models.Producer(id="client:sample"),
+            producer=_client_producer(models),
             records=[],
         )
     )
@@ -214,31 +223,28 @@ async def test_workflow_apis_call_the_stream_service(
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
     monkeypatch.setattr(temporalio.workflow, "in_workflow", lambda: True)
-    request_id = uuid.UUID(int=7)
-    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: request_id)
     stream = await api.create_stream(id=ref.id, body_type=str)
-    assert await stream.append("a", "b", sequence=3) == replies["AppendRecords"]
+    assert await stream.append("a", "b") == replies["AppendRecords"]
     read = stream.read(from_offset=_offset(1))
     assert [record.body async for record in read] == ["a", "b"]
     assert read.next_request is None
     await stream.close()
-    # The Workflow API fills the request id, and the Producer from its source.
+    # The Workflow API fills the Producer from its source.
     producer = model_types.Producer(
-        id="wf:r2",
         kind=model_types.ProducerKindWorkflow(
-            model_types.WorkflowProducer(run_id="r2")
+            model_types.WorkflowProducer(namespace="ns", workflow_id="w1", run_id="r2")
         ),
     )
     records = [model_types.AppendRecord(body="a"), model_types.AppendRecord(body="b")]
     expected = [
         (
             "CreateStream",
-            model_types.CreateStreamRequest(stream_ref=ref, request_id=str(request_id)),
+            model_types.CreateStreamRequest(stream_ref=ref),
         ),
         (
             "AppendRecords",
             model_types.AppendRecordsRequest(
-                ref=ref, records=records, producer=producer, sequence=3
+                ref=ref, records=records, producer=producer
             ),
         ),
         # Each page is a new Nexus operation from the Workflow.
@@ -262,7 +268,6 @@ async def test_workflow_apis_call_the_stream_service(
     assert [
         PayloadConverter.default.from_payload(record.body) for record in wire.records
     ] == ["a", "b"]
-    assert wire.sequence == 3
 
 
 @pytest.mark.parametrize("construction", ["create", "direct"])
@@ -300,7 +305,6 @@ async def test_workflow_handle_appends_with_its_type_parameter(
         return NexusClient()
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
-    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
     # A Workflow append takes its Producer from the run, so the test gives it one.
     monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
     if construction == "create":
@@ -616,13 +620,12 @@ async def test_a_workflow_stream_closes_at_the_end_of_async_with(
 
     monkeypatch.setattr(temporalio.workflow, "create_nexus_client", create_client)
     monkeypatch.setattr(temporalio.workflow, "info", lambda: FakeWorkflowInfo("r2"))
-    monkeypatch.setattr(temporalio.workflow, "uuid4", lambda: uuid.UUID(int=7))
     # The Workflow `Stream` closes, so the end of `async with` closes it.
     async with api.create_stream(id=ref.id, body_type=str) as created:
         assert created.ref == ref
         assert [name for name, _ in calls] == ["CreateStream"]
     assert [name for name, _ in calls] == ["CreateStream", "CloseStream"]
-    assert calls[-1][1].producer.id == "wf:r2"
+    assert calls[-1][1].producer.kind.value.run_id == "r2"
 
 
 @pytest.mark.parametrize(

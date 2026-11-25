@@ -52,7 +52,7 @@ export const streamService = nexus.service(
       outputType: { transferTypeConverter: closeStreamResponseTransferTypeConverter },
     }),
     /**
-     * A long poll. NOT_FOUND for an uncreated Stream.
+     * A long poll. It fails with NOT_FOUND for a Stream that was never created.
      */
     readRecords: nexus.operation<ReadRecordsRequest<any>, ReadRecordsResponse<any>>({
       name: "ReadRecords",

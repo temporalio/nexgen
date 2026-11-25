@@ -4,7 +4,6 @@ import type * as common from "@temporalio/common";
 import * as nexus from "../../../../nexus";
 import { streamService } from "../services";
 import type { CreateStreamRequest } from "../models";
-import * as support from "../../../../support/temporal_model_converters";
 import { Stream } from "../resources";
 
 function requiredField<T>(
@@ -21,10 +20,10 @@ function requiredField<T>(
 type CreateStreamInput<BodyT> =
   CreateStreamRequest<BodyT> extends infer Input
     ? Input extends unknown
-      ? Omit<Input, "request_id" | "streamRef"> & {
-          request_id?: never;
-          streamRef?: never;
-        } & { id: string; store?: string }
+      ? Omit<Input, "streamRef"> & { streamRef?: never } & {
+          id: string;
+          store?: string;
+        }
       : never
     : never;
 
@@ -38,7 +37,6 @@ export async function createStream<BodyT>(
   const { id, store, ...requestFields } = requestInput;
   const request = {
     ...requestFields,
-    requestId: support.requestId(),
     streamRef: { id, store },
   } as CreateStreamRequest<BodyT>;
   const client = nexus.createNexusServiceClient({

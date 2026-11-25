@@ -25,30 +25,27 @@ namespace Temporalio.Api.Enums.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiJ0ZW1wb3JhbC9hcGkvZW51bXMvdjEvc3RyZWFtLnByb3RvEhV0ZW1wb3Jh",
-            "bC5hcGkuZW51bXMudjEqegoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
+            "bC5hcGkuZW51bXMudjEqXwoMU3RyZWFtU3RhdHVzEh0KGVNUUkVBTV9TVEFU",
             "VVNfVU5TUEVDSUZJRUQQABIWChJTVFJFQU1fU1RBVFVTX09QRU4QARIYChRT",
-            "VFJFQU1fU1RBVFVTX0NMT1NFRBACEhkKFVNUUkVBTV9TVEFUVVNfRVhQSVJF",
-            "RBADKpMBChZTdHJlYW1JZENvbmZsaWN0UG9saWN5EikKJVNUUkVBTV9JRF9D",
-            "T05GTElDVF9QT0xJQ1lfVU5TUEVDSUZJRUQQABIiCh5TVFJFQU1fSURfQ09O",
-            "RkxJQ1RfUE9MSUNZX0ZBSUwQARIqCiZTVFJFQU1fSURfQ09ORkxJQ1RfUE9M",
-            "SUNZX1VTRV9FWElTVElORxACKugEChFTdHJlYW1FcnJvclJlYXNvbhIjCh9T",
-            "VFJFQU1fRVJST1JfUkVBU09OX1VOU1BFQ0lGSUVEEAASIQodU1RSRUFNX0VS",
-            "Uk9SX1JFQVNPTl9OT1RfRk9VTkQQARIfChtTVFJFQU1fRVJST1JfUkVBU09O",
-            "X0VYUElSRUQQAhIeChpTVFJFQU1fRVJST1JfUkVBU09OX0NMT1NFRBADEh4K",
-            "GlNUUkVBTV9FUlJPUl9SRUFTT05fRkVOQ0VEEAQSKAokU1RSRUFNX0VSUk9S",
-            "X1JFQVNPTl9TRVFVRU5DRV9UT09fTE9XEAUSJQohU1RSRUFNX0VSUk9SX1JF",
-            "QVNPTl9TRVFfRElWRVJHRU5UEAYSIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9O",
-            "T1RfT1dORVIQBxImCiJTVFJFQU1fRVJST1JfUkVBU09OX0ZPUk1BVF9UT09f",
-            "TkVXEAgSJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9PRkZTRVRfVE9PX0hJR0gQ",
-            "CRIhCh1TVFJFQU1fRVJST1JfUkVBU09OX1RPT19MQVJHRRAKEh8KG1NUUkVB",
-            "TV9FUlJPUl9SRUFTT05fSU5WQUxJRBALEisKJ1NUUkVBTV9FUlJPUl9SRUFT",
-            "T05fU1RPUkFHRV9VTkFWQUlMQUJMRRAMEiMKH1NUUkVBTV9FUlJPUl9SRUFT",
-            "T05fVU5TVVBQT1JURUQQDRImCiJTVFJFQU1fRVJST1JfUkVBU09OX0FMUkVB",
-            "RFlfRVhJU1RTEA4SJwojU1RSRUFNX0VSUk9SX1JFQVNPTl9TVE9SQUdFX0NP",
-            "UlJVUFQQD0KDAQoYaW8udGVtcG9yYWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Q",
-            "cm90b1ABWiFnby50ZW1wb3JhbC5pby9hcGkvZW51bXMvdjE7ZW51bXOqAhdU",
-            "ZW1wb3JhbGlvLkFwaS5FbnVtcy5WMeoCGlRlbXBvcmFsaW86OkFwaTo6RW51",
-            "bXM6OlYxYgZwcm90bzM="));
+            "VFJFQU1fU1RBVFVTX0NMT1NFRBACKpMBChZTdHJlYW1JZENvbmZsaWN0UG9s",
+            "aWN5EikKJVNUUkVBTV9JRF9DT05GTElDVF9QT0xJQ1lfVU5TUEVDSUZJRUQQ",
+            "ABIiCh5TVFJFQU1fSURfQ09ORkxJQ1RfUE9MSUNZX0ZBSUwQARIqCiZTVFJF",
+            "QU1fSURfQ09ORkxJQ1RfUE9MSUNZX1VTRV9FWElTVElORxACKvkDChFTdHJl",
+            "YW1FcnJvclJlYXNvbhIjCh9TVFJFQU1fRVJST1JfUkVBU09OX1VOU1BFQ0lG",
+            "SUVEEAASIQodU1RSRUFNX0VSUk9SX1JFQVNPTl9OT1RfRk9VTkQQARIfChtT",
+            "VFJFQU1fRVJST1JfUkVBU09OX0VYUElSRUQQAhIeChpTVFJFQU1fRVJST1Jf",
+            "UkVBU09OX0NMT1NFRBADEh4KGlNUUkVBTV9FUlJPUl9SRUFTT05fRkVOQ0VE",
+            "EAQSJgoiU1RSRUFNX0VSUk9SX1JFQVNPTl9GT1JNQVRfVE9PX05FVxAFEicK",
+            "I1NUUkVBTV9FUlJPUl9SRUFTT05fT0ZGU0VUX1RPT19ISUdIEAYSIQodU1RS",
+            "RUFNX0VSUk9SX1JFQVNPTl9UT09fTEFSR0UQBxIoCiRTVFJFQU1fRVJST1Jf",
+            "UkVBU09OX0lOVkFMSURfQVJHVU1FTlQQCBIpCiVTVFJFQU1fRVJST1JfUkVB",
+            "U09OX1NUT1JFX1VOQVZBSUxBQkxFEAkSIwofU1RSRUFNX0VSUk9SX1JFQVNP",
+            "Tl9VTlNVUFBPUlRFRBAKEiYKIlNUUkVBTV9FUlJPUl9SRUFTT05fQUxSRUFE",
+            "WV9FWElTVFMQCxIlCiFTVFJFQU1fRVJST1JfUkVBU09OX1NUT1JFX0NPUlJV",
+            "UFQQDEKDAQoYaW8udGVtcG9yYWwuYXBpLmVudW1zLnYxQgtTdHJlYW1Qcm90",
+            "b1ABWiFnby50ZW1wb3JhbC5pby9hcGkvZW51bXMvdjE7ZW51bXOqAhdUZW1w",
+            "b3JhbGlvLkFwaS5FbnVtcy5WMeoCGlRlbXBvcmFsaW86OkFwaTo6RW51bXM6",
+            "OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Temporalio.Api.Enums.V1.StreamStatus), typeof(global::Temporalio.Api.Enums.V1.StreamIdConflictPolicy), typeof(global::Temporalio.Api.Enums.V1.StreamErrorReason), }, null, null));
@@ -59,104 +56,99 @@ namespace Temporalio.Api.Enums.V1 {
   #region Enums
   /// <summary>
   /// Experimental. Might change in the future.
-  /// The state of a Stream, as a describe gives it.
+  /// The status of a Stream, as a describe returns it. A describe of an expired Stream fails with
+  /// the reason `EXPIRED`, so it has no status.
   /// (-- api-linter: core::0216::synonyms=disabled
-  ///     aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
+  ///     aip.dev/not-precedent: It has the same form as WorkflowExecutionStatus. --)
   /// </summary>
   public enum StreamStatus {
     [pbr::OriginalName("STREAM_STATUS_UNSPECIFIED")] Unspecified = 0,
+    /// <summary>
+    /// The Stream accepts appends.
+    /// </summary>
     [pbr::OriginalName("STREAM_STATUS_OPEN")] Open = 1,
+    /// <summary>
+    /// The Stream is closed. It accepts no append, and a read ends after its last Record.
+    /// </summary>
     [pbr::OriginalName("STREAM_STATUS_CLOSED")] Closed = 2,
-    [pbr::OriginalName("STREAM_STATUS_EXPIRED")] Expired = 3,
   }
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// What a create does when its Stream exists. Unspecified is FAIL, as for a Workflow start.
+  /// What a create does if its Stream already exists. Unspecified means `FAIL`, as it does for a
+  /// Workflow start.
   /// </summary>
   public enum StreamIdConflictPolicy {
     [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_UNSPECIFIED")] Unspecified = 0,
     /// <summary>
-    /// The create fails with ALREADY_EXISTS.
+    /// The create fails with `ALREADY_EXISTS`.
     /// </summary>
     [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_FAIL")] Fail = 1,
     /// <summary>
-    /// The create gets the open Stream, which keeps its own Retention.
+    /// The create returns the open Stream, and the Retention of that Stream doesn't change.
     /// </summary>
     [pbr::OriginalName("STREAM_ID_CONFLICT_POLICY_USE_EXISTING")] UseExisting = 2,
   }
 
   /// <summary>
   /// Experimental. Might change in the future.
-  /// Why a Stream call failed. Each reason has one gRPC status code, and several reasons share a
-  /// code. So code matches on the reason, and not on the status code. An SDK raises one error type
-  /// that carries the reason.
+  /// Why a Stream call failed. Each reason maps to one gRPC status code, shown in parentheses, and
+  /// several reasons share a code. So callers check the reason and not the status code. An SDK
+  /// raises one error type with the reason in it.
   /// </summary>
   public enum StreamErrorReason {
     [pbr::OriginalName("STREAM_ERROR_REASON_UNSPECIFIED")] Unspecified = 0,
     /// <summary>
-    /// Nobody created the Stream. NOT_FOUND.
+    /// The Stream was never created (`NOT_FOUND`).
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_NOT_FOUND")] NotFound = 1,
     /// <summary>
-    /// The Stream's Retention or its last-write TTL passed. NOT_FOUND.
+    /// The Retention of the Stream or its Producer idle TTL has passed (`NOT_FOUND`).
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_EXPIRED")] Expired = 2,
     /// <summary>
-    /// The Stream is closed. FAILED_PRECONDITION.
+    /// The Stream is closed (`FAILED_PRECONDITION`).
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_CLOSED")] Closed = 3,
     /// <summary>
-    /// The Producer's epoch is lower than the newest one. FAILED_PRECONDITION.
+    /// A later attempt of the same Producer has already written, and the Store fences
+    /// (`FAILED_PRECONDITION`).
     /// </summary>
     [pbr::OriginalName("STREAM_ERROR_REASON_FENCED")] Fenced = 4,
     /// <summary>
-    /// The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION.
+    /// The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_SEQUENCE_TOO_LOW")] SequenceTooLow = 5,
+    [pbr::OriginalName("STREAM_ERROR_REASON_FORMAT_TOO_NEW")] FormatTooNew = 5,
     /// <summary>
-    /// The batch has the `sequence` of the last one of its epoch, and other content.
-    /// FAILED_PRECONDITION.
+    /// The offset is past the newest one, for example after a failover lost the newest Records. A
+    /// read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_SEQ_DIVERGENT")] SeqDivergent = 6,
+    [pbr::OriginalName("STREAM_ERROR_REASON_OFFSET_TOO_HIGH")] OffsetTooHigh = 6,
     /// <summary>
-    /// The caller may not create or close this Stream. FAILED_PRECONDITION.
+    /// A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_NOT_OWNER")] NotOwner = 7,
+    [pbr::OriginalName("STREAM_ERROR_REASON_TOO_LARGE")] TooLarge = 7,
     /// <summary>
-    /// A newer format version wrote the Stream. FAILED_PRECONDITION.
+    /// The request is malformed (`INVALID_ARGUMENT`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_FORMAT_TOO_NEW")] FormatTooNew = 8,
+    [pbr::OriginalName("STREAM_ERROR_REASON_INVALID_ARGUMENT")] InvalidArgument = 8,
     /// <summary>
-    /// The offset is past the newest offset, for example after a failover lost the newest Records.
-    /// A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+    /// The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_OFFSET_TOO_HIGH")] OffsetTooHigh = 9,
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORE_UNAVAILABLE")] StoreUnavailable = 9,
     /// <summary>
-    /// A Record or a batch is over the Store's limit. INVALID_ARGUMENT.
+    /// The Store doesn't support something that the call needs (`UNIMPLEMENTED`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_TOO_LARGE")] TooLarge = 10,
+    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 10,
     /// <summary>
-    /// The request is malformed. INVALID_ARGUMENT.
+    /// A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_INVALID")] Invalid = 11,
+    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 11,
     /// <summary>
-    /// The Store failed or did not answer. A retry can succeed. UNAVAILABLE.
+    /// The Store returned data that isn't valid, such as a stored value of the wrong length. A
+    /// retry reads the same data (`DATA_LOSS`).
     /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_UNAVAILABLE")] StorageUnavailable = 12,
-    /// <summary>
-    /// The Store lacks a capability that the call needs. UNIMPLEMENTED.
-    /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_UNSUPPORTED")] Unsupported = 13,
-    /// <summary>
-    /// A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS.
-    /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_ALREADY_EXISTS")] AlreadyExists = 14,
-    /// <summary>
-    /// The Store gave back data that isn't valid, such as a stored value with the wrong length. A
-    /// retry reads the same data. DATA_LOSS.
-    /// </summary>
-    [pbr::OriginalName("STREAM_ERROR_REASON_STORAGE_CORRUPT")] StorageCorrupt = 15,
+    [pbr::OriginalName("STREAM_ERROR_REASON_STORE_CORRUPT")] StoreCorrupt = 12,
   }
 
   #endregion
