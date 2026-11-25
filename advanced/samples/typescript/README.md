@@ -34,7 +34,7 @@ npm run test
 To rebuild one example only:
 
 ```bash
-cargo build-examples --format wit --lang typescript workflow-service
+cargo build-examples --format wit --lang typescript proto-backed-showcase
 ```
 
 The definitions-mode JSON-Schema samples (plain data models) live under

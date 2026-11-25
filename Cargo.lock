@@ -859,6 +859,7 @@ dependencies = [
  "heck",
  "nexgen",
  "serde",
+ "tempfile",
  "thiserror",
  "toml",
 ]

@@ -169,6 +169,12 @@ Support can also share the generated package. Set `--support-package` and
 self-import, so support helpers need not be exported. Authored files alongside
 generated files are preserved.
 
+The repository's workflow-service fixture uses the actual SDK package paths and
+support code, not standalone sample adaptations. Its WIT and companion support
+changes live under [`advanced/sdk/`](advanced/sdk/README.md). Run
+`cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, or `sdk-dotnet` to
+regenerate inside an SDK checkout and execute native workflow-service tests.
+
 With `--system-nexus`, Go bindings use SDK `internal` APIs and prefix
 package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
 (private). To generate into the SDK's `internal` package, set
@@ -217,10 +223,10 @@ Standalone public functions call the generated terminal with an inline callback
 that delegates execution to the input's Nexus client. No execution helper is
 required in the support package. Tests can instead supply the next interceptor
 or execution function directly. There is no context installer or scheduling
-fallback, and facades do not re-export interceptor helpers. The Go
-`workflow-service` and `multi-operation-service` samples exercise typed calls,
-forwarding, short-circuiting, and terminal scheduling. SDK tests cover
-public-function entry into the SDK's interceptor chain.
+fallback, and facades do not re-export interceptor helpers. SDK integration
+tests validate public-function entry into the SDK's interceptor chain,
+operation-specific interception, and terminal scheduling against the real
+workflow service.
 
 The terminal uses default Nexus settings. With
 [`@nexus.context-propagation`](#nexuscontext-propagation), SDK generation
@@ -310,15 +316,13 @@ Pass the C# **namespace**, not a source path or assembly name:
 `--support-package Nexgen.Support` for the sample. Put hand-written `.cs` files
 such as
 [`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
-and
-[`WorkflowServiceSupport.cs`](advanced/samples/dotnet/TemporalSupport/WorkflowServiceSupport.cs)
 outside regenerated output and compile them into the **same project/assembly**
 as the generated files. This is why the sample's `internal` helpers work; simply
 referencing a separate support DLL would not give the generated code access to
 those members. The support namespace need not equal the generated models'
 namespace. If your `.csproj` disables default compile items or excludes
 directories, explicitly include the authored sources (see
-[`Nexgen.DotNetMultiOperationService.csproj`](advanced/samples/dotnet/Nexgen.DotNetMultiOperationService.csproj)).
+[`Nexgen.DotNetStreamService.csproj`](advanced/samples/dotnet/Nexgen.DotNetStreamService.csproj)).
 
 ```sh
 cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-showcase.wit \

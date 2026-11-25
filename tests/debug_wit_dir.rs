@@ -12,7 +12,7 @@ fn project_root() -> PathBuf {
 }
 
 fn sample_input_path(root: &Path) -> PathBuf {
-    root.join("advanced/samples/inputs/workflow-service.wit")
+    root.join("advanced/sdk/workflow-service.wit")
 }
 
 fn linked_inputs_path(root: &Path) -> PathBuf {

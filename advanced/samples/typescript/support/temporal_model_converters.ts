@@ -112,37 +112,6 @@ export function workflowNamespace(): string {
   return workflow.workflowInfo().namespace;
 }
 
-/** Serialization context for payloads owned by a signal-with-start target workflow. */
-export function signalWithStartWorkflowSerializationContext(request: {
-  namespace?: string | null;
-  workflowId?: string | null;
-}): common.WorkflowSerializationContext {
-  if (request.namespace == null || request.workflowId == null) {
-    throw new TypeError("signal-with-start request is missing namespace or workflowId");
-  }
-  return {
-    type: "workflow",
-    namespace: request.namespace,
-    workflowId: request.workflowId,
-  };
-}
-
-export function signalWithStartWorkflowStorageTarget(request: {
-  namespace?: string | null;
-  id: string;
-  workflow: string | common.Workflow;
-}): common.StorageDriverWorkflowInfo {
-  if (request.namespace == null) {
-    throw new TypeError("signal-with-start request is missing namespace");
-  }
-  return {
-    kind: "workflow",
-    namespace: request.namespace,
-    id: request.id,
-    type: workflowFunctionName(request.workflow),
-  };
-}
-
 export function payloadFromProto(
   payload: temporal.api.common.v1.IPayload,
 ): common.Payload {
@@ -233,14 +202,14 @@ export function payloadToValue<T>(
   );
 }
 
-export function errorFromFailure(proto: temporal.api.failure.v1.IFailure): Error {
+export function failureFromProto(proto: temporal.api.failure.v1.IFailure): Error {
   return common.defaultFailureConverter.failureToError(
     proto,
     configuredPayloadConverter(),
   );
 }
 
-export function errorToFailure(failure: Error): temporal.api.failure.v1.IFailure {
+export function failureToProto(failure: Error): temporal.api.failure.v1.IFailure {
   return common.defaultFailureConverter.errorToFailure(
     failure,
     configuredPayloadConverter(),

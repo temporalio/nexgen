@@ -280,7 +280,7 @@ fn available_wit_example_ids(
     };
     let mut ids = std::collections::BTreeSet::new();
     for language in languages {
-        ids.extend(discover_example_ids(repo_root, language)?);
+        ids.extend(discover_wit_example_ids(repo_root, language)?);
     }
     Ok(ids)
 }
@@ -329,7 +329,7 @@ fn build_wit_examples(request: &BuildExamplesRequest) -> Result<()> {
     };
     for language in languages {
         let example_ids = if request.example_ids.is_empty() {
-            discover_example_ids(&repo_root, language)?
+            discover_wit_example_ids(&repo_root, language)?
         } else if use_default_languages {
             filter_available_example_ids(&repo_root, language, &request.example_ids)?
         } else {
@@ -436,6 +436,21 @@ fn load_examples_config(input_root: &Path) -> Result<ExamplesConfig> {
         source,
     })?;
     parse_examples_config(&contents).map_err(|reason| Error::InvalidExampleConfig { path, reason })
+}
+
+fn discover_wit_example_ids(repo_root: &Path, language: Language) -> Result<Vec<String>> {
+    let mut ids = discover_example_ids(repo_root, language)?;
+    if matches!(
+        language,
+        Language::Dotnet | Language::Go | Language::Python | Language::TypeScript
+    ) && repo_root
+        .join("advanced/sdk/workflow-service.wit")
+        .is_file()
+    {
+        ids.push("workflow-service".into());
+        ids.sort();
+    }
+    Ok(ids)
 }
 
 fn parse_examples_config(contents: &str) -> std::result::Result<ExamplesConfig, String> {
@@ -564,7 +579,7 @@ fn validate_example_ids(
     language: Language,
     ids: &[String],
 ) -> Result<Vec<String>> {
-    let available = discover_example_ids(repo_root, language)?
+    let available = discover_wit_example_ids(repo_root, language)?
         .into_iter()
         .collect::<std::collections::BTreeSet<_>>();
     for id in ids {
@@ -583,7 +598,7 @@ fn filter_available_example_ids(
     language: Language,
     ids: &[String],
 ) -> Result<Vec<String>> {
-    let available = discover_example_ids(repo_root, language)?
+    let available = discover_wit_example_ids(repo_root, language)?
         .into_iter()
         .collect::<std::collections::BTreeSet<_>>();
     Ok(ids
@@ -695,6 +710,22 @@ fn reset_example_output_directory(language_root: &Path, output_path: &Path) -> R
 }
 
 fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Result<()> {
+    if example_id == "workflow-service" {
+        let request = sdk_snapshot_request(repo_root, language)?;
+        reset_example_output_directory(
+            &repo_root.join("advanced/sdk/generated"),
+            &request.output_path,
+        )?;
+        generate_to_file(&request)?;
+        format_example_output(
+            &advanced_language_root(repo_root, language),
+            language,
+            &request.output_path,
+        )?;
+        normalize_example_headers(&request.output_path)?;
+        println!("Built {} with nexgen", request.output_path.display());
+        return Ok(());
+    }
     let config = load_examples_config(&repo_root.join("advanced/samples/inputs"))?;
     let example = config.examples.get(example_id).cloned().unwrap_or_default();
     let configurations = example
@@ -712,6 +743,37 @@ fn build_example(repo_root: &Path, language: Language, example_id: &str) -> Resu
         build_example_configuration(repo_root, language, example_id, &output_id, &options)?;
     }
     Ok(())
+}
+
+fn sdk_snapshot_request(repo_root: &Path, language: Language) -> Result<GenerateRequest> {
+    let support_package = match language {
+        Language::Dotnet => "Temporalio.Nexus.SystemNexus",
+        Language::Go => "go.temporal.io/sdk/internal",
+        Language::Python => "temporalio.nexus.system._support",
+        Language::TypeScript => "../support",
+        language => return Err(NexgenError::UnsupportedLanguage { language }.into()),
+    };
+    Ok(GenerateRequest {
+        config: NexgenConfig {
+            system_nexus: true,
+            targets: vec![GenerationTarget::Workflow],
+        },
+        language,
+        input_paths: vec![
+            repo_root.join("advanced/sdk/workflow-service.wit"),
+            repo_root.join("advanced/samples/inputs/deps"),
+        ],
+        support_package: Some(support_package.into()),
+        descriptor_paths: vec![repo_root.join("advanced/samples/descriptors/temporal_api.bin")],
+        output_path: repo_root
+            .join("advanced/sdk/generated")
+            .join(language.as_str())
+            .join("workflow-service"),
+        format: false,
+        java_package_name: None,
+        ts_date_time_types: Default::default(),
+        dotnet_namespace: None,
+    })
 }
 
 fn build_example_configuration(
@@ -1321,6 +1383,73 @@ targets = ["workflow"]
     }
 
     #[test]
+    fn sdk_snapshots_are_discovered_without_becoming_standalone_samples() {
+        let root = tempfile::tempdir().unwrap();
+        let inputs = root.path().join("advanced/samples/inputs");
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(inputs.join("examples.toml"), "").unwrap();
+        let sdk = root.path().join("advanced/sdk");
+        fs::create_dir_all(&sdk).unwrap();
+        fs::write(sdk.join("workflow-service.wit"), "").unwrap();
+        for language in [
+            Language::Dotnet,
+            Language::Go,
+            Language::Python,
+            Language::TypeScript,
+        ] {
+            assert!(
+                discover_example_ids(root.path(), language)
+                    .unwrap()
+                    .is_empty()
+            );
+            assert_eq!(
+                discover_wit_example_ids(root.path(), language).unwrap(),
+                ["workflow-service"],
+            );
+            assert_eq!(
+                validate_example_ids(root.path(), language, &["workflow-service".into()]).unwrap(),
+                ["workflow-service"],
+            );
+        }
+        assert!(
+            discover_wit_example_ids(root.path(), Language::Java)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn sdk_snapshot_requests_preserve_sdk_native_configuration() {
+        let root = Path::new("repository");
+        for (language, support) in [
+            (Language::Dotnet, "Temporalio.Nexus.SystemNexus"),
+            (Language::Go, "go.temporal.io/sdk/internal"),
+            (Language::Python, "temporalio.nexus.system._support"),
+            (Language::TypeScript, "../support"),
+        ] {
+            let request = sdk_snapshot_request(root, language).unwrap();
+            assert_eq!(request.language, language);
+            assert!(request.config.system_nexus);
+            assert_eq!(request.config.targets, [GenerationTarget::Workflow]);
+            assert_eq!(request.support_package.as_deref(), Some(support));
+            assert_eq!(
+                request.input_paths,
+                [
+                    root.join("advanced/sdk/workflow-service.wit"),
+                    root.join("advanced/samples/inputs/deps"),
+                ],
+            );
+            assert_eq!(
+                request.output_path,
+                root.join("advanced/sdk/generated")
+                    .join(language.as_str())
+                    .join("workflow-service"),
+            );
+        }
+        assert!(sdk_snapshot_request(root, Language::Java).is_err());
+    }
+
+    #[test]
     fn configuration_rejects_unknown_settings_and_nested_children() {
         for (source, message) in [
             (
@@ -1488,7 +1617,7 @@ targets = ["workflow"]
         let root = repo_root();
         for (output, expected) in [
             (
-                "advanced/samples/typescript/wit/workflow-service",
+                "advanced/samples/typescript/wit/proto-backed-showcase",
                 "../../support/temporal_model_converters",
             ),
             (

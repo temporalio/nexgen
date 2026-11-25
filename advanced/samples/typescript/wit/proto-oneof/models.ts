@@ -47,7 +47,7 @@ function outcomeFromProto<OutputT>(
     case "failure":
       result = {
         tag: "failure",
-        value: support.errorFromFailure(
+        value: support.failureFromProto(
           requiredField(proto.failure, "Outcome", "failure"),
         ),
       };
@@ -78,7 +78,7 @@ function outcomeToProto<OutputT>(
       break;
     case "failure":
       proto.value = "failure";
-      proto.failure = support.errorToFailure(result.value);
+      proto.failure = support.failureToProto(result.value);
       break;
     default:
       result satisfies never;

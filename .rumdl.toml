@@ -13,6 +13,8 @@ exclude = [
     # Each nonempty line in a fragment is a separate changelog item, so
     # fragments must not be wrapped.
     "changelog/*/*.md",
+    # SDK dependencies own their Markdown formatting.
+    "advanced/sdk/repos/**",
 ]
 
 [MD013]

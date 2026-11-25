@@ -1,12 +1,3 @@
-[workflow-service]
-targets = ["workflow"]
-system_nexus = true
-descriptors = "temporal"
-
-[multi-operation-service]
-targets = ["workflow"]
-system_nexus = true
-
 [generic-models]
 targets = ["workflow"]
 descriptors = "temporal"

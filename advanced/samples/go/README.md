@@ -1,10 +1,10 @@
 # Go WIT samples
 
 WIT-generated packages live in directories such as `protobackedshowcase/` and
-`workflowservice/`. Hand-written converters live in [`support/`](support/) for
+`protooneof/`. Hand-written converters live in [`support/`](support/) for
 ordinary Nexus samples and [`systemsupport/`](systemsupport/) for System Nexus
-samples. The workflow-service sample also generates a facade in
-`workflowservice_facade/`.
+samples. Workflow service is validated inside the real SDK instead; see
+[SDK integration](../../sdk/README.md).
 
 The models-only notification sample generates System Nexus implementations in
 `notificationservice/` and unprefixed aliases in `notificationservice_facade/`
@@ -54,17 +54,8 @@ The sample uses `go="WorkflowNamespace(ctx)"`; generated code calls
 with:
 
 ```sh
-go run ./testsupport/storagecontract test ./...
+go test ./...
 ```
-
-The test helper copies the pinned SDK into a temporary directory, then uses a
-build overlay to supply its missing storage-target registry field. It also adds
-native tests to the generated workflow-service package without putting authored
-files in a regenerated directory. It does not edit the SDK checkout, module
-cache, or checked-in dependency files. Remove the SDK registry replacement and
-`sdk-registry.go.txt` when the sample SDK pin includes
-[`sdk-go#2914`](https://github.com/temporalio/sdk-go/pull/2914), retaining the
-factory tests. `cargo validate go` runs this command automatically.
 
 Other projects can run `go test ./...` from their module root. See
 [the WIT guide](../../../GUIDE.md#go) for support contracts and

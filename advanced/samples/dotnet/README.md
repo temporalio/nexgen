@@ -3,23 +3,27 @@
 Generated C# for the WIT inputs in [`../inputs/`](../inputs/), plus the
 snapshot-only Workflow API form of the JSON-Schema inputs.
 
-- `TemporalSupport/` — authored converters and workflow-service helpers shared
-  by the generated projects.
-- `wit/` — generated output per WIT example (`workflow-service`, `user-service`,
-  `type-showcase`, `proto-backed-showcase`, `start-workflow`,
-  `function-execution`): models, operations, and Nexus service interfaces.
+- `TemporalSupport/` — authored converters and workflow helpers shared by the
+  generated projects.
+- `wit/` — generated output per WIT example (`user-service`, `type-showcase`,
+  `proto-backed-showcase`, `start-workflow`, `function-execution`): models,
+  operations, and Nexus service interfaces.
 - `json_schema/api/` — Workflow API (service + client) output for the
   JSON-Schema inputs, compiled by its own project,
   `json_schema/Nexgen.DotNetJsonSchemaApi.csproj` (`net7.0` with its default C#
   11, the JSON Schema output's floor; the WIT projects pin C# 9).
-- `tests/` — endpoint runtime checks (`WorkflowService`, `UserService`), the
-  generated-api compile check, and proto-wire compatibility checks against the
-  fixtures in [`../wire/proto/`](../wire/proto/).
+- `tests/` — endpoint runtime checks (`UserService`), the generated-api compile
+  check, and proto-wire compatibility checks against the fixtures in
+  [`../wire/proto/`](../wire/proto/).
   `Nexgen.DotNetStreamServiceSystemNexus.csproj` compiles the stream interceptor
   on the SDK stand-in in `tests/SystemNexusStandIn/`.
 
 Regenerate WIT output with `cargo build-examples --format wit --lang dotnet`
 from the repo root.
+
+Workflow service is validated against the actual SDK with
+`cargo validate sdk-dotnet`, not a sample endpoint or SDK stand-in. See
+[SDK integration](../../sdk/README.md).
 
 ```bash
 dotnet build Nexgen.DotNetExamples.csproj
@@ -54,8 +58,9 @@ cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-sho
 
 If your project disables default compile items or excludes the support
 directory, explicitly include those authored sources. For example,
-[`Nexgen.DotNetMultiOperationService.csproj`](Nexgen.DotNetMultiOperationService.csproj)
-uses `<Compile Include="TemporalSupport/*.cs" />`. Run
-`dotnet build Nexgen.DotNetExamples.csproj` and `dotnet test tests/` from this
-directory to check this sample; build and test your own project similarly. See
-[the WIT guide](../../../GUIDE.md#net) for the required helper contract.
+[`Nexgen.DotNetStreamService.csproj`](Nexgen.DotNetStreamService.csproj)
+explicitly includes `TemporalSupport/TemporalSupport.cs` and the stream support
+sources. Run `dotnet build Nexgen.DotNetExamples.csproj` and
+`dotnet test tests/` from this directory to check this sample; build and test
+your own project similarly. See [the WIT guide](../../../GUIDE.md#net) for the
+required helper contract.
