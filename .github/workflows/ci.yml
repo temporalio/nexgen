@@ -10,8 +10,6 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request cancels that pull request's older run. Other
-# events get a group of their own, so every push to main is fully validated.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -50,21 +48,9 @@ jobs:
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
 
-      - name: Validate Markdown
-        if: matrix.stage == 'markdown'
-        run: |
-          if ! cargo validate markdown; then
-            echo "::error::Markdown formatting check failed. Run \`cargo fmt-markdown\` locally and commit the result."
-            exit 1
-          fi
-
       - name: Validate ${{ matrix.stage }}
-        if: matrix.stage != 'markdown'
         run: cargo validate ${{ matrix.stage }}
 
-  # The ruleset on main requires a check named "Validate". A skipped required
-  # check counts as passing, so this job always runs and fails unless every
-  # stage succeeded.
   validate:
     name: Validate
     needs: stage
