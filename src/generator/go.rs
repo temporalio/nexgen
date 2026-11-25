@@ -1666,12 +1666,6 @@ impl<'a> ApiPlanner<'a> {
         for service in &services {
             for operation in &service.operations {
                 if let Some(params) = &operation.unpacked_input {
-                    validate_wrapper_type_parameters(
-                        operation,
-                        params,
-                        &self.package,
-                        &visibility,
-                    )?;
                     for param in params {
                         if let Some(function) = &param.function
                             && function
@@ -1869,9 +1863,6 @@ impl<'a> ApiPlanner<'a> {
         {
             external_imports.push((path.clone(), "support".to_string()));
         }
-        for model in self.models.values() {
-            validate_model_getter_names(model)?;
-        }
         let facade = self.package.facade.as_ref().map(|options| {
             facade::plan(
                 options,
@@ -1891,7 +1882,7 @@ impl<'a> ApiPlanner<'a> {
             self.package.facade_exports = plan.exposed_names(&options.import_path);
         }
         let interceptors = if self.package.workflow_interceptors && has_operations {
-            interceptor::render(&services, &self.package, &visibility)?
+            interceptor::render(&services, &self.package, &visibility)
         } else {
             String::new()
         };
@@ -2155,16 +2146,10 @@ impl<'a> ApiPlanner<'a> {
         } else {
             None
         };
-        if let Some(helper) = serialization_context_expr {
-            validate_go_serialization_context_helper(helper, &operation.name)?;
-        }
         let storage_target_expr = crate::nexgen_config::current()
             .system_nexus
             .then(|| operation.storage_target.value())
             .flatten();
-        if let Some(helper) = storage_target_expr {
-            validate_go_context_helper(helper, &operation.name, "storage-target")?;
-        }
         let sourced_fields = record_for_message(self.api_plan, &input)
             .map(|record| {
                 record
@@ -2667,34 +2652,6 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
     PathBuf::from(format!("{stem}.go"))
 }
 
-fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Result<()> {
-    validate_go_context_helper(helper, operation, "serialization-context")
-}
-
-fn validate_go_context_helper(helper: &str, operation: &str, directive: &str) -> Result<()> {
-    let parts: Vec<_> = helper.split('.').collect();
-    if parts.len() > 2
-        || parts.iter().any(|part| {
-            part.is_empty()
-                || *part == "_"
-                || is_go_keyword(part)
-                || !part
-                    .as_bytes()
-                    .first()
-                    .is_some_and(|byte| is_go_ident_start(*byte))
-                || !part.bytes().all(is_go_ident_continue)
-        })
-    {
-        return Err(Error::InvalidWitDirective {
-            path: PathBuf::from("<go-plan>"),
-            context: format!("operation `{operation}`"),
-            directive: format!("@nexus.{directive}"),
-            reason: format!("Go support helper `{helper}` must be an identifier or pkg.Func"),
-        });
-    }
-    Ok(())
-}
-
 fn render_operation_registry(
     package: &GoPackageContext,
     services: &[RenderedService<'_>],
@@ -2721,13 +2678,14 @@ fn render_operation_registry(
     if let Some(path) = &package.support_package {
         candidates.push((path.clone(), "support".to_string()));
     }
-    let mut imports = BTreeMap::new();
+    // Deduplicate identical imports without hiding alias collisions from Go.
+    let mut imports = BTreeSet::new();
     if has_helpers
         && let Some((path, alias)) = package
             .sdk_reference(SdkSymbol::SerializationContext)
             .import
     {
-        imports.insert(alias.to_string(), path.to_string());
+        imports.insert((alias.to_string(), path.to_string()));
     }
     if services
         .iter()
@@ -2735,13 +2693,13 @@ fn render_operation_registry(
         .any(|operation| operation.storage_target_expr.is_some())
         && !package.is_self_import(CONVERTER)
     {
-        imports.insert("converter".to_string(), CONVERTER.to_string());
+        imports.insert(("converter".to_string(), CONVERTER.to_string()));
     }
     if !package.is_self_import("go.temporal.io/sdk/internal") {
-        imports.insert(
+        imports.insert((
             "internal".to_string(),
             "go.temporal.io/sdk/internal".to_string(),
-        );
+        ));
     }
     for (path, alias) in candidates {
         let used_by_input_type =
@@ -2765,18 +2723,7 @@ fn render_operation_registry(
         {
             continue;
         }
-        if let Some(previous) = imports.insert(alias.clone(), path.clone()) {
-            if previous != path {
-                return Err(Error::InvalidWitDirective {
-                    path: PathBuf::from("<go-plan>"),
-                    context: "Go operation registry".to_string(),
-                    directive: "@nexus.serialization-context".to_string(),
-                    reason: format!(
-                        "helper qualifier `{alias}` refers to both `{previous}` and `{path}`"
-                    ),
-                });
-            }
-        }
+        imports.insert((alias, path));
     }
     let mut output = String::from("\n// --- Registry ---\n");
     let sc = package.serialization_context_type();
@@ -2788,6 +2735,7 @@ fn render_operation_registry(
         .expression;
     let registry_name = go_declaration_name("nexusOperationRegistry");
     output.push_str(&format!("\nvar {registry_name} = map[{key}]{info}{{\n"));
+    // Go reports duplicate constant map keys, but registry keys are structs.
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
@@ -5102,33 +5050,6 @@ fn model_getter_name(field: &RenderedField) -> String {
     format!("Get{}", field.name)
 }
 
-// Go fields and methods share a namespace. Validate final native names here,
-// rather than reserving Go getter names in the language-neutral pipeline.
-fn validate_model_getter_names(model: &RenderedModel) -> Result<()> {
-    let mut occupied = BTreeMap::new();
-    for field in &model.fields {
-        occupied.insert(field.name.clone(), format!("field `{}`", field.name));
-    }
-    for field in model
-        .fields
-        .iter()
-        .filter(|field| is_go_exported_decl(&field.name))
-    {
-        let getter = model_getter_name(field);
-        if let Some(previous) =
-            occupied.insert(getter.clone(), format!("getter for field `{}`", field.name))
-        {
-            return Err(Error::GeneratedNameConflict {
-                language: Language::Go,
-                name: getter,
-                generated_by: format!("the getter of field `{}.{}`", model.name, field.name),
-                conflicting_declaration: previous,
-            });
-        }
-    }
-    Ok(())
-}
-
 fn render_model_getters(output: &mut String, model: &RenderedModel) {
     let (ident, parameters) = split_go_type_decl_name(&model.name);
     let receiver = if parameters.is_empty() {
@@ -5970,7 +5891,6 @@ fn required_function_type_parameters(
         .collect()
 }
 
-// Planning and rendering share the complete declaration namespace.
 fn wrapper_type_parameters(
     operation: &RenderedOperation<'_>,
     params: &[RenderedUnpackedParam],
@@ -5986,35 +5906,6 @@ fn wrapper_type_parameters(
         params, package, visibility,
     ));
     declarations
-}
-
-fn validate_wrapper_type_parameters(
-    operation: &RenderedOperation<'_>,
-    params: &[RenderedUnpackedParam],
-    package: &GoPackageContext,
-    visibility: &GoVisibility,
-) -> Result<()> {
-    let mut occupied = BTreeMap::new();
-    for (index, (name, _)) in wrapper_type_parameters(operation, params, package, visibility)
-        .into_iter()
-        .enumerate()
-    {
-        let source = if index < operation.model_type_parameters.len() {
-            format!("model type parameter `{name}`")
-        } else {
-            format!("generated type parameter `{name}`")
-        };
-        if let Some(previous) = occupied.insert(name.clone(), source) {
-            return Err(Error::TypeParameterNameConflict {
-                language: Language::Go,
-                declaration: format!("{} wrapper", operation.name),
-                parameter: name.clone(),
-                name,
-                conflicting: previous,
-            });
-        }
-    }
-    Ok(())
 }
 
 fn go_function_constraint(
@@ -6776,7 +6667,6 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{COMMON_CONVERTER, CONVERTER, INTERNAL, SdkReference, SdkSymbol, WORKFLOW};
-    use crate::error::Error;
 
     #[test]
     fn definitions_and_reexports_are_local_by_full_import_path() {
@@ -7001,65 +6891,11 @@ mod tests {
                 })
                 .collect(),
         };
-        super::validate_model_getter_names(&model).unwrap();
         let mut source = String::new();
         super::render_model_getters(&mut source, &model);
         assert_eq!(source.matches("func (m Request) GetID() string").count(), 1);
         assert!(!source.contains("return m.iD"), "{source}");
         assert!(!source.contains("// Get"), "{source}");
-    }
-
-    #[test]
-    fn serialization_context_helpers_reject_invalid_go_identifiers() {
-        for helper in [
-            "_",
-            "break",
-            "default",
-            "func",
-            "interface",
-            "select",
-            "case",
-            "defer",
-            "go",
-            "map",
-            "struct",
-            "chan",
-            "else",
-            "goto",
-            "package",
-            "switch",
-            "const",
-            "fallthrough",
-            "if",
-            "range",
-            "type",
-            "continue",
-            "for",
-            "import",
-            "return",
-            "var",
-            "helpers._",
-            "helpers.func",
-            "_.Context",
-            "type.Context",
-            "helpers.nested.Context",
-            "requestContext()",
-            "helpers/Context",
-            "1context",
-            "helpers.1context",
-            "request-context",
-        ] {
-            let error =
-                super::validate_go_serialization_context_helper(helper, "Send").expect_err(helper);
-            let Error::InvalidWitDirective {
-                directive, reason, ..
-            } = error
-            else {
-                panic!("unexpected error: {error}");
-            };
-            assert_eq!(directive, "@nexus.serialization-context");
-            assert!(reason.contains(helper), "{helper}: {reason}");
-        }
     }
 
     #[test]

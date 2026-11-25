@@ -202,7 +202,7 @@ pub(super) fn render(
     services: &[RenderedService<'_>],
     package: &GoPackageContext,
     visibility: &GoVisibility,
-) -> Result<String> {
+) -> String {
     let operations = services
         .iter()
         .flat_map(|service| {
@@ -212,24 +212,6 @@ pub(super) fn render(
                 .map(move |operation| (service, operation))
         })
         .collect::<Vec<_>>();
-    let mut names = BTreeSet::new();
-    for (_, operation) in &operations {
-        if !operation.model_type_parameters.is_empty() {
-            return Err(Error::UnsupportedType {
-                language: crate::language::Language::Go,
-                context: format!("interceptor for `{}`", operation.name),
-                reason: "Go interceptor methods require concrete types".to_string(),
-            });
-        }
-        if !names.insert(go_field_name(operation.name)) {
-            return Err(Error::GeneratedNameConflict {
-                language: crate::language::Language::Go,
-                name: go_field_name(operation.name),
-                generated_by: format!("interceptor method for operation `{}`", operation.name),
-                conflicting_declaration: "another SDK interceptor method".to_string(),
-            });
-        }
-    }
 
     let interface = go_declaration_name("workflowOutboundInterceptor");
     let next = format!("next {interface}");
@@ -318,5 +300,5 @@ pub(super) fn render(
         );
         output.push_str("}\n");
     }
-    Ok(output)
+    output
 }
