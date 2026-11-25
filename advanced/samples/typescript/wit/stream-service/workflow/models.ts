@@ -296,14 +296,14 @@ export interface AppendRecordsRequest<BodyT> {
   ref: StreamRef<BodyT>;
   records: BodyT[];
   /**
-   * The Producer of the batch. Defaults to the Producer of the calling context.
-   */
-  producer: Producer;
-  /**
    * The batch number in this epoch. Empty takes the next one, and a retry writes it
    * again.
    */
   sequence?: Long;
+  /**
+   * The Producer of the batch. Defaults to the Producer of the calling context.
+   */
+  producer: Producer;
 }
 
 function appendRecordsRequestFromProto<BodyT>(
@@ -323,10 +323,10 @@ function appendRecordsRequestFromProto<BodyT>(
       "AppendRecordsRequest",
       "records",
     ),
-    producer: producerFromProto(
-      requiredField(proto.producer, "AppendRecordsRequest", "producer"),
-    ),
     sequence: proto.sequence ?? undefined,
+    producer: producerFromProto(
+      requiredField(proto.producer, "sourced field", "producer"),
+    ),
   };
 }
 
@@ -347,10 +347,8 @@ function appendRecordsRequestToProto<BodyT>(
       "AppendRecordsRequest",
       "records",
     ),
-    producer: producerToProto(
-      requiredField(model.producer, "AppendRecordsRequest", "producer"),
-    ),
     sequence: model.sequence,
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 
@@ -927,7 +925,7 @@ function closeStreamRequestFromProto<BodyT>(
       bodyT: typeInfo.bodyT,
     }),
     producer: producerFromProto(
-      requiredField(proto.producer, "CloseStreamRequest", "producer"),
+      requiredField(proto.producer, "sourced field", "producer"),
     ),
   };
 }
@@ -942,9 +940,7 @@ function closeStreamRequestToProto<BodyT>(
     ref: streamRefToProto(requiredField(model.ref, "CloseStreamRequest", "ref"), {
       bodyT: typeInfo.bodyT,
     }),
-    producer: producerToProto(
-      requiredField(model.producer, "CloseStreamRequest", "producer"),
-    ),
+    producer: model.producer == null ? undefined : producerToProto(model.producer),
   };
 }
 

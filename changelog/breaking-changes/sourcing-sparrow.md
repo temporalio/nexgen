@@ -1,0 +1,1 @@
+A resource method no longer takes a parameter in a target where its request field has a `@nexus.source`, and the source fills the field. A field can now have a `@nexus.source` in one target and a `@nexus.default` in the other.

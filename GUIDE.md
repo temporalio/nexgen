@@ -1148,11 +1148,11 @@ record start-workflow-request {
 ```
 
 The workflow convenience API does not require a `namespace` argument. Request
-construction evaluates the helper. In a resource method, a resource field or a
-method parameter of the same name takes precedence over a source, and the source
-fills only the fields that the method has no value for. Every language follows
-this rule. Shared models and their converters do not evaluate sources, so direct
-model construction must supply required fields:
+construction evaluates the helper. In a resource method, a resource field of the
+same name takes precedence over a source, and the source fills only the fields
+that the method has no value for. Every language follows this rule. Shared
+models and their converters do not evaluate sources, so direct model
+construction must supply required fields:
 
 ```python
 request = StartWorkflowRequest(
@@ -1164,6 +1164,33 @@ request = StartWorkflowRequest(
 Nexgen prefixes the helper call, but it does not add arguments. The configured
 package supplies the helper. The `@nexus.output-transform` directive is
 different: its value remains a raw expression.
+
+A resource method parameter of the same name doesn't take precedence. In a
+target where the field has a source, nexgen generates the method as if it had no
+such parameter, so the source fills the field. The other targets keep the
+parameter. So one field can have a source in one target and a default in the
+other:
+
+```wit
+record append-records-request {
+  /// @nexus.source targets="workflow" python="workflow_producer()"
+  /// @nexus.default targets="client" python="_support.default_producer()"
+  producer: producer,
+}
+
+resource %stream {
+  append: func(records: list<append-record>, producer: option<producer>);
+}
+```
+
+Here the Workflow `append` takes only `records`, and its request gets
+`_support.workflow_producer()`. The client `append` also takes an optional
+`producer`, with the default of the field.
+
+This rule is for a parameter that fills a field of the request itself, not a
+field of a record inside it, and every language follows it too. nexgen refuses a
+parameter whose field has a source in each target of its method, since no target
+would keep the parameter.
 
 ### Omitted Fields
 
@@ -1902,14 +1929,15 @@ annotation order, including by scaffolding commands.
 - Field `api-omit` cannot accompany `default`, even with disjoint targets. It
   cannot accompany `source` when their API targets overlap.
 - Field `source` cannot accompany `function`. It cannot accompany `default` when
-  they supply values for the same language, even with disjoint targets.
+  they supply values for the same language and target.
 - Repeated `source` or `default` annotations must have disjoint target sets,
   even when they supply values for different languages.
 
 Language overlap includes positional defaults and all authored languages, not
 only the selected output language. Omitted `targets` means both `workflow` and
-`client`. Disjoint-language `source` and `default` annotations and
-disjoint-target `api-omit` and `source` annotations remain valid.
+`client`. `source` and `default` annotations with disjoint languages or disjoint
+targets remain valid, and so do disjoint-target `api-omit` and `source`
+annotations.
 
 ### Language and System Nexus restrictions
 
@@ -2497,7 +2525,9 @@ Repeated source directives must have disjoint target sets. A directive without
 `targets` covers all targets, so it overlaps any other source directive on the
 same field. Overlaps are errors, not declaration-order overrides.
 
-Cannot be combined with `@nexus.default` for the same language.
+Cannot be combined with `@nexus.default` for the same language and target. A
+field can have a source in one target and a default in the other. See
+[Sourced Fields](#sourced-fields) for what a resource method does then.
 
 ---
 
@@ -2557,7 +2587,8 @@ does a .NET resource method that builds the request itself.
 producer=((_support.default_producer()) if producer is None else producer)
 ```
 
-A default cannot be combined with `@nexus.source` for the same language.
+A default cannot be combined with `@nexus.source` for the same language and
+target.
 
 ---
 

@@ -18,7 +18,6 @@ from ..models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRecord,
@@ -66,27 +65,25 @@ class Stream(typing.Generic[BodyT]):
     async def append(
         self,
         *records: BodyT,
-        producer: Producer | None = None,
         sequence: int | None = None,
     ) -> AppendRecordsResponse:
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            producer=((_support.workflow_producer()) if producer is None else producer),
             sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
+            producer=_support.workflow_producer(),
         )
         handle = await _append_records(request)
         return await handle
 
     async def close(
         self,
-        producer: Producer | None = None,
     ) -> None:
         """Close the Stream. Readers drain what is left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=((_support.workflow_producer()) if producer is None else producer),
+            producer=_support.workflow_producer(),
         )
         handle = await _close_stream(request)
         await handle

@@ -865,6 +865,7 @@ impl<'a> TypePlanningContext<'a> {
                         .map(|result| self.planned_resource_method_result(service, result)),
                     varargs: method.varargs.clone(),
                     api_omitted: method.api_omitted.clone(),
+                    sourced_params: method.sourced_params.clone(),
                     binding,
                 })
             })

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   type CreateStreamRequest,
-  type Producer,
   type ReadRecordsResponse,
   type StreamRef,
   StreamStatus,
@@ -69,8 +68,8 @@ afterEach(() => {
 });
 
 interface WorkflowStream {
-  append(records: string[], producer?: Producer, sequence?: number): Promise<unknown>;
-  close(producer?: Producer): Promise<void>;
+  append(records: string[], sequence?: number): Promise<unknown>;
+  close(): Promise<void>;
 }
 
 // The tsconfig excludes the stream output, which doesn't typecheck here, so a test loads it at
@@ -188,23 +187,17 @@ describe("stream-service generated output", () => {
   test("passes the arguments of a Workflow append and close to their operations", async () => {
     const { Stream } = await loadWorkflowStream();
     const stream = new Stream({ id: "stream-1" }, undefined);
-    const producer: Producer = { id: "la:r2:1" };
 
-    await stream.append(["a", "b"], undefined, 3);
-    await stream.close(producer);
+    await stream.append(["a", "b"], 3);
+    await stream.close();
 
-    // A missing Producer stays missing here. The operation fills it from its default.
+    // A Workflow method takes no Producer. The operation fills it from its source.
     expect(captured.calls).toEqual([
       {
         operation: "appendRecords",
-        input: {
-          ref: { id: "stream-1" },
-          records: ["a", "b"],
-          producer: undefined,
-          sequence: 3,
-        },
+        input: { ref: { id: "stream-1" }, records: ["a", "b"], sequence: 3 },
       },
-      { operation: "closeStream", input: { ref: { id: "stream-1" }, producer } },
+      { operation: "closeStream", input: { ref: { id: "stream-1" } } },
     ]);
   });
 
