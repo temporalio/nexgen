@@ -10,10 +10,27 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  validate:
-    name: Validate
+  stage:
+    name: Validate (${{ matrix.stage }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        stage:
+          - markdown
+          - rust
+          - python
+          - typescript
+          - go
+          - java
+          - dotnet
+          - conformance
 
     steps:
       - name: Check out repository
@@ -27,33 +44,38 @@ jobs:
         with:
           cache-bin: "false"
 
+      - name: Cache language dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/uv
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.nuget/packages
+          key: deps-${{ matrix.stage }}-${{ hashFiles('**/package-lock.json', '**/uv.lock', '**/go.sum', '**/*.gradle', '**/gradle-wrapper.properties', '**/*.csproj') }}
+          restore-keys: deps-${{ matrix.stage }}-
+
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
 
-      - name: Validate Markdown
+      - name: Validate ${{ matrix.stage }}
+        run: cargo validate ${{ matrix.stage }}
+
+  validate:
+    name: Validate
+    needs: stage
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require every validation stage to pass
+        env:
+          RESULT: ${{ needs.stage.result }}
         run: |
-          if ! cargo validate markdown; then
-            echo "::error::Markdown formatting check failed. Run \`cargo fmt-markdown\` locally and commit the result."
+          if [[ "$RESULT" != "success" ]]; then
+            echo "::error::One or more validation stages finished with: $RESULT"
             exit 1
           fi
-
-      - name: Validate Rust
-        run: cargo validate rust
-
-      - name: Validate Python samples
-        run: cargo validate python
-
-      - name: Validate TypeScript samples
-        run: cargo validate typescript
-
-      - name: Validate Go samples
-        run: cargo validate go
-
-      - name: Validate Java samples
-        run: cargo validate java
-
-      - name: Validate .NET samples
-        run: cargo validate dotnet
-
-      - name: Validate cross-language conformance
-        run: cargo validate conformance
