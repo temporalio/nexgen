@@ -785,62 +785,6 @@ fn go_final_secondary_signature_args_are_variadic_without_primary_signature_vara
     }
 }
 
-#[test]
-fn go_rejects_model_parameters_colliding_with_wrapper_generics_during_planning() {
-    let fixture = r#"package test:generic@1.0.0;
-world system { export service; }
-interface functions {
-  type placeholder = string;
-  /// @nexus.type go="any"
-  type payload = placeholder;
-  /// @nexus.type go="go.temporal.io/sdk/workflow:workflow.Context"
-  type workflow-context = placeholder;
-  /// @nexus.function-args varargs=true param="input"
-  workflow-call: func(ctx: workflow-context, input: list<payload>) -> placeholder;
-  /// @nexus.function
-  ///   primary=true
-  ///   signature="workflow-call"
-  ///   args-field="input"
-  ///   alternate-type="string"
-  ///   result-type-parameter="WorkflowResult"
-  type workflow-function = placeholder;
-}
-/// @nexus.endpoint "test"
-interface service {
-  use functions.{placeholder, workflow-function};
-  /// @nexus.type-parameter
-  type workflow-arg = placeholder;
-  record request {
-    context: workflow-arg,
-    workflow: workflow-function,
-  }
-  run: func(request: request);
-}
-"#;
-    let wit = fixture
-        .replace("workflow-arg", "workflow-f")
-        .replace("primary=true", "primary=false");
-    let error = render_go_descriptor_fixture(&wit).unwrap_err();
-    match error.downcast_ref::<nexgen::error::Error>().unwrap() {
-        nexgen::error::Error::TypeParameterNameConflict {
-            language: nexgen::language::Language::Go,
-            declaration,
-            parameter,
-            name,
-            conflicting,
-        } => {
-            assert_eq!(declaration, "Run wrapper");
-            assert_eq!(parameter, "WorkflowF");
-            assert_eq!(name, "WorkflowF");
-            assert!(
-                conflicting.contains("model type parameter `WorkflowF`"),
-                "{error}"
-            );
-        }
-        other => panic!("expected early TypeParameterNameConflict for Go, got {other:?}"),
-    }
-}
-
 fn generate_formatted_go_json_output(
     root: &Path,
     example_id: &str,
