@@ -127,6 +127,22 @@ export function signalWithStartWorkflowSerializationContext(request: {
   };
 }
 
+export function signalWithStartWorkflowStorageTarget(request: {
+  namespace?: string | null;
+  id: string;
+  workflow: string | common.Workflow;
+}): common.StorageDriverWorkflowInfo {
+  if (request.namespace == null) {
+    throw new TypeError("signal-with-start request is missing namespace");
+  }
+  return {
+    kind: "workflow",
+    namespace: request.namespace,
+    id: request.id,
+    type: workflowFunctionName(request.workflow),
+  };
+}
+
 export function payloadFromProto(
   payload: temporal.api.common.v1.IPayload,
 ): common.Payload {

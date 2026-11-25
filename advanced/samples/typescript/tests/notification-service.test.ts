@@ -218,15 +218,18 @@ describe("notification-service generated models", () => {
     expect(failure.details).toEqual([{ reason: "test" }]);
   });
 
-  it("preserves null and undefined application values inside required envelopes", () => {
+  it("preserves undefined success and omits null optional source context", () => {
     const model: OnCompleteRequest<undefined, null> = {
       result: { tag: "success", value: undefined },
       sourceContext: null,
     };
     const wire = requestConverter.toTransferType(model);
     expect(wire.success).toBeDefined();
-    expect(wire.sourceContext).toBeDefined();
-    expect(requestConverter.fromTransferType<undefined, null>(wire)).toEqual(model);
+    expect(wire.sourceContext).toBeUndefined();
+    expect(requestConverter.fromTransferType<undefined, null>(wire)).toEqual({
+      result: model.result,
+      sourceContext: undefined,
+    });
   });
 
   it("validates single-value Payloads carriers", () => {
@@ -249,11 +252,17 @@ describe("notification-service generated models", () => {
       "missing required field OnCompleteRequest.result",
     );
     expect(() =>
-      requestConverter.fromTransferType({ result: "success", success: payload }),
-    ).toThrow("missing required field OnCompleteRequest.sourceContext");
-    expect(() =>
       requestConverter.fromTransferType({ result: "success", sourceContext: payload }),
     ).toThrow("missing required field OnCompleteRequest.success");
+  });
+
+  it("round-trips a request without source context", () => {
+    const model: OnCompleteRequest<string, string> = {
+      result: { tag: "success", value: "done" },
+    };
+    const wire = requestConverter.toTransferType(model);
+    expect(wire.sourceContext).toBeUndefined();
+    expect(requestConverter.fromTransferType<string, string>(wire)).toEqual(model);
   });
 
   it("uses the discriminator rather than inspecting other members", () => {

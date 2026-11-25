@@ -657,6 +657,9 @@ var systemnexus_nexusOperationRegistry = map[internal.SystemNexusRegistryKey]int
 		SerializationContext: func(request any) converter.SerializationContext {
 			return support.SignalWithStartWorkflowSerializationContext(request.(systemnexus_signalWithStartWorkflowRequest))
 		},
+		StorageTarget: func(request any) converter.StorageDriverWorkflowInfo {
+			return support.SignalWithStartWorkflowStorageTarget(request.(systemnexus_signalWithStartWorkflowRequest))
+		},
 	},
 }
 

@@ -93,6 +93,7 @@ enum SdkSymbol {
     TransferTypeConverter,
     NewTransferTypeConverter,
     SerializationContext,
+    StorageDriverWorkflowInfo,
     SystemNexusContext,
     NewSystemNexusTransferTypeConverter,
 }
@@ -133,6 +134,7 @@ impl SdkSymbol {
         Self::TransferTypeConverter,
         Self::NewTransferTypeConverter,
         Self::SerializationContext,
+        Self::StorageDriverWorkflowInfo,
         Self::SystemNexusContext,
         Self::NewSystemNexusTransferTypeConverter,
     ];
@@ -219,6 +221,11 @@ impl SdkSymbol {
                 package: COMMON_CONVERTER,
                 reexports: &[CONVERTER],
             },
+            Self::StorageDriverWorkflowInfo => SdkSymbolDefinition {
+                name: "StorageDriverWorkflowInfo",
+                package: CONVERTER,
+                reexports: &[],
+            },
             Self::SystemNexusContext => SdkSymbolDefinition {
                 name: "SystemNexusContext",
                 package: COMMON_CONVERTER,
@@ -266,7 +273,8 @@ impl SdkSymbol {
             Self::NewNexusClient => (WORKFLOW, "workflow"),
             Self::TransferTypeConverter
             | Self::NewTransferTypeConverter
-            | Self::SerializationContext => (CONVERTER, "converter"),
+            | Self::SerializationContext
+            | Self::StorageDriverWorkflowInfo => (CONVERTER, "converter"),
             Self::SystemNexusContext | Self::NewSystemNexusTransferTypeConverter => {
                 (COMMON_CONVERTER, "commonconverter")
             }
@@ -755,7 +763,7 @@ pub(in crate::generator) struct GoPackageContext {
     package_name: String,
     import_path: Option<String>,
     workflow_package_alias: &'static str,
-    pub(in crate::generator) has_serialization_context: bool,
+    pub(in crate::generator) has_context_helpers: bool,
     support_package: Option<String>,
     facade: Option<GoFacadeOptions>,
     facade_exports: BTreeMap<String, String>,
@@ -863,12 +871,15 @@ impl GoPackageContext {
             } else {
                 "workflow"
             },
-            has_serialization_context: crate::nexgen_config::current().system_nexus
+            has_context_helpers: crate::nexgen_config::current().system_nexus
                 && api_plan
                     .services
                     .iter()
                     .flat_map(|service| &service.operations)
-                    .any(|operation| operation.serialization_context.value().is_some()),
+                    .any(|operation| {
+                        operation.serialization_context.value().is_some()
+                            || operation.storage_target.value().is_some()
+                    }),
             support_package: options.support_package.clone(),
             facade,
             facade_exports: BTreeMap::new(),
@@ -1566,9 +1577,7 @@ impl<'a> ApiPlanner<'a> {
                 }
             }
         }
-        if self.package.has_serialization_context
-            && self.external_models.renders_operation_references()
-        {
+        if self.package.has_context_helpers && self.external_models.renders_operation_references() {
             return Err(Error::UnsupportedProtoConversion {
                 language: Language::Go,
                 context: "Go serialization context".to_string(),
@@ -1634,11 +1643,16 @@ impl<'a> ApiPlanner<'a> {
         )?;
         self.populate_operation_bindings(&mut services)?;
         for operation in services.iter().flat_map(|service| &service.operations) {
-            if operation.serialization_context_expr.is_some() && operation.wire_binding.is_none() {
+            if operation.context_helpers().next().is_some() && operation.wire_binding.is_none() {
+                let helper = if operation.serialization_context_expr.is_some() {
+                    "serialization-context"
+                } else {
+                    "storage-target"
+                };
                 return Err(Error::UnsupportedProtoConversion {
                     language: Language::Go,
                     context: format!("operation `{}`", operation.name),
-                    reason: "serialization-context requires a proto-backed operation".to_string(),
+                    reason: format!("{helper} requires a proto-backed operation"),
                 });
             }
             if operation.context_propagation_header.is_some() && operation.wire_binding.is_none() {
@@ -1788,7 +1802,7 @@ impl<'a> ApiPlanner<'a> {
             }
         }
         let registry = if crate::nexgen_config::current().system_nexus
-            && self.package.has_serialization_context
+            && self.package.has_context_helpers
         {
             render_operation_registry(&self.package, &services, &self.imports, &external_imports)?
         } else {
@@ -2144,6 +2158,13 @@ impl<'a> ApiPlanner<'a> {
         if let Some(helper) = serialization_context_expr {
             validate_go_serialization_context_helper(helper, &operation.name)?;
         }
+        let storage_target_expr = crate::nexgen_config::current()
+            .system_nexus
+            .then(|| operation.storage_target.value())
+            .flatten();
+        if let Some(helper) = storage_target_expr {
+            validate_go_context_helper(helper, &operation.name, "storage-target")?;
+        }
         let sourced_fields = record_for_message(self.api_plan, &input)
             .map(|record| {
                 record
@@ -2176,6 +2197,7 @@ impl<'a> ApiPlanner<'a> {
             output_type,
             raw_output_type,
             serialization_context_expr,
+            storage_target_expr,
             context_propagation_header,
             sourced_fields,
             output_transform_expr: go_output_transform
@@ -2621,17 +2643,21 @@ fn service_uses_manual_function_name_inlining(service: &RenderedService<'_>) -> 
     })
 }
 
-/// Derives the primary Go output filename from the first service name
-/// (`WorkflowService` -> `workflowservice.go`). Most WIT inputs export a single
-/// service; for empty plans, keep the historical `api.go` fallback.
+/// Uses the first service or models-only interface name for the Go output file.
+/// Plans without either keep the historical `api.go` fallback.
 fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
     let stem = api_plan
         .services
         .first()
-        .map(|service| {
-            service
-                .name
-                .chars()
+        .map(|service| service.name.as_str())
+        .or_else(|| {
+            api_plan
+                .model_scope
+                .as_ref()
+                .map(|scope| scope.name.as_str())
+        })
+        .map(|name| {
+            name.chars()
                 .filter(|c| c.is_ascii_alphanumeric())
                 .collect::<String>()
                 .to_lowercase()
@@ -2642,6 +2668,10 @@ fn go_api_file_name(api_plan: &PlannedSpec) -> PathBuf {
 }
 
 fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Result<()> {
+    validate_go_context_helper(helper, operation, "serialization-context")
+}
+
+fn validate_go_context_helper(helper: &str, operation: &str, directive: &str) -> Result<()> {
     let parts: Vec<_> = helper.split('.').collect();
     if parts.len() > 2
         || parts.iter().any(|part| {
@@ -2658,7 +2688,7 @@ fn validate_go_serialization_context_helper(helper: &str, operation: &str) -> Re
         return Err(Error::InvalidWitDirective {
             path: PathBuf::from("<go-plan>"),
             context: format!("operation `{operation}`"),
-            directive: "@nexus.serialization-context".to_string(),
+            directive: format!("@nexus.{directive}"),
             reason: format!("Go support helper `{helper}` must be an identifier or pkg.Func"),
         });
     }
@@ -2678,12 +2708,8 @@ fn render_operation_registry(
     let helper_packages: BTreeSet<_> = services
         .iter()
         .flat_map(|service| &service.operations)
-        .filter_map(|operation| {
-            operation
-                .serialization_context_expr?
-                .split_once('.')
-                .map(|(name, _)| name)
-        })
+        .flat_map(|operation| operation.context_helpers())
+        .filter_map(|helper| helper.split_once('.').map(|(name, _)| name))
         .collect();
     let mut candidates = external_imports.to_vec();
     candidates.extend(model_imports.iter().map(|path| {
@@ -2703,6 +2729,14 @@ fn render_operation_registry(
     {
         imports.insert(alias.to_string(), path.to_string());
     }
+    if services
+        .iter()
+        .flat_map(|service| &service.operations)
+        .any(|operation| operation.storage_target_expr.is_some())
+        && !package.is_self_import(CONVERTER)
+    {
+        imports.insert("converter".to_string(), CONVERTER.to_string());
+    }
     if !package.is_self_import("go.temporal.io/sdk/internal") {
         imports.insert(
             "internal".to_string(),
@@ -2715,14 +2749,14 @@ fn render_operation_registry(
                 .iter()
                 .flat_map(|service| &service.operations)
                 .any(|operation| {
-                    operation.serialization_context_expr.is_some()
+                    operation.context_helpers().next().is_some()
                         && operation.input_type.contains(&format!("{alias}."))
                 });
         let used_by_unqualified_helper = alias == "support"
             && services
                 .iter()
                 .flat_map(|service| &service.operations)
-                .filter_map(|operation| operation.serialization_context_expr)
+                .flat_map(|operation| operation.context_helpers())
                 .any(|helper| !helper.contains('.'));
         if (!helper_packages.contains(alias.as_str())
             && !used_by_input_type
@@ -2757,10 +2791,9 @@ fn render_operation_registry(
     let mut keys = BTreeSet::new();
     for service in services {
         for operation in &service.operations {
-            let Some(helper) = operation.serialization_context_expr else {
+            if operation.context_helpers().next().is_none() {
                 continue;
-            };
-            let helper = package.function_name_extractor(helper);
+            }
             if !keys.insert((service.wire_name, operation.wire_name)) {
                 return Err(Error::InvalidWitDirective {
                     path: PathBuf::from("<go-plan>"),
@@ -2778,9 +2811,21 @@ fn render_operation_registry(
                 "\t{{\n\t\tService: {service_name},\n\t\tOperation: {operation_name},\n\t}}: {{\n"
             ));
             let input_type = &operation.input_type;
-            output.push_str(&format!(
-                "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
-            ));
+            if let Some(helper) = operation.serialization_context_expr {
+                let helper = package.function_name_extractor(helper);
+                output.push_str(&format!(
+                    "\t\tSerializationContext: func(request any) {sc} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+                ));
+            }
+            if let Some(helper) = operation.storage_target_expr {
+                let helper = package.function_name_extractor(helper);
+                let target = package
+                    .sdk_reference(SdkSymbol::StorageDriverWorkflowInfo)
+                    .expression;
+                output.push_str(&format!(
+                    "\t\tStorageTarget: func(request any) {target} {{\n\t\t\treturn {helper}(request.({input_type}))\n\t\t}},\n"
+                ));
+            }
             output.push_str("\t},\n");
         }
     }
@@ -2866,6 +2911,7 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     pub(in crate::generator) output_transform_expr: Option<String>,
     /// Helper selecting the context for user payloads nested in this operation.
     pub(in crate::generator) serialization_context_expr: Option<&'a str>,
+    pub(in crate::generator) storage_target_expr: Option<&'a str>,
     /// Resolved Go request field receiving propagated context headers.
     context_propagation_header: Option<String>,
     /// The Go name and source expression of each sourced field of the request for the Workflow
@@ -2887,6 +2933,14 @@ pub(in crate::generator) struct RenderedOperation<'a> {
     /// Targets whose exported convenience wrapper `@nexus.api-omit` suppresses. The internal
     /// operation function stays, so resource methods still bind.
     api_omitted: &'a BTreeSet<GenerationTarget>,
+}
+
+impl<'a> RenderedOperation<'a> {
+    fn context_helpers(&self) -> impl Iterator<Item = &'a str> {
+        [self.serialization_context_expr, self.storage_target_expr]
+            .into_iter()
+            .flatten()
+    }
 }
 
 /// A single parameter in an unpacked convenience wrapper function signature.
@@ -6842,7 +6896,7 @@ mod tests {
             workflow_interceptors: false,
             import_path: None,
             workflow_package_alias: "temporalworkflow",
-            has_serialization_context: false,
+            has_context_helpers: false,
             support_package: None,
             facade: None,
             facade_exports: BTreeMap::new(),
@@ -6896,7 +6950,7 @@ mod tests {
             package_name: "internal".to_string(),
             import_path: Some("go.temporal.io/sdk/internal".to_string()),
             workflow_package_alias: "workflow",
-            has_serialization_context: false,
+            has_context_helpers: false,
             support_package: Some("go.temporal.io/sdk/internal".to_string()),
             facade: None,
             facade_exports: BTreeMap::new(),
@@ -7018,7 +7072,7 @@ mod tests {
             package_name: "converter".to_string(),
             import_path: Some("go.temporal.io/sdk/internal/common/converter".to_string()),
             workflow_package_alias: "workflow",
-            has_serialization_context: false,
+            has_context_helpers: false,
             support_package: None,
             facade: None,
             facade_exports: BTreeMap::new(),
@@ -7037,7 +7091,7 @@ mod tests {
             package_name: "internal".to_string(),
             import_path: Some("go.temporal.io/sdk/internal".to_string()),
             workflow_package_alias: "workflow",
-            has_serialization_context: false,
+            has_context_helpers: false,
             support_package: None,
             facade: None,
             facade_exports: BTreeMap::new(),

@@ -18,6 +18,33 @@ namespace Nexgen.DotNetExamples.Tests
 
     public class WorkflowServiceEndpointRuntimeChecks
     {
+        [Theory]
+        [InlineData("destination-a", "WorkflowA", "namespace-a")]
+        [InlineData("destination-b", "WorkflowB", "namespace-b")]
+        public void GeneratedStorageTargetFactoriesPreserveDestinationIdentity(
+            string id, string workflowType, string workflowNamespace)
+        {
+            var request = new SignalWithStartWorkflowRequest(
+                workflowType, id, "queue", "signal",
+                Temporalio.Api.Enums.V1.WorkflowIdReusePolicy.AllowDuplicate,
+                workflowNamespace);
+            var erased = NexgenOperationRegistry.Operations[
+                ("temporal.api.workflowservice.v1.WorkflowService", "SignalWithStartWorkflowExecution")];
+            var typed = Assert.IsType<NexgenOperationInfo<
+                SignalWithStartWorkflowRequest, SignalWithStartWorkflowResponse>>(erased);
+            var expected = new IStorageDriverTargetInfo.Workflow(
+                workflowNamespace, id, RunId: null, workflowType);
+            Assert.NotNull(typed.StorageTarget);
+            Assert.NotNull(erased.StorageTarget);
+            Assert.Equal(expected, typed.StorageTarget!(request));
+            Assert.Equal(expected, erased.StorageTarget!(request));
+
+            var withoutFactory = new NexgenOperationInfo<
+                SignalWithStartWorkflowRequest, SignalWithStartWorkflowResponse>(typed.Operation);
+            Assert.Null(withoutFactory.StorageTarget);
+            Assert.Null(((INexgenOperationInfo)withoutFactory).StorageTarget);
+        }
+
         [Workflow]
         public class WorkflowServiceCallerWorkflow
         {

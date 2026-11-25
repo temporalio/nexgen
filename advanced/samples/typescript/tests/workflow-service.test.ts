@@ -7,6 +7,7 @@ import * as nexus from "nexus-rpc";
 import { signalWithStartWorkflow } from "../wit/workflow-service/index.ts";
 import type { SignalWithStartWorkflowRequest } from "../wit/workflow-service/index.ts";
 import { workflowService } from "../wit/workflow-service/services.ts";
+import { operationRegistry } from "../wit/workflow-service/registry.ts";
 import { signalWithStartWorkflowRequestTransferTypeConverter as requestConverter } from "../wit/workflow-service/models.ts";
 import {
   headerFromProto,
@@ -33,6 +34,24 @@ vi.mock("../support/temporal_model_converters.ts", async (importOriginal) => {
 });
 
 describe("workflow-service generated output", () => {
+  test("resolves storage identity through generated operation metadata", () => {
+    const entry = operationRegistry[0];
+    const request: SignalWithStartWorkflowRequest = {
+      workflow: "ExampleWorkflow",
+      id: "destination-id",
+      taskQueue: "queue",
+      signal: "signal",
+      idReusePolicy: common.WorkflowIdReusePolicy.ALLOW_DUPLICATE,
+      namespace: "destination-namespace",
+    };
+    expect(entry.storageTarget(request)).toEqual({
+      kind: "workflow",
+      namespace: "destination-namespace",
+      id: "destination-id",
+      type: "ExampleWorkflow",
+    });
+  });
+
   test("passes through encoded interceptor headers", () => {
     const headers: Record<string, unknown> = {
       trace: {

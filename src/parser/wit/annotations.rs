@@ -347,6 +347,7 @@ const CATALOG: &[Annotation] = {
             repeatable: false,
             languages: None,
             system_nexus: false,
+            conflicts: &[],
         },
         Annotation {
             name: "output-transform",

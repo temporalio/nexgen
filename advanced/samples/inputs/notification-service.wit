@@ -38,8 +38,8 @@ interface notification-service {
   record on-complete-request {
     /// @nexus.doc "The successful output or failure of the source operation."
     %result: on-complete-request-result,
-    /// @nexus.doc "User-supplied data associated with the source invocation."
-    source-context: source-context-t,
+    /// @nexus.doc "User-supplied data associated with the source invocation, if provided."
+    source-context: option<source-context-t>,
   }
 
   /// @nexus.doc "An empty response that acknowledges a completion notification."
