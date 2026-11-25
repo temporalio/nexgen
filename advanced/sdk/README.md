@@ -50,9 +50,10 @@ cargo build-examples --format wit --lang python stream-service
 cargo build-examples --format wit --lang go workflow-service
 ```
 
-The regular `cargo build-examples` command also refreshes these snapshots.
-Normal language validation regenerates them and fails on Git differences. They
-are review artifacts, not standalone projects: they are neither compiled nor
+The regular `cargo build-examples` command also refreshes these snapshots. The
+language stages of `cargo validate`, also selectable with commands such as
+`cargo validate python`, regenerate them and fail on Git differences. They are
+review artifacts, not standalone projects: they are neither compiled nor
 executed here, and are never copied into SDK checkouts. The SDK stages
 independently regenerate and test bindings against real SDK internals.
 
@@ -105,6 +106,16 @@ that revision the shared baseline.
 | Python     | System Nexus and native stream suites                                  | Protobuf round trips, converters/codecs, destination storage routing, stream client/activity/workflow operations, stores, replay |
 | TypeScript | `packages/test/src/test-integration-system-nexus.cloud-unavailable.ts` | Generated public API, interceptor routing, target context, destination storage routing, replay                                   |
 | .NET       | System Nexus and concurrent destination-storage tests                  | Signal-with-start, target serialization context, codecs, replay, interceptor routing, destination storage routing                |
+
+Python selects `tests/nexus/test_temporal_system_nexus.py`,
+`tests/nexus/test_streams.py`, `tests/nexus/test_streams_with_worker.py`,
+`tests/worker/test_workflow_streams.py`, `tests/testing/test_stream_store.py`,
+and `tests/contrib/streams/`.
+
+.NET selects `NotificationTests`, `CompletionCallbackTests`,
+`NexusHandlerCallbackTests`, and `SystemNexusTests` in `tests/Temporalio.Tests`,
+plus the concurrent destination-storage/replay case in
+`Worker/ExternalStorageTargetTests.cs`.
 
 Go runs its canonical integration-test command with `-dev-server`; the other
 suites start their own local server using their SDK's pinned download and
