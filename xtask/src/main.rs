@@ -75,6 +75,14 @@ enum ValidationLanguage {
     Dotnet,
     /// Compare generated JSON Schema behavior across Go, Java, Python, and TypeScript.
     Conformance,
+    /// Regenerate and compile the Go SDK in a fresh checkout.
+    SdkGo,
+    /// Regenerate and type-check the Python SDK in a fresh checkout.
+    SdkPython,
+    /// Regenerate and compile the TypeScript SDK in a fresh checkout.
+    SdkTypescript,
+    /// Regenerate and compile the .NET SDK in a fresh checkout.
+    SdkDotnet,
 }
 
 impl From<ExampleLanguage> for Language {
@@ -133,6 +141,10 @@ impl From<ValidationLanguage> for validate::ValidationLanguage {
             ValidationLanguage::Java => Self::Java,
             ValidationLanguage::Dotnet => Self::Dotnet,
             ValidationLanguage::Conformance => Self::CrossLanguage,
+            ValidationLanguage::SdkGo => Self::SdkGo,
+            ValidationLanguage::SdkPython => Self::SdkPython,
+            ValidationLanguage::SdkTypescript => Self::SdkTypescript,
+            ValidationLanguage::SdkDotnet => Self::SdkDotnet,
         }
     }
 }

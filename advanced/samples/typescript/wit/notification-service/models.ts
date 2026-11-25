@@ -66,7 +66,7 @@ function onCompleteRequestFromProto<OutputT, SourceContextT>(
     case "failure":
       result = {
         tag: "failure",
-        value: support.errorFromFailure(
+        value: support.failureFromProto(
           requiredField(proto.failure, "OnCompleteRequest", "failure"),
         ),
       };
@@ -105,7 +105,7 @@ function onCompleteRequestToProto<OutputT, SourceContextT>(
       break;
     case "failure":
       proto.result = "failure";
-      proto.failure = support.errorToFailure(result.value);
+      proto.failure = support.failureToProto(result.value);
       break;
     default:
       result satisfies never;

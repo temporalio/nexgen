@@ -63,6 +63,55 @@ cross-language check.
 Validation writes per-stage logs to `target/validate-logs/`. Use `--verbose` to
 also see command output in the terminal.
 
+### SDK compatibility
+
+The SDK compatibility workflow regenerates System Nexus bindings and executes
+real workflow-service tests in the Go, Python, TypeScript, and .NET SDKs. Java
+is not included yet. Run the same checks locally:
+
+```sh
+cargo validate sdk-go --verbose
+cargo validate sdk-python --verbose
+cargo validate sdk-typescript --verbose
+cargo validate sdk-dotnet --verbose
+```
+
+These stages are opt-in locally, not part of bare `cargo validate`: they
+initialize pinned SDK submodules and download native dependencies. Install
+`protoc` (CI uses 23.x) and the relevant toolchains first. SDK builds also need
+a C/C++ compiler and CMake. Each run builds this worktree's nexgen with
+`advanced` enabled; no published nexgen binary is used. SDK versions are the Git
+submodule pointers under `advanced/sdk/repos/`, not floating branches. Logs
+record the selected commit. Detached test worktrees and generated output are
+kept under `target/sdk-validation/` for debugging. Dependency checkouts and Go's
+module cache are never modified.
+
+[`advanced/sdk/`](advanced/sdk/README.md) owns the SDK-native workflow-service
+WIT and companion support changes. They are staged verbatim, including local
+uncommitted edits; there are no sample-specific annotation rewrites or separate
+workflow-service sample outputs, test endpoints, or fake SDK compilation checks.
+The other advanced samples retain generic compiler and conversion coverage.
+
+Each stage runs the SDK's native test command, including Python's concurrent
+destination storage routing and .NET replay. See the fixture README for
+dependency updates, ownership, and test coverage.
+
+#### Coordinating SDK changes
+
+Every nexgen change that requires SDK changes must have a corresponding PR in
+each affected SDK. Stack each additional SDK PR on the previous pending PR for
+that SDK, keeping each nexgen change's integration work in its own layer. Use
+`gh stack` to manage the stack and pin the SDK submodule to its published tip
+for nexgen validation. Do not collect SDK fixes in validation-time patches or
+unreviewed integration commits.
+
+Keep the stack pending while its nexgen, WIT, and Core dependencies are
+unreleased. Once nexgen releases, update the canonical API WIT, pull that API
+revision into Core, and update the SDK stack with the released nexgen and Core
+pins. Regenerate and validate the bindings, then complete the SDK PRs in
+dependency order through the batch. Advance nexgen's SDK submodule back to SDK
+mainline once the batch has landed.
+
 Public-facing changes need a [changelog fragment](changelog/README.md).
 
 ## Preparing a release

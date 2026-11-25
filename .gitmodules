@@ -1,0 +1,12 @@
+[submodule "sdk-dotnet"]
+	path = advanced/sdk/repos/dotnet
+	url = https://github.com/temporalio/sdk-dotnet.git
+[submodule "sdk-go"]
+	path = advanced/sdk/repos/go
+	url = https://github.com/temporalio/sdk-go.git
+[submodule "sdk-python"]
+	path = advanced/sdk/repos/python
+	url = https://github.com/temporalio/sdk-python.git
+[submodule "sdk-typescript"]
+	path = advanced/sdk/repos/typescript
+	url = https://github.com/temporalio/sdk-typescript.git

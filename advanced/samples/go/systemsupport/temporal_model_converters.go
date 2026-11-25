@@ -8,7 +8,6 @@ import (
 	enums "go.temporal.io/api/enums/v1"
 	failurepb "go.temporal.io/api/failure/v1"
 	taskqueue "go.temporal.io/api/taskqueue/v1"
-	workflowpb "go.temporal.io/api/workflow/v1"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -17,27 +16,6 @@ import (
 // WorkflowNamespace returns the namespace of the current workflow.
 func WorkflowNamespace(ctx internal.Context) string {
 	return internal.GetWorkflowInfo(ctx).Namespace
-}
-
-type SignalWithStartWorkflowModelRequest interface {
-	GetNamespace() string
-	GetID() string
-	GetWorkflow() string
-}
-
-func SignalWithStartWorkflowSerializationContext(request SignalWithStartWorkflowModelRequest) converter.WorkflowSerializationContext {
-	return converter.WorkflowSerializationContext{
-		Namespace:  request.GetNamespace(),
-		WorkflowID: request.GetID(),
-	}
-}
-
-func SignalWithStartWorkflowStorageTarget(request SignalWithStartWorkflowModelRequest) converter.StorageDriverWorkflowInfo {
-	return converter.StorageDriverWorkflowInfo{
-		Namespace:    request.GetNamespace(),
-		WorkflowID:   request.GetID(),
-		WorkflowType: request.GetWorkflow(),
-	}
 }
 
 // --- Duration (google.protobuf.Duration) ---
@@ -285,47 +263,6 @@ func SearchAttributesFromProto(_ converter.DataConverter, searchAttributes *comm
 		}
 	}
 	value := internal.NewSearchAttributes(updates...)
-	return &value, nil
-}
-
-// --- VersioningOverride (temporal.api.workflow.v1.VersioningOverride) ---
-
-func VersioningOverrideToProto(_ converter.DataConverter, versioningOverride *internal.VersioningOverride) (*workflowpb.VersioningOverride, error) {
-	if versioningOverride == nil {
-		return nil, nil
-	}
-	return internal.VersioningOverrideToProto(*versioningOverride), nil
-}
-
-func VersioningOverrideFromProto(_ converter.DataConverter, versioningOverride *workflowpb.VersioningOverride) (*internal.VersioningOverride, error) {
-	if versioningOverride == nil {
-		return nil, nil
-	}
-
-	var value internal.VersioningOverride
-	switch override := versioningOverride.GetOverride().(type) {
-	case *workflowpb.VersioningOverride_AutoUpgrade:
-		value = &internal.AutoUpgradeVersioningOverride{}
-	case *workflowpb.VersioningOverride_Pinned:
-		version := override.Pinned.GetVersion()
-		value = &internal.PinnedVersioningOverride{Version: internal.WorkerDeploymentVersion{
-			DeploymentName: version.GetDeploymentName(),
-			BuildID:        version.GetBuildId(),
-		}}
-	}
-	if value == nil {
-		switch versioningOverride.GetBehavior() {
-		case enums.VERSIONING_BEHAVIOR_AUTO_UPGRADE:
-			value = &internal.AutoUpgradeVersioningOverride{}
-		case enums.VERSIONING_BEHAVIOR_PINNED:
-			deploymentName := versioningOverride.GetDeployment().GetSeriesName()
-			buildID := versioningOverride.GetDeployment().GetBuildId()
-			value = &internal.PinnedVersioningOverride{Version: internal.WorkerDeploymentVersion{
-				DeploymentName: deploymentName,
-				BuildID:        buildID,
-			}}
-		}
-	}
 	return &value, nil
 }
 

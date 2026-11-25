@@ -1,0 +1,497 @@
+import collections.abc
+import dataclasses
+import typing
+from datetime import datetime, timedelta
+
+import google.protobuf.duration_pb2
+import google.protobuf.message
+import google.protobuf.timestamp_pb2
+
+import temporalio.api.common.v1.message_pb2 as common_pb2
+import temporalio.api.enums.v1.workflow_pb2 as workflow_enums_pb2
+import temporalio.api.failure.v1.message_pb2 as failure_pb2
+import temporalio.api.taskqueue.v1.message_pb2 as taskqueue_pb2
+import temporalio.api.workflow.v1
+import temporalio.common
+import temporalio.converter
+import temporalio.nexus.system
+from temporalio.converter._payload_converter import _get_transfer_type_converter
+
+if typing.TYPE_CHECKING:
+    import temporalio.activity
+    import temporalio.client
+    from temporalio.nexus.system.stream_service.models import (
+        Producer,
+        ReadRecordsRequest,
+        ReadRecordsResponse,
+        StreamRecord,
+        Timestamp,
+    )
+
+_BodyT = typing.TypeVar("_BodyT")
+_ModelT = typing.TypeVar("_ModelT")
+
+
+class SignalWithStartWorkflowModelRequest(typing.Protocol):
+    namespace: str
+    id: str
+    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]
+
+
+def model_to_proto(
+    model: object,
+    payload_converter: temporalio.converter.PayloadConverter,
+    failure_converter: temporalio.converter.FailureConverter,
+) -> google.protobuf.message.Message:
+    """Convert a system Nexus model to its proto message, with no payload in between."""
+    converter = _get_transfer_type_converter(type(model))
+    if converter is None:
+        raise TypeError(f"{type(model).__name__} is not a system Nexus model")
+    with temporalio.nexus.system._user_converter_context(
+        temporalio.nexus.system._SystemNexusUserConverters(
+            payload_converter, failure_converter
+        )
+    ):
+        return converter.to_transfer_type(model)
+
+
+def model_from_proto(
+    proto: google.protobuf.message.Message,
+    model_type: type[_ModelT],
+    payload_converter: temporalio.converter.PayloadConverter,
+    failure_converter: temporalio.converter.FailureConverter,
+) -> _ModelT:
+    """Convert a proto message to the system Nexus model of ``model_type``."""
+    converter = _get_transfer_type_converter(model_type)
+    if converter is None:
+        raise TypeError(f"{model_type} is not a system Nexus model")
+    with temporalio.nexus.system._user_converter_context(
+        temporalio.nexus.system._SystemNexusUserConverters(
+            payload_converter, failure_converter
+        )
+    ):
+        return converter.from_transfer_type(proto, model_type)
+
+
+def default_producer(
+    nexus_client: "temporalio.client.NexusClient[typing.Any]",
+) -> "Producer":
+    """Return the Producer of a write of Activity or client code."""
+    import temporalio.activity
+    from temporalio.nexus.system.stream_service import models
+
+    if temporalio.activity.in_activity():
+        return activity_producer(temporalio.activity.info())
+    client: temporalio.client.Client = nexus_client._client  # type: ignore[attr-defined]
+    return models.Producer(
+        kind=models.ProducerKindClient(
+            models.ClientProducer(
+                namespace=client.namespace, id=client._stream_producer_id
+            )
+        )
+    )
+
+
+def workflow_producer() -> "Producer":
+    """Return the Producer of the Workflow run. It has no attempt, which Core sets."""
+    from temporalio.nexus.system.stream_service import models
+    from temporalio.workflow import info
+
+    return models.Producer(
+        kind=models.ProducerKindWorkflow(
+            models.WorkflowProducer(
+                namespace=info().namespace,
+                workflow_id=info().workflow_id,
+                run_id=info().run_id,
+            )
+        )
+    )
+
+
+def activity_producer(info: "temporalio.activity.Info") -> "Producer":
+    """Return the Producer of an attempt of an Activity, of the kind of the Activity."""
+    from temporalio.nexus.system.stream_service import models
+
+    workflow_id, run_id = info.workflow_id or "", info.workflow_run_id or ""
+    if info.is_local:
+        task = info.workflow_task
+        if task is None:
+            raise RuntimeError(
+                "Local Activity has no Workflow Task, which its Producer requires"
+            )
+        local_attempt = models.LocalActivityAttempt(
+            task=models.WorkflowTaskAttempt(
+                started_event_id=task.started_event_id,
+                attempt=task.attempt,
+                started_time=_timestamp(task.started_time)
+                if task.started_time
+                else None,
+            ),
+            attempt=info.attempt,
+        )
+        return models.Producer(
+            kind=models.ProducerKindLocalActivity(
+                models.LocalActivityProducer(
+                    namespace=info.namespace,
+                    workflow_id=workflow_id,
+                    run_id=run_id,
+                    activity_id=info.activity_id,
+                    attempt=local_attempt,
+                )
+            )
+        )
+    attempt = models.ActivityAttempt(
+        attempt_scheduled_time=_timestamp(info.current_attempt_scheduled_time),
+        attempt=info.attempt,
+    )
+    if run_id:
+        # Zero is a task whose scheduled event Core couldn't read.
+        scheduled_event_id = info._scheduled_event_id or None  # pyright: ignore[reportPrivateUsage]
+        return models.Producer(
+            kind=models.ProducerKindWorkflowActivity(
+                models.WorkflowActivityProducer(
+                    namespace=info.namespace,
+                    workflow_id=workflow_id,
+                    run_id=run_id,
+                    activity_id=info.activity_id,
+                    scheduled_event_id=scheduled_event_id,
+                    attempt=attempt,
+                )
+            )
+        )
+    if not info.activity_run_id:
+        raise RuntimeError(
+            "Standalone Activity has no run id, which its Producer requires"
+        )
+    return models.Producer(
+        kind=models.ProducerKindStandaloneActivity(
+            models.StandaloneActivityProducer(
+                namespace=info.namespace,
+                activity_id=info.activity_id,
+                run_id=info.activity_run_id,
+                attempt=attempt,
+            )
+        )
+    )
+
+
+def _timestamp(time: datetime) -> "Timestamp":
+    from temporalio.nexus.system.stream_service import models
+
+    proto = google.protobuf.timestamp_pb2.Timestamp()
+    proto.FromDatetime(time)
+    return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
+
+
+def next_read_request(
+    request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
+) -> "ReadRecordsRequest[_BodyT] | None":
+    # A read with no wait, or a wait of zero, ends at its first page with no Record.
+    if response.done or (not request.wait and not response.records):
+        return None
+    return dataclasses.replace(
+        request, from_offset=response.last_offset or request.from_offset
+    )
+
+
+def resume_read_request(
+    request: "ReadRecordsRequest[_BodyT]", item: "StreamRecord[_BodyT]"
+) -> "ReadRecordsRequest[_BodyT]":
+    return dataclasses.replace(request, from_offset=item.offset)
+
+
+def retry_policy_from_proto(
+    proto: common_pb2.RetryPolicy,
+) -> temporalio.common.RetryPolicy:
+    return temporalio.common.RetryPolicy.from_proto(proto)
+
+
+def retry_policy_to_proto(
+    retry_policy: temporalio.common.RetryPolicy,
+) -> common_pb2.RetryPolicy:
+    proto = common_pb2.RetryPolicy()
+    retry_policy.apply_to_proto(proto)
+    return proto
+
+
+def workflow_function_name(
+    value: str | collections.abc.Callable[..., collections.abc.Awaitable[object]],
+) -> str:
+    from temporalio.workflow import _Definition  # pyright: ignore[reportPrivateUsage]
+
+    name, _result_type = _Definition.get_name_and_result_type(value)
+    return name
+
+
+def signal_function_to_proto(
+    value: str | collections.abc.Callable[..., typing.Any],
+) -> str:
+    from temporalio.workflow import (
+        _SignalDefinition,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    return _SignalDefinition.must_name_from_fn_or_str(value)  # pyright: ignore[reportUnknownMemberType]
+
+
+def workflow_type_to_proto(
+    workflow_type: str
+    | collections.abc.Callable[..., collections.abc.Awaitable[object]],
+) -> common_pb2.WorkflowType:
+    return common_pb2.WorkflowType(name=workflow_function_name(workflow_type))
+
+
+def workflow_type_from_proto(
+    proto: common_pb2.WorkflowType,
+) -> str:
+    return proto.name
+
+
+def task_queue_from_proto(
+    proto: taskqueue_pb2.TaskQueue,
+) -> str:
+    return proto.name
+
+
+def task_queue_to_proto(
+    task_queue: str,
+) -> taskqueue_pb2.TaskQueue:
+    return taskqueue_pb2.TaskQueue(name=task_queue)
+
+
+def workflow_namespace() -> str:
+    from temporalio.workflow import info
+
+    return info().namespace
+
+
+def workflow_task_queue() -> str:
+    from temporalio.workflow import info
+
+    return info().task_queue
+
+
+def signal_with_start_workflow_serialization_context(
+    request: SignalWithStartWorkflowModelRequest,
+) -> temporalio.converter.WorkflowSerializationContext:
+    return temporalio.converter.WorkflowSerializationContext(
+        namespace=request.namespace,
+        workflow_id=request.id,
+    )
+
+
+def signal_with_start_workflow_storage_target(
+    request: SignalWithStartWorkflowModelRequest,
+) -> temporalio.converter.StorageDriverWorkflowInfo:
+    return temporalio.converter.StorageDriverWorkflowInfo(
+        namespace=request.namespace,
+        id=request.id,
+        type=workflow_function_name(request.workflow),
+    )
+
+
+def payloads_to_proto(
+    values: collections.abc.Sequence[typing.Any],
+) -> common_pb2.Payloads:
+    return (
+        temporalio.nexus.system._current_user_payload_converter().to_payloads_wrapper(
+            values
+        )
+    )
+
+
+def payloads_from_proto(
+    proto: common_pb2.Payloads,
+) -> list[object]:
+    return list(
+        temporalio.nexus.system._current_user_payload_converter().from_payloads_wrapper(
+            proto
+        )
+    )
+
+
+def _clone_payload(payload: common_pb2.Payload) -> common_pb2.Payload:
+    clone = common_pb2.Payload()
+    clone.CopyFrom(payload)
+    return clone
+
+
+def _value_to_payload(value: object | common_pb2.Payload) -> common_pb2.Payload:
+    if isinstance(value, common_pb2.Payload):
+        return _clone_payload(value)
+    payloads = (
+        temporalio.nexus.system._current_user_payload_converter().to_payloads_wrapper(
+            [value]
+        )
+    )
+    return _clone_payload(payloads.payloads[0])
+
+
+def _payload_to_value(
+    payload: common_pb2.Payload, type_hint: typing.Any = None
+) -> object:
+    return temporalio.nexus.system._current_user_payload_converter().from_payloads(
+        [_clone_payload(payload)], [type_hint] if type_hint is not None else None
+    )[0]
+
+
+def payload_from_proto(
+    proto: common_pb2.Payload,
+    type_hint: typing.Any = None,
+) -> object:
+    return _payload_to_value(proto, type_hint)
+
+
+def payload_to_proto(
+    payload: object,
+) -> common_pb2.Payload:
+    return _value_to_payload(payload)
+
+
+def failure_from_proto(
+    proto: failure_pb2.Failure,
+) -> BaseException:
+    return temporalio.nexus.system._current_user_failure_converter().from_failure(
+        proto, temporalio.nexus.system._current_user_payload_converter()
+    )
+
+
+def failure_to_proto(
+    failure: BaseException,
+) -> failure_pb2.Failure:
+    proto = failure_pb2.Failure()
+    temporalio.nexus.system._current_user_failure_converter().to_failure(
+        failure, temporalio.nexus.system._current_user_payload_converter(), proto
+    )
+    return proto
+
+
+def memo_from_proto(
+    proto: common_pb2.Memo,
+) -> collections.abc.Mapping[str, object]:
+    return {key: _payload_to_value(value) for key, value in proto.fields.items()}
+
+
+def memo_to_proto(
+    memo: collections.abc.Mapping[str, object],
+) -> common_pb2.Memo:
+    message = common_pb2.Memo()
+    for key, value in memo.items():
+        message.fields[key].CopyFrom(_value_to_payload(value))
+    return message
+
+
+def header_from_proto(
+    proto: common_pb2.Header,
+) -> collections.abc.Mapping[str, object]:
+    return {key: _payload_to_value(value) for key, value in proto.fields.items()}
+
+
+def header_to_proto(
+    header: collections.abc.Mapping[str, object],
+) -> common_pb2.Header:
+    message = common_pb2.Header()
+    for key, value in header.items():
+        message.fields[key].CopyFrom(_value_to_payload(value))
+    return message
+
+
+def duration_from_proto(proto: google.protobuf.duration_pb2.Duration) -> timedelta:
+    return proto.ToTimedelta()
+
+
+def duration_to_proto(
+    duration: timedelta,
+) -> google.protobuf.duration_pb2.Duration:
+    proto = google.protobuf.duration_pb2.Duration()
+    proto.FromTimedelta(duration)
+    return proto
+
+
+def workflow_id_reuse_policy_from_proto(
+    policy: workflow_enums_pb2.WorkflowIdReusePolicy.ValueType,
+) -> temporalio.common.WorkflowIDReusePolicy:
+    return temporalio.common.WorkflowIDReusePolicy(int(policy))
+
+
+def workflow_id_reuse_policy_to_proto(
+    policy: temporalio.common.WorkflowIDReusePolicy,
+) -> workflow_enums_pb2.WorkflowIdReusePolicy.ValueType:
+    return typing.cast(workflow_enums_pb2.WorkflowIdReusePolicy.ValueType, int(policy))
+
+
+def workflow_id_conflict_policy_from_proto(
+    policy: workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType,
+) -> temporalio.common.WorkflowIDConflictPolicy:
+    return temporalio.common.WorkflowIDConflictPolicy(int(policy))
+
+
+def workflow_id_conflict_policy_to_proto(
+    policy: temporalio.common.WorkflowIDConflictPolicy,
+) -> workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType:
+    return typing.cast(
+        workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType, int(policy)
+    )
+
+
+def search_attributes_to_proto(
+    search_attributes: temporalio.common.TypedSearchAttributes,
+) -> common_pb2.SearchAttributes:
+    proto = common_pb2.SearchAttributes()
+    temporalio.converter.encode_search_attributes(search_attributes, proto)
+    return proto
+
+
+def search_attributes_from_proto(
+    proto: common_pb2.SearchAttributes,
+) -> temporalio.common.TypedSearchAttributes:
+    return temporalio.converter.decode_typed_search_attributes(proto)
+
+
+def priority_from_proto(
+    proto: common_pb2.Priority,
+) -> temporalio.common.Priority:
+    return temporalio.common.Priority._from_proto(proto)  # pyright: ignore[reportPrivateUsage]
+
+
+def priority_to_proto(
+    priority: temporalio.common.Priority,
+) -> common_pb2.Priority:
+    return priority._to_proto()  # pyright: ignore[reportPrivateUsage]
+
+
+def versioning_override_to_proto(
+    versioning_override: temporalio.common.VersioningOverride,
+) -> temporalio.api.workflow.v1.VersioningOverride:
+    return versioning_override._to_proto()  # pyright: ignore[reportPrivateUsage]
+
+
+def versioning_override_from_proto(
+    proto: temporalio.api.workflow.v1.VersioningOverride,
+) -> temporalio.common.VersioningOverride:
+    if proto.HasField("pinned") and proto.pinned.HasField("version"):
+        version = proto.pinned.version
+        return temporalio.common.PinnedVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion(
+                deployment_name=version.deployment_name,
+                build_id=version.build_id,
+            )
+        )
+    if proto.HasField("one_time") and proto.one_time.HasField(
+        "target_deployment_version"
+    ):
+        version = proto.one_time.target_deployment_version
+        return temporalio.common.OneTimeVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion(
+                deployment_name=version.deployment_name,
+                build_id=version.build_id,
+            )
+        )
+    if proto.pinned_version:
+        return temporalio.common.PinnedVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion.from_canonical_string(
+                proto.pinned_version
+            )
+        )
+    if proto.auto_upgrade:
+        return temporalio.common.AutoUpgradeVersioningOverride()
+    raise ValueError("unknown versioning override proto shape")

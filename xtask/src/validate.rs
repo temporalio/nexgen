@@ -8,6 +8,8 @@ use nexgen::error::Error as NexgenError;
 
 use crate::error::{Error, Result};
 
+mod sdk;
+
 #[derive(Clone, Copy)]
 pub enum ValidationLanguage {
     Rust,
@@ -21,6 +23,10 @@ pub enum ValidationLanguage {
     // Full validation additionally checks agreement between all JSON Schema
     // backends, after every language's dependencies have been provisioned.
     CrossLanguage,
+    SdkGo,
+    SdkPython,
+    SdkTypescript,
+    SdkDotnet,
 }
 
 pub struct ValidateRequest {
@@ -56,6 +62,10 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
             ValidationLanguage::Dotnet => validate_dotnet(&repo_root, &mut log),
             ValidationLanguage::Markdown => validate_markdown(&repo_root, &mut log),
             ValidationLanguage::CrossLanguage => validate_conformance(&repo_root, &mut log),
+            ValidationLanguage::SdkGo => validate_sdk(&repo_root, "go", &mut log),
+            ValidationLanguage::SdkPython => validate_sdk(&repo_root, "python", &mut log),
+            ValidationLanguage::SdkTypescript => validate_sdk(&repo_root, "typescript", &mut log),
+            ValidationLanguage::SdkDotnet => validate_sdk(&repo_root, "dotnet", &mut log),
         };
         let result = result.and_then(|()| {
             if !matches!(
@@ -63,6 +73,10 @@ pub fn validate(request: &ValidateRequest) -> Result<()> {
                 ValidationLanguage::Rust
                     | ValidationLanguage::Markdown
                     | ValidationLanguage::CrossLanguage
+                    | ValidationLanguage::SdkGo
+                    | ValidationLanguage::SdkPython
+                    | ValidationLanguage::SdkTypescript
+                    | ValidationLanguage::SdkDotnet
             ) {
                 validate_generated_code(&repo_root, language, &mut log)?;
             }
@@ -111,6 +125,10 @@ impl ValidationLanguage {
             Self::Java => "Java",
             Self::Dotnet => ".NET",
             Self::CrossLanguage => "cross-language JSON Schema conformance",
+            Self::SdkGo => "Go SDK",
+            Self::SdkPython => "Python SDK",
+            Self::SdkTypescript => "TypeScript SDK",
+            Self::SdkDotnet => ".NET SDK",
         }
     }
 
@@ -124,6 +142,10 @@ impl ValidationLanguage {
             Self::Go => "go",
             Self::Java => "java",
             Self::CrossLanguage => "conformance",
+            Self::SdkGo => "sdk-go",
+            Self::SdkPython => "sdk-python",
+            Self::SdkTypescript => "sdk-typescript",
+            Self::SdkDotnet => "sdk-dotnet",
         }
     }
 }
@@ -224,6 +246,10 @@ fn validate_rust(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
     run(log, repo_root, "cargo", &["test", "--all-features"])
 }
 
+fn validate_sdk(repo_root: &Path, language: &str, log: &mut ValidationLog) -> Result<()> {
+    sdk::validate(repo_root, language, log)
+}
+
 fn validate_generated_code(
     repo_root: &Path,
     language: ValidationLanguage,
@@ -313,16 +339,7 @@ fn validate_go(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
                 source: io::Error::other("gofmt found unformatted files"),
             });
         }
-        if root == repo_root.join("advanced/samples/go") {
-            run(
-                log,
-                &root,
-                "go",
-                &["run", "./testsupport/storagecontract", "test", "./..."],
-            )?;
-        } else {
-            run(log, &root, "go", &["test", "./..."])?;
-        }
+        run(log, &root, "go", &["test", "./..."])?;
     }
     Ok(())
 }
@@ -340,30 +357,10 @@ fn validate_dotnet(repo_root: &Path, log: &mut ValidationLog) -> Result<()> {
     for root in sample_roots(repo_root, "dotnet") {
         run(log, &root, "dotnet", &["test", "tests/", "--nologo"])?;
     }
-    let workflow_service_docs_root = repo_root.join("advanced/samples/dotnet");
+    let dotnet_root = repo_root.join("advanced/samples/dotnet");
     run(
         log,
-        &workflow_service_docs_root,
-        "dotnet",
-        &[
-            "build",
-            "Nexgen.DotNetWorkflowServiceDocs.csproj",
-            "--nologo",
-        ],
-    )?;
-    run(
-        log,
-        &workflow_service_docs_root,
-        "dotnet",
-        &[
-            "build",
-            "Nexgen.DotNetMultiOperationService.csproj",
-            "--nologo",
-        ],
-    )?;
-    run(
-        log,
-        &workflow_service_docs_root.join("json_schema"),
+        &dotnet_root.join("json_schema"),
         "dotnet",
         &["build", "Nexgen.DotNetJsonSchemaApi.csproj", "--nologo"],
     )?;
@@ -503,6 +500,10 @@ mod tests {
             ValidationLanguage::Dotnet,
             ValidationLanguage::Markdown,
             ValidationLanguage::CrossLanguage,
+            ValidationLanguage::SdkGo,
+            ValidationLanguage::SdkPython,
+            ValidationLanguage::SdkTypescript,
+            ValidationLanguage::SdkDotnet,
         ] {
             let stages = validation_languages(Some(language));
             assert_eq!(stages.len(), 1);

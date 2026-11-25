@@ -10,7 +10,7 @@ use nexgen::add_rpc_to_string;
 use nexgen::language::Language;
 use nexgen::spec::{ApiSpec, TypeSpec};
 
-const PRIMARY_EXAMPLE_PATH: &str = "advanced/samples/inputs/workflow-service.wit";
+const PRIMARY_EXAMPLE_PATH: &str = "advanced/sdk/workflow-service.wit";
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -45,15 +45,6 @@ fn write_temp_wit(name: &str, contents: &str) -> PathBuf {
     fs::create_dir_all(&temp_dir).unwrap();
     let path = temp_dir.join("input.wit");
     fs::write(&path, contents).unwrap();
-    if contents.contains("dotnet/WorkflowServiceSupport.cs") {
-        let dotnet_dir = temp_dir.join("dotnet");
-        fs::create_dir_all(&dotnet_dir).unwrap();
-        fs::copy(
-            project_root().join("advanced/samples/inputs/dotnet/WorkflowServiceSupport.cs"),
-            dotnet_dir.join("WorkflowServiceSupport.cs"),
-        )
-        .unwrap();
-    }
     path
 }
 
@@ -281,9 +272,7 @@ fn add_rpc_can_extend_an_existing_wit_file() {
     assert!(generated.contains("signal-name: string,"));
     assert!(generated.contains("input: option<payloads>,"));
     assert!(generated.contains("workflow-execution: option<workflow-execution>,"));
-    assert!(generated.contains(
-        "/// @nexus.endpoint \"temporal-system\" go=\"__temporal_system\" python=\"__temporal_system\""
-    ));
+    assert!(generated.contains("/// @nexus.endpoint \"__temporal_system\""));
     assert!(!generated.contains("/// @nexus.endpoint \"__REPLACE_ME__\""));
     assert!(!generated.contains("package temporal:nexus@1.0.0;\n\npackage temporal:nexus@1.0.0;"));
 
@@ -328,9 +317,7 @@ fn add_rpc_can_update_existing_signal_with_start_operation() {
     assert!(!generated.contains("record link-nexus-operation"));
     assert!(!generated.contains("record link-workflow"));
     assert!(!generated.contains("record link {"));
-    assert!(generated.contains(
-        "/// @nexus.endpoint \"temporal-system\" go=\"__temporal_system\" python=\"__temporal_system\""
-    ));
+    assert!(generated.contains("/// @nexus.endpoint \"__temporal_system\""));
     assert!(!generated.contains("/// @nexus.endpoint \"__REPLACE_ME__\""));
 
     let parsed = parse(Language::Python, &generated, "updated-existing-input.wit");

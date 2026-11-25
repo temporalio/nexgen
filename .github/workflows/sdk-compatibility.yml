@@ -1,0 +1,56 @@
+name: SDK compatibility
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sdk:
+    name: SDK compatibility (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, python, typescript, dotnet]
+    steps:
+      - name: Check out nexgen
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Install toolchains
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache nexgen build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ". -> target/sdk-validation/nexgen"
+          key: sdk-${{ matrix.language }}
+          cache-bin: "false"
+
+      - name: Regenerate and test SDK
+        run: cargo validate sdk-${{ matrix.language }} --verbose
+
+      - name: Upload validation logs and test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-${{ matrix.language }}-validation
+          include-hidden-files: true
+          path: |
+            target/validate-logs/sdk-${{ matrix.language }}.log
+            target/sdk-validation/${{ matrix.language }}-*/.nexgen-test-results/

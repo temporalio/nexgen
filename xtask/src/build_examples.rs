@@ -1488,7 +1488,7 @@ targets = ["workflow"]
         let root = repo_root();
         for (output, expected) in [
             (
-                "advanced/samples/typescript/wit/workflow-service",
+                "advanced/samples/typescript/wit/proto-backed-showcase",
                 "../../support/temporal_model_converters",
             ),
             (

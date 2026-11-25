@@ -39,6 +39,9 @@ pub(crate) enum Error {
     )]
     MarkdownUnformatted,
 
+    #[error("SDK validation failed: {0}")]
+    SdkValidation(String),
+
     #[error("unknown {language} example `{example_id}")]
     UnknownExampleId {
         language: Language,

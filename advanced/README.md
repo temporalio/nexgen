@@ -96,9 +96,9 @@ replaced without deleting these authored helpers.
 - [`start-workflow`](samples/inputs/start-workflow.wit): a proto-backed Temporal
   workflow-start API that returns a generated resource handle with follow-up
   operations such as cancel, restart, and get-result.
-- [`workflow-service`](samples/inputs/workflow-service.wit): a proto-backed
-  `SignalWithStartWorkflowExecution` example showing flattened APIs, function
-  arguments, sourced fields, support converters, and output transforms.
+- [`workflow-service`](sdk/workflow-service.wit): the SDK-native
+  `SignalWithStartWorkflowExecution` fixture, validated by real
+  [SDK integration tests](sdk/README.md) rather than standalone sample APIs.
 - [`proto-backed-showcase`](samples/inputs/proto-backed-showcase.wit): a
   proto-backed type roundtrip example for focused native/proto conversion
   coverage, including retry policies, activity options, durations, task queues,
@@ -346,12 +346,12 @@ Generate a proto-backed example:
 
 ```bash
 cargo run --features advanced -- python \
-  advanced/samples/inputs/workflow-service.wit \
+  advanced/samples/inputs/proto-backed-showcase.wit \
   advanced/samples/inputs/deps \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --support-package temporal_support \
   --targets workflow \
-  --output /tmp/workflow_service
+  --output /tmp/proto_backed_showcase
 ```
 
 `--descriptors` can be passed more than once when a proto-backed API depends on
@@ -491,7 +491,7 @@ Extend an existing WIT file with a new RPC:
 cargo run --features advanced -- add-rpc \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --rpc SignalWorkflowExecution \
-  --input advanced/samples/inputs/workflow-service.wit \
+  --input advanced/sdk/workflow-service.wit \
   --input advanced/samples/inputs/deps
 ```
 
@@ -501,9 +501,9 @@ Rewrite the existing WIT file in place by pointing `--output` at the same path:
 cargo run --features advanced -- add-rpc \
   --descriptors advanced/samples/descriptors/temporal_api.bin \
   --rpc SignalWorkflowExecution \
-  --input advanced/samples/inputs/workflow-service.wit \
+  --input advanced/sdk/workflow-service.wit \
   --input advanced/samples/inputs/deps \
-  --output advanced/samples/inputs/workflow-service.wit
+  --output advanced/sdk/workflow-service.wit
 ```
 
 ## Validation
