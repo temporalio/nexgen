@@ -11,9 +11,22 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    name: Validate
+  stage:
+    name: Validate (${{ matrix.stage }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        stage:
+          - markdown
+          - rust
+          - python
+          - typescript
+          - go
+          - java
+          - dotnet
+          - conformance
 
     steps:
       - name: Check out repository
@@ -25,35 +38,39 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
+          key: ${{ matrix.stage }}
           cache-bin: "false"
 
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Validate Markdown
+        if: matrix.stage == 'markdown'
         run: |
           if ! cargo validate markdown; then
             echo "::error::Markdown formatting check failed. Run \`cargo fmt-markdown\` locally and commit the result."
             exit 1
           fi
 
-      - name: Validate Rust
-        run: cargo validate rust
+      - name: Validate ${{ matrix.stage }}
+        if: matrix.stage != 'markdown'
+        run: cargo validate ${{ matrix.stage }}
 
-      - name: Validate Python samples
-        run: cargo validate python
+  # The ruleset on main requires a check named "Validate". A skipped required
+  # check counts as passing, so this job always runs and fails unless every
+  # stage succeeded.
+  validate:
+    name: Validate
+    needs: stage
+    if: always()
+    runs-on: ubuntu-latest
 
-      - name: Validate TypeScript samples
-        run: cargo validate typescript
-
-      - name: Validate Go samples
-        run: cargo validate go
-
-      - name: Validate Java samples
-        run: cargo validate java
-
-      - name: Validate .NET samples
-        run: cargo validate dotnet
-
-      - name: Validate cross-language conformance
-        run: cargo validate conformance
+    steps:
+      - name: Require every validation stage to pass
+        env:
+          RESULT: ${{ needs.stage.result }}
+        run: |
+          if [[ "$RESULT" != "success" ]]; then
+            echo "::error::One or more validation stages finished with: $RESULT"
+            exit 1
+          fi
