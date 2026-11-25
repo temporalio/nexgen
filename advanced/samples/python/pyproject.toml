@@ -8,7 +8,6 @@ dependencies = [
     "pytest-asyncio>=1.2.0",
     "ruff>=0.15.12",
     "temporalio>=1.36.1",
-    "temporalio-stream-protos",
     "typing_extensions>=4.15.0",
 ]
 
@@ -18,11 +17,6 @@ exclude-newer = "2 weeks"
 # The launcher fixes require a newer SDK than the general dependency cooldown.
 exclude-newer-package = { temporalio = false }
 
-[tool.uv.sources]
-# Keep it non-editable. An editable install adds a path entry, and Python ignores that path for
-# modules of the installed temporalio package.
-temporalio-stream-protos = { path = "temporalio_stream_protos" }
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
@@ -30,11 +24,8 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-# The protoc output of the stream protos.
-extend-exclude = ["temporalio_stream_protos"]
-
 [tool.basedpyright]
-exclude = [".venv", "temporalio_stream_protos"]
+exclude = [".venv"]
 reportAny = false
 reportExplicitAny = false
 reportPrivateUsage = false

@@ -169,11 +169,12 @@ Support can also share the generated package. Set `--support-package` and
 self-import, so support helpers need not be exported. Authored files alongside
 generated files are preserved.
 
-The repository's workflow-service fixture uses the actual SDK package paths and
-support code, not standalone sample adaptations. Its WIT and companion support
-changes live under [`advanced/sdk/`](advanced/sdk/README.md). Run
-`cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, or `sdk-dotnet` to
+The repository's workflow-service and stream-service fixtures use the actual SDK
+package paths and support code, not standalone sample adaptations. Their WIT and
+companion support changes live under [`advanced/sdk/`](advanced/sdk/README.md).
+Run `cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, or `sdk-dotnet` to
 regenerate inside an SDK checkout and execute native workflow-service tests.
+Python also regenerates and tests the stream client and workflow APIs.
 
 With `--system-nexus`, Go bindings use SDK `internal` APIs and prefix
 package-level declarations with `SystemNexus_` (exported) or `systemnexus_`

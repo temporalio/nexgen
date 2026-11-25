@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.11"
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-11-11T18:59:33.093954Z"
 exclude-newer-span = "P2W"
 
 [options.exclude-newer-package]
@@ -19,7 +19,6 @@ dependencies = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "temporalio" },
-    { name = "temporalio-stream-protos" },
     { name = "typing-extensions" },
 ]
 
@@ -30,7 +29,6 @@ requires-dist = [
     { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "ruff", specifier = ">=0.15.12" },
     { name = "temporalio", specifier = ">=1.36.1" },
-    { name = "temporalio-stream-protos", directory = "temporalio_stream_protos" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
 ]
 
@@ -208,11 +206,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/3e/241ae6f12139b94945b673e503b79f669305418f47216adb78e3a4b78b08/temporalio-1.36.1-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b22d93523b65f17e39970a341ad17de2100fdb5a8cd23c7499ffbd342ffb412a", size = 14633381, upload-time = "2026-11-14T02:20:55.636Z" },
     { url = "https://files.pythonhosted.org/packages/83/0c/51e526f3926a29a442e703009c203fd301b30a41aeb963cd8be7617ac011/temporalio-1.36.1-cp311-abi3-win_amd64.whl", hash = "sha256:42675a52865cdd71c3a7a42f7415157af7574458788df419b723167be282e51d", size = 15509357, upload-time = "2026-11-14T02:20:58.109Z" },
 ]
-
-[[package]]
-name = "temporalio-stream-protos"
-version = "0.1.0"
-source = { directory = "temporalio_stream_protos" }
 
 [[package]]
 name = "types-protobuf"

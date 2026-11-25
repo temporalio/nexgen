@@ -25,28 +25,6 @@ languages = ["python", "dotnet", "typescript", "go"]
 system_nexus = ["go"]
 descriptors = "temporal"
 
-# The Stream service WIT of temporalio/api#895, on the Stream protos of that PR. Its .NET output
-# builds in Nexgen.DotNetStreamService.csproj.
-[stream-service]
-languages = ["python", "typescript", "dotnet"]
-system_nexus = true
-descriptors = ["temporal_api.bin", "streams.bin"]
-
-[stream-service.models]
-languages = ["python"]
-targets = []
-
-[stream-service.workflow]
-targets = ["workflow"]
-
-[stream-service.client]
-languages = ["python"]
-targets = ["client"]
-
-[stream-service.both]
-languages = ["python"]
-targets = ["workflow", "client"]
-
 # A System Nexus operation that returns a resource.
 [workflow-handle]
 targets = ["workflow"]
