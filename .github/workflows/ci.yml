@@ -44,6 +44,20 @@ jobs:
         with:
           cache-bin: "false"
 
+      - name: Cache language dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/uv
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.nuget/packages
+          key: deps-${{ matrix.stage }}-${{ hashFiles('**/package-lock.json', '**/uv.lock', '**/go.sum', '**/*.gradle', '**/gradle-wrapper.properties', '**/*.csproj') }}
+          restore-keys: deps-${{ matrix.stage }}-
+
       - name: Verify Cargo.lock is up to date
         run: cargo metadata --locked --format-version 1 > /dev/null
 
