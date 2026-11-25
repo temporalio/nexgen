@@ -1,6 +1,0 @@
-languages = ["go"]
-system_nexus = true
-
-[error]
-kind = "invalid-wit-directive"
-contains = ["@nexus.storage-target", "Go support helper `break` must be an identifier or pkg.Func"]

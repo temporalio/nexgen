@@ -227,7 +227,7 @@ fn compiler_failures() {
 fn system_nexus_requires_explicit_configuration_not_a_category_name() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
     let fixture =
-        repo.join("advanced/samples/invalid/system-nexus/serialization-context/helper-keyword");
+        repo.join("advanced/samples/invalid/system-nexus/serialization-context/non-proto-request");
     let temp = tempfile::tempdir().unwrap();
     let case = temp.path().join("system-nexus");
     fs::create_dir(&case).unwrap();

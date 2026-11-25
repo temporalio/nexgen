@@ -1,7 +1,0 @@
-languages = ["go"]
-
-[error]
-kind = "generated-name-conflict"
-contains = [
-  "go generated name `GetID` for the getter of field `Request.ID` conflicts with field `GetID`",
-]
