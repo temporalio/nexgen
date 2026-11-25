@@ -91,6 +91,9 @@ WIT and companion support changes. They are staged verbatim, including local
 uncommitted edits; there are no sample-specific annotation rewrites or separate
 workflow-service sample outputs, test endpoints, or fake SDK compilation checks.
 The other advanced samples retain generic compiler and conversion coverage.
+Review-only workflow-service snapshots under `advanced/sdk/generated/` are
+refreshed by `cargo build-examples`; they are not standalone compilation or
+runtime tests.
 
 Each stage runs the SDK's native test command, including Python's concurrent
 destination storage routing and .NET replay. See the fixture README for

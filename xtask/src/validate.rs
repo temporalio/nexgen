@@ -386,7 +386,14 @@ fn validate_generated_examples(
         log,
         repo_root,
         "git",
-        &["diff", "--exit-code", "--", "samples", "advanced/samples"],
+        &[
+            "diff",
+            "--exit-code",
+            "--",
+            "samples",
+            "advanced/samples",
+            "advanced/sdk/generated",
+        ],
     )
 }
 

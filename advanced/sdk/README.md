@@ -20,6 +20,23 @@ The Rust validation task in `xtask/src/validate/sdk.rs` owns orchestration. Its
 unit tests run with the regular Rust suite; there is no separate Python
 validation runner.
 
+## Review snapshots
+
+Checked-in output under `generated/<language>/workflow-service/` makes changes
+to the generated API visible in nexgen diffs. Regenerate all four SDK snapshots
+with:
+
+```sh
+cargo build-examples --format wit workflow-service
+```
+
+Use `--lang` to select one language. The regular `cargo build-examples` command
+also refreshes these snapshots, and sample validation checks their freshness.
+They use SDK-native namespaces and imports and are not standalone projects: they
+are neither compiled nor executed here, and they are never copied into SDK
+checkouts. The SDK checks above independently regenerate and test the bindings
+against real SDK internals.
+
 ## Ownership
 
 Support changes referenced by the WIT belong alongside it. Files under

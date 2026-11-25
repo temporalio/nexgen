@@ -99,6 +99,8 @@ replaced without deleting these authored helpers.
 - [`workflow-service`](sdk/workflow-service.wit): the SDK-native
   `SignalWithStartWorkflowExecution` fixture, validated by real
   [SDK integration tests](sdk/README.md) rather than standalone sample APIs.
+  Review-only generated snapshots live under `sdk/generated/` and are refreshed
+  by `cargo build-examples --format wit workflow-service`.
 - [`proto-backed-showcase`](samples/inputs/proto-backed-showcase.wit): a
   proto-backed type roundtrip example for focused native/proto conversion
   coverage, including retry policies, activity options, durations, task queues,
