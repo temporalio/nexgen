@@ -1,1 +1,0 @@
-Shared compiler error kinds now carry the target language instead of using Python-, Go-, Java-, or .NET-specific variants; Go naming conflicts are reported as name conflicts rather than unsupported types, and package/namespace configuration errors share an output-namespace error kind.
