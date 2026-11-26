@@ -725,6 +725,10 @@ fn render_go_array_checks(
         output.push_str("}\n");
     }
     if schema.unique_items == Some(true) {
+        let encoding = item.and_then(content_encoding_kind);
+        // A nullable encoded string uses a nil slice for JSON null and a
+        // non-nil empty slice for the empty wire string.
+        let track_null = nilable || (encoding.is_some() && item.is_some_and(allows_null));
         // A materialized element (a temporal `format`, a `contentEncoding`) is
         // compared on its **canonical wire string** in both directions (D10):
         // the native `time.Time`/`time.Duration` would compare instants rather
@@ -734,7 +738,7 @@ fn render_go_array_checks(
                 "string",
                 format!("{}({element})", go_temporal_format_fn(kind)),
             )
-        } else if let Some(encoding) = item.and_then(content_encoding_kind) {
+        } else if let Some(encoding) = encoding {
             (
                 "string",
                 format!("{}({element})", go_content_encoding_encode_fn(encoding)),
@@ -752,7 +756,7 @@ fn render_go_array_checks(
         output.push_str(&format!(
             "{{\n{indent}\tseen := make(map[{key_ty}]int, len({slice_expr}))\n"
         ));
-        if nilable {
+        if track_null {
             // `null` is one value for uniqueness: two `null` elements are a
             // duplicate (uniqueItems.md:188-190). It cannot be a map key here —
             // the key type is the branch's — so it is tracked on the side.
@@ -761,7 +765,7 @@ fn render_go_array_checks(
         }
         output.push_str(indent);
         output.push_str(&format!("\tfor i, e := range {slice_expr} {{\n"));
-        if nilable {
+        if track_null {
             output.push_str(indent);
             output.push_str("\t\tif e == nil {\n");
             output.push_str(indent);

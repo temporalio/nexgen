@@ -2802,6 +2802,13 @@ fn go_json_nullable_elements_are_unique_and_never_match_a_matcher() {
 type: object
 required: [words, counts]
 properties:
+  blobs:
+    type: array
+    uniqueItems: true
+    items:
+      oneOf:
+        - { type: string, contentEncoding: base64 }
+        - { type: "null" }
   words:
     type: array
     uniqueItems: true
@@ -2884,6 +2891,32 @@ func TestNullableElements(t *testing.T) {
     if _, err := json.Marshal(Elements{Words: []*string{}, Counts: []*int64{nil}}); err == nil ||
         !strings.Contains(validationText(err), "no element matches") {
         t.Errorf("a nil element must not match the matcher: %v", err)
+    }
+}
+func TestNullableBase64UniqueItems(t *testing.T) {
+    const wire = `{"blobs":[null,""],"words":[],"counts":[2]}`
+    var value Elements
+    if err := json.Unmarshal([]byte(wire), &value); err != nil {
+        t.Fatal(err)
+    }
+    encoded, err := json.Marshal(value)
+    if err != nil {
+        t.Errorf("round-trip failed: %v", err)
+    } else {
+        var result struct { Blobs json.RawMessage }
+        if err := json.Unmarshal(encoded, &result); err != nil {
+            t.Fatal(err)
+        }
+        if string(result.Blobs) != `[null,""]` {
+            t.Errorf("blobs = %s, want [null, empty base64 string]", result.Blobs)
+        }
+    }
+
+    for _, duplicate := range [][][]byte{{nil, nil}, {{}, {}}} {
+        value.Blobs = duplicate
+        if _, err := json.Marshal(value); err == nil || !strings.Contains(validationText(err), "duplicate") {
+            t.Errorf("expected duplicate error for %#v, got %v", duplicate, err)
+        }
     }
 }
 "#,
