@@ -158,7 +158,7 @@ class Stream(typing.Generic[BodyT]):
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
-        """Yield each response of ``read_page`` until the poll helper stops.
+        """Yield each response of ``read_page`` until the poll helper returns ``None``.
 
         Read one page of Records. The poll iterator reads them all.
 
@@ -207,7 +207,7 @@ class Stream(typing.Generic[BodyT]):
         """Yield each item of ``read_pages``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is
-        ``None`` after the last page.
+        ``None`` when the page helper returns ``None``.
 
         Read one page of Records. The poll iterator reads them all.
 
