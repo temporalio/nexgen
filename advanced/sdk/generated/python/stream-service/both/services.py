@@ -8,8 +8,6 @@ import typing
 from .models import (
     AppendRecordsRequest,
     AppendRecordsResponse,
-    CloseStreamRequest,
-    CloseStreamResponse,
     CreateStreamRequest,
     CreateStreamResult,
     DescribeStreamRequest,
@@ -35,11 +33,6 @@ class StreamService:
         AppendRecordsRequest[typing.Any],
         AppendRecordsResponse,
     ] = Operation(name="AppendRecords")
-
-    close_stream: Operation[
-        CloseStreamRequest[typing.Any],
-        CloseStreamResponse,
-    ] = Operation(name="CloseStream")
 
     read_records: Operation[
         ReadRecordsRequest[typing.Any],

@@ -4,8 +4,6 @@ export { createStream } from "./operations/create-stream";
 export type {
   AppendRecordsRequest,
   AppendRecordsResponse,
-  CloseStreamRequest,
-  CloseStreamResponse,
   CreateStreamRequest,
   CreateStreamResult,
   DescribeStreamRequest,
@@ -18,7 +16,6 @@ export { createStreamRefTransferTypeConverter } from "./models";
 export { createCreateStreamRequestTransferTypeConverter } from "./models";
 export { createAppendRecordsRequestTransferTypeConverter } from "./models";
 export { createAppendRecordTransferTypeConverter } from "./models";
-export { createCloseStreamRequestTransferTypeConverter } from "./models";
 export { createReadRecordsResponseTransferTypeConverter } from "./models";
 export { createStreamRecordTransferTypeConverter } from "./models";
 export { createReadRecordsRequestTransferTypeConverter } from "./models";

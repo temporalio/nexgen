@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import collections.abc
 import typing
-import typing_extensions
 import uuid as _uuid
 import datetime
-import types
 
 if typing.TYPE_CHECKING:
     import temporalio.client
@@ -17,7 +15,6 @@ from ...models import (
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
-    CloseStreamRequest,
     DescribeStreamRequest,
     DescribeStreamResponse,
     Producer,
@@ -58,17 +55,6 @@ class Stream(typing.Generic[BodyT]):
         arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
         return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
-    async def __aenter__(self) -> typing_extensions.Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: types.TracebackType | None,
-    ) -> None:
-        await self.close()
-
     async def append(
         self,
         *records: BodyT,
@@ -95,31 +81,6 @@ class Stream(typing.Generic[BodyT]):
         )
         return await handle.result()
 
-    async def close(
-        self,
-        producer: Producer | None = None,
-        *,
-        rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
-        rpc_timeout: datetime.timedelta | None = None,
-    ) -> None:
-        """Close the Stream. Readers get the Records that are left, then end."""
-        request = CloseStreamRequest(
-            ref=self.ref,
-            producer=(
-                (_support.default_producer(self._nexus_client))
-                if producer is None
-                else producer
-            ),
-        )
-        handle = await self._nexus_client.start_operation(
-            operation=StreamService.close_stream,
-            arg=request,
-            id=f"{_uuid.uuid4()}",
-            rpc_metadata=rpc_metadata or {},
-            rpc_timeout=rpc_timeout,
-        )
-        _ = await handle.result()
-
     async def read_page(
         self,
         from_offset: bytes | None = None,
@@ -130,7 +91,9 @@ class Stream(typing.Generic[BodyT]):
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> ReadRecordsResponse[BodyT]:
-        """Read one page of Records. The poll iterator reads them all."""
+        """Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
+        """
         request = ReadRecordsRequest(
             ref=self.ref,
             from_offset=from_offset,
@@ -160,13 +123,13 @@ class Stream(typing.Generic[BodyT]):
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
         """Yield each response of ``read_page`` until the poll helper stops.
 
-        Read one page of Records. The poll iterator reads them all.
+        Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record or a close before an empty
-                page.
+            wait: How long the read waits for a new Record before an empty page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
@@ -209,13 +172,13 @@ class Stream(typing.Generic[BodyT]):
         ``next_request`` resumes after the last item that the iterator yielded. It is
         ``None`` after the last page.
 
-        Read one page of Records. The poll iterator reads them all.
+        Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record or a close before an empty
-                page.
+            wait: How long the read waits for a new Record before an empty page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
@@ -247,7 +210,7 @@ class Stream(typing.Generic[BodyT]):
         rpc_metadata: collections.abc.Mapping[str, str | bytes] | None = None,
         rpc_timeout: datetime.timedelta | None = None,
     ) -> DescribeStreamResponse:
-        """Return the status and the newest offset of the Stream."""
+        """Return the newest offset of the Stream."""
         request = DescribeStreamRequest(
             ref=self.ref,
         )

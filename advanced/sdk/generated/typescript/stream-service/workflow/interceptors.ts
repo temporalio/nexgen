@@ -7,8 +7,6 @@ import type {
   CreateStreamRequest,
   AppendRecordsResponse,
   AppendRecordsRequest,
-  CloseStreamResponse,
-  CloseStreamRequest,
   ReadRecordsResponse,
   ReadRecordsRequest,
   DescribeStreamResponse,
@@ -28,12 +26,6 @@ export interface SystemNexusWorkflowOutboundCallsInterceptor {
       input: AppendRecordsRequest<unknown>,
     ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>,
   ) => Promise<nexus.NexusOperationHandle<AppendRecordsResponse>>;
-  closeStream?: (
-    input: CloseStreamRequest<unknown>,
-    next: (
-      input: CloseStreamRequest<unknown>,
-    ) => Promise<nexus.NexusOperationHandle<CloseStreamResponse>>,
-  ) => Promise<nexus.NexusOperationHandle<CloseStreamResponse>>;
   readRecords?: (
     input: ReadRecordsRequest<unknown>,
     next: (
@@ -69,12 +61,6 @@ export function dispatchSystemNexusSpecificInterceptors(
           return composeInterceptors(interceptors, "appendRecords", (request) =>
             next<AppendRecordsRequest<unknown>, AppendRecordsResponse>(request),
           )(input as AppendRecordsRequest<unknown>) as Promise<
-            nexus.NexusOperationHandle<unknown>
-          >;
-        case "CloseStream":
-          return composeInterceptors(interceptors, "closeStream", (request) =>
-            next<CloseStreamRequest<unknown>, CloseStreamResponse>(request),
-          )(input as CloseStreamRequest<unknown>) as Promise<
             nexus.NexusOperationHandle<unknown>
           >;
         case "ReadRecords":

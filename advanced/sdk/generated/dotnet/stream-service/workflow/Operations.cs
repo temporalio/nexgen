@@ -59,20 +59,6 @@ namespace Temporalio.Workflows
         public IReadOnlyList<TBody> Records { get; set; }
     }
 
-    [GeneratedCode("nexgen", null)]
-    internal class CloseStreamOptions<TBody>
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CloseStreamOptions{TBody}"/> class.
-        /// </summary>
-        public CloseStreamOptions(StreamRef<TBody> @ref)
-        {
-            Ref = @ref;
-        }
-
-        public StreamRef<TBody> Ref { get; set; }
-    }
-
     /// <summary>
     /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
     /// </summary>
@@ -101,7 +87,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? MaxBytes { get; set; }
         /// <summary>
-        /// How long the read waits for a new Record or a close before an empty page.
+        /// How long the read waits for a new Record before an empty page.
         /// </summary>
         public System.TimeSpan? Wait { get; set; }
     }
@@ -171,23 +157,6 @@ namespace Temporalio.Workflows
         {
             var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Temporalio.Nexus.SystemNexus.StreamWorkflowContext.Producer());
             return AppendRecordsAsync(request);
-        }
-
-        /// <param name="request">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
-        [GeneratedCode("nexgen", null)]
-        private static async Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamRequest<TBody> request)
-        {
-            var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<CloseStreamResponse>("CloseStream", request).ConfigureAwait(true);
-            return result;
-        }
-
-        /// <param name="options">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
-        [GeneratedCode("nexgen", null)]
-        internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
-        {
-            var request = new CloseStreamRequest<TBody>(options.Ref, Temporalio.Nexus.SystemNexus.StreamWorkflowContext.Producer());
-            return CloseStreamAsync(request);
         }
 
         /// <summary>

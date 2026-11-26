@@ -11,10 +11,6 @@ export const operationRegistry = [
   },
   {
     service: "temporal.api.streamservice.v1.StreamService",
-    operation: "CloseStream",
-  },
-  {
-    service: "temporal.api.streamservice.v1.StreamService",
     operation: "ReadRecords",
   },
   {

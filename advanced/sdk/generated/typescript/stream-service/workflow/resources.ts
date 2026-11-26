@@ -8,7 +8,6 @@ import type {
   DescribeStreamResponse,
 } from "./models";
 import { appendRecords } from "./operations/append-records";
-import { closeStream } from "./operations/close-stream";
 import { readRecords } from "./operations/read-records";
 import { describeStream } from "./operations/describe-stream";
 
@@ -32,12 +31,6 @@ export class Stream<BodyT = unknown> {
     const request = { ref: this.ref, records: records };
     const handle = await appendRecords(request);
     return await handle.result();
-  }
-
-  public async close(): Promise<void> {
-    const request = { ref: this.ref };
-    const handle = await closeStream(request);
-    await handle.result();
   }
 
   public async read(
