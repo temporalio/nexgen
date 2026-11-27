@@ -683,6 +683,25 @@ async def test_a_read_that_does_not_wait_stops_at_an_empty_page_that_did_not_mov
     assert len({started.id for started in answers.started}) == len(pages)
 
 
+async def test_a_pending_cancellation_stops_the_next_poll_of_an_empty_page() -> None:
+    ref = StreamRef(id="s1")
+    empty = ReadRecordsResponse[str](records=[], last_offset=_offset(1), done=False)
+    client, answers = connect(Client, {"ReadRecords": [empty]})
+    stream = client.get_stream(ref=ref, body_type=str)
+
+    # A nonzero wait makes this sample's page helper continue at an unchanged offset.
+    async def consume() -> None:
+        await anext(
+            stream.read(from_offset=_offset(1), wait=datetime.timedelta(seconds=1))
+        )
+
+    task = asyncio.create_task(consume())
+    asyncio.get_running_loop().call_soon(task.cancel)
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert len(answers.started) == 1
+
+
 async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -> None:
     ref = StreamRef(id="s1")
     wait = datetime.timedelta(seconds=30)

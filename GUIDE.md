@@ -2940,7 +2940,8 @@ def next_read_request(request, response):
 With `items="<field>"`, nexgen also generates `iter_<name>_items` on the client
 extension, and `<method>` on a resource method. The item iterator takes the
 parameters of the page iterator, reads its pages, and yields the items of the
-list field `<field>` of each response. It returns a `PollIterator`, whose
+list field `<field>` of each response. On the client, continuing after an empty page gives the asyncio event loop a turn,
+even when an in-process operation answers immediately. It returns a `PollIterator`, whose
 `next_request` is the request to resume with:
 
 - After an item, the `python-resume` helper gives it. The helper takes the
