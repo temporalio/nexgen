@@ -152,7 +152,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// Append one batch. The Store writes a batch that arrives again only once.
+    /// Append one batch. Retries are deduplicated within the Store resend window.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(AppendRecordsRequest<>.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -613,7 +613,7 @@ namespace Temporalio.Workflows
     }
 
     /// <summary>
-    /// The writer of a batch. A later attempt supersedes an earlier one.
+    /// The writer of a batch. Attempts compare only within the same Producer.
     /// </summary>
     [Temporalio.Converters.TemporalTransferTypeConverter(typeof(Producer.TransferTypeConverter))]
     [GeneratedCode("nexgen", null)]
@@ -717,15 +717,15 @@ namespace Temporalio.Workflows
         /// </summary>
         public byte[]? FromOffset { get; init; }
         /// <summary>
-        /// The maximum number of Records in one page.
+        /// The maximum Records per page. Zero uses the configured default.
         /// </summary>
         public int? MaxRecords { get; init; }
         /// <summary>
-        /// The maximum bytes of Records in a page. A larger Record is returned alone.
+        /// The page byte target. One larger Record can be returned unless an SDK hard limit rejects it.
         /// </summary>
         public long? MaxBytes { get; init; }
         /// <summary>
-        /// How long the read waits for a new Record before an empty page.
+        /// How long to wait for a new Record. Unset returns immediately.
         /// </summary>
         public System.TimeSpan? Wait { get; init; }
 
@@ -794,7 +794,7 @@ namespace Temporalio.Workflows
 
         public IReadOnlyList<StreamRecord<TBody>> Records { get; init; }
         /// <summary>
-        /// Where the next read goes on. It is never before the last Record in this page.
+        /// The next read starts here. If empty, use the last Record or request offset.
         /// </summary>
         public byte[]? LastOffset { get; init; }
 
@@ -976,7 +976,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// The Stream id, 1 to 4096 bytes.
+        /// The Stream id. It must not be empty.
         /// </summary>
         public string Id { get; init; }
         /// <summary>

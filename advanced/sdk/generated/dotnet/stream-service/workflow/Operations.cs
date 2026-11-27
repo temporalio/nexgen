@@ -27,7 +27,7 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// The Stream id, 1 to 4096 bytes.
+        /// The Stream id. It must not be empty.
         /// </summary>
         public string Id { get; set; }
         /// <summary>
@@ -79,15 +79,15 @@ namespace Temporalio.Workflows
         /// </summary>
         public byte[]? FromOffset { get; set; }
         /// <summary>
-        /// The maximum number of Records in one page.
+        /// The maximum Records per page. Zero uses the configured default.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
-        /// The maximum bytes of Records in a page. A larger Record is returned alone.
+        /// The page byte target. One larger Record can be returned unless an SDK hard limit rejects it.
         /// </summary>
         public long? MaxBytes { get; set; }
         /// <summary>
-        /// How long the read waits for a new Record before an empty page.
+        /// How long to wait for a new Record. Unset returns immediately.
         /// </summary>
         public System.TimeSpan? Wait { get; set; }
     }
@@ -139,7 +139,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="request">Append one batch. The Store writes a batch that arrives again only once.</param>
+        /// <param name="request">Append one batch. Retries are deduplicated within the Store resend window.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
         {
@@ -151,7 +151,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="options">Append one batch. The Store writes a batch that arrives again only once.</param>
+        /// <param name="options">Append one batch. Retries are deduplicated within the Store resend window.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {

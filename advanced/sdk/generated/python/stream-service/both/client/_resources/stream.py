@@ -129,10 +129,10 @@ class Stream(typing.Generic[BodyT]):
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
-            max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record before an empty page.
-            max_bytes: The maximum bytes of Records in a page. A larger Record is
-                returned alone.
+            max_records: The maximum Records per page. Zero uses the configured default.
+            wait: How long to wait for a new Record. Unset returns immediately.
+            max_bytes: The page byte target. One larger Record can be returned unless an
+                SDK hard limit rejects it.
         """
         request = ReadRecordsRequest(
             ref=self.ref,
@@ -180,10 +180,10 @@ class Stream(typing.Generic[BodyT]):
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
-            max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record before an empty page.
-            max_bytes: The maximum bytes of Records in a page. A larger Record is
-                returned alone.
+            max_records: The maximum Records per page. Zero uses the configured default.
+            wait: How long to wait for a new Record. Unset returns immediately.
+            max_bytes: The page byte target. One larger Record can be returned unless an
+                SDK hard limit rejects it.
         """
         request = ReadRecordsRequest(
             ref=self.ref,

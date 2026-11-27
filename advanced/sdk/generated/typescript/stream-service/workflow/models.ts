@@ -100,7 +100,7 @@ export function createCreateStreamResultTransferTypeConverter<BodyT>(
 }
 export interface StreamRef<BodyT> {
   /**
-   * The Stream id, 1 to 4096 bytes.
+   * The Stream id. It must not be empty.
    */
   id: string;
   /**
@@ -1008,7 +1008,7 @@ export const clientProducerTransferTypeConverter = {
 export interface ReadRecordsResponse<BodyT> {
   records: StreamRecord<BodyT>[];
   /**
-   * Where the next read goes on. It is never before the last Record in this page.
+   * The next read starts here. If empty, use the last Record or request offset.
    */
   lastOffset?: Uint8Array;
 }
@@ -1163,15 +1163,16 @@ export interface ReadRecordsRequest<BodyT> {
    */
   fromOffset?: Uint8Array;
   /**
-   * The maximum number of Records in one page.
+   * The maximum Records per page. Zero uses the configured default.
    */
   maxRecords?: number;
   /**
-   * The maximum bytes of Records in a page. A larger Record is returned alone.
+   * The page byte target. One larger Record can be returned unless an SDK hard limit
+   * rejects it.
    */
   maxBytes?: Long;
   /**
-   * How long the read waits for a new Record before an empty page.
+   * How long to wait for a new Record. Unset returns immediately.
    */
   wait?: common.Duration;
 }
