@@ -183,14 +183,18 @@ def _timestamp(time: datetime) -> "Timestamp":
     return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
 
 
+DEFAULT_READ_WAIT = timedelta(minutes=1)
+"""Default wait after the first page of ``read`` and ``read_pages``."""
+
+
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    # A read with no wait, or a wait of zero, ends at its first page with no Record.
-    if response.done or (not request.wait and not response.records):
-        return None
+    # Empty pages don't end a Stream. The default wait avoids busy polling.
     return dataclasses.replace(
-        request, from_offset=response.last_offset or request.from_offset
+        request,
+        from_offset=response.last_offset or request.from_offset,
+        wait=DEFAULT_READ_WAIT if request.wait is None else request.wait,
     )
 
 
