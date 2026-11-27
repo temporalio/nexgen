@@ -1,1 +1,1 @@
-Python client poll iterators let other asyncio tasks run between empty pages.
+Python client poll iterators let other `asyncio` tasks run between empty pages.
