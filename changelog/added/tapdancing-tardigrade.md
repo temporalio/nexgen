@@ -1,1 +1,0 @@
-Add SDK integration CI and local `cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, and `sdk-dotnet` stages that regenerate bindings from the current nexgen source and SDK-native workflow-service WIT/support, then execute real SDK workflow tests instead of standalone workflow-service samples.
