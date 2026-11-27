@@ -5702,6 +5702,7 @@ fn render_optional_python_imports_with_skipped_language_modules(
     skipped_language_modules: &BTreeSet<String>,
 ) -> bool {
     let simple_imports = [
+        ("import asyncio as _asyncio\n", "_asyncio"),
         ("import collections.abc\n", "collections.abc"),
         ("import dataclasses\n", "dataclasses"),
         ("import enum\n", "enum"),
@@ -10470,6 +10471,12 @@ fn render_client_poll_loop(
     start_line(output, target, "        yield response\n");
     start_line(output, target, "        if next_request is None:\n");
     start_line(output, target, "            return\n");
+    if let Some((items_attr, _)) = &operation.poll_items {
+        // A local client implementation can answer without suspending. Give cancellation and
+        // other tasks a turn before polling another empty page.
+        start_line(output, target, &format!("        if not response.{items_attr}:\n"));
+        start_line(output, target, "            await _asyncio.sleep(0)\n");
+    }
     start_line(output, target, "        request = next_request\n");
 }
 

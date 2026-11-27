@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import collections.abc
 import typing
 import typing_extensions
@@ -192,6 +193,8 @@ class Stream(typing.Generic[BodyT]):
             yield response
             if next_request is None:
                 return
+            if not response.records:
+                await _asyncio.sleep(0)
             request = next_request
 
     def read(
