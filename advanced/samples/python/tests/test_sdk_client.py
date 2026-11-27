@@ -689,7 +689,7 @@ async def test_a_pending_cancellation_stops_the_next_poll_of_an_empty_page() -> 
     client, answers = connect(Client, {"ReadRecords": [empty]})
     stream = client.get_stream(ref=ref, body_type=str)
 
-    # A nonzero wait makes this sample's page helper continue at an unchanged offset.
+    # This sample's helper requires a nonzero wait to continue at the same offset.
     async def consume() -> None:
         _ = await anext(
             stream.read(from_offset=_offset(1), wait=datetime.timedelta(seconds=1))
