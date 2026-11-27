@@ -691,12 +691,12 @@ async def test_a_pending_cancellation_stops_the_next_poll_of_an_empty_page() -> 
 
     # A nonzero wait makes this sample's page helper continue at an unchanged offset.
     async def consume() -> None:
-        await anext(
+        _ = await anext(
             stream.read(from_offset=_offset(1), wait=datetime.timedelta(seconds=1))
         )
 
     task = asyncio.create_task(consume())
-    asyncio.get_running_loop().call_soon(task.cancel)
+    _ = asyncio.get_running_loop().call_soon(task.cancel)
     with pytest.raises(asyncio.CancelledError):
         await task
     assert len(answers.started) == 1
