@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.14] - 2026-11-25
+
+### Added
+
+- TypeScript, Go, and .NET operation registries support `@nexus.storage-target` helpers for destination-aware external-storage routing, independently of the storing worker's namespace.
+- Go System Nexus models-only interfaces can generate facades without the workflow target.
+- Python operation registries support `@nexus.storage-target` helpers for destination-aware external-storage routing, independently of the storing worker's namespace.
+- Add SDK integration CI and local `cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, and `sdk-dotnet` stages that regenerate bindings from the current nexgen source and SDK-native workflow-service WIT/support, then execute real SDK workflow tests instead of standalone workflow-service samples.
+
+### Changed
+
+- Go models-only WIT outputs use the interface name instead of `api.go` when available.
+- Shared compiler error kinds now carry the target language instead of using Python-, Go-, Java-, or .NET-specific variants; Go naming conflicts are reported as name conflicts rather than unsupported types, and package/namespace configuration errors share an output-namespace error kind.
+
+### :boom: Breaking Changes
+
+- A resource method no longer takes a parameter in a target where its request field has a `@nexus.source`, and the source fills the field. A field can now have a `@nexus.source` in one target and a `@nexus.default` in the other.
+
+### Fixed
+
+- Go protobuf oneof converters use the emitted case type names in System Nexus mode.
+- Validate incompatible WIT annotations through the annotation catalog, including unused declarations and linked packages, with language- and target-aware conflict rules.
+- Go variant case structs now document their generated `Value` fields.
+
 ## [0.2.13] - 2026-11-19
 
 ### Added

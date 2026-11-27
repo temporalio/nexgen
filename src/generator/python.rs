@@ -5702,6 +5702,7 @@ fn render_optional_python_imports_with_skipped_language_modules(
     skipped_language_modules: &BTreeSet<String>,
 ) -> bool {
     let simple_imports = [
+        ("import asyncio as _asyncio\n", "_asyncio"),
         ("import collections.abc\n", "collections.abc"),
         ("import dataclasses\n", "dataclasses"),
         ("import enum\n", "enum"),
@@ -7610,7 +7611,7 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
 
     ``next_request`` is the request to resume with. After an item, the resume helper gives
     it. Without a resume helper, it reads the item's page again. After a page's last item,
-    it is the page helper's request, which is ``None`` after the last page.
+    it is the page helper's request. It is ``None`` when the page helper returns ``None``.
     """
 
     def __init__(
@@ -10208,8 +10209,8 @@ fn poll_items_summary(pages: &str, doc: Option<&str>, resume: bool) -> String {
          page's last item."
     };
     let summary = format!(
-        "Yield each item of ``{pages}``, page by page.\n\n{next_request} It is ``None`` after \
-         the last page."
+        "Yield each item of ``{pages}``, page by page.\n\n{next_request} It is ``None`` when \
+         the page helper returns ``None``."
     );
     match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
         Some(doc) => format!("{summary}\n\n{doc}"),
@@ -10218,7 +10219,8 @@ fn poll_items_summary(pages: &str, doc: Option<&str>, resume: bool) -> String {
 }
 
 fn poll_function_summary(name: &str, doc: Option<&str>) -> String {
-    let summary = format!("Yield each response of ``{name}`` until the poll helper stops.");
+    let summary =
+        format!("Yield each response of ``{name}`` until the poll helper returns ``None``.");
     match doc.map(str::trim).filter(|doc| !doc.is_empty()) {
         Some(doc) => format!("{summary}\n\n{doc}"),
         None => summary,
@@ -10469,6 +10471,15 @@ fn render_client_poll_loop(
     start_line(output, target, "        yield response\n");
     start_line(output, target, "        if next_request is None:\n");
     start_line(output, target, "            return\n");
+    if let Some((items_attr, _)) = &operation.poll_items {
+        // A local client can return without suspending, which prevents cancellation.
+        start_line(
+            output,
+            target,
+            &format!("        if not response.{items_attr}:\n"),
+        );
+        start_line(output, target, "            await _asyncio.sleep(0)\n");
+    }
     start_line(output, target, "        request = next_request\n");
 }
 
