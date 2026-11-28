@@ -20,6 +20,7 @@ from ..models import (
     StreamRef,
 )
 from ._resources.stream import Stream
+import temporalio.nexus.system._support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
@@ -107,14 +108,7 @@ class StreamServiceClientExtension(abc.ABC):
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
-        if result.ref is None:
-            raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream[body_type](
-            nexus_client,
-            ref=result.ref,
-            created=result.created or None,
-        )
-        return resource
+        return _support.stream_from_create(result, nexus_client, body_type)
 
     @typing.overload
     async def create_stream(

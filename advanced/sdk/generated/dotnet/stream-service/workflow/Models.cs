@@ -725,7 +725,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public long? MaxBytes { get; init; }
         /// <summary>
-        /// How long to wait for a new Record. Unset returns immediately.
+        /// Wait per page. Unset reads immediately, then iterators use a one-minute wait.
         /// </summary>
         public System.TimeSpan? Wait { get; init; }
 

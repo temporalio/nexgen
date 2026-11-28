@@ -13,6 +13,7 @@ from ...models import (
     StreamRef,
 )
 from .._resources import Stream
+import temporalio.nexus.system._support as _support
 
 
 BodyT = typing.TypeVar("BodyT")
@@ -32,12 +33,7 @@ async def _create_stream(
         output_type=CreateStreamResult[body_type],
     )
     result = await handle
-    if result.ref is None:
-        raise RuntimeError("CreateStream answered without `ref`")
-    return Stream[body_type](
-        ref=result.ref,
-        created=result.created or None,
-    )
+    return _support.stream_from_create(result, nexus_client, body_type)
 
 
 @typing.overload

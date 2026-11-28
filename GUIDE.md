@@ -2874,6 +2874,10 @@ is emitted as written and has access to `request` and `result` variables.
 Helpers used by the expression must be available to the generated code. Go
 expressions must return `(T, error)`.
 
+Freestanding Python resource creation functions also provide `nexus_client`, the
+Nexus client used for the call. Generic resources provide their runtime type
+arguments, such as `body_type` for `body-t`.
+
 ```wit
 /// @nexus.output-transform
 ///   python-type="workflow.ExternalWorkflowHandle[typing.Any]"
