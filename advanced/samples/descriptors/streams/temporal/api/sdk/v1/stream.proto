@@ -22,7 +22,7 @@ import "temporal/api/stream/v1/message.proto";
 // SDKs encode references with this message so that other SDKs can decode them.
 message StreamRef {
   string id = 1;
-  // The registered Store name. Empty selects the configured default.
+  // When empty, the SDK uses its Store selector or the only registered Store.
   // This field is local to the SDK. Store and server requests omit it.
   string store = 2;
 }
@@ -63,7 +63,9 @@ message ReadRecordsRequest {
   // (-- api-linter: core::0140::prepositions=disabled
   //     aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
   bytes from_offset = 2;
+  // Zero uses the configured default.
   int32 max_records = 3;
+  // One Record can exceed this target unless an SDK hard limit rejects it.
   int64 max_bytes = 4;
   google.protobuf.Duration wait = 5;
 }

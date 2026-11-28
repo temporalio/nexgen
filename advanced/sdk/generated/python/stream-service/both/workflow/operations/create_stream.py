@@ -70,7 +70,7 @@ async def create_stream(
     """
     Args:
         id: The Stream id. It must not be empty.
-        store: The registered name of the Store. If empty, the SDK picks a Store.
+        store: If empty, the SDK uses its Store selector or the only registered Store.
         id_conflict_policy: What the create does if the Stream already exists.
             Unspecified means fail.
     """

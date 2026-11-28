@@ -104,7 +104,7 @@ export interface StreamRef<BodyT> {
    */
   id: string;
   /**
-   * The registered name of the Store. If empty, the SDK picks a Store.
+   * If empty, the SDK uses its Store selector or the only registered Store.
    */
   store?: string;
 }
@@ -1167,8 +1167,7 @@ export interface ReadRecordsRequest<BodyT> {
    */
   maxRecords?: number;
   /**
-   * The page byte target. One larger Record can be returned unless an SDK hard limit
-   * rejects it.
+   * Page byte target. A larger Record can exceed it within SDK hard limits.
    */
   maxBytes?: Long;
   /**

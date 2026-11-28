@@ -721,7 +721,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public int? MaxRecords { get; init; }
         /// <summary>
-        /// The page byte target. One larger Record can be returned unless an SDK hard limit rejects it.
+        /// Page byte target. A larger Record can exceed it within SDK hard limits.
         /// </summary>
         public long? MaxBytes { get; init; }
         /// <summary>
@@ -980,7 +980,7 @@ namespace Temporalio.Workflows
         /// </summary>
         public string Id { get; init; }
         /// <summary>
-        /// The registered name of the Store. If empty, the SDK picks a Store.
+        /// If empty, the SDK uses its Store selector or the only registered Store.
         /// </summary>
         public string? Store { get; init; }
 
