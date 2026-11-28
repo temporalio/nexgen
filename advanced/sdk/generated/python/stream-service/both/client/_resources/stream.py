@@ -156,8 +156,7 @@ class Stream(typing.Generic[BodyT]):
             yield response
             if next_request is None:
                 return
-            if not response.records:
-                await _asyncio.sleep(0)
+            await _asyncio.sleep(0)
             request = next_request
 
     def read(
