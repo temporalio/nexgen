@@ -1087,7 +1087,7 @@ world system { export stream-service; }
 interface stream-service {
   use nexus:temporal-types/model@1.0.0.{placeholder};
 
-  /// @nexus.proto "temporal.api.streamservice.v1.ReadRecordsRequest"
+  /// @nexus.proto "temporal.api.sdk.v1.ReadRecordsRequest"
   record read-records-request {
     /// @nexus.omit
     ref: placeholder,

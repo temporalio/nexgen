@@ -872,18 +872,22 @@ return CreateJobResult(job=Job(job_id=result.job_id), created=result.created)
 optional.
 
 ```wit
-/// @nexus.operation "close-stream"
-/// @nexus.close
-close: func();
+resource session {
+  constructor(id: string);
+
+  /// @nexus.operation "close-session"
+  /// @nexus.close
+  close: func();
+}
 ```
 
 ```python
-async with client.create_stream(id="turns", body_type=Turn) as stream:
-    await stream.publish(records=[AppendRecord(body=Turn(role="user"))])
+async with client.create_session(id="s1") as session:
+    await use_session(session)
 ```
 
-A call that returns the resource returns a `ResourceCall`, such as
-`ResourceCall[Stream[Turn]]`. Await it for the resource, or enter it with
+A call that returns the resource returns a `ResourceContextManager`, such as
+`ResourceContextManager[Session]`. Await it for the resource, or enter it with
 `async with`. Only Python closes a resource this way.
 
 ### Variadic Items
@@ -2603,12 +2607,12 @@ becomes the marked case. An enum has at most one fallback case, and the
 directive takes no arguments.
 
 ```wit
-/// @nexus.proto "temporal.api.enums.v1.StreamStatus"
-enum stream-status {
+/// @nexus.proto "temporal.api.enums.v1.StreamIdConflictPolicy"
+enum stream-id-conflict-policy {
   /// @nexus.fallback
-  stream-status-unspecified,
-  stream-status-open,
-  stream-status-closed,
+  stream-id-conflict-policy-unspecified,
+  stream-id-conflict-policy-fail,
+  stream-id-conflict-policy-use-existing,
 }
 ```
 
@@ -2870,6 +2874,10 @@ is emitted as written and has access to `request` and `result` variables.
 Helpers used by the expression must be available to the generated code. Go
 expressions must return `(T, error)`.
 
+Freestanding Python resource creation functions also provide `nexus_client`, the
+Nexus client used for the call. Generic resources provide their runtime type
+arguments, such as `body_type` for `body-t`.
+
 ```wit
 /// @nexus.output-transform
 ///   python-type="workflow.ExternalWorkflowHandle[typing.Any]"
@@ -2919,20 +2927,17 @@ target that has the method gets them, and `targets="client"` keeps them out of
 Workflow code. With `targets="client"`, the Workflow `<method>` stays the one
 call.
 
+The [catalog fixture](advanced/samples/inputs/page-poll.wit) puts the next
+request in each page. Its helper returns `None` when that request is absent.
+
 ```wit
-/// @nexus.operation name="ReadRecords"
-/// @nexus.poll python="next_read_request"
-read-records: func(request: read-records-request) -> read-records-response;
+/// @nexus.poll python="next_page_request"
+list-pages: func(request: page-request) -> page;
 ```
 
 ```python
-def next_read_request(request, response):
-    if response.done:
-        return None
-    # A read that doesn't wait stops at the newest Record.
-    if not response.records and not request.wait:
-        return None
-    return dataclasses.replace(request, from_offset=response.next_offset)
+def next_page_request(_request, response):
+    return response.next
 ```
 
 With `items="<field>"`, nexgen also generates `iter_<name>_items` on the client
@@ -2949,6 +2954,9 @@ list field `<field>` of each response. Each item iterator returns a
 - After a page's last item, it is the page helper's request. It is `None` when
   the page helper returns `None`.
 
+Streams read after an opaque offset. Their resume helper passes the Record's
+offset unchanged.
+
 ```wit
 /// @nexus.poll python="next_read_request" items="records"
 ///   python-resume="resume_read_request"
@@ -2957,7 +2965,7 @@ read-records: func(request: read-records-request) -> read-records-response;
 
 ```python
 def resume_read_request(request, item):
-    return dataclasses.replace(request, from_offset=item.offset + 1)
+    return dataclasses.replace(request, from_offset=item.offset)
 ```
 
 To resume, pass the fields of a saved `next_request` to the item iterator. A

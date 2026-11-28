@@ -15,18 +15,26 @@ import temporalio.api.workflow.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system
+from temporalio._workflow_context import _current_workflow_flags, _WorkflowLogicFlag
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 
 if typing.TYPE_CHECKING:
     import temporalio.activity
     import temporalio.client
+    from temporalio.client import NexusClient as ClientNexusClient
+    from temporalio.nexus.system.stream_service.client import Stream as ClientStream
     from temporalio.nexus.system.stream_service.models import (
+        CreateStreamResult,
         Producer,
         ReadRecordsRequest,
         ReadRecordsResponse,
         StreamRecord,
         Timestamp,
     )
+    from temporalio.nexus.system.stream_service.workflow._resources import (
+        Stream as WorkflowStream,
+    )
+    from temporalio.workflow import NexusClient as WorkflowNexusClient
 
 _BodyT = typing.TypeVar("_BodyT")
 _ModelT = typing.TypeVar("_ModelT")
@@ -71,6 +79,55 @@ def model_from_proto(
         )
     ):
         return converter.from_transfer_type(proto, model_type)
+
+
+@typing.overload
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "ClientNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "ClientStream[_BodyT]": ...
+
+
+@typing.overload
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "WorkflowNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "WorkflowStream[_BodyT]": ...
+
+
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "ClientNexusClient[typing.Any] | WorkflowNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "ClientStream[_BodyT] | WorkflowStream[_BodyT]":
+    import temporalio.workflow
+
+    if result.ref is None:
+        raise RuntimeError("CreateStream answered without `ref`")
+    created: bool | None = bool(result.created)
+    if isinstance(nexus_client, temporalio.workflow.NexusClient):
+        from temporalio.nexus.system.stream_service.workflow._resources import (
+            Stream as WorkflowStream,
+        )
+
+        if not created:
+            flags = _current_workflow_flags.get()
+            # Unflagged replay must retain None, including responses from interceptors.
+            if flags is not None and not flags.is_flag_enabled(
+                _WorkflowLogicFlag.REPORT_EXISTING_STREAM_AS_FALSE
+            ):
+                created = None
+        return WorkflowStream[body_type](  # type: ignore[valid-type, reportInvalidTypeForm]
+            ref=result.ref, created=created
+        )
+
+    from temporalio.nexus.system.stream_service.client import Stream as ClientStream
+
+    return ClientStream[body_type](  # type: ignore[valid-type, reportInvalidTypeForm]
+        nexus_client, ref=result.ref, created=created
+    )
 
 
 def default_producer(
@@ -183,14 +240,26 @@ def _timestamp(time: datetime) -> "Timestamp":
     return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
 
 
+DEFAULT_READ_WAIT = timedelta(minutes=1)
+"""Default wait after the first page of ``read`` and ``read_pages``."""
+
+
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    # A read with no wait, or a wait of zero, ends at its first page with no Record.
-    if response.done or (not request.wait and not response.records):
-        return None
+    cursor = response.last_offset or request.from_offset
+    if not response.last_offset and response.records:
+        # An unflagged replay must issue its next read at the recorded request cursor.
+        flags = _current_workflow_flags.get()
+        if flags is None or flags.is_flag_enabled(
+            _WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET
+        ):
+            cursor = response.records[-1].offset
+    # Empty pages don't end a Stream. The default wait avoids busy polling.
     return dataclasses.replace(
-        request, from_offset=response.last_offset or request.from_offset
+        request,
+        from_offset=cursor,
+        wait=DEFAULT_READ_WAIT if request.wait is None else request.wait,
     )
 
 

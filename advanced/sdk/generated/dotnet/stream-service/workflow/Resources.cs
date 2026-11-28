@@ -32,13 +32,6 @@ namespace Temporalio.Workflows
         }
 
         [GeneratedCode("nexgen", null)]
-        public Task CloseAsync()
-        {
-            var request = new CloseStreamOptions<TBody>(Ref);
-            return Operations.CloseStreamAsync(request);
-        }
-
-        [GeneratedCode("nexgen", null)]
         public Task<ReadRecordsResponse<TBody>> ReadAsync(byte[]? fromOffset, int? maxRecords, System.TimeSpan? wait, long? maxBytes)
         {
             var request = new ReadRecordsOptions<TBody>(Ref) { FromOffset = fromOffset, MaxRecords = maxRecords, MaxBytes = maxBytes, Wait = wait };

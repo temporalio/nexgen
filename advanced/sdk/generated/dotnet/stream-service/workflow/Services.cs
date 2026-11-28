@@ -29,10 +29,6 @@ namespace Temporalio.Workflows
         [NexusOperation("AppendRecords")]
         AppendRecordsResponse AppendRecords(AppendRecordsRequest<object> request);
 
-        [GeneratedCode("nexgen", null)]
-        [NexusOperation("CloseStream")]
-        CloseStreamResponse CloseStream(CloseStreamRequest<object> request);
-
         /// <summary>
         /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
         /// </summary>
@@ -82,8 +78,6 @@ namespace Temporalio.Workflows
                 StreamServiceServiceDefinition.Operations["CreateStream"]),
             [("temporal.api.streamservice.v1.StreamService", "AppendRecords")] = new NexgenOperationInfo<AppendRecordsRequest<object>, AppendRecordsResponse>(
                 StreamServiceServiceDefinition.Operations["AppendRecords"]),
-            [("temporal.api.streamservice.v1.StreamService", "CloseStream")] = new NexgenOperationInfo<CloseStreamRequest<object>, CloseStreamResponse>(
-                StreamServiceServiceDefinition.Operations["CloseStream"]),
             [("temporal.api.streamservice.v1.StreamService", "ReadRecords")] = new NexgenOperationInfo<ReadRecordsRequest<object>, ReadRecordsResponse<object>>(
                 StreamServiceServiceDefinition.Operations["ReadRecords"]),
             [("temporal.api.streamservice.v1.StreamService", "DescribeStream")] = new NexgenOperationInfo<DescribeStreamRequest<object>, DescribeStreamResponse>(

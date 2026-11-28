@@ -56,20 +56,6 @@ namespace Temporalio.Worker
                 throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
             }
             if (service == "temporal.api.streamservice.v1.StreamService" &&
-                operationName == "CloseStream")
-            {
-                if (arg is null || !arg.GetType().IsGenericType ||
-                    arg.GetType().GetGenericTypeDefinition() != typeof(CloseStreamRequest<>))
-                {
-                    throw new System.ArgumentException("System Nexus operation expects a CloseStreamRequest<> request.", nameof(arg));
-                }
-                if (typeof(TResult) != typeof(CloseStreamResponse))
-                {
-                    throw new System.ArgumentException("System Nexus operation expects a CloseStreamResponse result.");
-                }
-                throw new System.NotSupportedException("System Nexus interception of generic models is not supported in .NET.");
-            }
-            if (service == "temporal.api.streamservice.v1.StreamService" &&
                 operationName == "ReadRecords")
             {
                 if (arg is null || !arg.GetType().IsGenericType ||

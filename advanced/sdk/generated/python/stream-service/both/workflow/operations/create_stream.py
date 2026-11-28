@@ -13,7 +13,7 @@ from ...models import (
     StreamRef,
 )
 from .._resources import Stream
-from ..._resource_context_manager import resource_context_manager
+import temporalio.nexus.system._support as _support
 
 
 BodyT = typing.TypeVar("BodyT")
@@ -33,16 +33,10 @@ async def _create_stream(
         output_type=CreateStreamResult[body_type],
     )
     result = await handle
-    if result.ref is None:
-        raise RuntimeError("CreateStream answered without `ref`")
-    return Stream[body_type](
-        ref=result.ref,
-        created=result.created or None,
-    )
+    return _support.stream_from_create(result, nexus_client, body_type)
 
 
 @typing.overload
-@resource_context_manager
 async def create_stream(
     *,
     id: str,
@@ -53,7 +47,6 @@ async def create_stream(
 
 
 @typing.overload
-@resource_context_manager
 async def create_stream(
     *,
     id: str,
@@ -63,7 +56,6 @@ async def create_stream(
 ) -> Stream[object]: ...
 
 
-@resource_context_manager
 async def create_stream(
     *,
     id: str,
@@ -73,8 +65,8 @@ async def create_stream(
 ) -> Stream[typing.Any]:
     """
     Args:
-        id: The Stream id, 1 to 4096 bytes.
-        store: The registered name of the Store. If empty, the SDK picks a Store.
+        id: The Stream id. It must not be empty.
+        store: If empty, the SDK uses its Store selector or the only registered Store.
         id_conflict_policy: What the create does if the Stream already exists.
             Unspecified means fail.
     """

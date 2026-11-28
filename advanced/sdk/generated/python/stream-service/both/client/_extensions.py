@@ -20,7 +20,7 @@ from ..models import (
     StreamRef,
 )
 from ._resources.stream import Stream
-from .._resource_context_manager import resource_context_manager
+import temporalio.nexus.system._support as _support
 
 
 _NexusServiceT = typing.TypeVar("_NexusServiceT")
@@ -108,17 +108,9 @@ class StreamServiceClientExtension(abc.ABC):
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
-        if result.ref is None:
-            raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream[body_type](
-            nexus_client,
-            ref=result.ref,
-            created=result.created or None,
-        )
-        return resource
+        return _support.stream_from_create(result, nexus_client, body_type)
 
     @typing.overload
-    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -131,7 +123,6 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream[BodyT]: ...
 
     @typing.overload
-    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -143,7 +134,6 @@ class StreamServiceClientExtension(abc.ABC):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream[object]: ...
 
-    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -156,8 +146,9 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream[typing.Any]:
         """
         Args:
-            id: The Stream id, 1 to 4096 bytes.
-            store: The registered name of the Store. If empty, the SDK picks a Store.
+            id: The Stream id. It must not be empty.
+            store: If empty, the SDK uses its Store selector or the only registered
+                Store.
             id_conflict_policy: What the create does if the Stream already exists.
                 Unspecified means fail.
         """

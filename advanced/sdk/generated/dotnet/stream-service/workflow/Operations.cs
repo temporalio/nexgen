@@ -27,11 +27,11 @@ namespace Temporalio.Workflows
         }
 
         /// <summary>
-        /// The Stream id, 1 to 4096 bytes.
+        /// The Stream id. It must not be empty.
         /// </summary>
         public string Id { get; set; }
         /// <summary>
-        /// The registered name of the Store. If empty, the SDK picks a Store.
+        /// If empty, the SDK uses its Store selector or the only registered Store.
         /// </summary>
         public string? Store { get; set; }
         /// <summary>
@@ -59,20 +59,6 @@ namespace Temporalio.Workflows
         public IReadOnlyList<TBody> Records { get; set; }
     }
 
-    [GeneratedCode("nexgen", null)]
-    internal class CloseStreamOptions<TBody>
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CloseStreamOptions{TBody}"/> class.
-        /// </summary>
-        public CloseStreamOptions(StreamRef<TBody> @ref)
-        {
-            Ref = @ref;
-        }
-
-        public StreamRef<TBody> Ref { get; set; }
-    }
-
     /// <summary>
     /// A long poll. It fails with NOT_FOUND for a Stream that was never created.
     /// </summary>
@@ -93,15 +79,15 @@ namespace Temporalio.Workflows
         /// </summary>
         public byte[]? FromOffset { get; set; }
         /// <summary>
-        /// The maximum number of Records in one page.
+        /// The maximum Records per page. Zero uses the configured default.
         /// </summary>
         public int? MaxRecords { get; set; }
         /// <summary>
-        /// The maximum bytes of Records in a page. A larger Record is returned alone.
+        /// Page byte target. A larger Record can exceed it within SDK hard limits.
         /// </summary>
         public long? MaxBytes { get; set; }
         /// <summary>
-        /// How long the read waits for a new Record or a close before an empty page.
+        /// Wait per page. Unset reads immediately, then iterators use a one-minute wait.
         /// </summary>
         public System.TimeSpan? Wait { get; set; }
     }
@@ -153,7 +139,7 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="request">Append one batch. The Store writes a batch that arrives again only once.</param>
+        /// <param name="request">Append one batch. Retries are deduplicated within the Store resend window.</param>
         [GeneratedCode("nexgen", null)]
         private static async Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsRequest<TBody> request)
         {
@@ -165,29 +151,12 @@ namespace Temporalio.Workflows
         /// <summary>
         /// Append one batch. For Workflow code, Core makes the call.
         /// </summary>
-        /// <param name="options">Append one batch. The Store writes a batch that arrives again only once.</param>
+        /// <param name="options">Append one batch. Retries are deduplicated within the Store resend window.</param>
         [GeneratedCode("nexgen", null)]
         internal static Task<AppendRecordsResponse> AppendRecordsAsync<TBody>(AppendRecordsOptions<TBody> options)
         {
             var request = new AppendRecordsRequest<TBody>(options.Ref, System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(options.Records, value => new AppendRecord<TBody>(value))), Temporalio.Nexus.SystemNexus.StreamWorkflowContext.Producer());
             return AppendRecordsAsync(request);
-        }
-
-        /// <param name="request">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
-        [GeneratedCode("nexgen", null)]
-        private static async Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamRequest<TBody> request)
-        {
-            var client = Workflow.CreateNexusWorkflowClient("temporal.api.streamservice.v1.StreamService", StreamServiceEndpoint);
-            var result = await client.ExecuteNexusOperationAsync<CloseStreamResponse>("CloseStream", request).ConfigureAwait(true);
-            return result;
-        }
-
-        /// <param name="options">Close a Stream. Readers get the Records that are left. Later appends fail.</param>
-        [GeneratedCode("nexgen", null)]
-        internal static Task<CloseStreamResponse> CloseStreamAsync<TBody>(CloseStreamOptions<TBody> options)
-        {
-            var request = new CloseStreamRequest<TBody>(options.Ref, Temporalio.Nexus.SystemNexus.StreamWorkflowContext.Producer());
-            return CloseStreamAsync(request);
         }
 
         /// <summary>

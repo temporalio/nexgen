@@ -6,8 +6,6 @@ import {
   createStreamRequestTransferTypeConverter,
   appendRecordsResponseTransferTypeConverter,
   appendRecordsRequestTransferTypeConverter,
-  closeStreamResponseTransferTypeConverter,
-  closeStreamRequestTransferTypeConverter,
   readRecordsResponseTransferTypeConverter,
   readRecordsRequestTransferTypeConverter,
   describeStreamResponseTransferTypeConverter,
@@ -18,8 +16,6 @@ import type {
   CreateStreamRequest,
   AppendRecordsResponse,
   AppendRecordsRequest,
-  CloseStreamResponse,
-  CloseStreamRequest,
   ReadRecordsResponse,
   ReadRecordsRequest,
   DescribeStreamResponse,
@@ -45,11 +41,6 @@ export const streamService = nexus.service(
       name: "AppendRecords",
       inputType: { transferTypeConverter: appendRecordsRequestTransferTypeConverter },
       outputType: { transferTypeConverter: appendRecordsResponseTransferTypeConverter },
-    }),
-    closeStream: nexus.operation<CloseStreamRequest<any>, CloseStreamResponse>({
-      name: "CloseStream",
-      inputType: { transferTypeConverter: closeStreamRequestTransferTypeConverter },
-      outputType: { transferTypeConverter: closeStreamResponseTransferTypeConverter },
     }),
     /**
      * A long poll. It fails with NOT_FOUND for a Stream that was never created.
