@@ -2900,7 +2900,8 @@ type or transform expression refers to an otherwise-unavailable module.
 Generates an `iter_<name>` async iterator on the client extension. The iterator
 sends the request, yields the response, and calls
 `<support-helper>(request, response)` for the next request. The helper is a sync
-function in the `--support-package`. It returns `None` to stop.
+function in the `--support-package`. It returns `None` to stop. When it returns
+a next request, the client yields to `asyncio` before sending that request.
 
 A resource method `<method>` that binds the operation gets these methods
 instead. The short name is the iterator that callers should use first:
@@ -2940,16 +2941,16 @@ def next_read_request(request, response):
 With `items="<field>"`, nexgen also generates `iter_<name>_items` on the client
 extension, and `<method>` on a resource method. The item iterator takes the
 parameters of the page iterator, reads its pages, and yields the items of the
-list field `<field>` of each response. It returns a `PollIterator`, whose
-`next_request` is the request to resume with:
+list field `<field>` of each response. Each item iterator returns a
+`PollIterator` whose `next_request` is the request to resume with:
 
 - After an item, the `python-resume` helper gives it. The helper takes the
   page's request and the item, and returns the request that resumes after the
   item.
 - Without `python-resume`, it reads the item's page again, so a resumed read can
   yield an item twice.
-- After a page's last item, it is the page helper's request. It is `None` after
-  the last page.
+- After a page's last item, it is the page helper's request. It is `None` when
+  the page helper returns `None`.
 
 ```wit
 /// @nexus.poll python="next_read_request" items="records"

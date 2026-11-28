@@ -20,6 +20,11 @@ targets = ["workflow"]
 languages = ["python", "dotnet", "typescript", "go"]
 descriptors = "temporal"
 
+[page-poll]
+languages = ["python"]
+targets = ["client"]
+system_nexus = true
+
 [notification-service]
 languages = ["python", "dotnet", "typescript", "go"]
 system_nexus = ["go"]

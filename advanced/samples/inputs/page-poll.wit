@@ -1,0 +1,19 @@
+package example:page-poll@1.0.0;
+
+world service {
+  export catalog;
+}
+
+/// @nexus.endpoint "catalog"
+interface catalog {
+  record page-request {
+    cursor: u32,
+  }
+
+  record page {
+    next: option<page-request>,
+  }
+
+  /// @nexus.poll python="next_page_request"
+  list-pages: func(request: page-request) -> page;
+}
