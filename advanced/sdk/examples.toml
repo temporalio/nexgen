@@ -1,0 +1,18 @@
+[workflow-service]
+languages = ["dotnet", "go", "python", "typescript"]
+targets = ["workflow"]
+system_nexus = true
+descriptors = "temporal"
+
+[stream-service]
+languages = ["dotnet", "python", "typescript"]
+system_nexus = true
+descriptors = ["temporal_api.bin", "streams.bin"]
+
+[stream-service.workflow]
+languages = ["dotnet", "typescript"]
+targets = ["workflow"]
+
+[stream-service.both]
+languages = ["python"]
+targets = ["workflow", "client"]

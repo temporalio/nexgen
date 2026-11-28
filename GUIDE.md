@@ -169,11 +169,12 @@ Support can also share the generated package. Set `--support-package` and
 self-import, so support helpers need not be exported. Authored files alongside
 generated files are preserved.
 
-The repository's workflow-service fixture uses the actual SDK package paths and
-support code, not standalone sample adaptations. Its WIT and companion support
-changes live under [`advanced/sdk/`](advanced/sdk/README.md). Run
-`cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, or `sdk-dotnet` to
+The repository's workflow-service and stream-service fixtures use the actual SDK
+package paths and support code, not standalone sample adaptations. Their WIT and
+companion support changes live under [`advanced/sdk/`](advanced/sdk/README.md).
+Run `cargo validate sdk-go`, `sdk-python`, `sdk-typescript`, or `sdk-dotnet` to
 regenerate inside an SDK checkout and execute native workflow-service tests.
+Python also regenerates and tests the stream client and workflow APIs.
 
 With `--system-nexus`, Go bindings use SDK `internal` APIs and prefix
 package-level declarations with `SystemNexus_` (exported) or `systemnexus_`
@@ -312,17 +313,13 @@ module.
 
 ### .NET
 
-Pass the C# **namespace**, not a source path or assembly name:
-`--support-package Nexgen.Support` for the sample. Put hand-written `.cs` files
-such as
+Pass the C# namespace as `--support-package`. The sample uses `Nexgen.Support`.
+Keep authored files such as
 [`TemporalSupport.cs`](advanced/samples/dotnet/TemporalSupport/TemporalSupport.cs)
-outside regenerated output and compile them into the **same project/assembly**
-as the generated files. This is why the sample's `internal` helpers work; simply
-referencing a separate support DLL would not give the generated code access to
-those members. The support namespace need not equal the generated models'
-namespace. If your `.csproj` disables default compile items or excludes
-directories, explicitly include the authored sources (see
-[`Nexgen.DotNetStreamService.csproj`](advanced/samples/dotnet/Nexgen.DotNetStreamService.csproj)).
+outside the generated directory. Compile them in the same assembly so the
+generated code can call their `internal` helpers. The support and model
+namespaces can differ. If your project disables default compile items or
+excludes the support directory, add the authored sources as `Compile` items.
 
 ```sh
 cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-showcase.wit \
@@ -2900,7 +2897,8 @@ type or transform expression refers to an otherwise-unavailable module.
 Generates an `iter_<name>` async iterator on the client extension. The iterator
 sends the request, yields the response, and calls
 `<support-helper>(request, response)` for the next request. The helper is a sync
-function in the `--support-package`. It returns `None` to stop.
+function in the `--support-package`. It returns `None` to stop. When it returns
+a next request, the client yields to `asyncio` before sending that request.
 
 A resource method `<method>` that binds the operation gets these methods
 instead. The short name is the iterator that callers should use first:
@@ -2940,16 +2938,16 @@ def next_read_request(request, response):
 With `items="<field>"`, nexgen also generates `iter_<name>_items` on the client
 extension, and `<method>` on a resource method. The item iterator takes the
 parameters of the page iterator, reads its pages, and yields the items of the
-list field `<field>` of each response. It returns a `PollIterator`, whose
-`next_request` is the request to resume with:
+list field `<field>` of each response. Each item iterator returns a
+`PollIterator` whose `next_request` is the request to resume with:
 
 - After an item, the `python-resume` helper gives it. The helper takes the
   page's request and the item, and returns the request that resumes after the
   item.
 - Without `python-resume`, it reads the item's page again, so a resumed read can
   yield an item twice.
-- After a page's last item, it is the page helper's request. It is `None` after
-  the last page.
+- After a page's last item, it is the page helper's request. It is `None` when
+  the page helper returns `None`.
 
 ```wit
 /// @nexus.poll python="next_read_request" items="records"
@@ -2966,8 +2964,8 @@ To resume, pass the fields of a saved `next_request` to the item iterator. A
 resource method's iterator takes only the method's parameters, such as
 `from_offset` of the Stream's `read`.
 
-The stream sample's full helpers are in
-[`temporal_support/poll.py`](advanced/samples/python/temporal_support/poll.py).
+The Python SDK’s Stream continuation and resume helpers are in
+[its support module](advanced/sdk/python/temporalio/nexus/system/_support.py).
 
 - On the client extension, `iter_<name>` yields pages, and `iter_<name>_items`
   yields the items in them. On a resource method, `<method>` yields the items,

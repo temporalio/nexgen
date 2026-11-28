@@ -15,14 +15,13 @@ snapshot-only Workflow API form of the JSON-Schema inputs.
 - `tests/` — endpoint runtime checks (`UserService`), the generated-api compile
   check, and proto-wire compatibility checks against the fixtures in
   [`../wire/proto/`](../wire/proto/).
-  `Nexgen.DotNetStreamServiceSystemNexus.csproj` compiles the stream interceptor
-  on the SDK stand-in in `tests/SystemNexusStandIn/`.
 
 Regenerate WIT output with `cargo build-examples --format wit --lang dotnet`
 from the repo root.
 
-Workflow service is validated against the actual SDK with
-`cargo validate sdk-dotnet`, not a sample endpoint or SDK stand-in. See
+Run `cargo validate sdk-dotnet` for the Workflow service tests in the SDK. The
+Stream bindings have a
+[review snapshot](../../sdk/generated/dotnet/stream-service/workflow/). See
 [SDK integration](../../sdk/README.md).
 
 ```bash
@@ -57,10 +56,7 @@ cargo run --features advanced -- dotnet advanced/samples/inputs/proto-backed-sho
 ```
 
 If your project disables default compile items or excludes the support
-directory, explicitly include those authored sources. For example,
-[`Nexgen.DotNetStreamService.csproj`](Nexgen.DotNetStreamService.csproj)
-explicitly includes `TemporalSupport/TemporalSupport.cs` and the stream support
-sources. Run `dotnet build Nexgen.DotNetExamples.csproj` and
-`dotnet test tests/` from this directory to check this sample; build and test
-your own project similarly. See [the WIT guide](../../../GUIDE.md#net) for the
-required helper contract.
+directory, add the authored sources as `Compile` items. Run
+`dotnet build Nexgen.DotNetExamples.csproj` and `dotnet test tests/` from this
+directory to check the sample. See [the WIT guide](../../../GUIDE.md#net) for
+the required helper contract.

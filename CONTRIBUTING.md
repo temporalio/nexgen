@@ -87,13 +87,13 @@ kept under `target/sdk-validation/` for debugging. Dependency checkouts and Go's
 module cache are never modified.
 
 [`advanced/sdk/`](advanced/sdk/README.md) owns the SDK-native workflow-service
-WIT and companion support changes. They are staged verbatim, including local
-uncommitted edits; there are no sample-specific annotation rewrites or separate
-workflow-service sample outputs, test endpoints, or fake SDK compilation checks.
-The other advanced samples retain generic compiler and conversion coverage.
-Review-only workflow-service snapshots under `advanced/sdk/generated/` are
-refreshed by `cargo build-examples`; they are not standalone compilation or
-runtime tests.
+and stream-service WIT and companion support changes. They are staged verbatim,
+including local uncommitted edits; there are no sample-specific annotation
+rewrites or separate workflow-service sample outputs, test endpoints, or fake
+SDK compilation checks. The other advanced samples retain generic compiler and
+conversion coverage. Review-only snapshots under `advanced/sdk/generated/` are
+configured in `advanced/sdk/examples.toml` and refreshed by
+`cargo build-examples`; they are not standalone compilation or runtime tests.
 
 Each stage runs the SDK's native test command, including Python's concurrent
 destination storage routing and .NET replay. See the fixture README for

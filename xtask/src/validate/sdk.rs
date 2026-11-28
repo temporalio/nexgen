@@ -1,4 +1,4 @@
-//! Execute SDK-native workflow-service tests against the pinned SDK submodules.
+//! SDK tests catch runtime failures that generated snapshots cannot check.
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -373,6 +373,10 @@ fn stage_wit(root: &Path, destination: &Path, workflow_path: &str) -> Result<()>
         &shared.join("notification-service.wit"),
         &destination.join("notification-service.wit"),
     )?;
+    copy_file(
+        &root.join("advanced/sdk/stream-service.wit"),
+        &destination.join("stream-service.wit"),
+    )?;
     for entry in io_at(&shared, fs::read_dir(shared.join("deps")))? {
         let entry = io_at(&shared, entry)?;
         let target = destination.join("deps").join(entry.file_name());
@@ -482,6 +486,10 @@ mod tests {
         assert_eq!(
             read(&temp.path().join("workflow-service.wit")).unwrap(),
             read(&root.join("advanced/sdk/workflow-service.wit")).unwrap(),
+        );
+        assert_eq!(
+            read(&temp.path().join("stream-service.wit")).unwrap(),
+            read(&root.join("advanced/sdk/stream-service.wit")).unwrap(),
         );
         let go = temp.path().join("go-wit");
         stage_wit(&root, &go, "workflowservice/v1/workflow-service.wit").unwrap();

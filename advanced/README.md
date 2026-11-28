@@ -51,34 +51,34 @@ input name. Child tables generate separate outputs, inheriting the parent
 settings and replacing the fields they specify:
 
 ```toml
-[stream-service]
+[example]
 languages = ["python"]
 system_nexus = true
-descriptors = ["temporal_api.bin", "streams.bin"]
+descriptors = "temporal"
 
-[stream-service.models]
+[example.models]
 targets = []
 
-[stream-service.workflow]
+[example.workflow]
 targets = ["workflow"]
 
-[stream-service.client]
+[example.client]
 targets = ["client"]
 
-[stream-service.both]
+[example.both]
 targets = ["workflow", "client"]
 ```
 
-These outputs are placed in `stream-service/models`, `stream-service/workflow`,
-`stream-service/client`, and `stream-service/both`, with language-specific
-casing. Each child can override any of the parent's settings. Lists replace the
-inherited list; `targets = []` selects no APIs and `descriptors = []` selects no
-descriptors. `system_nexus` accepts a boolean for all languages or a list such
-as `["go"]` to enable System Nexus only for the listed languages. If `languages`
-is set, every language in the `system_nexus` list must also appear in
-`languages`. This check and language filtering use the resolved child settings.
-Child tables cannot contain further child tables. The sample builder clears the
-example's output directory once before generating its children.
+These illustrative outputs are placed in `example/models`, `example/workflow`,
+`example/client`, and `example/both`, with language-specific casing. Each child
+can override any of the parent's settings. Lists replace the inherited list;
+`targets = []` selects no APIs and `descriptors = []` selects no descriptors.
+`system_nexus` accepts a boolean for all languages or a list such as `["go"]` to
+enable System Nexus only for the listed languages. If `languages` is set, every
+language in the `system_nexus` list must also appear in `languages`. This check
+and language filtering use the resolved child settings. Child tables cannot
+contain further child tables. The sample builder clears the example's output
+directory once before generating its children.
 
 The linked `nexus:temporal-types` WIT package describes semantic types, while
 authored language-specific Temporal converters live in each sample project:
@@ -101,6 +101,10 @@ replaced without deleting these authored helpers.
   [SDK integration tests](sdk/README.md) rather than standalone sample APIs.
   Review-only generated snapshots live under `sdk/generated/` and are refreshed
   by `cargo build-examples --format wit workflow-service`.
+- [`stream-service`](sdk/stream-service.wit): the SDK-native Stream service,
+  regenerated and exercised in the Python SDK. Review-only Python, .NET, and
+  TypeScript snapshots are configured in `sdk/examples.toml` and refreshed by
+  `cargo build-examples --format wit stream-service`.
 - [`proto-backed-showcase`](samples/inputs/proto-backed-showcase.wit): a
   proto-backed type roundtrip example for focused native/proto conversion
   coverage, including retry policies, activity options, durations, task queues,
