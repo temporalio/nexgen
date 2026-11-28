@@ -1,11 +1,14 @@
-"""The poll helper of the stream-service sample."""
+"""Poll helpers for the Python samples."""
 
 import dataclasses
 import typing
 
 
-# The generated models import this package, so a typed import of them here would be a cycle. The
-# helper only reads a few fields and copies the request, so Any is enough.
+# The generated models import this package, so these helpers avoid importing them at runtime.
+def next_page_request(_request: typing.Any, response: typing.Any) -> typing.Any:
+    return response.next
+
+
 def next_read_request(request: typing.Any, response: typing.Any) -> typing.Any:
     if response.done:
         return None

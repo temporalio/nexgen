@@ -26,6 +26,8 @@ from temporalio.api.common.v1 import Payload
 from temporalio.api.stream.v1 import message_pb2
 from typing_extensions import assert_type, override
 
+from wit.page_poll.client import CatalogClientExtension
+from wit.page_poll.models import Page, PageRequest
 import wit.stream_service.both.models as both_models
 import wit.stream_service.both.workflow as workflow_package
 import wit.stream_service.both.workflow._resources.stream as workflow_stream_module
@@ -700,6 +702,46 @@ async def test_a_pending_cancellation_stops_the_next_poll_of_an_empty_page() -> 
     with pytest.raises(asyncio.CancelledError):
         await task
     assert len(answers.started) == 1
+
+
+async def test_changing_an_empty_page_still_allows_cancellation() -> None:
+    client, answers = connect(
+        Client,
+        {
+            "ReadRecords": [
+                ReadRecordsResponse[str](records=[], done=False),
+                ReadRecordsResponse[str](records=[], done=True),
+            ]
+        },
+    )
+    stream = client.get_stream(ref=StreamRef(id="s"), body_type=str)
+    pages = stream.read_pages(wait=datetime.timedelta(seconds=1))
+    page = await anext(pages)
+    page.records.append(_record(1))
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0):
+            _ = await anext(pages)
+    assert len(answers.started) == 1
+
+
+async def test_a_page_only_poll_can_be_cancelled_before_the_next_request() -> None:
+    class CatalogClient(ClientBase, CatalogClientExtension):
+        pass
+
+    client, answers = connect(
+        CatalogClient, {"ListPages": [Page(next=PageRequest(cursor=1)), Page()]}
+    )
+
+    async def consume() -> None:
+        async for _page in client.iter_list_pages(cursor=0):
+            pass
+
+    task = asyncio.create_task(consume())
+    _ = asyncio.get_running_loop().call_soon(task.cancel)
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert [started.arg for started in answers.started] == [PageRequest(cursor=0)]
 
 
 async def test_a_waiting_read_goes_on_after_an_empty_page_at_the_same_offset() -> None:
