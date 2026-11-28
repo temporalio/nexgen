@@ -1,4 +1,4 @@
-//! Execute SDK-native System Nexus tests against the pinned SDK submodules.
+//! SDK tests catch runtime failures that generated snapshots cannot check.
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;

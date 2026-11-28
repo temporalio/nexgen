@@ -10471,15 +10471,8 @@ fn render_client_poll_loop(
     start_line(output, target, "        yield response\n");
     start_line(output, target, "        if next_request is None:\n");
     start_line(output, target, "            return\n");
-    if let Some((items_attr, _)) = &operation.poll_items {
-        // A local client can return without suspending, which prevents cancellation.
-        start_line(
-            output,
-            target,
-            &format!("        if not response.{items_attr}:\n"),
-        );
-        start_line(output, target, "            await _asyncio.sleep(0)\n");
-    }
+    // A local client can return without suspending, which prevents cancellation.
+    start_line(output, target, "        await _asyncio.sleep(0)\n");
     start_line(output, target, "        request = next_request\n");
 }
 
